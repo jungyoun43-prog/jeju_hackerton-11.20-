@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { createDemoCase } from '../app/domain.js';
 import { AgentError, fail } from './errors.mjs';
-import { isProgressKey, normalizeProgressSnapshot, PROGRESS_TTL_SECONDS } from './progress.mjs';
+import { isProgressKey, isProgressWriterId, normalizeProgressSnapshot, PROGRESS_TTL_SECONDS } from './progress.mjs';
 
 /**
  * 저장 허용 대상: 합성 사례의 정규화된 준비 상태, requestId, 횟수, TTL.
@@ -45,14 +45,14 @@ export function createMemorySessionStore({ now = () => Date.now(), ttlSeconds = 
       if (used >= limit) throw new AgentError('DAILY_LIMIT', '오늘의 대화 시연 한도에 도달했습니다.', 429);
       budgets.set(day, used + 1);
     },
-    async writeProgress(key,value,{expiresAt,initial=false,signal} = {}) {
+    async writeProgress(key,value,{expiresAt,writerId,signal} = {}) {
       if(signal?.aborted)return false;
       const time=Math.floor(now()/1000),snapshot=normalizeProgressSnapshot(value);
-      if(!isProgressKey(key) || !Number.isSafeInteger(expiresAt) || expiresAt <= time || expiresAt > time + PROGRESS_TTL_SECONDS || typeof initial !== 'boolean')throw new TypeError('진행 저장 형식을 확인해 주세요.');
+      if(!isProgressKey(key) || !isProgressWriterId(writerId) || !Number.isSafeInteger(expiresAt) || expiresAt <= time || expiresAt > time + PROGRESS_TTL_SECONDS)throw new TypeError('진행 저장 형식을 확인해 주세요.');
       for(const [id,item] of progress)if(item.expiresAt <= time)progress.delete(id);
       const current=progress.get(key);
-      if(initial ? current || progress.size >= maxProgress : !current || current.expiresAt !== expiresAt || current.sequence >= snapshot.sequence)return false;
-      progress.set(key,clone({pk:key,expiresAt,sequence:snapshot.sequence,progress:snapshot}));
+      if(current ? current.writerId !== writerId || current.expiresAt !== expiresAt || current.sequence >= snapshot.sequence : progress.size >= maxProgress)return false;
+      progress.set(key,clone({pk:key,writerId,expiresAt,sequence:snapshot.sequence,progress:snapshot}));
       return true;
     },
     async readProgress(key,{signal} = {}) {

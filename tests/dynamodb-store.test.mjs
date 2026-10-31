@@ -81,7 +81,8 @@ test('진행 DTO는 별도 해시 키·120초 TTL로 저장되고 다른 인스�
   const f=fixture(),a=f.store(),progressToken='p'.repeat(43),reporter=createProgressReporter({store:a,token:progressToken,now:f.now});
   reporter.started('request_records',{source:'demo',query:'PRIVATE_QUERY'});reporter.finished('request_records');reporter.completed();await reporter.flush();
   const key=progressKey(progressToken),row=f.client.item(key);
-  assert.deepEqual(Object.keys(row).sort(),['pk','expiresAt','sequence','progress'].sort());assert.equal(row.expiresAt,initialTime/1000+120);
+  assert.deepEqual(Object.keys(row).sort(),['pk','writerId','expiresAt','sequence','progress'].sort());assert.equal(row.expiresAt,initialTime/1000+120);
+  assert.match(row.writerId,/^[a-f0-9]{32}$/);
   const b=f.store({client:new FakeDocumentClient(f.client.items)}),before=f.client.calls.length;
   const value=await b.readProgress(key);assert.equal(value.status,'completed');assert.equal(value.version,1);
   assert.equal(f.client.calls.length,before);assert.equal(f.client.calls.every(call=>call.input.Item?.pk.startsWith('progress#')),true);
@@ -96,14 +97,16 @@ test('진행 저장은 활성 토큰 재사용과 늦은 순번을 거절하고 
   const f=fixture(),store=f.store(),progressToken='q'.repeat(43),key=progressKey(progressToken),reporter=createProgressReporter({store,token:progressToken,now:f.now});
   reporter.started('get_case');await reporter.flush();
   const first=f.client.item(key),newer={...first.progress,sequence:2,status:'completed'};
-  assert.equal(await store.writeProgress(key,newer,{expiresAt:first.expiresAt}),true);
-  assert.equal(await store.writeProgress(key,first.progress,{expiresAt:first.expiresAt}),false);
-  assert.equal(await store.writeProgress(key,first.progress,{expiresAt:first.expiresAt,initial:true}),false);
+  assert.equal(await store.writeProgress(key,newer,{expiresAt:first.expiresAt,writerId:first.writerId}),true);
+  assert.equal(await store.writeProgress(key,first.progress,{expiresAt:first.expiresAt,writerId:first.writerId}),false);
+  const otherWriter=first.writerId==='0'.repeat(32)?'1'.repeat(32):'0'.repeat(32);
+  assert.equal(await store.writeProgress(key,{...newer,sequence:10},{expiresAt:first.expiresAt,writerId:otherWriter}),false);
   assert.equal((await store.readProgress(key)).sequence,2);assert.equal(f.client.item(key).expiresAt,first.expiresAt);
   f.advance(120);
-  await assert.rejects(store.writeProgress(key,newer,{expiresAt:first.expiresAt}),safeError('SESSION_STATE_INVALID',503));
+  await assert.rejects(store.writeProgress(key,newer,{expiresAt:first.expiresAt,writerId:first.writerId}),safeError('SESSION_STATE_INVALID',503));
   const next=createProgressReporter({store,token:progressToken,now:f.now});next.completed();await next.flush();
   assert.equal(f.client.item(key).expiresAt,first.expiresAt+120);assert.equal((await store.readProgress(key)).sequence,1);
+  assert.notEqual(f.client.item(key).writerId,first.writerId);
 });
 
 test('진행의 원문 추가·알 수 없는 도구·raw 키·늘린 TTL은 SDK 호출 전에 거절한다',async()=>{
@@ -113,8 +116,8 @@ test('진행의 원문 추가·알 수 없는 도구·raw 키·늘린 TTL은 SDK
     [progressToken,base.progress,{expiresAt:base.expiresAt}],
     [key,{...base.progress,patient:'PRIVATE'},{expiresAt:base.expiresAt}],
     [key,{...base.progress,events:[{sequence:1,stage:'plan',tool:'PRIVATE_TOOL',status:'completed'}]},{expiresAt:base.expiresAt}],
-    [key,base.progress,{expiresAt:base.expiresAt+1}],[key,base.progress,{expiresAt:base.expiresAt,initial:'yes'}],
-  ])await assert.rejects(store.writeProgress(badKey,progress,options),error=>error.status===503&&!error.message.includes('PRIVATE'));
+    [key,base.progress,{expiresAt:base.expiresAt+1}],[key,base.progress,{expiresAt:base.expiresAt,writerId:'PRIVATE'}],
+  ])await assert.rejects(store.writeProgress(badKey,progress,{writerId:base.writerId,...options}),error=>error.status===503&&!error.message.includes('PRIVATE'));
   assert.equal(f.client.calls.length,before);
   await assert.rejects(store.readProgress(progressToken),safeError('SESSION_STATE_INVALID',503));assert.equal(f.client.calls.length,before);
 });
@@ -122,7 +125,7 @@ test('진행의 원문 추가·알 수 없는 도구·raw 키·늘린 TTL은 SDK
 test('오염된 진행 행·SDK 오류는 unavailable이며 합성 세션과 budget·모델 결과를 바꾸지 않는다',async()=>{
   const f=fixture(),store=f.store(),progressToken='s'.repeat(43),key=progressKey(progressToken),reporter=createProgressReporter({store,token:progressToken,now:f.now});
   reporter.completed();await reporter.flush();const original=f.client.item(key);
-  for(const corrupt of [row=>{row.history='PRIVATE';},row=>{row.progress.events[0].result='PRIVATE';},row=>{row.progress.stages[0].lastTool='PRIVATE';},row=>{row.sequence=100;},row=>{row.expiresAt+=3600;}]) {
+  for(const corrupt of [row=>{row.history='PRIVATE';},row=>{row.progress.events[0].result='PRIVATE';},row=>{row.progress.stages[0].lastTool='PRIVATE';},row=>{row.sequence=100;},row=>{row.expiresAt+=3600;},row=>{row.writerId='PRIVATE';},row=>{delete row.writerId;}]) {
     const row=clone(original);corrupt(row);f.client.items.set(f.client.key(tableName,key),row);
     assert.deepEqual(await readProgress(store,progressToken),{available:false,progress:null});
   }
@@ -141,10 +144,31 @@ test('중단된 초기 진행 쓰기가 늦게 끝나도 새 실행의 진행을
   const f=fixture(),store=f.store(),progressToken='t'.repeat(43),key=progressKey(progressToken),reporter=createProgressReporter({store,token:progressToken,now:f.now});
   reporter.completed();await reporter.flush();const base=f.client.item(key);f.client.items.delete(f.client.key(tableName,key));
   let finishOld;f.client.beforeSend=({name})=>{if(name==='PutCommand'){f.client.beforeSend=undefined;return new Promise(resolve=>{finishOld=resolve;});}};
-  const controller=new AbortController(),old=store.writeProgress(key,{...base.progress,status:'running'},{expiresAt:base.expiresAt,initial:true,signal:controller.signal});
+  const oldWriter=base.writerId==='0'.repeat(32)?'1'.repeat(32):'0'.repeat(32);
+  const controller=new AbortController(),old=store.writeProgress(key,{...base.progress,status:'running'},{expiresAt:base.expiresAt,writerId:oldWriter,signal:controller.signal});
   await new Promise(resolve=>setImmediate(resolve));controller.abort();await assert.rejects(old,safeError('AGENT_TIMEOUT',504));
-  assert.equal(await store.writeProgress(key,base.progress,{expiresAt:base.expiresAt,initial:true}),true);
+  assert.equal(await store.writeProgress(key,base.progress,{expiresAt:base.expiresAt,writerId:base.writerId}),true);
   finishOld();await new Promise(resolve=>setImmediate(resolve));assert.equal((await store.readProgress(key)).status,'completed');
+});
+
+test('DynamoDB Put 성공 뒤 ack가 유실돼도 같은 writer가 다음 최신 상태와 완료를 저장한다',async()=>{
+  const f=fixture(),send=f.client.send.bind(f.client);let loseFirstAck=true;
+  f.client.send=async(command,options)=>{
+    const result=await send(command,options);
+    if(command.constructor.name==='PutCommand' && loseFirstAck){loseFirstAck=false;throw new Error('PRIVATE lost ack after commit');}
+    return result;
+  };
+  const store=f.store(),progressToken='u'.repeat(43),key=progressKey(progressToken),reporter=createProgressReporter({store,token:progressToken,now:f.now});
+  reporter.finished('apply_care_preferences');await reporter.flush();
+  const first=f.client.item(key);assert.equal(first.sequence,1);
+  reporter.finished('search_hospital_contacts');await reporter.flush();
+  reporter.finished('prepare_inquiries',{kind:'taxi'});await reporter.flush();
+  reporter.completed();await reporter.flush();
+  const last=f.client.item(key),value=await store.readProgress(key);
+  assert.equal(last.sequence,4);assert.equal(last.writerId,first.writerId);assert.equal(last.expiresAt,first.expiresAt);
+  assert.deepEqual(value.stages.map(item=>item.status),['observed','observed','observed','observed']);assert.equal(value.status,'completed');
+  assert.equal(JSON.stringify(value).includes(last.writerId),false);assert.equal(JSON.stringify(value).includes('PRIVATE'),false);
+  assert.equal(f.client.calls.filter(call=>call.name==='GetCommand').length,1,'복구는 별도 원문/세션 조회 없이 조건부 Put만 사용한다.');
 });
 
 test('factory는 AWS 호출 없이 client·table·TTL을 검증한다', () => {

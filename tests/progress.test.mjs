@@ -126,7 +126,8 @@ test('메모리 진행은 해시 키·120초 TTL·별도 DTO이며 원문과 사
   reporter.finished('search_hospital_contacts',{},'completed');reporter.completed();await reporter.flush();
   const stored=store.inspectProgress();
   assert.equal(stored.length,1);assert.equal(stored[0].pk,progressKey(progressToken));assert.equal(stored[0].expiresAt,Math.floor(now/1000)+120);
-  assert.deepEqual(Object.keys(stored[0]).sort(),['pk','expiresAt','sequence','progress'].sort());
+  assert.deepEqual(Object.keys(stored[0]).sort(),['pk','writerId','expiresAt','sequence','progress'].sort());
+  assert.match(stored[0].writerId,/^[a-f0-9]{32}$/);
   const serialized=JSON.stringify(stored);
   for(const value of [progressToken,'PRIVATE_QUERY','010-0000-0000','private.invalid','patient','sessionId','query','reasoning','arguments','result'])assert.equal(serialized.includes(value),false);
   const received=await store.readProgress(progressKey(progressToken));received.stages[0].status='failed';
@@ -222,13 +223,91 @@ test('같은 활성 토큰을 재사용한 다른 요청은 기존 진행을 덮
   first.completed();await first.flush();assert.equal((await readProgress(store,progressToken)).progress.status,'completed');
 });
 
+test('초기 저장 뒤 ack timeout이 나도 다음 실제 전이에서 네 단계와 마지막 응답을 기록한다',async()=>{
+  const memory=createMemorySessionStore(),progressToken=token();
+  let first=true,attempts=0;
+  const store={...memory,async writeProgress(key,snapshot,options){
+    attempts++;
+    const written=await memory.writeProgress(key,snapshot,options);
+    if(first){first=false;return new Promise((_,reject)=>options.signal.addEventListener('abort',()=>reject(new Error('PRIVATE lost ack')),{once:true}));}
+    return written;
+  }};
+  const reporter=createProgressReporter({store,token:progressToken});
+  reporter.finished('apply_care_preferences');
+  await reporter.flush();
+  const initial=memory.inspectProgress()[0];
+  assert.equal(initial.sequence,1);
+  // 최초 응답 유실 뒤 이 실제 전이가 없으면 임의 재시도/가짜 진행은 생성하지 않는다.
+  assert.equal(attempts,1);
+  reporter.finished('search_hospital_contacts');await reporter.flush();
+  reporter.finished('prepare_inquiries',{kind:'taxi'});await reporter.flush();
+  reporter.completed();await reporter.flush();
+  const stored=memory.inspectProgress()[0],value=(await readProgress(store,progressToken)).progress;
+  assert.equal(stored.writerId,initial.writerId);assert.equal(stored.expiresAt,initial.expiresAt);
+  assert.equal(value.status,'completed');assert.equal(value.sequence,4);
+  assert.deepEqual(value.stages.map(item=>item.status),['observed','observed','observed','observed']);
+  assert.equal(JSON.stringify(value).includes('writerId'),false);assert.equal(JSON.stringify(value).includes('PRIVATE'),false);
+});
+
+test('초기 저장 전 일시 오류와 후속 ack 유실은 최신 실제 전이로 회복하고 조건부 소유 충돌은 중단한다',async()=>{
+  const memory=createMemorySessionStore(),progressToken=token();
+  let attempts=0;
+  const store={...memory,async writeProgress(...args){
+    attempts++;
+    if(attempts===1)throw new Error('PRIVATE transport before commit');
+    const written=await memory.writeProgress(...args);
+    if(attempts===2)throw new Error('PRIVATE lost acknowledgement');
+    return written;
+  }};
+  const reporter=createProgressReporter({store,token:progressToken});
+  reporter.planning(true);await reporter.flush();
+  assert.equal(memory.inspectProgress().length,0);
+  reporter.finished('search_hospital_contacts');await reporter.flush();
+  assert.equal(memory.inspectProgress()[0].sequence,2);
+  reporter.finished('prepare_inquiries',{kind:'companion'});await reporter.flush();
+  reporter.completed();await reporter.flush();
+  assert.equal((await readProgress(store,progressToken)).progress.status,'completed');
+  const original=memory.inspectProgress()[0],before=attempts;
+  const second=createProgressReporter({store,token:progressToken});
+  second.started('get_case');await second.flush();
+  second.finished('search_hospital_contacts');second.completed();await second.flush();
+  assert.equal(attempts,before+1);assert.deepEqual(memory.inspectProgress()[0],original);
+});
+
+test('같은 TTL의 다른 writer는 높은 순번으로도 기존 진행을 바꾸지 못한다',async()=>{
+  const store=createMemorySessionStore(),progressToken=token(),reporter=createProgressReporter({store,token:progressToken});
+  reporter.started('get_case');await reporter.flush();
+  const row=store.inspectProgress()[0],otherWriter=row.writerId==='0'.repeat(32)?'1'.repeat(32):'0'.repeat(32);
+  const newer={...row.progress,sequence:10,status:'completed'};
+  assert.equal(await store.writeProgress(row.pk,newer,{expiresAt:row.expiresAt,writerId:otherWriter}),false);
+  assert.deepEqual(store.inspectProgress()[0],row);
+  assert.equal(await store.writeProgress(row.pk,newer,{expiresAt:row.expiresAt,writerId:row.writerId}),true);
+  assert.equal(await store.writeProgress(row.pk,row.progress,{expiresAt:row.expiresAt,writerId:row.writerId}),false);
+  const value=await store.readProgress(row.pk);assert.equal(value.sequence,10);assert.equal(Object.hasOwn(value,'writerId'),false);
+});
+
+test('진행 쓰기 도중 완료돼도 flush는 단일 writer의 진행·최종 두 I/O를 기다린다',async()=>{
+  const memory=createMemorySessionStore(),progressToken=token();let active=0,maxActive=0,writes=0;
+  const store={...memory,async writeProgress(...args){
+    active++;maxActive=Math.max(maxActive,active);writes++;
+    try{await new Promise(resolve=>setTimeout(resolve,115));return await memory.writeProgress(...args);}
+    finally{active--;}
+  }};
+  const reporter=createProgressReporter({store,token:progressToken});
+  reporter.planning(true);reporter.completed();await reporter.flush();
+  assert.equal(writes,2);assert.equal(maxActive,1);assert.equal(active,0);
+  const value=(await readProgress(store,progressToken)).progress;
+  assert.equal(value.sequence,2);assert.equal(value.status,'completed');assert.equal(value.currentStage,'plan');
+});
+
 test('진행 저장이 멈춰도 모델·상태 저장·응답은 기존 deadline 안에서 완료하고 읽기도 짧게 끝낸다',async()=>{
-  let signal,modelCalls=0;
-  const memory=createMemorySessionStore(),store={...memory,async writeProgress(_key,_value,options){signal=options.signal;return new Promise(()=>{});},async readProgress(){return new Promise(()=>{});}};
+  let modelCalls=0;const signals=[];
+  const memory=createMemorySessionStore(),store={...memory,async writeProgress(_key,_value,options){signals.push(options.signal);return new Promise(()=>{});},async readProgress(){return new Promise(()=>{});}};
   const provider={connected:true,model:'fixture',async respond(){modelCalls++;return done('진행 연결과 무관한 합성 응답');}};
   const service=createAgentService({provider,store,config:{deadlineMs:30}}),startedAt=performance.now();
   const result=await post(service,request({progressToken:token()}));
   assert.equal(result.statusCode,200);assert.equal(modelCalls,1);assert.equal(memory.inspect()[0].turns,1);assert.ok(performance.now()-startedAt<500);
   assert.deepEqual(await poll(service,token()),{available:false,progress:null});
-  assert.equal(signal.aborted,true);
+  assert.equal(signals[0].aborted,true);
+  assert.ok(signals.length<=2,'진행 대기 1개와 예약된 최종 상태만 시도한다.');
 });

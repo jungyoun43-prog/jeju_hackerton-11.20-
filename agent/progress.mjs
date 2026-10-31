@@ -1,12 +1,14 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { getToolStage, PREPARATION_STAGE_IDS } from '../app/preparation-stages.js';
 
 export const PROGRESS_TTL_SECONDS = 120;
 export const PROGRESS_IO_TIMEOUT_MS = 150;
 const WRITE_BUDGET_MS = 1000;
-const FLUSH_TIMEOUT_MS = 200;
+// 이미 진행 중인 쓰기와 뒤에 합쳐진 최종 쓰기, 최대 두 번의 I/O를 기다린다.
+const FLUSH_TIMEOUT_MS = PROGRESS_IO_TIMEOUT_MS * 2 + 25;
 const TOKEN = /^[A-Za-z0-9_-]{43}$/;
 const KEY = /^progress#[a-f0-9]{64}$/;
+const WRITER = /^[a-f0-9]{32}$/;
 // 모델이 돌려준 임의의 문자열을 DTO에 복사하지 않는다. 새 도구는 명시적으로 검토한다.
 export const PROGRESS_TOOLS = Object.freeze([
   'get_case','update_visit','search_hospital_contacts','select_hospital_contact','request_records',
@@ -25,6 +27,7 @@ const integer = (value,min,max) => Number.isSafeInteger(value) && value >= min &
 
 export const isProgressToken = value => typeof value === 'string' && value.length === 43 && TOKEN.test(value);
 export const isProgressKey = value => typeof value === 'string' && value.length === 73 && KEY.test(value);
+export const isProgressWriterId = value => typeof value === 'string' && value.length === 32 && WRITER.test(value);
 export function progressKey(token) {
   requireValue(isProgressToken(token));
   return `progress#${createHash('sha256').update(token,'utf8').digest('hex')}`;
@@ -86,10 +89,11 @@ export async function readProgress(store,token) {
 /** 실제 전이만 기록한다. writer는 하나, 대기 snapshot은 하나이며 도구 실행을 기다리게 하지 않는다. */
 export function createProgressReporter({store,token,now = () => Date.now()} = {}) {
   if(!isProgressToken(token) || !supportsProgress(store))return {planning(){},planned(){},started(){},finished(){},completed(){},failed(){},async flush(){}};
-  const key = progressKey(token), time = now(), expiresAt = Math.floor(time/1000) + PROGRESS_TTL_SECONDS;
+  // 응답 유실 뒤에도 같은 실행만 다시 쓸 수 있다. 외부 DTO에는 소유 표식을 넣지 않는다.
+  const key = progressKey(token), writerId = randomBytes(16).toString('hex'), time = now(), expiresAt = Math.floor(time/1000) + PROGRESS_TTL_SECONDS;
   const state = {version:1,status:'running',sequence:0,updatedAt:new Date(time).toISOString(),currentStage:null,
     stages:PREPARATION_STAGE_IDS.map(id=>({id,status:'waiting',lastTool:null})),events:[]};
-  let queued,working,initial=true,disabled=false,spent=0,terminal=false;
+  let queued,working,disabled=false,spent=0,terminal=false;
 
   function write() {
     if(working || disabled || !queued)return;
@@ -101,10 +105,12 @@ export function createProgressReporter({store,token,now = () => Date.now()} = {}
         if(remaining <= 0)continue;
         const startedAt = performance.now();
         try {
-          const written = await progressIO(signal=>store.writeProgress(key,snapshot,{expiresAt,initial,signal}),Math.min(PROGRESS_IO_TIMEOUT_MS,remaining));
+          const written = await progressIO(signal=>store.writeProgress(key,snapshot,{expiresAt,writerId,signal}),Math.min(PROGRESS_IO_TIMEOUT_MS,remaining));
           if(written === false){disabled=true;queued=undefined;break;}
-          initial=false;
-        } catch {disabled=true;queued=undefined;}
+        } catch {
+          // 저장은 됐지만 ack가 유실될 수 있다. 다음 실제 전이의 최신 snapshot은
+          // 같은 writerId와 원래 TTL로 다시 시도하며 다른 실행의 조건부 거절은 중단한다.
+        }
         finally {spent += performance.now()-startedAt;}
       }
     })().finally(()=>{working=undefined;if(queued && !disabled)write();});
