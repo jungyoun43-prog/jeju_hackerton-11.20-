@@ -120,7 +120,9 @@ jobs:
         run: |
           node --input-type=module <<'JS'
           import assert from 'node:assert/strict';
-          import { appendFile } from 'node:fs/promises';
+          import { appendFile, readFile } from 'node:fs/promises';
+          const expectedTitle = (await readFile('dist/index.html', 'utf8')).match(/<title>[^<]+<\/title>/)?.[0];
+          assert.ok(expectedTitle, '검증한 산출물에 문서 제목이 없습니다.');
           const base = new URL(process.env.AWS_SITE_URL);
           let last;
           for (let attempt = 0; attempt < 12; attempt++) {
@@ -140,7 +142,7 @@ jobs:
               assert.equal(health.mode, 'simulation');
               assert.equal(health.phoneConnected, false);
               assert.equal(health.medicalRecordTransfer, false);
-              assert.match(await (await get('/')).text(), /제주 진료 나침반/);
+              assert.ok((await (await get('/')).text()).includes(expectedTitle), '공개 제목이 검증한 산출물과 다릅니다.');
               await appendFile(process.env.GITHUB_STEP_SUMMARY, `### 합성 시연 배포 확인\n[사이트 열기](${base.href})\n\n검증한 커밋: \`${process.env.GITHUB_SHA}\`\n실제 전화·의료기관 전송은 미연동입니다.\n`);
               last = undefined;
               break;

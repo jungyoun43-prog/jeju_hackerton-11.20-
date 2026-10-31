@@ -181,6 +181,8 @@ API에15개 도구가 있으며 기존 기본 preview와11개 도구를 보존�
 
 이 로컬 검증에서 실제 유료 모델·전화·개인기록을 호출하지 않았다. 새 공개 버전·실모델 증거는 `orchestration/runs/care-journey-deployed.json`, `care-journey-live-check.json`, `aws-deployment.json`에서 revision·범위를 따로 확인한다. Impeccable 지침/실제 렌더를 적용했으며 CLI126 제약을 자동 디자인 통과로 표시하지 않는다. 실제 환자/의료진·실전화·개인기록 연계·임상/법률·현장 효과·센터 실기기·최종15페이지PDF는 별도다.
 
+첫 게시 `90bb5d1`의 CI41218002417은 화면/API 업로드 뒤 옛 서비스명을 확인하던 배포 검증에서 실패했다. 배포 검사는 검증한 `dist/index.html`의 제목을 읽어 공개 HTML과 비교하도록 수정했다. 이 수정은 workflow/문서이며 실행 지문은 위와 같다. 최종 CI·공개 revision은 별도 배포 증거를 따른다.
+
 ## 4. 보존한 이전 검증 이력
 
 ### 4.1 병원 데이터·일러스트 제거 버전
