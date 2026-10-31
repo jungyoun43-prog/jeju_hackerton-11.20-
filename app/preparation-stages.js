@@ -102,11 +102,11 @@ export function getPreparationBoard(state,{events=[],progress=null,pending=false
   const mobility=baseStage(PREPARATION_STAGES[2],recheck?'needs_recheck':supportBlocked?'needs_input':selected?'available':support.totalNeeded?'waiting':'not_needed',
     !support.totalNeeded?'이번 조건에서 필요 없음':recheck?'변경 조건 재확인':supportBlocked?'인계·추가 확인 필요':selected?'문의 준비 결과':'문의 준비 전',
     !support.totalNeeded?'이번 조건에서는 별도의 이동·동행 지원을 요청하지 않았어요.':requirements.wheelchair?'휠체어 탑승·승하차 지원과 동행 조건을 함께 확인해요.':'출발 지역과 방문 시각에 맞는 이동·동행을 준비해요.',
-    ['taxi','companion'].map(kind=>({label:kind==='taxi'?'이동':'동행',value:support[kind].status==='not_needed'?'필요 없음':`${support[kind].providerName||'문의처 선택 전'} · ${support[kind].label}`})),
+    ['taxi','companion'].map(kind=>({label:kind==='taxi'?'이동':'동행',value:support[kind].status==='not_needed'?'필요 없음':support[kind].providerName?`${support[kind].providerName} · ${support[kind].label}`:support[kind].label})),
     [...journey.schedule.recheckReasons,...supportHandoffs.map(item=>`${item.owner} · ${item.detail}`),...support.unresolved],
     ['taxi','companion'].map(kind=>support[kind].status==='not_needed'?null:source(support[kind].source)));
   const plan=baseStage(PREPARATION_STAGES[3],responseCount?'available':'waiting',responseCount?'이번 요청의 답변':'말씀을 기다리고 있어요.',
-    responseCount?'확인된 준비와 남은 일을 함께 읽어 보세요.':'아래 입력창에 필요한 준비를 한 번에 말씀해 주세요.',
+    responseCount?'확인된 준비와 남은 일을 함께 읽어 보세요.':'입력창에 필요한 준비를 한 번에 말씀해 주세요.',
     [{label:'다음 확인',value:journey.nextActions[0]?.title||'요청하실 내용을 말씀해 주세요.'}],[]);
   const stages=[records,hospitals,mobility,plan];
   // 기호는 자료·문의 준비만 요약한다. 미확인은 문의 실패나 임상 부적합이 아니다.
@@ -121,7 +121,7 @@ export function getPreparationBoard(state,{events=[],progress=null,pending=false
     const id=PREPARATION_STAGE_IDS.includes(event.stage)?event.stage:event.tool==='analyze_public_data'&&/이동|동행/.test(event.label)?'support':getToolStage(event.tool);
     if(id)stages.find(stage=>stage.id===id).events.push(safeEvent(event));
   }
-  for(const stage of stages){stage.events=stage.events.slice(-5);const gaps=[...new Set(stage.gaps)];stage.gapCount=gaps.length;stage.gaps=gaps.slice(0,3);}
+  for(const stage of stages){stage.events=stage.events.slice(-5);const gaps=[...new Set(stage.gaps)];stage.gapCount=gaps.length;stage.gaps=gaps;}
   let activeStageId=responseCount?'plan':'records';
   const live=pending&&progress?.status==='running'&&PREPARATION_STAGE_IDS.includes(progress.currentStage);
   if(live)activeStageId=progress.currentStage;

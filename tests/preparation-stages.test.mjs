@@ -38,6 +38,8 @@ test('초기 네 작업창은 실제 합성 사례를 읽고 미확인·의료�
  assert.equal(board.activeStageId,'records');assert.equal(board.stages[0].status,'needs_input');
  assert.match(board.stages[0].gaps.join(' '),/진료 시각/);
  assert.match(board.stages[0].gaps.join(' '),/의료진/);
+ assert.equal(board.stages[0].gapCount,board.stages[0].gaps.length,'자세히 읽을 전체 누락 목록과 건수가 일치해야 한다');
+ assert.doesNotMatch(board.stages[2].facts.map(fact=>fact.value).join(' '),/문의처 선택 전 · 문의처 선택 전/);
  assert.equal(board.stages[1].status,'waiting');assert.match(board.stages[1].summary,/실제 진료 수락 미확인/);
  assert.equal(board.stages[3].status,'waiting');assert.equal(board.hasResponse,false);
  assert.ok(Object.values(board.boundary).every(value=>value===false));assert.deepEqual(state,before);
