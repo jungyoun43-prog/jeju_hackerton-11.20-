@@ -57,3 +57,7 @@
 ## 혼디 로고 교체 (2026-10-31)
 
 사용자가 지정한 에이전트 대화에서 생성·선택한 귤 심볼 + 소문자 `hondi` PNG를 재사용했습니다. 새 생성 호출은 하지 않았습니다. 원본은 `app/assets/hondi-logo-source-v1.png`, 웹용 투명 PNG와 심볼은 `hondi-logo-v1.png`·`hondi-mark-v1.png`입니다. 원본 해시·정확 프롬프트·부모 시안·생성 도구·여백/축소 범위는 `app/assets/manifest.json`에 기록합니다. 이전 로고는 이력으로 보존하며 상표 등록·중복 검토를 완료했다고 주장하지 않습니다.
+
+## 진료 연결 여정
+
+`app/care-journey.js`와 새 여정 도구·preview는 자체 구현이며 새 통신/예약/의무기록 업체 의존성을 추가하지 않습니다. 기존 공개 snapshot3종과 공식 보완2건의 범위·이용조건을 그대로 적용합니다. 동형 요약은 JSON import attributes를 사용하므로 Node22와 해당 문법을 지원하는 브라우저가 필요하며 실제 검증 브라우저는 Chromium입니다. 비교 서비스의 소스·코드·상표·이미지를 제품 자산으로 복사하지 않았고 공식 기능 설명만 [비교 조사](research/care_journey_positioning_2026-10-31.md)에 기록했습니다.

@@ -19,7 +19,8 @@
     "eval": "node orchestration/eval.mjs",
     "rollback": "node orchestration/rollback.mjs",
     "build:agent": "node scripts/build-agent.mjs",
-    "test:conversation": "node scripts/conversation-browser-check.mjs"
+    "test:conversation": "node scripts/conversation-browser-check.mjs",
+    "test:journey": "node scripts/journey-browser-check.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-bedrock-runtime": "3.1161.0",

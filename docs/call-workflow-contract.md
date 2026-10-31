@@ -64,3 +64,7 @@ export function buildCallPlan(state, target) {
 - ui-hardening / fix/caregiver-ui-hardening: conversation.js/css, DESIGN.md, design.json.
 - ui-call-qa / test/ui-call-hardening: conversation-browser-check.mjs의 기존 회귀와 초안·짧은 높이·중지/race·전화 계획 접근·휠체어 문의 검증.
 - root: 문서·공식 자료 조사·하네스·통합 검증·배포. 사용자 응답 없이 실제 전화 서비스 계정·발신번호를 생성하거나 기관에 발신하지 않는다.
+
+## 실패 이후
+
+실패 이유·시도·남은 일·담당자를 보존하는 전화 복구는 [진료 여정 계약의 전화 실패 절](care-journey-contract.md)을 따른다. 무응답의 허용 횟수/시간 gate, AI 거절·환자 본인확인의 자동중단, 서류/허용날짜 후속 준비와 보호자 인계를 같은 simulation dispatcher에서 처리한다. 실제 발신/예약된 재시도는 없다.

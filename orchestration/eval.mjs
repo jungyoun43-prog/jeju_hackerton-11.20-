@@ -114,6 +114,17 @@ await check('conversation-browser-evidence','verification',async()=>{
  for(const path of [proof.desktop.screenshot,proof.mobile.screenshot]) {const bytes=await readFile(resolve(root,path));requireThat(bytes.readUInt32BE(0)===0x89504e47,'유효한 PNG 대화 화면 증거가 아닙니다.');}
  return `${proof.checks.length}개 실제 API/화면 검사·고정 예시·일반503·입력복원·출처 확인. 실제 모델·음성·발신 품질 검증은 아님`;
 });
+await check('journey-browser-evidence','verification',async()=>{
+ const proof=JSON.parse(await readFile(resolve(root,'orchestration/runs/journey-browser.json'),'utf8'));
+ requireThat(proof.result==='pass' && proof.errors.length===0 && proof.checks.length>0 && proof.checks.every(c=>c.status==='pass'),'진료 연결 여정 브라우저 검사가 필요합니다.');
+ requireThat(proof.apiLive===true && ['missing_record','jeju_unavailable','time_changed'].every(id=>proof.scenarioIds.includes(id)),'실제 keyless preview 세 상황을 확인해야 합니다.');
+ requireThat(proof.modelInvoked===false && proof.phoneInvoked===false && proof.healthRecordsQueried===false,'합성 여정 검사를 실제 연동 검증으로 표시하면 안 됩니다.');
+ requireThat(['call_no_answer','call_ai_declined','call_identity_required','call_documents_or_schedule'].every(id=>proof.recoveryScenarioIds?.includes(id)) && (proof.normalAgentPostAttempts ?? proof.scope?.normalAgentPostAttempts)===0,'전화 실패4종의 인계와 모델 비발송 검사가 필요합니다.');
+ requireThat(proof.desktop.noOverflow && proof.mobile.noOverflow,'진료 연결 여정 화면에 가로 넘침이 있습니다.');
+ requireThat(proof.sourceHash===await runtimeFingerprint(root),'여정 증거 이후 실행 소스가 변경됐습니다. 다시 캡처하세요.');
+ for(const path of [proof.desktop.screenshot,proof.mobile.screenshot]) {const bytes=await readFile(resolve(root,path));requireThat(bytes.readUInt32BE(0)===0x89504e47,'유효한 여정 PNG 증거가 아닙니다.');}
+ return `${proof.checks.length}개 실제 preview/여정 검사. 실제 의료진·전화·환자기록·효과 검증은 별도`;
+});
 await check('rollback-boundary','rollback',()=>{
  for(const task of rules.tasks) {
   const integrated=state.tasks[task.id].integrationCommits;

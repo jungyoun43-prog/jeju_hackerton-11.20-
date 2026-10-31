@@ -347,7 +347,7 @@
     {
       "id": "journey-backend",
       "branch": "feature/care-journey",
-      "baseCommit": "b40b34b",
+      "baseCommit": "f0dc9f4",
       "allow": [
         "app/care-journey.js",
         "app/domain.js",
@@ -366,13 +366,15 @@
         "tests/call-policy.test.mjs",
         "tests/agent.test.mjs",
         "tests/server.test.mjs",
-        "tests/dynamodb-store.test.mjs"
+        "tests/dynamodb-store.test.mjs",
+        "app/call-recovery.js",
+        "tests/call-recovery.test.mjs"
       ]
     },
     {
       "id": "journey-ui",
       "branch": "feature/care-journey-ui",
-      "baseCommit": "b40b34b",
+      "baseCommit": "f0dc9f4",
       "allow": [
         "app/conversation.js",
         "app/conversation.css",
@@ -383,7 +385,7 @@
     {
       "id": "journey-qa",
       "branch": "test/care-journey-browser",
-      "baseCommit": "b40b34b",
+      "baseCommit": "f0dc9f4",
       "allow": [
         "scripts/journey-browser-check.mjs"
       ]

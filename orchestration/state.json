@@ -1,6 +1,6 @@
 {
   "baseCommit": "e1e7e44",
-  "updatedAt": "2026-10-31T15:31:19.163129+00:00",
+  "updatedAt": "2026-10-31T15:34:39.259327+00:00",
   "tasks": {
     "ui": {
       "phase": "verified",
@@ -244,19 +244,19 @@
       "note": "통합·단위233·대화171·수동47·규칙40 통과. 실행 지문 cfbcb480893bdab26debe0281d2c9453ce5131b1632185b7d74913b1f96e3cc4. 실제 전화/개인기록·임상·법률은 미검증."
     },
     "journey-backend": {
-      "phase": "assigned",
+      "phase": "in_progress",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-journey-backend",
-      "note": "진료 연결 계약 기준 구현 예정. 기준선 확정 후 전용 worktree 배정."
+      "note": "계약 f0dc9f4 기준 전용 worktree에서 병렬 구현 중. root 통합/최종검증 전."
     },
     "journey-ui": {
-      "phase": "assigned",
+      "phase": "in_progress",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-journey-ui",
-      "note": "진료 연결 계약 기준 구현 예정. 기준선 확정 후 전용 worktree 배정."
+      "note": "계약 f0dc9f4 기준 전용 worktree에서 병렬 구현 중. root 통합/최종검증 전."
     },
     "journey-qa": {
-      "phase": "assigned",
+      "phase": "in_progress",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-journey-qa",
-      "note": "진료 연결 계약 기준 구현 예정. 기준선 확정 후 전용 worktree 배정."
+      "note": "계약 f0dc9f4 기준 전용 worktree에서 병렬 구현 중. root 통합/최종검증 전."
     }
   },
   "review": {
