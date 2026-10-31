@@ -35,7 +35,7 @@ export function getPreparationDataEvidence(context,purpose);
 
 `PUBLIC_DATA_TOOLS` 2개 JSON Schema spec과 `executePublicDataTool({name,input,state})`를 export한다. 도구는 `search_public_data`/`analyze_public_data`이며 각각 위 입력을 사용하고 `readOnly:true`로 표시한다. 결과는 기존 `{state,data,events,pendingActions}` 형태, state를 절대 변경하지 않는다. 원문 query는 새 세션 필드/로그에 저장하지 않는다. 새출처 event는 catalog allowlist로만 생성한다. root가 기존15도구와 합치고 `prepare_inquiries`/병원조회에 getPreparationDataEvidence를 연결한다.
 
-비교질문의 지역를 환자의 실제 출발지로 덮어쓰지 않는다. 결과를 예약/의학적 적합성으로 해석하지 않는다. 준비 요청이 있을 때만 검증한 후보/질문을 기존 도구에 이어준다. 일반 준비는 providerId를 생략해 기존 선호택시·지역·휠체어 규칙을 적용하고 사용자가 이번 요청에서 해당 문의처를 명시 선택했을 때만 후보id를 넘긴다. 제안은 사용자의 선택·동의가 아니다. 근거와 불확실성을 설명한다. 키 없는 기본 API503·기존 preview15이벤트+여정/복구7상황은 보존한다.
+비교질문의 지역을 환자의 실제 출발지로 덮어쓰지 않는다. 결과를 예약/의학적 적합성으로 해석하지 않는다. 준비 요청이 있을 때만 검증한 후보/질문을 기존 도구에 이어준다. 일반 준비는 providerId를 생략해 기존 선호택시·지역·휠체어 규칙을 적용하고 사용자가 이번 요청에서 해당 문의처를 명시 선택했을 때만 후보id를 넘긴다. 제안은 사용자의 선택·동의가 아니다. 근거와 불확실성을 설명한다. 키 없는 기본 API503·기존 preview15이벤트+여정/복구7상황은 보존한다.
 
 ## UI와 검증
 

@@ -246,7 +246,7 @@
     "journey-backend": {
       "phase": "verified",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-journey-backend",
-      "note": "자연형 시연 요청 인식 보완 e39fe94 통합. 독립 backend 264검사 통과; 공공데이터 포함 root 통합·공개 모델 재검증 중.",
+      "note": "자연형 실행 요청·부정종결 차단 보완 통합. 최종 지문02ea9ba1581fcacfd3cd279b691acbad5c7ae8f380367e1c95f883867586225f. 단위308/308·대화171/171·수동47/47·여정/인계208/208(실preview14,모델POST0)·테이블3viewport·규칙47/47 통과. public 모델/센터PC·실전화/기록/임상/법률은 별도.",
       "integrationCommits": [
         "04b864d",
         "39d63ac",
@@ -275,26 +275,26 @@
       ]
     },
     "public-data-store": {
-      "phase": "integrated",
+      "phase": "verified",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-public-data-store",
-      "note": "전용 worktree 커밋 통합 완료. 읽기 전용 공공데이터·표본/분모·개인기록 미사용 경계를 root에서 새로 검증 중.",
+      "note": "최종 지문02ea9ba1581fcacfd3cd279b691acbad5c7ae8f380367e1c95f883867586225f. 단위308/308·대화171/171·수동47/47·여정/인계208/208(실preview14,모델POST0)·테이블3viewport·규칙47/47 통과. public 모델/센터PC·실전화/기록/임상/법률은 별도.",
       "integrationCommits": [
         "6fd3df7",
         "031e514"
       ]
     },
     "public-data-adapter": {
-      "phase": "integrated",
+      "phase": "verified",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-public-data-adapter",
-      "note": "전용 worktree 커밋 통합 완료. 읽기 전용 공공데이터·표본/분모·개인기록 미사용 경계를 root에서 새로 검증 중.",
+      "note": "최종 지문02ea9ba1581fcacfd3cd279b691acbad5c7ae8f380367e1c95f883867586225f. 단위308/308·대화171/171·수동47/47·여정/인계208/208(실preview14,모델POST0)·테이블3viewport·규칙47/47 통과. public 모델/센터PC·실전화/기록/임상/법률은 별도.",
       "integrationCommits": [
         "e43010b"
       ]
     },
     "public-data-tables": {
-      "phase": "integrated",
+      "phase": "verified",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-public-data-tables",
-      "note": "전용 worktree 커밋 통합 완료. 읽기 전용 공공데이터·표본/분모·개인기록 미사용 경계를 root에서 새로 검증 중.",
+      "note": "최종 지문02ea9ba1581fcacfd3cd279b691acbad5c7ae8f380367e1c95f883867586225f. 단위308/308·대화171/171·수동47/47·여정/인계208/208(실preview14,모델POST0)·테이블3viewport·규칙47/47 통과. public 모델/센터PC·실전화/기록/임상/법률은 별도.",
       "integrationCommits": [
         "0eac1f7"
       ]
