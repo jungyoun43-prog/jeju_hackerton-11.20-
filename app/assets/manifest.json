@@ -34,6 +34,18 @@
       "referenceImages": [],
       "prompt": "Use case: logo-brand. Asset type: original square brand symbol image for a Korean family medical-coordination service named '제주 진료 나침반', used at 40–56 px beside a separate live Korean wordmark. Create ONE exceptionally refined, ownable, flat graphic logo mark on a genuinely transparent background. Idea: two softly irregular dark basalt stone forms from Jeju, one forming a confident open protective arc, the other a small upward guiding wedge; the clean negative space between them describes a clear continuing path and quiet sense of connection across distance. One small restrained burnt-tangerine orange junction is integral to the shape. The mark feels designed by a sophisticated Korean identity studio: compact, asymmetrical but optically balanced, warm human character through precise organic curves, memorable solid silhouette, crisp vector-like edges, very simple geometry, thick enough to read at 32 px. Palette only deep basalt ink #243631 and burnt orange #C6653E. Center the mark with generous transparent padding, symbol fills roughly 75% of square. No text, no letters, no words, no medical cross, no heart, no hands, no leaf, no location pin, no circle badge, no generic compass rose, no gradient, no glow, no 3D, no shadows, no texture, no mockup, no watermark. Produce a final professional logo symbol, not a sheet of concepts.",
       "notes": "투명 PNG 원본을 그대로 복사했다. 현무암 형태 사이의 길과 귤색 연결점을 표현한 독창적 생성 시안이며, 상표 등록·유사상표 조사를 수행한 것은 아니다."
+    },
+    {
+      "file": "care-journey-v3.webp",
+      "type": "generated_photographic_image",
+      "createdAt": "2026-10-31",
+      "tool": "ChatGPT built-in Imagegen / GPT Image family",
+      "modelId": "not exposed by tool",
+      "usage": "의료 서비스 참고를 반영한 보호자 진료 준비 환영 영역",
+      "referenceImages": [],
+      "prompt": "Use case: photorealistic-natural. Asset type: original editorial lifestyle photograph for a Korean family-care healthcare web workspace. Primary request: convey a daughter who lives far away helping her older mother in Jeju prepare for an outpatient visit, through an intimate credible everyday moment. Scene: a bright, modest modern Jeju home in soft morning daylight. A Korean mother in her late sixties, healthy ordinary appearance and natural gray-streaked short hair, wearing a muted sage cardigan over an ivory shirt, sits beside a window and quietly checks a smartphone held in her hands; a simple closed document folder and canvas day bag rest on the nearby table ready for her outing. Her expression is calm and reassured, not a posed advertising grin; she is looking at the phone, never at the camera. A small out-of-focus basalt garden wall and one citrus plant outside suggest Jeju subtly. Style: high-end candid editorial photography, natural skin and linen textures, believable hands, gentle depth of field, fresh and understated. Palette: warm ivory, deep forest green, soft sage, a tiny restrained tangerine accent. Composition: landscape 3:2, medium shot with the person on the right half and soft uncluttered light wall/window space to the left; frame safely so it works as a wide cropped welcome image as well as a compact crop. Constraints: this is a photo asset only, not a web page mockup. No readable phone screen, no medical records or personal data, no logos, no captions, no text, no watermark. No doctor, nurse, white coat, stethoscope, clinical equipment, giant landscape, sea panorama, distressed or helpless patient. The subject is fictional and must not resemble a known person.",
+      "originalFile": "care-journey-v3.png",
+      "notes": "휴대전화로 가족과 연결되는 제주 어머니의 가상 일상 사진. 실제 환자·의료기관·파트너의 증거가 아니다. 원본 PNG를 보존하고 같은 크기의 WebP로 형식만 변환했다."
     }
   ]
 }

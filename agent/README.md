@@ -5,7 +5,7 @@
 ## 경로와 실행
 
 - `GET /api/agent/capabilities`: capability 객체. llm:true는 어댑터 설정이며 요청 성공을 보장하지 않습니다. AWS의 첫 조회는 Secret을 준비하지만 모델 추론·세션/예산 DB는 호출하지 않습니다. 준비 실패 시 llm:false를 반환합니다.
-- `POST /api/agent`: `{message,requestId,sessionId?,history?}`. OpenAI Responses API와 검증된 도구를 실행합니다. 로컬 키가 없으면 MODEL_NOT_CONNECTED/503, AWS 키/저장소 준비 실패는 CLOUD_RUNTIME_UNAVAILABLE/503입니다.
+- `POST /api/agent`: `{message,requestId,sessionId?,history?,preferences?,applyPreferences?}`. OpenAI Responses API와 검증된 도구를 실행합니다. 로컬 키가 없으면 MODEL_NOT_CONNECTED/503, AWS 키/저장소 준비 실패는 CLOUD_RUNTIME_UNAVAILABLE/503입니다.
 - `POST /api/agent/preview`: `{scenarioId:'aewol-parent-visit',requestId}`. 별도 고정 예시이며 모델·Secret·세션 DB를 호출하지 않습니다.
 
 로컬은 `.env.example`을 복사한 뒤 키를 채우고 `npm run dev`를 실행합니다. 기존 .env를 덮어쓰지 않습니다. `npm start`·`npm run preview`도 .env를 읽습니다. `OPENAI_MODEL=gpt-6.1-terra`는 Terra만 선택합니다. 키 없는 검사는 `OPENAI_API_KEY= PORT=4180 node scripts/server.mjs`로 실행합니다.
@@ -25,6 +25,14 @@
 AWS는 UTC 하루80개 대화 요청을 모델 호출 전에 조건부 원자 갱신으로 차감합니다. 한 요청 내부 Responses 호출은 최대8회이며 API 호출80회나 금액 한도를 뜻하지 않습니다. 실패한 요청도 차감하고 DB 오류 시 모델을 실행하지 않습니다. AWS store 상한은1~80이고 로컬 메모리 한도는 인스턴스별입니다.
 
 중복 방지는 sessionId가 있는 세션 안에서만 적용합니다. 최초 응답 유실로 sessionId 없는 채 재시도하면 새 세션과 추가 유료 턴이 생길 수 있습니다. 실제 외부 작업은 아직 없고 전역80턴 한도는 유지됩니다. 이후 실제 발신·예약·결제를 붙이기 전에 최초 요청까지 포함한 영속 중복 방지가 필요합니다.
+
+## 보호자 기본 설정과 복합 요청
+
+선택 설정은 `{taxiProviderId:'auto'|공개택시ID,wheelchair:boolean,companionNeeded:boolean}`만 허용합니다. 임의 연락처·실명·기록·권한 항목을 받지 않습니다. 새 세션 또는 applyPreferences:true에서 두 boolean을 기존 준비 상태에 반영합니다. false이면 대화에서 수정한 이동 조건을 유지합니다. 선호 택시 ID는 매 요청의 초안 선택 fallback이며, 준비 첫 턴이 자료 안내뿐이어도 다음 택시 요청에 사용할 수 있습니다. 명시한 도구 providerId가 우선하고 휠체어 지원·현재 지역 후보 경계를 지킵니다. 실제 배차·이용자격을 확인한 것은 아닙니다.
+
+기기 설정만 브라우저 localStorage에 저장하고 API/모델에 검증한 값만 보냅니다. 설정 변경 자체는 모델을 호출하지 않습니다. 요청 중 설정을 바꾸면 그 변경은 다음 요청에 남기며, 실패 재시도는 원래 본문을 그대로 씁니다. 서버 DB에 preferences 원문이나 새로운 권한을 저장하지 않습니다. 상세는 [설정 계약](../docs/caregiver-preferences-contract.md)을 따릅니다.
+
+모델 호출은 최대8회 중 마지막1회를 tool_choice:none 요약에 남깁니다. 함수 정의와 요청별 reasoning context는 유지합니다. 독립 도구는 묶어 실행할 수 있고 실제 도구16개/작업45초 제한은 유지합니다. 호출 횟수·도구 예산에 다가가면 완료한 준비와 아직 실행하지 않은 일을 구분해 요약하고 저장합니다. 정상적인 여러 단계가 마지막 답변 기회를 잃어 전부 롤백되던 경로를 수정한 것이며, 모든 요청이 한 번에 끝남을 보장하지 않습니다. 작업 deadline에 lease 해제 최대2.5초가 별도로 더해질 수 있습니다.
 
 ## AWS 키와 배포
 

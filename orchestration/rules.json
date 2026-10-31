@@ -251,6 +251,45 @@
         "tests/agent-infra.test.mjs",
         ".github/workflows/deploy-aws.yml"
       ]
+    },
+    {
+      "id": "caregiver-sidebar",
+      "branch": "feature/caregiver-sidebar",
+      "baseCommit": "e601d25cf38ee9c3e296c52f1e32b440b7b16eda",
+      "allow": [
+        "app/conversation.js",
+        "app/conversation.css",
+        "app/index.html",
+        "app/message-format.js",
+        "DESIGN.md",
+        ".impeccable/design.json",
+        "tests/message-format.test.mjs"
+      ]
+    },
+    {
+      "id": "caregiver-preferences-agent",
+      "branch": "feature/caregiver-preferences-agent",
+      "baseCommit": "5ae1c48",
+      "allow": [
+        "app/care-preferences.js",
+        "agent/service.mjs",
+        "agent/tools.mjs",
+        "agent/validation.mjs",
+        "agent/openai-provider.mjs",
+        "prompts/caregiver-system.mjs",
+        "tests/agent.test.mjs",
+        "tests/agent-config.test.mjs",
+        "tests/openai-provider.test.mjs",
+        "tests/care-preferences.test.mjs"
+      ]
+    },
+    {
+      "id": "caregiver-qa",
+      "branch": "test/caregiver-workspace",
+      "baseCommit": "e601d25",
+      "allow": [
+        "scripts/conversation-browser-check.mjs"
+      ]
     }
   ],
   "rules": [

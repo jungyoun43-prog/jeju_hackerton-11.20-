@@ -1,6 +1,6 @@
 {
   "baseCommit": "e1e7e44",
-  "updatedAt": "2026-10-31T13:28:37.657177+00:00",
+  "updatedAt": "2026-10-31T14:32:07.222577+00:00",
   "tasks": {
     "ui": {
       "phase": "verified",
@@ -175,6 +175,32 @@
         "5c5b222"
       ],
       "note": "정확 Secret IAM·기존DDB활성화·원점보존·키없는CI배포/검증"
+    },
+    "caregiver-sidebar": {
+      "phase": "verified",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-caregiver-sidebar",
+      "integrationCommits": [
+        "8228b1a",
+        "889634b9833942a90a34ec8d5d4ce21de360ed9f"
+      ],
+      "note": "PC/모바일 새화면·선택설정·안전서식·음성검토.104개개발QA+빈제목진행정지 회귀6개통과. 최종root검증 진행."
+    },
+    "caregiver-preferences-agent": {
+      "phase": "verified",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-caregiver-preferences-agent",
+      "integrationCommits": [
+        "e601d25cf38ee9c3e296c52f1e32b440b7b16eda",
+        "d3183a64f802033eebef522d408c170668502357"
+      ],
+      "note": "58개 관련검사통과. 선호택시 실제선택·휠체어 우선·마지막 요약예약·기존 동의/DB 경계 보존. 실모델/화면후속검증. 후속 회귀: 요청 범위 택시 선호와 기존 이동 조건의 분리 유지."
+    },
+    "caregiver-qa": {
+      "phase": "verified",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-caregiver-qa",
+      "integrationCommits": [
+        "245ed28"
+      ],
+      "note": "단일소유 QA스크립트, A keyless화면104/104. 최종root sourceHash/캡처 재생성 필요."
     }
   },
   "review": {

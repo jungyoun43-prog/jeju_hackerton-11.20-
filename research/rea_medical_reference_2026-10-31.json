@@ -1,0 +1,45 @@
+{
+  "checkedAt": "2026-10-31",
+  "skillRepo": "https://github.com/morluto/rea",
+  "skillCommit": "23de10bb2849cdce8ddbe70504aa7cc57de75a98",
+  "cliVersion": "6.8.0",
+  "runtimeNode": "22.23.4",
+  "observations": [
+    {
+      "url": "https://www.goodoc.co.kr/",
+      "evidenceId": "ev_c278e33e6620f54b143d99cd0840cb50a59443d8d43bc3e2b4557cbd227ed67c",
+      "operation": "capture_browser_scenario",
+      "confidence": "observed",
+      "complete": "complete",
+      "browserCleanup": "terminated-owned-process",
+      "steps": [
+        {
+          "id": "scenario_start",
+          "status": "completed"
+        },
+        {
+          "id": "main-visible",
+          "status": "completed"
+        },
+        {
+          "id": "settled",
+          "status": "completed"
+        }
+      ],
+      "cliExitCode": 143,
+      "retainedRawSha256": "cde347238c257bb8ad7d5077063fd14d5758df63576de9ea211b129efb0bfb78",
+      "rawLocalPath": "/tmp/jeju-medical-reference-root/goodoc-rea.json"
+    }
+  ],
+  "failed": [
+    {
+      "url": "https://www.onemedical.com/",
+      "code": "provider_timeout",
+      "phase": "launch",
+      "commandTimeoutMs": 20000,
+      "cleanupReported": "cleanup_incomplete",
+      "note": "관측 성공·사이트 장애로 세지 않음. 이후 로컬 프로세스 조회에서 REA/해당 도구 소유 프로필 프로세스 잔존은 발견하지 못함."
+    }
+  ],
+  "thirdPartyScreenshotsRedistributed": false
+}

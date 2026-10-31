@@ -12,6 +12,9 @@
 - 로컬 기본 저장은 메모리이며 AWS는 Secrets Manager 키 조회와 DynamoDB 합성 상태·lease·UTC 전역80턴 budget을 함께 사용한다. 공개 Sol→get_case→응답1건 HTTP200·5.2초와 세션 저장/중복 시 미차감·원점403을 확인했다. 80은 요청 수이며 내부 Responses는 최대8회다. Bedrock Error002 추가 시도는 보류한다. 최초 응답 유실 시 sessionId 없는 재시도는 추가 턴이 될 수 있다. 키 교체 후 warm runtime을 새로 시작해야 한다. [최신 대화 계약](docs/conversation-agent-contract.md), README·PRD·검증 기록을 따른다.
 - 지정 공개 데이터의 기본 활용에 별도 사용권이나 사용자 파일 업로드를 선행 조건으로 요구하지 않는다. 공개 표본·전체 운영 API·실시간 확인의 범위를 구분하고 출처·자료 시점을 보존한다. 자유 라이선스나 원자료 전체 재배포 허락은 추정하지 않는다.
 
+- 최신 사용자 요구는 실제 의료 웹사이트들을 먼저 둘러보고 근거를 가지고 디자인을 개선하는 것이다. REA https://github.com/morluto/rea 의 reverse-engineer-anything 스킬을 개인 스킬 경로에 설치하고 CLI6.8.0으로 굿닥 브라우저 Evidence를 확보했다. 비교한6개 사이트와 관측 한계·도구 실패는 docs/medical-reference-design.md를 따른다. 비공개 제품을 봤다고 주장하거나 외부 자산을 복사하지 않는다.
+- 왼쪽의 선택적 이동 기본 설정은 app/care-preferences.js 계약을 따른다. applyPreferences는 두 이동 boolean의 재적용, taxiProviderId는 요청범위 문의 후보 fallback이다. 설정은 동의·예약·배차가 아니다. 기본 설정만 localStorage에 저장한다. 새 가상 가족 사진·Pretendard와 기존 로고를 사용하며 임의 의사 이미지를 추가하지 않는다.
+
 ## 자료조사
 
 - **자료조사를 할 때는 `insane_search`를 사용한다.** 이는 사용자가 지정한 작업 방식이다.
