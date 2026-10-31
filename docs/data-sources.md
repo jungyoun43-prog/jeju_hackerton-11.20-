@@ -6,7 +6,7 @@
 
 ### 2026-10-31 데이터 도구의 실제 활용 범위
 
-병원 자료859는 **공개 미리보기20행을 후보 검색과 집계·품질 분석**에 사용한다. 이동·동행 데이터 도구는 최신택시34·돌봄등록19·공식안내2의55개 문의 경로를 사용한다. 대화 Agent의 도구 dispatcher와 고정 예시가 같은 snapshot·상태 엔진을 재사용하며, 실제 모델 연결은 후속 보류했다. 새 PC·모바일·AWS revision의 최종 통합 검증은 결과 기록을 따른다. `app/data/hospital-candidates.json`에는 폐업 7행을 제외한 당시 행정상 정상 13개 기관의 최소 사실(기관명·주소·등록 과목·행정 상태·행별 시점)과 출처를 변환해 둔다. 원문 CSV·전체 행 파일은 저장하거나 제공하지 않는다. `app/data/datahub-profile.json`에는 기관명·주소 없이 20행 집계를 둔다. 기본 공개 표본을 이용하는 데 별도 사용권이나 파일 업로드를 요구하지 않는다. 전체 운영 API 연결이나 현재 제주 의료기관 현황을 확보한 것으로 표시하지 않는다.
+병원 자료859는 **공개 미리보기20행을 후보 검색과 집계·품질 분석**에 사용한다. 이동·동행 데이터 도구는 최신택시34·돌봄등록19·공식안내2의55개 문의 경로를 사용한다. 대화 Agent의 도구 dispatcher와 고정 예시가 같은 snapshot·상태 엔진을 재사용하며, Sol 공개 단일 도구 실호출은 확인했으며 복합 모델 품질은 후속이다. 새 PC·모바일·AWS revision의 최종 통합 검증은 결과 기록을 따른다. `app/data/hospital-candidates.json`에는 폐업 7행을 제외한 당시 행정상 정상 13개 기관의 최소 사실(기관명·주소·등록 과목·행정 상태·행별 시점)과 출처를 변환해 둔다. 원문 CSV·전체 행 파일은 저장하거나 제공하지 않는다. `app/data/datahub-profile.json`에는 기관명·주소 없이 20행 집계를 둔다. 기본 공개 표본을 이용하는 데 별도 사용권이나 파일 업로드를 요구하지 않는다. 전체 운영 API 연결이나 현재 제주 의료기관 현황을 확보한 것으로 표시하지 않는다.
 
 | 실제 계산 결과 | 의미 |
 | --- | --- |
@@ -251,9 +251,9 @@ insane-search의 `weak_ok`는 본문 검토의 출발점으로 취급했다. 제
 | Impeccable | [원본](https://github.com/pbakaus/impeccable), revision `b7a89176e4e87422b40f98adabceb051dbb5448b` | 개발 시 디자인 지침으로 사용. 자동 context 로더 권한 실패 후 프로젝트 문맥·Operate/craft 지침을 직접 적용. 사용자 화면의 런타임 AI 모델이 아님 |
 | Awesome Design Skills · Refined | [원본 스킬](https://github.com/bergside/awesome-design-skills/blob/f631a09b4fcc0166f2e2c1a8c81906ef680c57e8/skills/refined/SKILL.md) | MIT 표기 확인. 토큰·간격·상태·접근성 지침 참고. 예시 팔레트·영문 글꼴을 그대로 복제하지 않음 |
 | Sites·Imagegen·Codex | 로컬 웹 구현·생성 이미지·코드/문서 작성 보조 | 개발 도구 사용과 제품 런타임 기능을 구분. 숨겨진 모델 버전·사용량을 추정하지 않음 |
-| Bedrock Runtime SDK·esbuild | `@aws-sdk/client-bedrock-runtime`3.1161.0(Apache-2.0)·esbuild0.28.2(MIT) | 공급자 어댑터·별도 Lambda 번들. 기본 handler는 미연결이며 실제 모델 호출 성공을 의미하지 않음 |
+| AWS SDK·esbuild | Bedrock/Secrets Manager/DynamoDB SDK3.1161.0(Apache-2.0)·esbuild0.28.2(MIT) | 별도 Lambda 번들. Bedrock은 보존, OpenAI는 Native fetch·AWS Secret 사용 |
 | 브라우저 음성 입력 | SpeechRecognition 계열 `ko-KR` | 지원 브라우저·마이크 권한·서비스 정책 의존. 실제 전화·별도 STT 계정·마이크 품질 검증과 구분 |
-| 런타임 LLM·전화망 STT/TTS·통신 | 사용자 요청으로 실제 연결 후속 보류 | 공급자 주입 인터페이스·루프·prompt·검증 준비. Bedrock 실호출 Error002 실패 후 추가 시도 중단. 모델/통신 정책 선정·실제 추론은 별도 |
-| 세션·budget | 기본 인스턴스별 메모리, DynamoDB 어댑터 미구현 | 정규화 합성 상태만 보관하고 원문·대화 전문 미저장. 메모리 일일한도는 분산 전역 quota가 아님 |
+| 런타임 LLM·전화망 통신 | OpenAI Sol 실연결, 전화 미연동 | 로컬·AWS 단일 도구 스모크200. Terra·복합 품질·실제 전화/공단 연계 별도 |
+| 세션·budget | 로컬 메모리·AWS DynamoDB | 합성 상태 TTL1시간·UTC 전역80요청. 원문·답변 미저장. 동일 세션 중복 재전송 미차감 확인 |
 
 ZIP에는 최소 기관 사실 snapshot·집계·출처·재취득 코드, 합성 의료 사례와 라이브러리 고지·생성 자산 명세를 포함한다. 원자료 전체 파일·지도 타일·외부 논문 전문은 포함하지 않는다. 최종 소스·데이터·환경·외부 코드·모델 기록은 [제출 체크리스트](submission-checklist.md)와 [구현 결과](implementation-results.md)에 연결한다.

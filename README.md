@@ -6,7 +6,7 @@
 
 ## 지금 실행되는 범위
 
-첫 화면은 대화·음성 입력, 처리 기록과 이번 방문 요약입니다. **루트 `.env`의 `OPENAI_API_KEY`를 채우면 OpenAI Responses API를 사용하는 연결 템플릿**을 제공합니다. 기본 모델은 `gpt-6.1-sol`, 선택 모델은 `gpt-6.1-terra`입니다. 키가 없으면 실제 호출 없이 미연결 상태로 실행합니다. 2026-10-31 Sol 합성 사례1건에서 실제 모델→get_case 도구→최종 응답을 HTTP200·약5.5초로 확인했습니다. Terra 실호출과 일반적인 모델 품질은 별도 검증 대상입니다.
+첫 화면은 대화·음성 입력, 처리 기록과 이번 방문 요약입니다. **AWS 공개 데모에 `gpt-6.1-sol`과 실제 도구 호출을 연결했습니다.** 2026-10-31 공개 주소의 합성 사례에서 모델→`get_case`→최종 응답을 HTTP200·5.2초로 확인했습니다. 로컬은 `.env`의 `OPENAI_API_KEY`만 넣으면 실행하며 `gpt-6.1-terra`를 명시적으로 선택할 수 있습니다. 키 없는 로컬은 미연결 상태입니다. Terra 실호출·복합 요청·일반적인 모델 품질은 별도 검증 대상입니다.
 
 | 구분 | 현재 동작 |
 | --- | --- |
@@ -27,7 +27,7 @@ npm ci --ignore-scripts
 npm run dev
 ```
 
-이 작업 환경에는 빈 키 템플릿 `.env`를 만들었습니다. **`OPENAI_API_KEY=` 뒤에 키만 입력하고 서버를 다시 시작**하면 됩니다. 새로 복제한 저장소에서는 `.env.example`을 `.env`로 복사하되 기존 파일을 덮어쓰지 않습니다. 모델을 Terra로 바꾸려면 `OPENAI_MODEL=gpt-6.1-terra`로 설정합니다. 기본 Sol과 Terra를 동시에 호출하거나 오류 시 다른 모델로 자동 대체하지 않습니다.
+로컬에서는 **`.env`의 `OPENAI_API_KEY=` 뒤에 키만 입력하고 서버를 다시 시작**하면 됩니다. 새로 복제한 저장소에서는 `.env.example`을 `.env`로 복사하되 기존 파일을 덮어쓰지 않습니다. 모델을 Terra로 바꾸려면 `OPENAI_MODEL=gpt-6.1-terra`로 설정합니다. 기본 Sol과 Terra를 동시에 호출하거나 오류 시 다른 모델로 자동 대체하지 않습니다.
 
 터미널의 **http://127.0.0.1:4173** 을 엽니다. 키 설정 후 자유 요청을 보내면 모델 API를 호출합니다. 키 없이도 **대화 흐름 미리보기**에서 병원·자료·택시·동행의 처리 기록과 출처를 볼 수 있습니다. 이 고정 예시는 모델 응답과 구분합니다.
 
@@ -43,7 +43,7 @@ npm run preview
 
 - 실행 환경변수: [예시](.env.example)의 서버·지도·OpenAI 설정. `.env`는 Git·정적 빌드·제출 ZIP에서 제외하며 브라우저에 키를 보내지 않습니다. AWS 배포에는 로컬 `.env`가 자동 전송되지 않습니다.
 - 지도: 개발용 수동 화면의 Leaflet 1.9.4·OSM과 키 없는 Google Maps 외부 링크. 실제 경로·ETA·배차 API는 연결하지 않았습니다.
-- 저장: 기본 세션 저장소는 인스턴스별 메모리입니다. DynamoDB 어댑터는 미구현이며 메모리 예산은 분산 Lambda의 전역 호출 한도가 아닙니다.
+- 저장: 로컬은 인스턴스별 메모리, AWS는 DynamoDB입니다. AWS는 합성 준비 상태를 TTL1시간으로 보관하고 UTC 하루80개 대화 요청을 원자적으로 제한합니다. 한 요청 내부 모델 호출은 최대8회이며 금액 한도나 API 호출80회를 뜻하지 않습니다.
 - 자세한 사용법·오류: [사용자 매뉴얼](docs/user-manual.md), [연결 준비](agent/README.md), [실제 검증 기록](docs/implementation-results.md).
 
 ## 실제 활용하는 데이터
@@ -76,9 +76,9 @@ node scripts/datahub-profile.mjs --fetch
 
 **[공개 데모](https://d1mfksxrj025bx.cloudfront.net)** · [GitHub Actions](https://github.com/jungyoun43-prog/jeju_hackerton-11.20-/actions/workflows/deploy-aws.yml)
 
-대화 UI와 API를 비공개 S3·CloudFront·Lambda로 배포했습니다. `32d0694`의 [자동 배포](https://github.com/jungyoun43-prog/jeju_hackerton-11.20-/actions/runs/41202034743)에서 검사·분리 artifact·OIDC 인증·웹/API 게시와 동일 revision·Lambda 코드 hash 검증이 성공했습니다. 단위122개·대화 브라우저40개·수동 흐름47개·자동규칙28개 및 ZIP 독립 설치를 확인했으며 상세 범위와 공개 화면 기록은 [검증 기록](docs/implementation-results.md)을 따릅니다.
+대화 UI와 API를 비공개 S3·CloudFront·Lambda로 배포했습니다. 서버만 Secrets Manager의 전용 키를 읽고 DynamoDB로 상태·전역 한도를 관리합니다. 실제 공개 모델 응답·세션 저장·동일 세션 중복 요청의 도구/예산 재실행 방지·직접 원점403을 확인했습니다. 최신 CI·공개 revision·검사 범위는 [검증 기록](docs/implementation-results.md)을 따릅니다.
 
-CI는 같은 커밋의 `dist/`와 별도 `output/agent-lambda.zip`을 검사·보존합니다. backend는 명시한 배포 toggle에서만 Lambda에 직접 게시하며 사이트 S3에 ZIP을 올리지 않습니다. Lambda URL은 AWS_IAM과 CloudFront OAC를 사용하고 모델·DynamoDB는 기본 비활성입니다. AWS 장기 키를 GitHub Secrets에 넣지 않습니다. [배포 매뉴얼](docs/deployment.md)에 변수·게시·검증·롤백을 기록했습니다.
+CI는 같은 커밋의 `dist/`와 별도 `output/agent-lambda.zip`을 검사·보존하고 OIDC로 게시합니다. Lambda URL은 AWS_IAM과 CloudFront OAC를 사용합니다. 키는 GitHub·Lambda 환경변수·정적 사이트에 넣지 않습니다. [배포 매뉴얼](docs/deployment.md)에 키 전송·변수·검증·롤백을 기록했습니다.
 
 ## 개발·검사·제출
 
@@ -90,15 +90,15 @@ npm run eval
 npm run rollback -- <통합-커밋-SHA>
 ```
 
-이 명령은 브랜치·worktree가 있는 개발 저장소용입니다. 자동 eval은 기계 검증한 규칙만 평가하며 임상·법률·데이터 권리·제출 준비 전체를 보장하지 않습니다. 선택 브라우저 검사는 Playwright와 Chromium이 필요합니다. 기존 `npm run test:browser`는 수동 화면을, `npm run test:conversation`은 대화 화면을 확인합니다. 모의 음성 결과를 실제 마이크 검증으로 표시하지 않습니다.
+이 명령은 브랜치·worktree가 있는 개발 저장소용입니다. 자동 eval은 기계 검증한 규칙만 평가하며 임상·법률·데이터 권리·제출 준비 전체를 보장하지 않습니다. 선택 브라우저 검사는 Playwright와 Chromium이 필요합니다. `test:conversation`은 키를 끈 별도 로컬 서버에서 미연결·고정 예시·연결 상태 fixture를 검사합니다. 공개 유료 서버를 대상으로 실행하지 않습니다. 실제 공개 LLM 스모크는 별도 기록으로 구분합니다.
 
-개발 서버를 실행한 상태에서 별도 터미널로 선택 QA 도구를 설치·실행합니다. 기존 설치는 `PLAYWRIGHT_MODULE`, `CHROMIUM_PATH`, 서버 주소는 `BASE_URL`로 지정할 수 있습니다.
+유료 모델을 호출하지 않는 QA 서버를 `OPENAI_API_KEY= PORT=4180 node scripts/server.mjs`로 먼저 실행합니다. 별도 터미널에서 선택 QA 도구를 설치·실행합니다. 기존 설치는 `PLAYWRIGHT_MODULE`, `CHROMIUM_PATH`, 서버 주소는 `BASE_URL`로 지정할 수 있습니다.
 
 ```bash
 npm install --no-save --package-lock=false playwright@1.64.1
 npx playwright install chromium
-npm run test:conversation
-npm run test:browser
+BASE_URL=http://127.0.0.1:4180 npm run test:conversation
+BASE_URL=http://127.0.0.1:4180 npm run test:browser
 ```
 
 ```bash
@@ -108,9 +108,9 @@ npm run package
 
 Lambda 빌드와 ZIP 패키징에는 Python 3가 필요합니다. Lambda ZIP은 `index.mjs`·`deployment.json`으로 구성하며 제출용 `output/jeju-care-compass-mvp.zip`과 구분합니다. 제출 ZIP은 개발 스냅샷이며 이번 버전의 재생성·독립 설치·최종 제출 확인은 [추적표](docs/submission-checklist.md)를 따릅니다. 센터 PC의 GPU·로컬 모델은 요구하지 않지만 센터 실기기 검증은 별도입니다.
 
-- [PRD v0.7](docs/prd.md): 대화 중심 UX, 실제·시연·후속 기능과 대회 요구사항.
+- [PRD v0.8](docs/prd.md): 대화 중심 UX, 실제·시연·후속 기능과 대회 요구사항.
 - [기능 파이프라인](docs/agent-pipeline.md): 요청부터 도구·처리 기록·재확인까지.
-- [외부 의존성](THIRD_PARTY.md): Bedrock SDK 3.1161.0·esbuild 0.28.2·라이선스·모델·이미지 기록.
+- [외부 의존성](THIRD_PARTY.md): AWS SDK3.1161.0·esbuild0.28.2·라이선스·모델·이미지 기록.
 - [AGENTS.md](AGENTS.md): 조사 방식·데이터·병렬 개발 지침.
 - [원격협진 사례 조사](research/remote_collaboration_cases_2026-10-31.md): 비교 사례의 확인 범위.
 

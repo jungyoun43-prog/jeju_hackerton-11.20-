@@ -1,39 +1,35 @@
-# 보호자 대화 API 연결 준비
+# Agent API 연결과 운영
 
-루트 `.env`에 OpenAI 키를 넣으면 실제 API를 사용할 수 있는 연결 템플릿입니다. 기본 모델 `gpt-6.1-sol`, 선택 모델 `gpt-6.1-terra`만 사용하며 자동 fallback하지 않습니다. 실제 계정·모델 호출은 아직 검증하지 않았습니다. 전화·기록 연계는 계속 합성 자료·전화 역할 시연입니다.
+로컬은 `.env`의 `OPENAI_API_KEY`로 실행하고 AWS는 Secrets Manager에서 키를 읽습니다. 기본 `gpt-6.1-sol`, 선택 `gpt-6.1-terra`만 사용하며 자동 대체하지 않습니다. 2026-10-31 로컬5.5초·공개 AWS5.2초의 Sol→get_case→응답을 각각 확인했습니다. Terra·복합 요청·모델 전반 품질은 별도입니다. 전화·공단 기록·의료진 회신은 합성 시연입니다.
 
-- `GET /api/agent/capabilities`: 직접 capability 객체. 키가 없으면 llm:false, 키 설정 시 llm:true는 호출 어댑터 구성 상태이며 계정 접근 성공을 사전 검증한 값이 아닙니다. 상태 조회는 모델·DB를 호출하지 않습니다.
-- `POST /api/agent`: 키 설정 시 OpenAI Responses API를 호출합니다. 키가 없으면 MODEL_NOT_CONNECTED/503. 입력 원문을 저장하지 않습니다.
-- `POST /api/agent/preview`: `{scenarioId:'aewol-parent-visit',requestId:'...12자이상...'}`만 받습니다. 임의 message를 거절하고 사전 작성 예시의 snapshot 검색·순수 reducer를 실행합니다. `isPreview:true`와 `previewMessages`를 반환하며 마지막 assistant는 reply와 같습니다. 모델·DB·전화망을 사용하지 않습니다. preview sessionId는 빈 문자열이며 일반 대화 세션으로 재사용하지 않습니다.
+## 경로와 실행
 
-`agent/handler.mjs`의 `handler(event)`는 Lambda HTTP event를, `handleAgentRequest({method,path,body,headers})`는 로컬 서버를 받습니다. 두 경로의 반환은 `{statusCode,headers,body:JSON문자열}`입니다.
+- `GET /api/agent/capabilities`: capability 객체. llm:true는 어댑터 설정이며 요청 성공을 보장하지 않습니다. AWS의 첫 조회는 Secret을 준비하지만 모델 추론·세션/예산 DB는 호출하지 않습니다. 준비 실패 시 llm:false를 반환합니다.
+- `POST /api/agent`: `{message,requestId,sessionId?,history?}`. OpenAI Responses API와 검증된 도구를 실행합니다. 로컬 키가 없으면 MODEL_NOT_CONNECTED/503, AWS 키/저장소 준비 실패는 CLOUD_RUNTIME_UNAVAILABLE/503입니다.
+- `POST /api/agent/preview`: `{scenarioId:'aewol-parent-visit',requestId}`. 별도 고정 예시이며 모델·Secret·세션 DB를 호출하지 않습니다.
 
-## 키 입력과 실행
+로컬은 `.env.example`을 복사한 뒤 키를 채우고 `npm run dev`를 실행합니다. 기존 .env를 덮어쓰지 않습니다. `npm start`·`npm run preview`도 .env를 읽습니다. `OPENAI_MODEL=gpt-6.1-terra`는 Terra만 선택합니다. 키 없는 검사는 `OPENAI_API_KEY= PORT=4180 node scripts/server.mjs`로 실행합니다.
 
-루트 `.env`에서 `OPENAI_API_KEY=` 뒤에 본인의 키를 입력하고 `npm run dev`를 다시 실행합니다. 템플릿은 `.env.example`이며 기존 키는 덮어쓰지 않습니다. `npm start`와 `npm run preview`도 루트 `.env`를 읽습니다. `OPENAI_MODEL=gpt-6.1-terra`로 바꾸면 Terra만 호출합니다. 기본값은 Sol입니다.
+## 모델과 도구
 
-OpenAI 기본 한도는 reasoning low, 호출당 최대 출력4,096토큰, 호출 timeout40초·요청 전체45초, 요청당 최대8라운드·16도구, 인스턴스 하루80턴입니다. 출력 한도는 reasoning 토큰을 포함하며 잘린 응답을 완료로 표시하지 않습니다. 실제 계정의 권한·이용 한도는 키만으로 보장되지 않습니다.
+`createRuntimeAgent({env,store})`가 provider를 구성하고 `createAgentService`에 주입합니다. Native fetch로 공식 HTTPS Responses endpoint만 사용하며 redirect·자동 재시도·모델 대체를 하지 않습니다. reasoning/encrypted 항목은 같은 요청의 도구 결과와 재전달하고 HTTP·로그·세션에 저장하지 않습니다. store:false는 공급자의 모든 보관 정책을 해제하는 설정이 아닙니다.
 
-서버가 store:false를 보내고 reasoning/encrypted 항목을 같은 요청 안의 다음 도구 결과와 함께 재전달합니다. 이 옵션은 공급자의 모든 보관 정책을 끄는 설정이 아닙니다. 키는 서버에서만 읽고 HTTP 응답·로그·브라우저·빌드·소스 ZIP에 넣지 않습니다. 로컬 `.env`는 AWS Lambda에 자동 배포되지 않습니다.
+도구 인자는 allowlist 스키마로 검증합니다. 상태는 공공 snapshot·고정 합성 템플릿·도메인 reducer로만 변경합니다. 실명·상세주소·임의 의료기록·출처 URL을 도구 인자로 받지 않고 진찰 소견·임상 결론을 작성하지 않습니다. 공단 연계의 승인된 어댑터가 없어 조회 완료를 표시하지 않습니다. Bedrock 어댑터는 보존하되 선택하지 않습니다.
 
-## 공급자 연결 지점
+## 보관과 한도
 
-`agent/config.mjs`의 `createRuntimeAgent()`가 키 설정을 읽어 `createAgentService({provider})`에 주입합니다. `respond({system,messages,tools,signal,context})`는 `{content:[{text}|{toolUse}],stopReason,context?}`를 반환합니다. context는 한 요청의 reasoning replay에만 사용하고 세션·응답·로그에 저장하지 않습니다. OpenAI 어댑터는 고정 공식 HTTPS endpoint만 쓰고 redirect·자동 재시도·모델 fallback을 하지 않습니다. Bedrock Converse도 보존하되 기본 handler에서 선택하지 않습니다. 공급자 오류는 정해진 공개 문구로 처리하며 키나 오류 원문을 노출하지 않습니다.
+로컬은 메모리, AWS는 `createDynamoSessionStore`입니다. AWS 저장 필드는 opaque sessionId·requestIds·턴 수·정규화된 합성 상태·TTL 및 처리 중 lease입니다. 원문·이력·모델 답변·reasoning·키는 저장하지 않습니다. 강한 읽기와65초 lease 소유권 조건으로 동시 저장을 보호하고, 애플리케이션에서도1시간 TTL 만료를 검사합니다. DynamoDB의 실제 삭제는 TTL 정책에 따라 지연될 수 있습니다.
 
-모델의 도구 인자는 별도 allowlist 스키마로 검증하고, 상태는 공공 snapshot·고정 합성 템플릿·기존 domain reducer로만 변경합니다. 의료진 진찰 소견과 임상 결론을 생성하는 도구는 없습니다. 선택 병원은 현재 메시지에 명시된 공개 기관만 허용합니다. 실명·상세주소·임의 의료기록·출처 URL을 도구 입력으로 받지 않습니다. 공단 기록 연계는 승인된 어댑터가 없으므로 인증·조회 완료를 표시하거나 추측 endpoint를 만들지 않습니다.
+기본 OpenAI 한도는 low reasoning·호출당 출력4,096토큰(추론 포함)·호출40초·처리 전체45초·최대8라운드/16도구·세션20턴입니다. 요청24KiB·message4,000자·최근이력8개/각2,000자이며 UI 입력은1,600자입니다. cloud 준비8초와 정리2.5초는 별도이고 브라우저는65초까지 기다립니다. Lambda·CloudFront origin은60초입니다.
 
-## 상태·한도·배포
+AWS는 UTC 하루80개 대화 요청을 모델 호출 전에 조건부 원자 갱신으로 차감합니다. 한 요청 내부 Responses 호출은 최대8회이며 API 호출80회나 금액 한도를 뜻하지 않습니다. 실패한 요청도 차감하고 DB 오류 시 모델을 실행하지 않습니다. AWS store 상한은1~80이고 로컬 메모리 한도는 인스턴스별입니다.
 
-현재 기본 저장소는 인스턴스별 메모리이며 선택적 `store`를 주입할 수 있습니다. 미연결 일반 요청과 preview는 session store에 접근하지 않습니다. 연결 후에는 정규화된 합성 상태·opaque sessionId·requestId·턴 수·TTL만 저장하고 원문/대화 전문/모델 답변은 저장하지 않습니다. 세션 내 중복 requestId는 도구를 재실행하지 않습니다. 모델 오류·타임아웃의 도구 상태는 commit하지 않습니다. 실제 외부 작업이 추가되면 별도 영속 idempotency·승인/수신처 검증이 필요합니다.
+중복 방지는 sessionId가 있는 세션 안에서만 적용합니다. 최초 응답 유실로 sessionId 없는 채 재시도하면 새 세션과 추가 유료 턴이 생길 수 있습니다. 실제 외부 작업은 아직 없고 전역80턴 한도는 유지됩니다. 이후 실제 발신·예약·결제를 붙이기 전에 최초 요청까지 포함한 영속 중복 방지가 필요합니다.
 
-기본 한도는 요청24KiB·메시지4,000자·최근이력8개/각2,000자·세션20턴·도구12개·루프6회·45초·하루80턴(인스턴스 기준)입니다. `DEMO_DAILY_TURN_LIMIT`만 1~1,000 사이에서 조정할 수 있습니다. 메모리 한도는 분산 Lambda의 전역 유료 호출 quota가 아니므로 실제 모델 공개 연결 전에는 영속 budget store 등을 붙여야 합니다. 현재 DynamoDB는 연결하지 않습니다. 미래 저장소는 pk String과 expiresAt epoch seconds TTL 규약을 따릅니다.
+## AWS 키와 배포
 
-`APP_REVISION=<커밋SHA> node scripts/build-agent.mjs`는 esbuild·Python3를 사용해 `output/agent-lambda.zip`을 만듭니다. ZIP에는 `index.mjs`와 `deployment.json`이 있고 Handler는 `index.handler`입니다. metadata는 `{revision,runtime:'lambda',mode:'synthetic'}`이며 capabilities/revision 및 x-app-revision과 일치합니다. 비밀키와 .env는 포함하지 않습니다. SDK·공공 JSON·prompt는 Lambda bundle에 포함됩니다.
+Lambda는 전용 `OPENAI_SECRET_ARN`·`SESSION_TABLE_NAME`을 함께 요구하며 평문 키만으로 메모리 경로를 사용할 수 없습니다. exact ARN·계정·서울 리전과 한 필드 JSON을 확인하고 성공한 runtime을 warm cache에 둡니다. Secret·SDK 오류 원문은 공개하지 않습니다.
 
-## AWS 연결·재시도 운영 범위
+`scripts/aws-agent-key.mjs --apply`는 현재 계정·stack·소유 태그·활성 Secret을 확인하고 로컬 키를 메모리 파이프로만 전달합니다. CLI 인자·임시 비밀파일·자식 환경·GitHub·Lambda 환경변수·프런트·빌드·제출 ZIP에 키를 넣지 않습니다. AWS CLI와 Python3가 필요합니다. 키를 교체하면 코드 재게시 등으로 warm cache도 갱신합니다. 자세한 명령·롤백은 [배포 매뉴얼](../docs/deployment.md)을 따릅니다.
 
-AWS 연결은 Secrets Manager의 전용 Secret ARN과 DynamoDB 저장소를 함께 요구합니다. Lambda의 평문 키만으로 모델을 활성화할 수 없습니다. 로컬 .env는 자동 배포하지 않으며 scripts/aws-agent-key.mjs가 소유 계정·stack·Secret을 확인한 후 값을 메모리 파이프로만 전송합니다. 키는 CLI 인자·임시 파일·Lambda 환경변수·GitHub에 넣지 않습니다.
-
-DynamoDB의 조건부 갱신으로 UTC 하루80개 대화 요청을 모델 호출 전에 차감합니다. 한 요청 내부 Responses 호출은 최대8회이며 API 호출80회나 금액 한도를 뜻하지 않습니다. 실패한 요청도 차감합니다. 합성 준비 상태의 TTL은1시간이며 원문·답변·reasoning은 저장하지 않습니다.
-
-중복 방지는 sessionId가 있는 세션 안에서만 적용합니다. 첫 요청의 응답을 받지 못해 sessionId가 없는 채 재시도하면 새 세션과 추가 유료 턴이 생길 수 있습니다. 실제 외부 작업은 아직 없고 전역80턴 한도는 유지됩니다. 브라우저 대기는65초로 cloud 준비8초·처리45초·정리2.5초보다 길게 둡니다. 키를 교체하면 warm cache 갱신을 위해 코드 재게시 또는 새 실행환경 시작도 필요합니다.
+`APP_REVISION=<SHA> npm run build:agent`는 Node22·esbuild·Python3로 별도 `output/agent-lambda.zip`을 만듭니다. ZIP은 index.mjs·deployment.json, handler는 index.handler입니다. revision은 capabilities/x-app-revision과 일치합니다. SDK·공공 JSON·prompt를 번들하며 .env는 포함하지 않습니다.
