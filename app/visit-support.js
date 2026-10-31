@@ -256,13 +256,14 @@ export function applyVisitSupportAction(state, action) {
 
 export function getVisitSupportSummary(state) {
   const support = supportOf(state), context = contextOf(state);
+  const destinationKnown = Boolean(object(state.selectedHospital) && state.selectedHospital.companyName?.trim() && context.address);
   const unresolved = [], nextActions = [];
   let preparedCount = 0, totalNeeded = 0;
   const result = {};
   for (const kind of KINDS) {
     const entry = support[kind], needed = support.requirements[neededKey(kind)], name = kindName(kind);
     const labels = { not_selected: '문의처 선택 전', selected: '문의처 선택', prepared: '초안 준비 · 응답 전', available_demo: '가능 응답 · 시연', unavailable_demo: '불가 응답 · 시연', unreachable_demo: '불통 · 시연', needs_recheck: '조건 변경 · 재확인 필요' };
-    result[kind] = { status: needed ? entry.status : 'not_needed', label: needed ? labels[entry.status] : '필요 없음', providerName: entry.provider?.name || '', source: entry.provider ? { ...entry.provider.source } : null, questions: needed ? questionsFor(state, kind) : [] };
+    result[kind] = { status: needed ? entry.status : 'not_needed', label: needed ? labels[entry.status] : '필요 없음', providerName: entry.provider?.name || '', source: entry.provider ? { ...entry.provider.source } : null, questions: needed ? questionsFor(state, kind) : [], ready: false, unresolved: [] };
     if (!needed) continue;
     totalNeeded += 1;
     const gaps = [];
@@ -271,11 +272,14 @@ export function getVisitSupportSummary(state) {
     if (!context.area) gaps.push('출발 지역이 미확인입니다.');
     if (!validDate(context.date)) gaps.push('방문 날짜가 미확인입니다.');
     if (!context.appointmentTime) gaps.push('예약 시각이 미확인입니다.');
+    if (!destinationKnown) gaps.push('방문기관·주소 확인이 필요합니다.');
     if (entry.provider && !entry.provider.phone) gaps.push(`${name} 대표 연락처가 미확인입니다.`);
     if (!context.inquiryAllowed) gaps.push('기관 문의 위임을 확인해야 합니다.');
     if (kind === 'taxi' && support.requirements.wheelchair && !entry.wheelchairConfirmed) gaps.push('휠체어 탑승 차량·지원 여부가 미확인입니다.');
     if (kind === 'taxi' && entry.provider?.serviceType === 'accessible_transport' && !entry.eligibilityConfirmed) gaps.push('교통약자 이동지원 이용자격·회원등록이 미확인입니다.');
-    if (!gaps.length) preparedCount += 1;
+    result[kind].unresolved = [...gaps];
+    result[kind].ready = entry.status === 'available_demo' && gaps.length === 0;
+    if (result[kind].ready) preparedCount += 1;
     else {
       unresolved.push(...gaps);
       const title = !entry.provider ? `${name} 문의처 선택` : ['unavailable_demo', 'unreachable_demo'].includes(entry.status) ? `${name} 재문의 또는 다른 문의처 확인` : entry.status === 'needs_recheck' ? `${name} 변경 조건으로 재문의` : entry.status === 'selected' ? `${name} 문의 초안 준비` : `${name} 빠진 조건 확인`;

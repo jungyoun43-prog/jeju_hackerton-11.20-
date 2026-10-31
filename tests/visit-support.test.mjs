@@ -1,9 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createDemoCase, applyAction, getTasks, getProgress, calculateBurden, buildReport } from '../app/domain.js';
+import { parseHospitalImport } from '../app/datahub.js';
 import { createVisitSupport, applyVisitSupportAction, reconcileVisitSupport, getVisitSupportSummary, buildSupportInquiry, buildVisitSupportReport } from '../app/visit-support.js';
 
 const act = (state, type, args = {}) => applyAction(state, { type, ...args });
+function withDestination(state = createDemoCase(), address = '제주특별자치도 제주시 합성방문로 1') {
+  const hospital = parseHospitalImport(JSON.stringify([{ companyName: '합성 방문 기관', addressDoro: address, medicalSubject: '내과', openStatus: '정상', updateAt: '2026-01-01' }]), 'synthetic-hospital.json').records[0];
+  return act(state, 'SELECT_LOCAL_HOSPITAL', { hospital });
+}
 function provider(serviceType = 'call_taxi', overrides = {}) {
   const official = ['hospital_escort', 'accessible_transport'].includes(serviceType);
   const taxi = ['call_taxi', 'accessible_transport'].includes(serviceType);
@@ -93,12 +98,14 @@ test('차량·돌봄 문의처·병원동행·교통약자 서비스의 질문�
 });
 
 test('가능 합성 응답도 시각·휠체어·특수교통 자격이 빠지면 준비 공백으로 남긴다', () => {
-  let state = act(createDemoCase(), 'SUPPORT_UPDATE_REQUIREMENTS', { values: { companionNeeded: false, wheelchair: true } });
+  let state = act(withDestination(), 'SUPPORT_UPDATE_REQUIREMENTS', { values: { companionNeeded: false, wheelchair: true } });
   state = available(state, 'accessible_transport');
   let summary = getVisitSupportSummary(state);
   assert.equal(summary.preparedCount, 0);
   assert.match(summary.unresolved.join(' '), /예약 시각/);
   assert.match(summary.unresolved.join(' '), /휠체어/);
+  assert.equal(summary.taxi.ready, false);
+  assert.match(summary.taxi.unresolved.join(' '), /휠체어/);
   assert.match(summary.unresolved.join(' '), /이용자격/);
   state = act(state, 'SUPPORT_UPDATE_REQUIREMENTS', { values: { appointmentTime: '10:30' } });
   assert.equal(state.visitSupport.taxi.status, 'needs_recheck');
@@ -106,6 +113,8 @@ test('가능 합성 응답도 시각·휠체어·특수교통 자격이 빠지�
   state = act(state, 'SUPPORT_RECORD_RESPONSE', { kind: 'taxi', outcome: 'available', wheelchairConfirmed: true, eligibilityConfirmed: true });
   summary = getVisitSupportSummary(state);
   assert.equal(summary.preparedCount, 1);
+  assert.equal(summary.taxi.ready, true);
+  assert.deepEqual(summary.taxi.unresolved, []);
   assert.equal(summary.totalNeeded, 1);
   assert.deepEqual(summary.unresolved, []);
   assert.equal(summary.taxi.status, 'available_demo');
@@ -186,6 +195,10 @@ test('필요 없음은 지원별로 계산하고 다시 필요해지면 과거 �
   assert.equal(summary.totalNeeded, 0);
   assert.equal(summary.taxi.status, 'not_needed');
   assert.equal(summary.companion.status, 'not_needed');
+  assert.equal(summary.taxi.ready, false);
+  assert.equal(summary.companion.ready, false);
+  assert.deepEqual(summary.taxi.unresolved, []);
+  assert.deepEqual(summary.companion.unresolved, []);
   assert.deepEqual(summary.unresolved, []);
   assert.throws(() => act(off, 'SUPPORT_PREPARE_INQUIRY', { kind: 'taxi' }), /필요하지 않은/);
   const on = act(off, 'SUPPORT_UPDATE_REQUIREMENTS', { values: { transportNeeded: true } });
@@ -225,4 +238,43 @@ test('지원 보고서는 공개 출처·자료시점·시연 응답을 표시�
   for (let i = 0; i < 220; i++) state = act(state, 'SUPPORT_PREPARE_INQUIRY', { kind: 'taxi' });
   assert.equal(state.events.length, 200);
   assert.equal(new Set(state.events.map(event => event.id)).size, 200);
+});
+
+test('기본 가상 기관이나 주소 없는 선택 기관은 두 지원의 가능 응답만으로 준비 완료가 되지 않는다', () => {
+  for (const initial of [createDemoCase(), withDestination(createDemoCase(), '')]) {
+    let state = act(initial, 'SUPPORT_UPDATE_REQUIREMENTS', { values: { appointmentTime: '10:30' } });
+    state = available(state, 'call_taxi');
+    state = available(state, 'hospital_escort');
+    const summary = getVisitSupportSummary(state);
+    assert.equal(summary.preparedCount, 0);
+    assert.equal(summary.totalNeeded, 2);
+    for (const kind of ['taxi', 'companion']) {
+      assert.equal(summary[kind].status, 'available_demo');
+      assert.equal(summary[kind].ready, false);
+      assert.match(summary[kind].unresolved.join(' '), /방문기관·주소 확인/);
+    }
+    assert.match(summary.unresolved.join(' '), /방문기관·주소 확인/);
+  }
+});
+
+test('기관·주소를 선택한 뒤 새 조건으로 재문의하면 지원별 준비 상태와 공백이 갱신된다', () => {
+  let state = act(createDemoCase(), 'SUPPORT_UPDATE_REQUIREMENTS', { values: { appointmentTime: '10:30' } });
+  state = available(state, 'call_taxi');state = available(state, 'hospital_escort');
+  state = withDestination(state);
+  assert.equal(state.visitSupport.taxi.status, 'needs_recheck');
+  assert.equal(state.visitSupport.companion.status, 'needs_recheck');
+  assert.equal(getVisitSupportSummary(state).preparedCount, 0);
+  for (const kind of ['taxi', 'companion']) {
+    state = act(state, 'SUPPORT_PREPARE_INQUIRY', { kind });
+    state = act(state, 'SUPPORT_RECORD_RESPONSE', { kind, outcome: 'available' });
+  }
+  const summary = getVisitSupportSummary(state);
+  assert.equal(summary.preparedCount, 2);
+  for (const kind of ['taxi', 'companion']) {
+    assert.equal(summary[kind].ready, true);
+    assert.deepEqual(summary[kind].unresolved, []);
+  }
+  assert.deepEqual(summary.unresolved, []);
+  assert.equal(state.review.status, 'not_requested');
+  assert.match(buildVisitSupportReport(state), /합성 응답은 실제 예약·배차·동행인 배정이 아닙니다/);
 });
