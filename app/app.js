@@ -60,7 +60,7 @@ function formatTime(value) { const date = new Date(value); return Number.isNaN(d
 function isRequired(id) { return id !== 'referral' || Object.values(state.inquiries).some(inquiry => inquiry.requestedDocuments?.includes(id)); }
 
 function overview() {
-  return `${pageTitle('우리 가족의 진료 준비', '김하늘 님, 오늘도 함께 차근차근 준비해요.')}<section class="hero" aria-label="제주 해안 일러스트"><div class="hero-copy"><h2>멀리 있어도,<br>진료는 함께 이어가요.</h2><p>제주의 진찰부터 기존 주치의의 회신까지.<br>가족이 챙길 일을 나침반이 함께 정리해요.</p><span class="hero-label">${icon('leaf')}제주에서, 우리 가족의 일상 가까이</span></div></section>${patientStrip()}${progressPanel()}<div class="dashboard-grid"><div class="column">${tasksPanel()}${documentsPanel()}</div><div class="column right-column">${assistantPanel()}${mapPanel()}</div></div>${activitiesPanel()}`;
+  return `${pageTitle('우리 가족의 진료 준비', `${state.patient.caregiver} 님, 오늘도 함께 차근차근 준비해요.`)}<section class="hero" aria-label="제주 어머니와 현지 의사, 원격 전문의와 멀리 있는 자녀의 연결을 표현한 생성 일러스트"><div class="hero-copy"><h2>멀리 있어도,<br>진료는 함께 이어가요.</h2><p>제주의 진찰부터 기존 주치의의 회신까지.<br>가족이 챙길 일을 나침반이 함께 정리해요.</p><span class="hero-label">${icon('leaf')}제주에서, 우리 가족의 일상 가까이</span></div></section>${patientStrip()}${progressPanel()}<div class="dashboard-grid"><div class="column">${tasksPanel()}${documentsPanel()}</div><div class="column right-column">${assistantPanel()}${mapPanel()}</div></div>${activitiesPanel()}`;
 }
 
 function fullDocuments() {
@@ -76,7 +76,7 @@ function packetPanel() {
   return `<section class="panel"><div class="panel-top"><h2>협진 자료 묶음</h2>${badge(state.packet.status === 'submitted' ? '검토 접수 재현' : `${progress.prepared}/${progress.total} 준비`, state.packet.status === 'submitted' ? 'green' : 'neutral')}</div><p class="help-text">양쪽 기관의 절차와 필요한 자료를 확인한 뒤 검토 접수를 재현합니다.</p><label class="checkbox"><input type="checkbox" data-permission="share" ${state.permissions.share ? 'checked' : ''}/><span><strong>시연 자료 공유 허용</strong>가상 기관에 자료를 전달하는 단계를 재현합니다. 실제 외부 전송은 하지 않아요.</span></label>${button(state.packet.status === 'submitted' ? '검토 접수 재현 완료' : '협진 검토 접수 시연', `data-submit-packet ${!canSubmit || state.packet.status === 'submitted' ? 'disabled' : ''}`, 'primary', 'send')}${!canSubmit && state.packet.status !== 'submitted' ? '<p class="help-text" style="margin-top:12px">병원 두 곳 문의, 필수 자료 준비, 공유 허용이 필요해요.</p>' : ''}</section>`;
 }
 function reviewPanel() {
-  const pending = state.packet.status === 'submitted';
+  const pending = state.packet.status === 'submitted' && state.review.status === 'pending';
   return `<section class="panel review-controls"><div class="panel-top"><h2>의료진 회신</h2>${badge(state.review.status === 'completed' ? '합성 회신 확인' : state.review.status === 'needs_information' ? '자료 보완 요청' : pending ? '회신 대기 · 시연' : '접수 전', state.review.status === 'completed' ? 'green' : 'neutral')}</div><p class="help-text">의료진 역할의 합성 응답으로 다음 작업이 바뀌는 과정을 확인해요. 실제 환자에 대한 판단이 아닙니다.</p>${state.review.note ? `<p class="review-note">${escape(state.review.note)}</p><p class="help-text">출처 · ${escape(state.review.source)}</p>` : ''}<form id="review-form"><div class="field"><label for="review-outcome">합성 의료진 응답</label><select id="review-outcome" name="outcome" ${!pending ? 'disabled' : ''}><option value="local_followup">제주 진찰 + 기존 주치의 검토 계획</option><option value="needs_information">추가 판독문 요청 · 보완 필요</option><option value="mainland_visit">도외 대면 방문 계획</option></select></div><button class="button secondary" type="submit" ${!pending ? 'disabled' : ''}>의료진 회신 재현${icon('arrow')}</button></form></section>`;
 }
 function documents() {

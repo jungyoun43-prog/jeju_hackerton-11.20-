@@ -62,7 +62,7 @@ button { border: 0; background: transparent; color: inherit; }
 .page-title-row p { margin-top: 7px; font-size: 13px; color: var(--muted); }
 .date-note { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); padding-top: 5px; white-space: nowrap; }
 .date-note .icon { width: 15px; height: 15px; }
-.hero { position: relative; overflow: hidden; min-height: 200px; background-color: #e5eee3; background-image: url('/assets/jeju-coast.png'); background-size: cover; background-position: center 59%; border-radius: 16px; padding: 31px 32px; margin-bottom: 22px; }
+.hero { position: relative; overflow: hidden; min-height: 250px; background-color: #faf6e9; background-image: url('/assets/jeju-care-v2.png'); background-size: auto 100%; background-position: right center; background-repeat: no-repeat; border-radius: 16px; padding: 31px 32px; margin-bottom: 22px; }
 .hero-copy { position: relative; z-index: 1; max-width: 420px; }
 .hero h2 { font-size: 28px; letter-spacing: -.035em; font-weight: 730; line-height: 1.5; }
 .hero p { margin-top: 9px; font-size: 13px; color: #385b51; line-height: 1.7; max-width: 330px; }
@@ -240,7 +240,7 @@ select { min-height: 43px; }
 @media (min-width: 1600px) {
   .main { padding: 32px 48px 40px; }
   .dashboard-grid, .subpage-grid { grid-template-columns: minmax(0, 1fr) 350px; gap: 26px; }
-  .hero { min-height: 225px; padding: 35px; }
+  .hero { min-height: 260px; padding: 35px; }
 }
 @media (max-width: 1199px) {
   .app-layout { grid-template-columns: 184px minmax(0,1fr); }
@@ -267,7 +267,7 @@ select { min-height: 43px; }
   .profile { padding: 14px 0 0; }
   .dashboard-grid, .subpage-grid { grid-template-columns: minmax(0,1fr) 270px; gap: 16px; }
   .main { padding: 22px; }
-  .hero { padding: 25px; min-height: 193px; }
+  .hero { padding: 25px; min-height: 230px; }
   .hero h2 { font-size: 25px; }
   .hero-copy { max-width: 310px; }
   .hero p { max-width: 255px; font-size: 12px; }
@@ -284,8 +284,9 @@ select { min-height: 43px; }
   .right-column { display: grid; grid-template-columns: 1fr 1fr; align-items: start; }
   .map-canvas { height: 240px; }
   .task-footer { flex-direction: row; align-items: center; }
-  .hero { background-position: 47% center; }
+  .hero { padding: 24px 24px 200px; min-height: 0; background-size: 100% auto; background-position: center bottom; }
   .hero-copy { max-width: 310px; }
+  .hero-label { display: none; }
 }
 @media (max-width: 560px) {
   :root { font-size: 15px; }
@@ -310,12 +311,11 @@ select { min-height: 43px; }
   .page-title-row h1 { font-size: 21px; }
   .page-title-row p { font-size: 11px; line-height: 1.7; }
   .date-note { display: none; }
-  .hero { min-height: 235px; padding: 22px; background-position: 52% center; margin-bottom: 21px; }
-  .hero::before { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg,#f2f5e9d9 0%,#f2f5e933 85%); }
+  .hero { min-height: 0; padding: 22px 22px 145px; background-size: 100% auto; background-position: center bottom; background-repeat: no-repeat; margin-bottom: 21px; }
   .hero h2 { font-size: 24px; line-height: 1.55; }
   .hero p { font-size: 12px; max-width: 255px; }
   .hero-copy { max-width: 280px; }
-  .hero-label { font-size: 10px; margin-top: 19px; }
+  .hero-label { display: none; }
   .patient-strip { gap: 10px; padding-bottom: 20px; }
   .patient-avatar { width: 39px; height: 39px; }
   .patient-name h2 { font-size: 15px; }

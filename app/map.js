@@ -1,6 +1,7 @@
 let map;
 let fallbackTimer;
 let mapLoaded = false;
+let mapError = '';
 
 export const DEMO_LOCATIONS = {
   home: [33.461, 126.31],
@@ -19,12 +20,16 @@ export function destroyMap() {
   clearTimeout(fallbackTimer);
   if (map) { map.remove(); map = undefined; }
   mapLoaded = false;
+  mapError = '';
 }
 
 export function refreshMap() {
   if (!map) return;
   const hint = map.getContainer().parentElement?.querySelector('.map-load-state');
-  if (hint && mapLoaded) hint.hidden = true;
+  if (hint) {
+    hint.hidden = mapLoaded;
+    if (!mapLoaded && mapError) hint.textContent = mapError;
+  }
   requestAnimationFrame(() => map?.invalidateSize({ pan: false }));
 }
 
@@ -45,8 +50,9 @@ export async function mountMap(id = 'care-map') {
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors',
   });
   const currentHint = () => container.parentElement?.querySelector('.map-load-state');
-  tile.on('load', () => { mapLoaded = true; const hint = currentHint(); if (hint) hint.hidden = true; clearTimeout(fallbackTimer); });
-  tile.on('tileerror', () => { const hint = currentHint(); if (hint) { hint.hidden = false; hint.textContent = '지도 배경 연결을 확인해 주세요 · 외부 지도에서 열 수 있어요'; } });
+  tile.on('tileload', () => { mapLoaded = true; });
+  tile.on('load', () => { const hint = currentHint(); if (hint) { hint.hidden = mapLoaded; if (!mapLoaded) hint.textContent = mapError || '지도 연결을 확인해 주세요 · Google 지도에서 위치를 볼 수 있어요'; } clearTimeout(fallbackTimer); });
+  tile.on('tileerror', () => { mapError = '지도 배경 연결을 확인해 주세요 · 외부 지도에서 열 수 있어요'; const hint = currentHint(); if (hint) { hint.hidden = false; hint.textContent = mapError; } });
   tile.addTo(map);
   const marker = (position, type, label) => {
     const artwork = type === 'home'
