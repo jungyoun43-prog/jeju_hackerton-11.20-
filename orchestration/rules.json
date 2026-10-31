@@ -460,6 +460,38 @@
         "scripts/journey-browser-check.mjs",
         "scripts/preparation-board-browser-check.mjs"
       ]
+    },
+    {
+      "id": "ponytail-progress",
+      "branch": "refactor/ponytail-progress",
+      "baseCommit": "4895e55e5e652b2a00f79fd42bb75b6828c3b3ce",
+      "allow": [
+        "app/preparation-stages.js",
+        "agent/progress.mjs",
+        "tests/preparation-stages.test.mjs",
+        "tests/progress.test.mjs",
+        "scripts/preparation-board-browser-check.mjs"
+      ]
+    },
+    {
+      "id": "ponytail-frontend",
+      "branch": "refactor/ponytail-frontend",
+      "baseCommit": "4895e55e5e652b2a00f79fd42bb75b6828c3b3ce",
+      "allow": [
+        "app/app.js",
+        "app/styles.css",
+        "app/conversation.js",
+        "scripts/conversation-browser-check.mjs"
+      ]
+    },
+    {
+      "id": "ponytail-package",
+      "branch": "fix/ponytail-package",
+      "baseCommit": "4895e55e5e652b2a00f79fd42bb75b6828c3b3ce",
+      "allow": [
+        "scripts/package.mjs",
+        "tests/package.test.mjs"
+      ]
     }
   ],
   "rules": [

@@ -325,6 +325,24 @@
         "9baabe0",
         "bfbd1d2"
       ]
+    },
+    "ponytail-progress": {
+      "phase": "implementing",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-ponytail-progress",
+      "note": "Ponytail 읽기전용 감사의 확인된 문제만 정리; docs/refactoring-contract.md 준수",
+      "integrationCommits": []
+    },
+    "ponytail-frontend": {
+      "phase": "implementing",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-ponytail-frontend",
+      "note": "Ponytail 읽기전용 감사의 확인된 문제만 정리; docs/refactoring-contract.md 준수",
+      "integrationCommits": []
+    },
+    "ponytail-package": {
+      "phase": "implementing",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-ponytail-package",
+      "note": "Ponytail 읽기전용 감사의 확인된 문제만 정리; docs/refactoring-contract.md 준수",
+      "integrationCommits": []
     }
   },
   "review": {
