@@ -1,6 +1,6 @@
 {
   "baseCommit": "e1e7e44",
-  "updatedAt": "2026-10-31T13:17:27.309332+00:00",
+  "updatedAt": "2026-10-31T13:28:37.657177+00:00",
   "tasks": {
     "ui": {
       "phase": "verified",
@@ -197,16 +197,22 @@
     "stackStatus": "UPDATE_COMPLETE",
     "ciWorkflow": "passed",
     "evidence": "orchestration/runs/aws-deployment.json",
-    "ciRun": "https://github.com/jungyoun43-prog/jeju_hackerton-11.20-/actions/runs/41202034743",
-    "verifiedRevision": "32d0694ef91b8e7d8b0de01a275ae0f374db7277",
-    "apiStack": "CREATE_COMPLETE",
-    "apiRevision": "32d0694ef91b8e7d8b0de01a275ae0f374db7277",
+    "ciRun": "https://github.com/jungyoun43-prog/jeju_hackerton-11.20-/actions/runs/41205565820",
+    "verifiedRevision": "201f3e68cd9ac8b0fbd40f9ecd5b90c1bea032c7",
+    "apiStack": "UPDATE_COMPLETE",
+    "apiRevision": "201f3e68cd9ac8b0fbd40f9ecd5b90c1bea032c7",
     "apiChecks": {
       "capabilities": 200,
       "fixedPreview": 200,
-      "normalInput": 503,
+      "normalInput": 200,
       "directOrigin": 403
     },
-    "note": "실제 Actions에서 같은 커밋 정적/서버 artifact 게시·공개 revision·Lambda 코드 hash 확인. 실제 LLM·전화·공단 연결은 비활성"
+    "note": "같은 SHA 웹/API artifact·OIDC·공개 revision·코드 hash CI 성공. Sol 실제 get_case 스모크200·5.2초와 DDB 저장/같은세션 중복 미차감 확인. 실전화·공단 미연동. 이 값은 검증 시점 스냅샷이며 이후 문서 커밋의 배포는 runs/aws-deployment.json을 따른다.",
+    "model": "gpt-6.1-sol",
+    "sessionStore": "dynamodb",
+    "dailyTurnLimit": 80,
+    "dailyTurnTimezone": "UTC",
+    "liveModelEvidence": "orchestration/runs/aws-llm-live-check.json",
+    "durableStoreEvidence": "orchestration/runs/aws-durable-store-check.json"
   }
 }

@@ -74,7 +74,7 @@ AWS 첫 site 연결은 CloudFront가 SHA256 헤더의 명시 allowlist를 거부
 
 사용자가 AWS 적용을 요청해 로컬 키를 전용 Secrets Manager에 저장하고, ARN·exact 실행 권한·DynamoDB 상태/예산을 연결했다. 키는 Node→Python OS pipe→AWS CLI stdin으로만 전달했다. 초기 Node child stdin의 Unix socket은 CLI가 /dev/stdin을 다시 열지 못해 실패했고, 실제 OS pipe로 수정한 뒤 가짜 CLI 실프로세스 검사와 실제 업로드를 확인했다. 키·오류 원문·reasoning을 기록하지 않았다.
 
-Agent stack은 UPDATE_COMPLETE이며 직접 코드 게시 `96563ea11b34ac0cdaa743dc3ea8385db69d8f27`에서 다음을 실제 확인했다. 자동 배포 최종 SHA는 아래 추가 기록과 하네스 상태를 따른다.
+Agent stack은 UPDATE_COMPLETE이며 직접 코드 게시 `96563ea11b34ac0cdaa743dc3ea8385db69d8f27`에서 다음을 실제 확인했다. 이후 [Actions41205565820](https://github.com/jungyoun43-prog/jeju_hackerton-11.20-/actions/runs/41205565820)도 성공했다. `201f3e68cd9ac8b0fbd40f9ecd5b90c1bea032c7`의 웹/API artifact·OIDC 게시·공개 revision·Lambda code hash가 일치하며 llm:true·Sol을 확인했다. 이 값은 검증 시점 기록이다.
 
 | 검사 | 실제 결과 |
 | --- | --- |
