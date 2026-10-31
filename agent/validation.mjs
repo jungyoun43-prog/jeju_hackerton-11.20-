@@ -1,4 +1,5 @@
 import { AgentError, assertKeys, fail, isObject } from './errors.mjs';
+import { JOURNEY_SCENARIOS, CALL_RECOVERY_SCENARIOS } from '../app/care-journey.js';
 import { normalizeCarePreferences } from '../app/care-preferences.js';
 
 export const LIMITS = Object.freeze({ bodyBytes: 24576, messageChars: 4000, historyTurns: 8, historyChars: 2000, totalTextChars: 16000 });
@@ -41,7 +42,7 @@ export function validateMessageRequest(body) {
 export function validatePreviewRequest(body) {
   assertKeys(body, ['scenarioId', 'requestId']);
   validateRequestId(body.requestId);
-  fail(body.scenarioId === 'aewol-parent-visit', 'UNKNOWN_PREVIEW', '지원하는 고정 대화 예시를 선택해 주세요.');
+  fail(['aewol-parent-visit',...JOURNEY_SCENARIOS.map(item => item.id),...CALL_RECOVERY_SCENARIOS.map(item=>item.id)].includes(body.scenarioId), 'UNKNOWN_PREVIEW', '지원하는 고정 대화 예시를 선택해 주세요.');
   return body;
 }
 

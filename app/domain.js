@@ -1,3 +1,5 @@
+import { createCallRecovery, applyCallRecoveryAction } from './call-recovery.js';
+import { createCareJourney, applyCareJourneyAction, reconcileCareJourney, getCareJourneySummary } from './care-journey.js';
 import { createVisitSupport, applyVisitSupportAction, reconcileVisitSupport, buildVisitSupportReport } from './visit-support.js';
 
 /**
@@ -46,7 +48,8 @@ function event(state, title, detail, kind, source = '결정적 시뮬레이터')
   state.events = state.events.slice(-200);
 }
 
-function invalidateReview(state) {
+function invalidateReview(state, {medical = true} = {}) {
+  if(medical) {state.careJourney ??= createCareJourney();state.careJourney.medicalRevision+=1;}
   state.packet = { status: 'draft', submittedAt: null };
   state.review = { status: 'not_requested', outcome: null, note: '', source: '' };
 }
@@ -83,6 +86,8 @@ export function createDemoCase() {
     review: { status: 'not_requested', outcome: null, note: '', source: '' },
     plan: { visits: 2, caregiverAvailable: 1, localTransport: 40000, offIslandTransport: null, lodging: null, medical: null, caregiverTransport: null },
     visitSupport: createVisitSupport(),
+    careJourney: createCareJourney(),
+    callRecovery: createCallRecovery(),
     events: [{ id: 'event-1', at, title: '시연 사례를 준비했어요', detail: '합성 환자·가상 기관으로 문의와 자료 보완 과정을 확인합니다.', kind: 'case', source: '시연용 합성 사례' }],
   };
 }
@@ -118,7 +123,9 @@ function validatePlan(plan) {
 export function applyAction(state, action) {
   assertState(state);
   assert(object(action) && typeof action.type === 'string', '실행할 작업을 확인해 주세요.');
-  if (action.type.startsWith('SUPPORT_')) return applyVisitSupportAction(state, action);
+  if (action.type.startsWith('SUPPORT_')) return reconcileCareJourney(state, applyVisitSupportAction(state, action));
+  if (action.type.startsWith('CALL_')) return applyCallRecoveryAction(state, action);
+  if (action.type.startsWith('JOURNEY_')) return reconcileCareJourney(state, reconcileVisitSupport(state, applyCareJourneyAction(state, action)));
   const next = structuredClone(state);
   switch (action.type) {
     case 'SELECT_LOCAL_HOSPITAL': {
@@ -159,7 +166,8 @@ export function applyAction(state, action) {
       const old = next.inquiries[action.target];
       const result = callResponse(action.target, action.outcome);
       const requestedDocuments = result.requestedDocuments ?? old.requestedDocuments;
-      if (old.status !== result.status || JSON.stringify(old.requestedDocuments) !== JSON.stringify(requestedDocuments)) invalidateReview(next);
+      const requirementsChanged=JSON.stringify(old.requestedDocuments)!==JSON.stringify(requestedDocuments);
+      if (old.status !== result.status || requirementsChanged) invalidateReview(next,{medical:requirementsChanged});
       next.inquiries[action.target] = { ...result, requestedDocuments: [...new Set(requestedDocuments)], at: now() };
       event(next, `${action.target === 'mainland' ? '기존 도외' : '제주'} 병원 문의 응답을 기록했어요`, result.response, 'call', '합성 전화 응답 · 실제 발신 없음');
       break;
@@ -205,6 +213,7 @@ export function applyAction(state, action) {
       };
       const note = action.note === undefined ? defaults[action.outcome] : text(action.note, '의료진 역할 회신', 10000);
       if (action.outcome === 'needs_information') {
+        next.careJourney ??= createCareJourney();next.careJourney.medicalRevision+=1;
         next.packet = { status: 'draft', submittedAt: null };
         Object.assign(next.documents.find(doc => doc.id === 'report'), { status: 'missing', content: '', source: '' });
         next.review = { status: 'needs_information', outcome: 'needs_information', note, source: '합성 의료진 역할 회신' };
@@ -240,7 +249,7 @@ export function applyAction(state, action) {
     }
     default: throw new Error('지원하지 않는 작업입니다. 화면의 작업을 다시 선택해 주세요.');
   }
-  return reconcileVisitSupport(state, next);
+  return reconcileCareJourney(state, reconcileVisitSupport(state, next));
 }
 
 export function getTasks(state) {
@@ -308,6 +317,8 @@ export function buildReport(state) {
   const progress = getProgress(state);
   const burden = calculateBurden(state.plan);
   const rows = state.documents.map(doc => `| ${md(doc.label)} | ${doc.status === 'ready' ? '자료 보유' : doc.status === 'not_performed' ? '진찰 시행 전' : '미보유/보완 필요'} | ${md(doc.source || '미확인')} |`).join('\n');
+  const journey=getCareJourneySummary(state);
+  const journeyReport=['## 진료 연결과 후속 준비','',`${md(journey.pathway.label)} · ${md(journey.pathway.detail)}`,...journey.nextActions.slice(0,8).map(item=>`- ${md(item.title)}: ${md(item.detail)}`),'','### 전화 실패·사람 인계',...journey.handoffs.flatMap(item=>[`- ${md(item.title)} / 담당: ${md(item.owner)} / 자동 중단: ${item.stopAutomatic ? '예' : '허용 범위 확인'} / 실제 발신: 없음`,...item.attempts.map(attempt=>`  - 합성 ${attempt.number}회 ${attempt.at}: ${md(attempt.outcome)}`),`  - 남은 일: ${item.remainingTasks.map(md).join(', ')}`])].join('\n');
   const hospitalSource = state.selectedHospital ? `\n\n제주 기관 선택 출처: ${state.selectedHospital.source.kind === 'public-preview' ? '제주데이터허브 859 공개 미리보기 · 최대20행 표본 · 전체 운영 API 미검증' : '사용자 가져오기 · 공식 운영 API 미검증'}. 출처 URL: ${md(state.selectedHospital.source.url || '사용자 제공 파일·원출처 미확인')}. 행정 상태: ${md(state.selectedHospital.openStatus)}, 행별 갱신일: ${md(state.selectedHospital.updatedAt || '미확인')}, 자료 수집일: ${md(state.selectedHospital.collectedAt || '미확인')}. 현재 진료·예약·실시간 수용·협진 참여는 미확인입니다.` : '';
-  return `# 혼디 진행 보고서\n\n합성 환자의 시연 결과입니다. 초기 기관은 가상이며 허브 공개 미리보기 또는 사용자 파일에서 선택한 기관은 출처를 따로 표시합니다. 실제 통화·기관 전송·예약·의료진 판단은 수행하지 않았습니다.\n\n작성 시각: ${now()}\n\n## 사례\n\n- 환자: ${md(state.patient.name)} (합성 사례)\n- 보호자: ${md(state.patient.caregiver)}\n- 지역: ${md(state.patient.area)}\n- 기존 병원: ${md(state.patient.existingHospital)}\n- 제주 병원: ${md(state.patient.localHospital)}\n- 목적: ${md(state.patient.purpose)}\n- 준비 일정: ${md(state.patient.nextVisit)} (시연 일정·예약 확정 아님)${hospitalSource}\n\n## 현재 진행\n\n${getSummary(state)}\n\n합성 전화 문의 시연 허용: ${state.permissions.inquiry ? '허용' : '해제'} / 합성 자료 공유 시연 허용: ${state.permissions.share ? '허용' : '해제'}\n실제 환자 위임·대리 권한·민감정보 공유 동의는 미검증입니다. 실제 녹음·전사·보관 정책은 미설정이며 국외 이전 근거는 별도 확인 대상입니다.\n\n${TARGETS.map(target => `- ${target === 'mainland' ? '기존 도외' : '제주'} 병원: ${md(state.inquiries[target].status)} · ${md(state.inquiries[target].response || '미문의')} · 출처: 합성 전화 응답`).join('\n')}\n\n## 준비 자료 (${progress.prepared}/${progress.total})\n\n| 자료 | 상태 | 출처 |\n| --- | --- | --- |\n${rows}\n\n## 다음 행동\n\n${getTasks(state).map(task => `- ${md(task.title)} / 담당: ${md(task.owner)} / ${md(task.description)}`).join('\n')}\n\n## 의료진 역할 회신\n\n${md(state.review.note || '회신 전입니다.')}\n\n출처: ${md(state.review.source || '미확인')}\n\n## 부담 가정\n\n방문 ${state.plan.visits}회, 보호자 동행 가능 ${state.plan.caregiverAvailable}회. 입력한 예산의 소계: ${burden.estimatedSubtotal.toLocaleString('ko-KR')}원. 미확인 항목은 합계에 포함하지 않았으며 0원 확정이 아닙니다.\n\n- 미확인: ${burden.unknownItems.join(', ') || '입력 가정 내 없음'}\n- 동행 미배정 방문: ${burden.careGap}회\n- 계산 범위: 방문당 제주 왕복 이동·환자 도외 왕복 교통·일행 공동 숙박·진료비를 방문 횟수로 곱하고, 보호자 왕복 교통은 동행 가능한 횟수만 곱합니다. 불필요한 항목은 사용자가 명시적으로 0을 입력합니다.\n- 금액·방문 횟수는 사용자 입력 가정이며 실제 견적·급여 판정·의학적 계획이 아닙니다.\n\n${buildVisitSupportReport(state)}\n\n## 실행 이력\n\n${state.events.map(item => `- ${item.at}: ${md(item.title)} — ${md(item.detail)} (출처: ${md(item.source)})`).join('\n')}\n\n## 한계\n\n규칙 기반 준비 상태·공개 자료·합성 외부 응답을 정리한 보고서입니다. 이 보고서는 런타임 AI 모델의 연결 여부를 판정하지 않으며, 실제 모델 연결 상태는 별도 대화 API에서 확인해야 합니다. 공공데이터의 병원명·진료과는 실제 협진 참여나 환자별 적합성을 보장하지 않습니다. 실제 데이터 접근·이용조건, 기관 연동, 통화, 임상 검증은 별도로 필요합니다.\n`;
+  return `# 혼디 진행 보고서\n\n합성 환자의 시연 결과입니다. 초기 기관은 가상이며 허브 공개 미리보기 또는 사용자 파일에서 선택한 기관은 출처를 따로 표시합니다. 실제 통화·기관 전송·예약·의료진 판단은 수행하지 않았습니다.\n\n작성 시각: ${now()}\n\n## 사례\n\n- 환자: ${md(state.patient.name)} (합성 사례)\n- 보호자: ${md(state.patient.caregiver)}\n- 지역: ${md(state.patient.area)}\n- 기존 병원: ${md(state.patient.existingHospital)}\n- 제주 병원: ${md(state.patient.localHospital)}\n- 목적: ${md(state.patient.purpose)}\n- 준비 일정: ${md(state.patient.nextVisit)} (시연 일정·예약 확정 아님)${hospitalSource}\n\n## 현재 진행\n\n${getSummary(state)}\n\n합성 전화 문의 시연 허용: ${state.permissions.inquiry ? '허용' : '해제'} / 합성 자료 공유 시연 허용: ${state.permissions.share ? '허용' : '해제'}\n실제 환자 위임·대리 권한·민감정보 공유 동의는 미검증입니다. 실제 녹음·전사·보관 정책은 미설정이며 국외 이전 근거는 별도 확인 대상입니다.\n\n${TARGETS.map(target => `- ${target === 'mainland' ? '기존 도외' : '제주'} 병원: ${md(state.inquiries[target].status)} · ${md(state.inquiries[target].response || '미문의')} · 출처: 합성 전화 응답`).join('\n')}\n\n## 준비 자료 (${progress.prepared}/${progress.total})\n\n| 자료 | 상태 | 출처 |\n| --- | --- | --- |\n${rows}\n\n## 다음 행동\n\n${getTasks(state).map(task => `- ${md(task.title)} / 담당: ${md(task.owner)} / ${md(task.description)}`).join('\n')}\n\n## 의료진 역할 회신\n\n${md(state.review.note || '회신 전입니다.')}\n\n출처: ${md(state.review.source || '미확인')}\n\n## 부담 가정\n\n방문 ${state.plan.visits}회, 보호자 동행 가능 ${state.plan.caregiverAvailable}회. 입력한 예산의 소계: ${burden.estimatedSubtotal.toLocaleString('ko-KR')}원. 미확인 항목은 합계에 포함하지 않았으며 0원 확정이 아닙니다.\n\n- 미확인: ${burden.unknownItems.join(', ') || '입력 가정 내 없음'}\n- 동행 미배정 방문: ${burden.careGap}회\n- 계산 범위: 방문당 제주 왕복 이동·환자 도외 왕복 교통·일행 공동 숙박·진료비를 방문 횟수로 곱하고, 보호자 왕복 교통은 동행 가능한 횟수만 곱합니다. 불필요한 항목은 사용자가 명시적으로 0을 입력합니다.\n- 금액·방문 횟수는 사용자 입력 가정이며 실제 견적·급여 판정·의학적 계획이 아닙니다.\n\n${buildVisitSupportReport(state)}\n\n${journeyReport}\n\n## 실행 이력\n\n${state.events.map(item => `- ${item.at}: ${md(item.title)} — ${md(item.detail)} (출처: ${md(item.source)})`).join('\n')}\n\n## 한계\n\n규칙 기반 준비 상태·공개 자료·합성 외부 응답을 정리한 보고서입니다. 이 보고서는 런타임 AI 모델의 연결 여부를 판정하지 않으며, 실제 모델 연결 상태는 별도 대화 API에서 확인해야 합니다. 공공데이터의 병원명·진료과는 실제 협진 참여나 환자별 적합성을 보장하지 않습니다. 실제 데이터 접근·이용조건, 기관 연동, 통화, 임상 검증은 별도로 필요합니다.\n`;
 }

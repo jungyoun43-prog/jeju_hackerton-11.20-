@@ -1,8 +1,10 @@
+import { validateCallRecoveryState } from '../app/call-recovery.js';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import { GetCommand, PutCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { createDemoCase, applyAction, getTasks, calculateBurden } from '../app/domain.js';
 import { getVisitSupportSummary } from '../app/visit-support.js';
+import { validateCareJourneyState, getCareJourneySummary } from '../app/care-journey.js';
 import { AGENT_TOOLS } from './tools.mjs';
 import hospitalData from '../app/data/hospital-candidates.json' with { type: 'json' };
 import supportData from '../app/data/visit-support-providers.json' with { type: 'json' };
@@ -63,7 +65,9 @@ const supportStates = new Map(supportData.providers.map(provider => {
 const reportText = '[고정 합성 판독문 보유 예시] 최근 검사 자료의 파일이 있는 것으로 시연합니다. 실제 검사 결과·병변·치료 판단은 포함하지 않습니다. 의료진이 원본과 시행일을 확인해야 합니다.';
 function normalizedState(value) {
   const baseline = createDemoCase(), state = jsonClone(value);
-  keys(state, [...Object.keys(baseline), 'selectedHospital'], Object.keys(baseline));
+  keys(state, [...Object.keys(baseline), 'selectedHospital'], Object.keys(baseline).filter(key => !['careJourney','callRecovery'].includes(key)));
+  if (state.careJourney !== undefined) validateCareJourneyState(state.careJourney);
+  if (state.callRecovery !== undefined) validateCallRecoveryState(state.callRecovery);
   requireValue(state.version === 1);
   keys(state.patient, Object.keys(baseline.patient));
   for (const field of ['name', 'age', 'caregiver', 'existingHospital', 'purpose']) requireValue(state.patient[field] === baseline.patient[field]);
@@ -95,7 +99,7 @@ function normalizedState(value) {
   keys(state.packet, ['status', 'submittedAt']); oneOf(state.packet.status, ['draft', 'submitted']); timestamp(state.packet.submittedAt);
   keys(state.review, ['status', 'outcome', 'note', 'source']);
   oneOf(state.review.status, ['not_requested', 'pending', 'needs_information', 'completed']);
-  oneOf(state.review.outcome, [null, 'needs_information', 'local_followup', 'mainland_visit']); string(state.review.note, 10000); string(state.review.source, 300);
+  oneOf(state.review.outcome, [null, 'needs_information', 'local_followup', 'mainland_visit', 'local_transfer', 'shared_care', 'mainland_continues']); string(state.review.note, 10000); string(state.review.source, 300);
   keys(state.plan, Object.keys(baseline.plan)); calculateBurden(state.plan);
   keys(state.visitSupport, ['requirements', 'taxi', 'companion']);
   keys(state.visitSupport.requirements, Object.keys(baseline.visitSupport.requirements));
@@ -115,7 +119,7 @@ function normalizedState(value) {
     for (const field of ['title', 'detail', 'kind', 'source']) string(event[field]);
   }
   // 현재 dispatcher와 같은 reducer의 불변 조건도 검사한다. 도메인 오류 원문은 공개하지 않는다.
-  getTasks(state); getVisitSupportSummary(state);
+  getTasks(state); getVisitSupportSummary(state); getCareJourneySummary(state);
   return state;
 }
 

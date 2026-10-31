@@ -109,7 +109,7 @@ export function createAgentService({provider = createDisconnectedProvider(),stor
           }
           toolCount++;
           try {
-            const result = await bounded(Promise.resolve().then(() => dispatch({name:call.name,input:call.input,state,userMessage:request.message,preferences:request.preferences,signal:controller.signal})),controller.signal);
+            const result = await bounded(Promise.resolve().then(() => dispatch({name:call.name,input:call.input,state,userMessage:request.message,preferences:request.preferences,requestId:request.requestId,signal:controller.signal})),controller.signal);
             state = result.state;
             events.push(...result.events); pending.push(...result.pendingActions);
             results.push({toolResult:{toolUseId:call.toolUseId,status:'success',content:[{json:{...result.data,events:result.events,pendingActions:result.pendingActions}}]}});
@@ -149,7 +149,7 @@ export function createAgentService({provider = createDisconnectedProvider(),stor
       if (typeof parsed?.requestId === 'string' && /^[A-Za-z0-9][A-Za-z0-9_-]{11,79}$/.test(parsed.requestId)) requestId = parsed.requestId;
       if (route === '/api/agent/preview') {
         const request = validatePreviewRequest(parsed);
-        return response(200,await buildFixedPreview({capabilities:getCapabilities(),requestId:request.requestId}),revision);
+        return response(200,await buildFixedPreview({capabilities:getCapabilities(),requestId:request.requestId,scenarioId:request.scenarioId}),revision);
       }
       const request = validateMessageRequest(parsed);
       return response(200,await runTurn(request),revision);

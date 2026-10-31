@@ -1,3 +1,5 @@
+import { getJourneyContactContext } from './care-journey.js';
+
 /** 전화 준비만 계산한다. 실제 위임 검증·발신·예약·기록 처리는 수행하지 않는다. */
 export const CALL_TARGETS = Object.freeze(['mainland', 'jeju', 'taxi', 'companion']);
 
@@ -60,7 +62,7 @@ function recipientFor(state, target) {
     sourceUrl:knownSource ? source.url : null, contactVerified:false, serviceType:knownSource ? provider.serviceType : '',
   };
 }
-function questionsFor(target, recipient, requirements) {
+function questionsFor(target, recipient, requirements, state) {
   let questions;
   if (target === 'mainland') questions = [
     '제주 의료기관과의 협진·진료의뢰/회송을 문의할 행정 창구와 접수 방법은 무엇인가요?',
@@ -97,7 +99,7 @@ function questionsFor(target, recipient, requirements) {
     ];
     if (requirements.wheelchair === true) questions.push('휠체어 이동·승하차 보조와 차량 동행 탑승을 어느 범위까지 지원하나요?');
   }
-  return [...questions, 'AI를 통한 행정 문의 응대가 가능한가요? 어렵다면 사람이 문의할 창구를 안내받을 수 있나요?'];
+  return [...questions, ...getJourneyContactContext(state, target), 'AI를 통한 행정 문의 응대가 가능한가요? 어렵다면 사람이 문의할 창구를 안내받을 수 있나요?'];
 }
 function disclosureFor(state, target) {
   const requirements = state.visitSupport?.requirements ?? {};
@@ -161,7 +163,7 @@ export function buildCallPlan(state, target) {
     : target === 'taxi' ? `${supportSubject} ${requirements.wheelchair === true ? '휠체어 이동 지원 이용자격·등록·탑승·승하차 보조·동행인 탑승·차량 가능 여부' : '병원 이동 지원 조건·희망 시각의 차량 가능 여부'}`
       : `${supportSubject} 병원동행 제공 여부·지원 역할·시간·비용`;
   return {
-    version:1,target,recipient,purpose,questions:questionsFor(target,recipient,requirements),minimumDisclosure:disclosureFor(state,target),
+    version:1,target,recipient,purpose,questions:questionsFor(target,recipient,requirements,state),minimumDisclosure:disclosureFor(state,target),
     excludedInformation:['환자 실명·나이','진단명·병력·검사 결과·의료기록 본문','주민등록번호 등 고유식별정보','실제 환자·보호자 연락처','환자의 상세 주소','API 키·인증정보'],
     openingScript:`[실발신 전 위임·수신처·기록처리 확인 후 사용할 예정 문구 · 현재 발신 없음] 안녕하세요. 혼디의 AI 전화 도우미입니다. 오늘 문의 목적은 ${purpose}입니다. AI를 통한 행정 문의에 응대하실 수 있는지 먼저 확인해 주시겠습니까? [실제 확인한 위임 범위와 녹음·전사 여부, 목적·보관기간·외부 전송·거절 방법을 여기서 안내한 뒤 기관이 수락한 범위로 진행합니다. 현재 해당 정책은 미설정입니다.]`,
     recordHandling,preCallChecks,simulation:{inquiryDelegated,status,label,detail},nextActions,

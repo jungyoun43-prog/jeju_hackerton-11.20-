@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { createDynamoSessionStore } from '../agent/dynamodb-store.mjs';
 import { createAgentService } from '../agent/service.mjs';
 import { createToolDispatcher } from '../agent/tools.mjs';
+import { buildFixedPreview } from '../agent/preview.mjs';
+import { getCareJourneySummary } from '../app/care-journey.js';
 import { AgentError } from '../agent/errors.mjs';
 
 const tableName = 'test-synthetic-sessions';
@@ -294,4 +296,20 @@ test('서비스 중복 요청과 전역 budget 실패는 두 인스턴스에서�
   assert.equal(JSON.stringify([...f.client.items.values()]).includes('PRIVATE'), false);
   f.client.beforeSend = () => { throw new Error('PRIVATE database error'); };
   assert.equal((await post(a, 'request-service-004', sessionId)).statusCode, 503); assert.equal(calls, 2);
+});
+
+
+test('legacy 선택 필드 없는 세션과 7개 고정 상황의 ID·시점·행정조건을 저장·복원하고 임의 원문을 거부한다',async()=>{
+  const f=fixture(),{store,item}=await locked(f);
+  const legacy=clone(item.state);delete legacy.careJourney;delete legacy.callRecovery;
+  await store.save({...item,state:legacy});assert.equal((await store.loadOrCreate(item.sessionId)).state.careJourney,undefined);
+  for(const scenarioId of ['missing_record','jeju_unavailable','time_changed','call_no_answer','call_ai_declined','call_identity_required','call_documents_or_schedule']) {
+    const preview=await buildFixedPreview({scenarioId,requestId:'ddb-preview-roundtrip-001',capabilities:{llm:false}});
+    await store.save({...item,state:preview.caseState});const restored=(await store.loadOrCreate(item.sessionId)).state;
+    assert.deepEqual(getCareJourneySummary(restored),getCareJourneySummary(preview.caseState));
+    const bad=clone(restored);bad.callRecovery.targets.mainland.rawText='PRIVATE patient transcript';
+    await assert.rejects(store.save({...item,state:bad}),safeError('SESSION_STATE_INVALID',503));
+    const badGuidance=clone(restored);badGuidance.careJourney.rawText='PRIVATE medical original';
+    await assert.rejects(store.save({...item,state:badGuidance}),safeError('SESSION_STATE_INVALID',503));
+  }
 });

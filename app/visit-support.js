@@ -1,3 +1,5 @@
+import { getJourneyContactContext } from './care-journey.js';
+
 /** 단일 방문의 이동·동행 문의 준비. 실제 발신·예약·배차·결제를 수행하지 않는다. */
 const KINDS = ['taxi', 'companion'];
 const STATUSES = ['not_selected', 'selected', 'prepared', 'available_demo', 'unavailable_demo', 'unreachable_demo', 'needs_recheck'];
@@ -109,6 +111,7 @@ function contextOf(state) {
     address: clean(state.selectedHospital?.address ?? '', '공개 기관 주소', 1000, true),
     ...support.requirements,
     inquiryAllowed: state.permissions?.inquiry !== false,
+    journeyMobility: getJourneyContactContext(state, 'taxi').filter(line => !line.startsWith('변경 전 ')),
   };
 }
 const contextKey = state => JSON.stringify(contextOf(state));
@@ -176,7 +179,7 @@ function questionsFor(state, kind) {
     questions.push('요청한 날짜와 예약 시각에 병원 동행이 가능한가요?', '서비스 지역·이용 대상·신청 자격은 어떻게 되나요?', '방문·접수·진료·약국·귀가 중 지원 범위와 이동 차량 포함 여부는 무엇인가요?', '이용 비용·취소 조건·접수 절차를 확인할 수 있나요?');
   }
   if (kind === 'companion' && support.requirements.wheelchair) questions.push('휠체어 이동 보조를 어느 범위까지 지원하나요?');
-  return questions;
+  return [...questions, ...getJourneyContactContext(state, kind)];
 }
 
 export function buildSupportInquiry(state, kind) {

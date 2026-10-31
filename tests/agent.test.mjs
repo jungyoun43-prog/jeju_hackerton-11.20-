@@ -175,9 +175,10 @@ test('도구는 실제 발신 어댑터를 거절하고 전화 위임을 우회�
   assert.equal(result.events[0].status,'not_connected');
 });
 
-test('get_case는 기존 11개 도구 계약을 유지하고 전체 계획 대신 작은 전화 준비 요약만 반환한다',async () => {
+test('get_case는 기존 도구와 새 여정·인계 도구를 함께 제공하고 작은 전화 준비 요약을 유지한다',async () => {
   const {data,state} = await createToolDispatcher()({name:'get_case',input:{},state:createDemoCase()});
-  assert.equal(AGENT_TOOLS.length,11);
+  assert.equal(AGENT_TOOLS.length,15);
+  for(const name of ['get_case','update_visit','request_hospital_contact','request_support_contact','get_care_journey','run_journey_demo','update_call_retry_policy','run_call_recovery_demo']) assert.ok(AGENT_TOOLS.some(tool=>tool.name===name));
   assert.deepEqual(data.callPlans.map(plan => plan.target),['mainland','jeju','taxi','companion']);
   assert.ok(JSON.stringify(data.callPlans).length < 1800);
   for (const plan of data.callPlans) {
@@ -554,4 +555,22 @@ test('SDK·provider 오류 원문·ARN·키는 공개 응답에 노출하지 않
   const result = await post(createAgentService({provider}));
   assert.equal(result.statusCode,503); assert.equal(result.body.includes(secret),false); assert.equal(result.body.includes('stack'),false);
   assert.throws(() => createConverseProvider({modelId:'id-without-client'}));
+});
+
+
+test('일반 방문 요청은 기존 도구 뒤 get_care_journey의 실제 변경 상태를 읽고 명시 시연 없이 결과를 주입할 수 없다',async()=>{
+  const provider=scripted([
+    use(call('get_case',{},'journey-case')),
+    use(call('update_visit',{wheelchair:true,appointmentTime:'11:00'},'journey-update'),call('request_hospital_contact',{target:'mainland'},'journey-mainland')),
+    use(call('request_hospital_contact',{target:'jeju'},'journey-jeju')),
+    use(call('get_care_journey',{},'journey-summary')),
+    input=>{const facts=input.messages.at(-1).content[0].toolResult.content[0].json;assert.equal(facts.pathway.outcome,'unconfirmed');assert.equal(facts.schedule.time,'11:00');assert.ok(facts.tasks.some(x=>x.id==='wheelchair-loan'));assert.ok(facts.findings.some(x=>x.target==='mainland'));return done('판독문 발급·제출 문의와 휠체어 대여 확인을 합성으로 연결했습니다. 실제 진찰과 의료진 확인은 남아 있습니다.');},
+  ]);
+  const store=createMemorySessionStore(),result=await post(createAgentService({provider,store,config:{maxRounds:8}}),req({message:'병원 문의를 이어서 하고 휠체어도 필요합니다. 11시 방문 준비해줘'}));
+  assert.equal(result.statusCode,200);assert.equal(json(result).caseState.careJourney.scenarioId,null);
+  assert.equal(JSON.stringify(store.inspect()).includes('병원 문의를 이어서 하고 휠체어도 필요합니다'),false);
+  assert.ok(!json(result).events.some(x=>x.tool==='run_journey_demo'));
+  const dispatch=createToolDispatcher();
+  for(const userMessage of ['자료가 없으니 준비해줘','자료 누락 시연하지 말고 실제로 해줘','자료 누락 시연이 무엇인지 설명해줘']) await assert.rejects(dispatch({name:'run_journey_demo',input:{scenarioId:'missing_record'},state:createDemoCase(),userMessage}),e=>e.code==='EXPLICIT_DEMO_REQUIRED');
+  for(const input of [{scenarioId:'missing_record',outcome:'local_transfer'},{scenarioId:'missing_record',date:'2026-11-20'},{scenarioId:'missing_record',excerpt:'임의 원문'}]) await assert.rejects(dispatch({name:'run_journey_demo',input,state:createDemoCase(),userMessage:'자료 누락 상황을 합성 시연으로 실행해줘'}),e=>e.code==='INVALID_TOOL_ARGUMENTS');
 });

@@ -35,6 +35,15 @@ test('로컬 서버는 시연 상태만 공개하고 비밀 파일·경로 이�
  assert.equal(result.capabilities.llm,false);
  assert.equal(result.caseState.visitSupport.taxi.provider.name,'애월콜');
  assert.equal(result.events.length,15);
+ for(const scenarioId of ['missing_record','jeju_unavailable','time_changed','call_no_answer','call_ai_declined','call_identity_required','call_documents_or_schedule']) {
+  const preview=await fetch(base+'/api/agent/preview',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({scenarioId,requestId:'server-journey-'+scenarioId})});
+  assert.equal(preview.status,200);const payload=await preview.json();assert.equal(payload.isPreview,true);assert.equal(payload.capabilities.llm,false);assert.equal(payload.sessionId,'');
+  assert.equal(payload.careJourney.pathway.outcome,'unconfirmed');assert.equal(payload.careJourney.boundary.actualCallPlaced,false);
+  if(scenarioId.startsWith('call_')) assert.ok(payload.careJourney.handoffs.length);
+ }
+ const injected=await fetch(base+'/api/agent/preview',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({scenarioId:'call_no_answer',requestId:'server-injected-001',now:'2099-01-01',outcome:'answered'})});assert.equal(injected.status,400);
+ for(const asset of ['/care-journey.js','/call-recovery.js']) {const module=await fetch(base+asset);assert.equal(module.status,200);assert.match(module.headers.get('content-type'),/javascript/);}
+ for(const asset of ['/data/hospital-candidates.json','/data/visit-support-providers.json']) {const module=await fetch(base+asset);assert.equal(module.status,200);assert.match(module.headers.get('content-type'),/application\/json/);}
  assert.equal((await post('{')).status,400);
  assert.equal((await post('x'.repeat(40000))).status,413);
  for(const path of ['/.env','/README.md','/.git/config']) assert.equal((await fetch(base+path)).status,404);

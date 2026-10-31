@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { applyAction, getTasks, buildReport } from '../app/domain.js';
+import { applyAction, createDemoCase, getTasks, buildReport } from '../app/domain.js';
 import { getVisitSupportSummary, buildSupportInquiry } from '../app/visit-support.js';
 import { filterHospitals } from '../app/hospitals.js';
 import { getSupportCandidates, validateSupportRegistry } from '../app/support-data.js';
@@ -9,6 +9,8 @@ import { AgentError, fail } from './errors.mjs';
 import { validateSchema } from './validation.mjs';
 import { normalizeCarePreferences } from '../app/care-preferences.js';
 import { CALL_TARGETS, buildCallPlan } from '../app/call-policy.js';
+import { CALL_RECOVERY_SCENARIOS, CALL_FAILURE_REASONS, getCallAttemptGate, getCallRecoveryHandoffs } from '../app/call-recovery.js';
+import { getCareJourneySummary, JOURNEY_SCENARIOS } from '../app/care-journey.js';
 
 const registry = validateSupportRegistry(supportData);
 const HOSPITAL_SOURCE = 'https://jejudatahub.net/data/view/data/859';
@@ -34,6 +36,10 @@ const objectSchema = (properties = {}, required = [], extra = {}) => ({type:'obj
 const shortText = maxLength => ({type:'string', maxLength});
 const kindSchema = {type:'string', enum:['taxi','companion']};
 export const AGENT_TOOLS = Object.freeze([
+  {name:'update_call_retry_policy',description:'사용자가 이번 요청에서 N분 안에 최초 포함 최대 M회 재시도를 명시한 경우에만 합성 문의 허용 범위를 설정한다. 총1~3회·1~120분. 기존 시도·시계는 초기화하지 않으며 실제 자동 발신 예약·환자 위임이 아니다. AI거절·본인확인 중단을 해제하지 못한다.',inputSchema:objectSchema({target:{type:'string',enum:CALL_TARGETS},maxAttempts:{type:'integer',minimum:1,maximum:3},windowMinutes:{type:'integer',minimum:1,maximum:120}},['target','maxAttempts','windowMinutes'])},
+  {name:'run_call_recovery_demo',description:'사용자가 무응답/AI응대거절/본인확인/서류·일정 막힘 중 특정 상황의 합성 시연 실행을 명시한 때만 고정 전화 실패·인계 예시를 실행한다. 실제 전화·인증·예약이나 재시도 발신 예약은 하지 않는다.',inputSchema:objectSchema({scenarioId:{type:'string',enum:CALL_RECOVERY_SCENARIOS.map(item=>item.id)}},['scenarioId'])},
+  {name:'get_care_journey', description:'현재 진료 연결 근거, 요구 문서·일정과 보유자료 비교, 발급·제출 문의, 휠체어·귀가·동행 후속 작업과 조건 변경 재확인을 읽는다. 의료진 근거 없는 결과를 선택하지 않는다.', inputSchema:objectSchema()},
+  {name:'run_journey_demo', description:'사용자가 특정 상황의 합성 시연·미리보기 실행을 명시적으로 요청했을 때만 고정 자료 누락/제주 접수 거절/진료 시각 변경 예시를 실행한다. 현재 합성 사례를 해당 고정 예시로 바꾸며 실제 결과·원문·날짜를 받지 않는다. 일반 방문 준비 요청에서는 사용하지 않는다.', inputSchema:objectSchema({scenarioId:{type:'string',enum:JOURNEY_SCENARIOS.map(item => item.id)}}, ['scenarioId'])},
   {name:'get_case', description:'서버의 합성 사례, 준비 상태·빠진 작업과 병원·이동·동행 전화 준비 요약을 확인한다. 실제 환자 위임 검증이 아니다.', inputSchema:objectSchema()},
   {name:'update_visit', description:'보호자가 명시한 방문일·행정지역·시각·이동/동행 필요만 변경한다. 실명·의료기록·주소 상세는 받지 않는다.', inputSchema:objectSchema({
     date:{type:'string',format:'date',maxLength:10}, area:{type:'string',enum:ADMIN_AREAS}, appointmentTime:{type:'string',format:'time',maxLength:5},
@@ -75,7 +81,9 @@ function callPlanSummaries(state) {
   });
 }
 export function getPendingActions(state) {
-  const tasks = getTasks(state).slice(0, 8).map(task => pending(task.id,task.title,task.description));
+  const journey = getCareJourneySummary(state);
+  const tasks = journey.nextActions.slice(0, 5).map(task => pending(`journey-${task.id}`,task.title,task.detail));
+  tasks.push(...getTasks(state).slice(0, 5).map(task => pending(task.id,task.title,task.description)));
   const support = getVisitSupportSummary(state);
   for (const action of support.nextActions) tasks.push(pending(`support-${action.kind}`,action.title,action.reason));
   return tasks.slice(0,12);
@@ -86,22 +94,123 @@ function caseFacts(state) {
     permissions:state.permissions,documents:state.documents.map(({id,label,status,source}) => ({id,label,status,source})),
     inquiries:Object.fromEntries(Object.entries(state.inquiries).map(([target,item]) => [target,{status:item.status,requestedDocuments:item.requestedDocuments,source:'합성 전화 역할 · 실제 발신 없음'}])),
     packet:state.packet,review:state.review,visitSupport:getVisitSupportSummary(state),requirements:state.visitSupport.requirements,
-    nextActions:getPendingActions(state),callPlans:callPlanSummaries(state),
+    nextActions:getPendingActions(state),callPlans:callPlanSummaries(state),careJourney:getCareJourneySummary(state),
   };
 }
 function supportCandidates(state,kind) { return getSupportCandidates(registry,{kind,area:state.patient.area,wheelchair:state.visitSupport.requirements.wheelchair}); }
 function publicProvider(item) { return {...item,source:{...item.source,url:assertSourceUrl(item.source.url)}}; }
 
+function explicitJourneyDemo(message, scenarioId) {
+  const request = typeof message === 'string' ? message.normalize('NFKC') : '';
+  if (/(?:시연|데모|미리\s*보기)(?:은|는|을|를)?\s*(?:하지|말|없이|금지|아니|원치)|(?:실제|진짜)로만/.test(request)) return false;
+  const requested = /(?:시연|데모|미리\s*보기).{0,30}(?:보여|실행|진행|재현|시작)|(?:보여|실행|진행|재현|시작).{0,30}(?:시연|데모|미리\s*보기)|\b(?:run|show)\b.{0,30}\b(?:demo|preview)\b/i.test(request) || /(?:시연|데모|미리\s*보기)(?:을|를)?\s*(?:해\s*줘|해\s*주|해주세요)/.test(request);
+  const terms = { call_no_answer:/무응답|call_no_answer/,call_ai_declined:/AI.{0,8}(?:응대\s*)?거절|call_ai_declined/i,call_identity_required:/본인\s*확인|call_identity_required/,call_documents_or_schedule:/서류.{0,8}일정|서류.{0,8}막힘|call_documents_or_schedule/,missing_record:/자료\s*(?:누락|부족)|판독문\s*(?:누락|없)|missing_record/, jeju_unavailable:/제주.{0,12}(?:접수\s*)?거절|접수\s*거절|jeju_unavailable/, time_changed:/(?:진료\s*)?(?:시각|시간|일정)\s*변경|time_changed/ };
+  return requested && terms[scenarioId].test(request);
+}
+function explicitRetryPolicy(message,input) {
+  const request = typeof message === 'string' ? message : '';
+  if (!/재시도|다시\s*(?:문의|연락|시도)/.test(request) || /재시도(?:는|를)?\s*(?:하지|말|금지|없이)/.test(request)) return false;
+  const match = /(\d{1,3})\s*분\s*(?:안|이내).{0,25}(?:최대|총)\s*(\d)\s*(?:회|번)/.exec(request);
+  return Boolean(match && Number(match[1]) === input.windowMinutes && Number(match[2]) === input.maxAttempts);
+}
+const alternativeDatesPermitted = message => /(?:다른|대체)\s*(?:날짜|일자|일정).{0,25}(?:문의|확인|알아)/.test(message) && !/(?:다른|대체)\s*(?:날짜|일자|일정).{0,15}(?:말|하지|금지)/.test(message);
+async function runCallRecoveryScenario(scenarioId) {
+  const fixedClock = () => Date.parse('2026-10-31T12:00:00Z');
+  const phoneAdapter = { isSimulation:true,
+    async hospital({target}) { return {isSimulation:true,outcome:'unreachable',failureReason:scenarioId === 'call_identity_required' ? 'identity_required' : target === 'mainland' ? 'missing_documents' : 'no_slots'}; },
+    async support() { return {isSimulation:true,outcome:'unreachable',failureReason:scenarioId === 'call_ai_declined' ? 'ai_declined' : 'no_answer'}; },
+  };
+  const dispatch = createToolDispatcher({phoneAdapter,clock:fixedClock});
+  let state = createDemoCase(); const events=[],pendingActions=[];
+  const message = `${CALL_RECOVERY_SCENARIOS.find(item=>item.id===scenarioId).label} 상황을 고정 합성 시연으로 실행해 줘. 무응답이면 15분 안에 최대 2회까지 재시도해 줘.`;
+  const steps = scenarioId === 'call_documents_or_schedule' ? [['request_hospital_contact',{target:'mainland'}],['request_hospital_contact',{target:'jeju'}],['request_hospital_contact',{target:'jeju'}]]
+    : scenarioId === 'call_identity_required' ? [['request_hospital_contact',{target:'mainland'}],['request_hospital_contact',{target:'mainland'}]]
+    : [['prepare_inquiries',{kind:'taxi'}],...(scenarioId === 'call_no_answer' ? [['update_call_retry_policy',{target:'taxi',maxAttempts:2,windowMinutes:15}]] : []),['request_support_contact',{kind:'taxi'}],['request_support_contact',{kind:'taxi'}],...(scenarioId === 'call_no_answer' ? [['request_support_contact',{kind:'taxi'}]] : [])];
+  for (const [name,input] of steps) { const result=await dispatch({name,input,state,userMessage:message,requestId:'fixed-call-recovery-001'});state=result.state;events.push(...result.events);pendingActions.push(...result.pendingActions); }
+  if (scenarioId === 'call_documents_or_schedule') {
+    const result=await dispatch({name:'request_hospital_contact',input:{target:'jeju'},state,userMessage:'다른 날짜도 문의해 줘. 날짜 선택·예약은 하지 말고 안내만 확인해 줘.',requestId:'fixed-call-recovery-alt-002'});
+    state=result.state;events.push(...result.events);pendingActions.push(...result.pendingActions);
+  }
+  return {state,events,pendingActions};
+}
+
+function journeyPreviewAdapter(scenarioId) {
+  return Object.freeze({ isSimulation:true,
+    async hospital({target}) { return { outcome:target === 'mainland' ? 'referral' : scenarioId === 'jeju_unavailable' ? 'not_participating' : 'documents',isSimulation:true }; },
+    async support() { return { outcome:'available',isSimulation:true,wheelchairConfirmed:true,eligibilityConfirmed:true }; },
+  });
+}
+async function runJourneyScenario(scenarioId) {
+  const scenario = JOURNEY_SCENARIOS.find(item => item.id === scenarioId);
+  const dispatch = createToolDispatcher({phoneAdapter:journeyPreviewAdapter(scenarioId)});
+  let state = applyAction(createDemoCase(),{type:'JOURNEY_START_SCENARIO',scenarioId});
+  const userMessage = `제주우리병원을 문의 대상으로 하는 ${scenario.label} 상황을 고정 합성 시연으로 실행해 줘.`;
+  const steps = [
+    ['get_case',{}], ['update_visit',{appointmentTime:'10:00',wheelchair:true,caregiverAvailable:0}],
+    ['search_hospital_contacts',{name:'제주우리병원'}], ['select_hospital_contact',{hospitalId:'hospital-4'}],
+    ['request_records',{source:'nhis'}], ['request_hospital_contact',{target:'mainland'}], ['request_hospital_contact',{target:'jeju'}],
+  ];
+  if (scenarioId === 'jeju_unavailable') steps.push(['search_hospital_contacts',{area:'제주시'}],['find_support',{kind:'taxi'}],['find_support',{kind:'companion'}]);
+  else steps.push(['prepare_inquiries',{kind:'taxi'}],['request_support_contact',{kind:'taxi'}],['prepare_inquiries',{kind:'companion'}],['request_support_contact',{kind:'companion'}]);
+  if (scenarioId === 'time_changed') steps.push(['update_visit',{appointmentTime:'14:00'}]);
+  steps.push(['prepare_review',{}],['get_care_journey',{}]);
+  const events = [], pendingActions = [];
+  for (const [name,input] of steps) {
+    const result = await dispatch({name,input,state,userMessage});
+    state=result.state; events.push(...result.events); pendingActions.push(...result.pendingActions);
+  }
+  return {state,events,pendingActions};
+}
+
 /** 검증된 순수 reducer만 상태를 변경한다. 인자에 source/clinical text/action을 받지 않는다. */
-export function createToolDispatcher({phoneAdapter = createPhoneSimulationAdapter()} = {}) {
+export function createToolDispatcher({phoneAdapter = createPhoneSimulationAdapter(),clock = () => Date.now()} = {}) {
   if (phoneAdapter !== null && phoneAdapter.isSimulation !== true) throw new TypeError('실제 발신 어댑터는 아직 지원하지 않습니다.');
-  return async function executeTool({name,input,state,userMessage = '',preferences,signal}) {
+  return async function executeTool({name,input,state,userMessage = '',preferences,signal,requestId = 'direct-tool-request'}) {
     const spec = toolMap.get(name);
     fail(spec, 'UNKNOWN_TOOL', '지원하지 않는 도구입니다.');
     validateSchema(input, spec.inputSchema);
     if (signal?.aborted) throw new AgentError('AGENT_TIMEOUT', '요청 처리를 중단했습니다.', 504);
     let next = state, data = {}, item, events = [], pendingActions = [];
+    const callAt = () => new Date(clock()).toISOString();
+    let attemptedAt;
+    const checkCallGate = target => {
+      attemptedAt=callAt();
+      if (alternativeDatesPermitted(userMessage) && next.callRecovery?.targets[target].reason === 'no_slots') next=applyAction(next,{type:'CALL_ALLOW_ALTERNATIVE_DATES',target,requestId});
+      next=applyAction(next,{type:'CALL_CHECK_GATE',target,at:attemptedAt});
+      const gate=getCallAttemptGate(next,target,attemptedAt);
+      if (!gate.allowed) {
+        const handoff=getCallRecoveryHandoffs(next).find(item=>item.target===target);
+        data={status:gate.status,...realCallStatus,handoff:handoff ?? null,callPlan:buildCallPlan(next,target)};
+        events.push(event(name,'자동 문의 중단·사람 인계 확인',gate.detail,{status:'needs_input',isSimulation:true,source:'합성 문의의 횟수·시간·실패 인계 gate'}));
+        pendingActions.push(pending(`call-recovery-${target}`,handoff?.title ?? '전화 문의 허용 범위 확인',gate.detail));
+      }
+      return gate.allowed;
+    };
     switch (name) {
+      case 'update_call_retry_policy':
+        fail(explicitRetryPolicy(userMessage,input),'EXPLICIT_RETRY_POLICY_REQUIRED','재시도는 이번 요청에서 N분 안에 최초 포함 최대 M회로 명시한 범위만 설정할 수 있습니다.');
+        next=applyAction(next,{type:'CALL_SET_RETRY_POLICY',...input,at:callAt()});
+        data={retryPolicy:{configured:true,...next.callRecovery.targets[input.target].retryPolicy,scheduled:false},handoffs:getCallRecoveryHandoffs(next),...realCallStatus};
+        events.push(event(name,'명시한 합성 재시도 범위 반영',`최초 포함 총 ${input.maxAttempts}회·${input.windowMinutes}분입니다. 기존 시도·시작/종료 시각과 AI거절·본인확인 중단은 보존하며 실제 발신 예약은 하지 않았습니다.`,{isSimulation:true,source:'이번 요청에 명시한 합성 문의 범위'}));
+        break;
+      case 'run_call_recovery_demo': {
+        fail(explicitJourneyDemo(userMessage,input.scenarioId),'EXPLICIT_DEMO_REQUIRED','실행할 전화 실패 상황의 합성 시연을 명시적으로 요청해 주세요.');
+        const result=await runCallRecoveryScenario(input.scenarioId);next=result.state;data=getCareJourneySummary(next);
+        events.push(event(name,'고정 합성 전화 실패·인계 시연','고정 합성 시계·응답과 공통 어댑터 gate로 실패 사유·시도·다음 담당자를 보존했습니다. 실제 발신·인증·예약·재시도 예약은 없습니다.',{isSimulation:true,source:'서버 고정 합성 전화 실패 시연'}),...result.events);pendingActions.push(...result.pendingActions);
+        break;
+      }
+      case 'get_care_journey':
+        data = getCareJourneySummary(next);
+        events.push(event(name,'진료 연결 근거와 다음 할 일 확인','요구 자료·발급과 제출 문의·휠체어·이동·동행의 의존 작업과 조건 변경을 정리했습니다. 진료 연결 결과는 의료진 근거가 없으면 미확인입니다.',{isSimulation:true,source:'합성 사례·고정 합성 안내·공개 snapshot'}));
+        break;
+      case 'run_journey_demo': {
+        fail(explicitJourneyDemo(userMessage,input.scenarioId),'EXPLICIT_DEMO_REQUIRED','자료 누락·제주 접수 거절·진료 시각 변경 중 실행할 상황의 합성 시연을 명시적으로 요청해 주세요. 일반 방문 준비에는 고정 예시를 덮어쓰지 않습니다.');
+        const result = await runJourneyScenario(input.scenarioId);
+        next = result.state; data = getCareJourneySummary(next);
+        events.push(event(name,'명시적으로 요청한 고정 합성 상황 실행',`${data.activeScenario.label} · 서버 고정 조건을 사용했습니다. 실제 환자 기록·의료진 확인·발신·예약은 수행하지 않았습니다.`,{isSimulation:true,source:'서버 고정 합성 진료 연결 상황'}),...result.events);
+        pendingActions.push(...result.pendingActions);
+        break;
+      }
       case 'get_case':
         data = caseFacts(next);
         events.push(event(name,'기존 합성 사례 확인',`${next.patient.nextVisit} 방문 준비 합성 사례와 서버의 현재 상태를 확인했습니다. 실제 환자 기록은 조회하지 않았습니다.`,{isSimulation:true,source:'서버 합성 사례'}));
@@ -158,9 +267,22 @@ export function createToolDispatcher({phoneAdapter = createPhoneSimulationAdapte
           break;
         }
         fail(next.permissions.inquiry === true, 'PERMISSION_REQUIRED', '합성 전화 문의 시연의 허용 범위를 먼저 확인해 주세요. 실제 환자 위임은 미검증입니다.');
+        if (!checkCallGate(input.target)) break;
         item = await phoneAdapter.hospital({target:input.target,plan,signal});
-        fail(item?.isSimulation === true && ['documents','referral','unreachable','not_participating'].includes(item.outcome), 'INVALID_ADAPTER_RESPONSE', '시연 어댑터 응답을 확인해 주세요.', 502);
+        fail(item?.isSimulation === true && ['documents','referral','unreachable','not_participating'].includes(item.outcome) && (item.failureReason === undefined || item.outcome === 'unreachable' && CALL_FAILURE_REASONS.includes(item.failureReason)), 'INVALID_ADAPTER_RESPONSE', '시연 어댑터 응답을 확인해 주세요.', 502);
+        const failureReason=item.failureReason ?? (item.outcome === 'unreachable' ? 'no_answer' : item.outcome === 'not_participating' ? 'not_participating' : 'answered');
         next = applyAction(next,{type:'RECORD_CALL',target:input.target,outcome:item.outcome});
+        next = applyAction(next,{type:'CALL_RECORD_ATTEMPT',target:input.target,outcome:failureReason,at:attemptedAt});
+        if (failureReason === 'missing_documents' && next.documents.find(doc=>doc.id==='report')?.status === 'ready') next=applyAction(next,{type:'REMOVE_DOCUMENT',id:'report'});
+        if (input.target === 'jeju' && next.inquiries.jeju.status === 'not_participating') next=applyAction(next,{type:'JOURNEY_RECORD_FINDING',findingId:'jeju_unavailable'});
+        if (next.inquiries[input.target].status === 'confirmed') {
+          if (!next.careJourney?.guidance.some(item => item.id === 'preparation')) next = applyAction(next,{type:'JOURNEY_RECORD_GUIDANCE',guidanceId:'preparation'});
+          if (input.target === 'mainland' && next.documents.find(doc => doc.id === 'report')?.status !== 'ready') next = applyAction(next,{type:'JOURNEY_RECORD_FINDING',findingId:'report_issuance'});
+          if (input.target === 'jeju') {
+            if (next.careJourney?.findings.some(item => item.id === 'report_issuance')) next = applyAction(next,{type:'JOURNEY_RECORD_FINDING',findingId:'report_submission'});
+            if (next.visitSupport.requirements.wheelchair) next = applyAction(next,{type:'JOURNEY_RECORD_FINDING',findingId:'hospital_wheelchair'});
+          }
+        }
         data = {...next.inquiries[input.target],isSimulation:true,...realCallStatus,callPlan:buildCallPlan(next,input.target)};
         events.push(event(name,`${input.target === 'mainland' ? '기존 도외' : '제주'} 병원 접수 문의 시연`,`${next.inquiries[input.target].response} 기관 역할의 고정 합성 응답이며 실제 발신·수용 확인은 하지 않았습니다.`,{isSimulation:true,source:'기관 역할의 합성 전화 시뮬레이터'}));
         break;
@@ -214,13 +336,16 @@ export function createToolDispatcher({phoneAdapter = createPhoneSimulationAdapte
           break;
         }
         fail(next.permissions.inquiry === true, 'PERMISSION_REQUIRED', '합성 전화 문의 시연의 허용 범위를 먼저 확인해 주세요. 실제 환자 위임은 미검증입니다.');
+        if (!checkCallGate(input.kind)) break;
         const entry = next.visitSupport[input.kind];
         fail(entry.provider, 'INQUIRY_REQUIRED', '먼저 해당 지원의 문의 초안을 준비해 주세요.');
         if (entry.status !== 'prepared') next = applyAction(next,{type:'SUPPORT_PREPARE_INQUIRY',kind:input.kind});
         item = await phoneAdapter.support({kind:input.kind,providerId:entry.provider.id,plan:buildCallPlan(next,input.kind),signal});
-        fail(item?.isSimulation === true && ['available','unavailable','unreachable'].includes(item.outcome), 'INVALID_ADAPTER_RESPONSE', '시연 어댑터 응답을 확인해 주세요.', 502);
+        fail(item?.isSimulation === true && ['available','unavailable','unreachable'].includes(item.outcome) && (item.failureReason === undefined || item.outcome === 'unreachable' && CALL_FAILURE_REASONS.includes(item.failureReason)), 'INVALID_ADAPTER_RESPONSE', '시연 어댑터 응답을 확인해 주세요.', 502);
         for (const key of ['wheelchairConfirmed','eligibilityConfirmed']) fail(item[key] === undefined || typeof item[key] === 'boolean', 'INVALID_ADAPTER_RESPONSE', '시연 어댑터 응답을 확인해 주세요.', 502);
         next = applyAction(next,{type:'SUPPORT_RECORD_RESPONSE',kind:input.kind,outcome:item.outcome,wheelchairConfirmed:item.wheelchairConfirmed,eligibilityConfirmed:item.eligibilityConfirmed});
+        next=applyAction(next,{type:'CALL_RECORD_ATTEMPT',target:input.kind,outcome:item.failureReason ?? (item.outcome === 'unreachable' ? 'no_answer' : item.outcome === 'unavailable' ? 'no_slots' : 'answered'),at:attemptedAt});
+        if (item.outcome === 'available') next = applyAction(next,{type:'JOURNEY_RECORD_FINDING',findingId:input.kind === 'taxi' ? 'taxi_conditions' : 'companion_conditions'});
         const summary = getVisitSupportSummary(next)[input.kind];
         data = {...summary,isSimulation:true,...realCallStatus,callPlan:buildCallPlan(next,input.kind)};
         events.push(event(name,`${input.kind === 'taxi' ? '택시' : '동행'} 합성 전화 응답`,next.visitSupport[input.kind].response,{isSimulation:true,source:entry.provider.source.url,status:item.outcome === 'available' ? 'completed' : 'needs_input'}));
@@ -229,7 +354,7 @@ export function createToolDispatcher({phoneAdapter = createPhoneSimulationAdapte
       case 'prepare_review': {
         const missing = next.documents.filter(doc => ['history','report','exam',...Object.values(next.inquiries).flatMap(item => item.requestedDocuments)].includes(doc.id) && doc.status !== 'ready');
         data = {packet:next.packet,missingDocuments:missing.map(({id,label,status}) => ({id,label,status})),sharePermission:next.permissions.share,
-          procedureStatus:Object.fromEntries(Object.entries(next.inquiries).map(([target,inquiry]) => [target,inquiry.status])),actualTransferMade:false,clinicalAcceptanceConfirmed:false,reservationConfirmed:false};
+          careJourney:getCareJourneySummary(next),procedureStatus:Object.fromEntries(Object.entries(next.inquiries).map(([target,inquiry]) => [target,inquiry.status])),actualTransferMade:false,clinicalAcceptanceConfirmed:false,reservationConfirmed:false};
         events.push(event(name,'의료진 검토 준비 상태 정리','보유 자료와 빠진 자료를 정리했습니다. 실제 진찰 소견·의뢰서·자료 공유 동의와 의료진 검토가 필요하며 기관 전송은 하지 않았습니다.',{status:'needs_input',isSimulation:true,source:'합성 사례의 자료 준비 상태'}));
         pendingActions.push(pending('physician-exam','제주 대면 진찰·의료진 기록 확인','Agent는 진찰 소견이나 임상 판단을 대신 작성하지 않습니다.'));
         break;
