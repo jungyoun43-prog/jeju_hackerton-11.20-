@@ -1,0 +1,28 @@
+{
+  "checkedAt": "2026-10-31",
+  "hubCatalogRows": 1259,
+  "hubUniqueIds": 1259,
+  "hubCategories": 8,
+  "hubDetailsChecked": 58,
+  "healthMetadataRows": 198,
+  "healthDetailsChecked": 41,
+  "centerRegisteredRows": 70,
+  "centerAdvertisedTotal": 73,
+  "centerWorkbookSheets": 74,
+  "centerSchemasMatched": 70,
+  "centerRawDatasetsRetrieved": 0,
+  "latestLinkedFilesChecked": [
+    327,
+    216,
+    229,
+    1304,
+    1321
+  ],
+  "method": "전체 공개 목록 메타데이터 선별 후 관련 상세58종과 센터 공개 명세 확인. 전체1259종 원자료 검증 아님.",
+  "sources": [
+    "https://jejudatahub.net/data/list/12",
+    "https://jejudatahub.net/center/data",
+    "https://jejudatahub.net/api/ndapTable/list",
+    "https://jejudatahub.net/document/데이터명세서_kr.xlsx"
+  ]
+}
