@@ -9,7 +9,7 @@
   --ground:#f8f6f0;
   --surface:#fffefa;
   --ink:#263631;
-  --muted:#6d7369;
+  --muted:#62695f;
   --teal:#315f52;
   --teal-hover:#20483e;
   --seafoam:#edf1e8;
@@ -151,7 +151,7 @@ input,textarea {
   letter-spacing:-.03em
 }
 .sidebar-caption {
-  font-size:11px;
+  font-size:12px;
   color:var(--muted);
   margin:48px 12px 14px
 }
@@ -189,7 +189,7 @@ input,textarea {
   background:#fcfbf5;
   min-width:20px;
   padding:3px 4px;
-  font-size:10px;
+  font-size:12px;
   text-align:center;
   border-radius:2px
 }
@@ -202,11 +202,11 @@ input,textarea {
   border-top:1px solid var(--line);
   display:grid;
   gap:5px;
-  font-size:10px;
+  font-size:12px;
   color:var(--muted)
 }
 .sidebar-note .text-button {
-  font-size:11px
+  font-size:12px
 }
 .profile {
   display:flex;
@@ -222,7 +222,7 @@ input,textarea {
   background:#dfdfce;
   display:grid;
   place-items:center;
-  font-size:11px
+  font-size:12px
 }
 .profile strong {
   display:block;
@@ -231,7 +231,7 @@ input,textarea {
 }
 .profile small {
   display:block;
-  font-size:10px;
+  font-size:12px;
   color:var(--muted);
   margin-top:4px
 }
@@ -251,7 +251,7 @@ input,textarea {
   display:flex;
   align-items:center;
   gap:12px;
-  font-size:11px;
+  font-size:12px;
   color:var(--muted)
 }
 .breadcrumb .icon {
@@ -268,7 +268,7 @@ input,textarea {
   gap:10px
 }
 .demo-pill {
-  font-size:10px;
+  font-size:12px;
   color:#8b4a2f;
   display:flex;
   align-items:center;
@@ -313,7 +313,7 @@ input,textarea {
   color:var(--teal);
   padding:5px 0;
   min-height:29px;
-  font-size:11px;
+  font-size:12px;
   font-weight:600;
   text-decoration:none
 }
@@ -365,13 +365,13 @@ input,textarea {
   border-color:#879483
 }
 .button.small {
-  font-size:11px;
+  font-size:12px;
   min-height:37px;
   padding:8px 12px
 }
 .case-intro {
   display:grid;
-  grid-template-columns:minmax(0,1fr) 318px;
+  grid-template-columns:minmax(0,1fr);
   align-items:center;
   gap:30px;
   padding-bottom:30px;
@@ -389,7 +389,7 @@ input,textarea {
   display:none
 }
 .intro-copy>p {
-  font-size:13px;
+  font-size:14px;
   color:#596858;
   line-height:1.8;
   margin-top:12px
@@ -398,40 +398,22 @@ input,textarea {
   display:flex;
   flex-wrap:wrap;
   gap:6px 13px;
-  font-size:11px;
+  font-size:12px;
   color:var(--muted);
   margin-top:19px
 }
 .synthetic-label {
-  color:#9a6949
+  color:#885437
 }
 .case-settings {
-  font-size:10px;
+  font-size:12px;
   font-weight:400;
   color:var(--muted);
   margin-top:6px
 }
-.case-visual {
-  position:relative
-}
-.hero.care-scene {
-  height:146px;
-  background-image:url('/assets/jeju-care-v2.png');
-  background-size:auto 100%;
-  background-position:right center;
-  background-repeat:no-repeat;
-  background-color:#faf6e9;
-  mix-blend-mode:multiply
-}
-.case-visual>span {
-  display:block;
-  font-family:MaruBuri,serif;
-  color:#6e7061;
-  font-size:12px;
-  text-align:right;
-  margin-top:10px;
-  padding-right:3px
-}
+
+
+
 .case-workspace {
   display:grid;
   grid-template-columns:minmax(0,1.85fr) minmax(270px,1fr);
@@ -461,7 +443,7 @@ input,textarea {
   font-weight:650
 }
 .mission-step {
-  font-size:10px;
+  font-size:12px;
   color:var(--tangerine)
 }
 .mission-card h3 {
@@ -474,7 +456,7 @@ input,textarea {
 .mission-description {
   margin-top:10px;
   color:var(--muted);
-  font-size:12px;
+  font-size:14px;
   line-height:1.8;
   max-width:58ch
 }
@@ -488,7 +470,7 @@ input,textarea {
   display:inline-flex;
   align-items:center;
   gap:5px;
-  font-size:11px;
+  font-size:12px;
   color:#5a6858
 }
 .mission-outputs .icon {
@@ -503,7 +485,7 @@ input,textarea {
   margin-top:24px
 }
 .mission-action>span {
-  font-size:10px;
+  font-size:12px;
   color:var(--muted)
 }
 .mission-button {
@@ -525,7 +507,7 @@ input,textarea {
   letter-spacing:-.015em
 }
 .panel-meta {
-  font-size:10px;
+  font-size:12px;
   color:var(--muted);
   white-space:nowrap
 }
@@ -549,7 +531,7 @@ input,textarea {
   height:36px;
   border:1px solid #c5c9b9;
   border-radius:50%;
-  font-size:10px;
+  font-size:12px;
   color:#4b5c48;
   background:var(--ground);
   position:relative;
@@ -580,7 +562,7 @@ input,textarea {
   font-weight:650
 }
 .care-place p {
-  font-size:12px;
+  font-size:14px;
   font-weight:500;
   line-height:1.8;
   margin-top:10px;
@@ -588,7 +570,7 @@ input,textarea {
 }
 .place-purpose {
   display:block;
-  font-size:10px;
+  font-size:12px;
   color:var(--muted);
   line-height:1.8;
   margin-top:3px
@@ -598,7 +580,7 @@ input,textarea {
   gap:18px
 }
 .place-record>.text-button,.place-actions .text-button {
-  font-size:10px
+  font-size:12px
 }
 .connection-bridge {
   display:flex;
@@ -606,7 +588,7 @@ input,textarea {
   flex-wrap:wrap;
   gap:7px;
   padding:11px 0 13px 56px;
-  font-size:10px;
+  font-size:12px;
   color:var(--muted)
 }
 .connection-bridge>.icon {
@@ -619,14 +601,14 @@ input,textarea {
 }
 .connection-bridge .text-button {
   margin-left:auto;
-  font-size:10px
+  font-size:12px
 }
 .badge {
   display:inline-flex;
   align-items:center;
   gap:4px;
   color:#626a5b;
-  font-size:9px;
+  font-size:12px;
   line-height:1.5;
   white-space:nowrap;
   background:#edeee5;
@@ -661,21 +643,21 @@ input,textarea {
 }
 .family-task small {
   display:block;
-  font-size:10px;
+  font-size:12px;
   color:var(--muted);
   margin-bottom:6px
 }
 .family-task strong {
   display:block;
   font-weight:500;
-  font-size:11px;
+  font-size:14px;
   line-height:1.9
 }
 .family-task .text-button {
-  font-size:10px
+  font-size:12px
 }
 .family-boundary {
-  font-size:10px;
+  font-size:12px;
   color:var(--muted);
   line-height:1.8;
   margin-top:9px
@@ -727,14 +709,14 @@ input,textarea {
 }
 .doc-title {
   display:block;
-  font-size:12px;
+  font-size:14px;
   font-weight:500;
   line-height:1.7
 }
 .doc-source {
   display:block;
   color:var(--muted);
-  font-size:10px;
+  font-size:12px;
   margin-top:4px;
   line-height:1.8
 }
@@ -743,7 +725,7 @@ input,textarea {
   align-items:flex-start;
   gap:5px;
   color:var(--muted);
-  font-size:9px;
+  font-size:12px;
   line-height:1.8;
   margin-top:16px
 }
@@ -776,13 +758,13 @@ input,textarea {
   color:var(--teal)
 }
 .assistant-message {
-  font-size:11px;
+  font-size:14px;
   line-height:1.9;
   color:#485b46
 }
 .assistant-attribution {
   color:var(--muted);
-  font-size:9px;
+  font-size:12px;
   line-height:1.8;
   margin-top:10px
 }
@@ -793,7 +775,7 @@ input,textarea {
   margin-top:16px
 }
 .quick-chip {
-  font-size:9px;
+  font-size:12px;
   padding:7px 8px;
   border:1px solid #d4d5c4;
   background:#faf9ef;
@@ -816,7 +798,7 @@ input,textarea {
   border:0!important;
   background:transparent!important;
   padding:4px 0!important;
-  font-size:10px!important;
+  font-size:12px!important;
   min-height:27px!important;
   min-width:0
 }
@@ -852,7 +834,7 @@ input,textarea {
   display:flex;
   gap:5px;
   align-items:center;
-  font-size:9px;
+  font-size:12px;
   color:var(--muted)
 }
 .source-summary>span .icon {
@@ -860,15 +842,15 @@ input,textarea {
   height:12px
 }
 .source-summary strong {
-  font-size:11px;
+  font-size:12px;
   font-weight:500
 }
 .source-summary small {
-  font-size:9px;
+  font-size:12px;
   color:var(--muted)
 }
 .source-summary .text-button {
-  font-size:10px;
+  font-size:12px;
   justify-self:start
 }
 .activity-panel {
@@ -901,22 +883,22 @@ input,textarea {
   min-width:0
 }
 .activity-text strong {
-  font-size:11px;
+  font-size:12px;
   font-weight:500
 }
 .activity-text p {
-  font-size:10px;
+  font-size:12px;
   color:var(--muted);
   line-height:1.8;
   margin-top:5px
 }
 .activity-time {
-  font-size:9px;
+  font-size:12px;
   color:var(--muted);
   white-space:nowrap
 }
 .empty-note {
-  font-size:11px;
+  font-size:12px;
   color:var(--muted);
   line-height:1.9;
   padding:5px 0
@@ -945,7 +927,7 @@ input,textarea {
   line-height:1.6
 }
 .location-note p {
-  font-size:11px;
+  font-size:12px;
   color:var(--muted);
   line-height:2;
   margin:12px 0
@@ -966,7 +948,7 @@ input,textarea {
   gap:12px;
   padding:0 22px 13px;
   color:var(--muted);
-  font-size:10px
+  font-size:12px
 }
 .context-grid .map-legend {
   padding-left:0
@@ -991,7 +973,7 @@ input,textarea {
   z-index:1
 }
 .map-foot {
-  font-size:9px;
+  font-size:12px;
   color:var(--muted);
   line-height:1.9;
   padding:13px 22px 18px
@@ -1011,12 +993,12 @@ input,textarea {
   height:11px
 }
 .map-load-state {
-  font-size:9px;
+  font-size:12px;
   color:#8b6545
 }
 .map-error {
   padding:30px 20px;
-  font-size:11px;
+  font-size:12px;
   color:var(--muted)
 }
 .care-marker-wrap {
@@ -1044,7 +1026,7 @@ input,textarea {
   font-family:inherit
 }
 .leaflet-control-attribution {
-  font-size:9px
+  font-size:12px
 }
 .page-title-row {
   display:flex;
@@ -1067,7 +1049,7 @@ input,textarea {
   margin-top:8px
 }
 .date-note {
-  font-size:10px;
+  font-size:12px;
   color:var(--muted);
   display:flex;
   gap:5px;
@@ -1080,7 +1062,7 @@ input,textarea {
   height:13px
 }
 .page-description {
-  font-size:12px;
+  font-size:14px;
   line-height:1.9;
   color:var(--muted);
   max-width:70ch;
@@ -1114,7 +1096,7 @@ input,textarea {
   gap:8px;
   flex:1;
   position:relative;
-  font-size:10px;
+  font-size:12px;
   color:#626a5b
 }
 .step:not(:last-child):after {
@@ -1132,7 +1114,7 @@ input,textarea {
   place-items:center;
   flex-shrink:0;
   background:#ebece2;
-  font-size:10px
+  font-size:12px
 }
 .step-dot .icon {
   width:12px;
@@ -1179,16 +1161,16 @@ input,textarea {
   margin-left:auto
 }
 .full-doc p {
-  font-size:11px;
+  font-size:14px;
   color:var(--muted);
   line-height:1.9;
   margin:10px 0
 }
 .full-doc .text-button {
-  font-size:10px
+  font-size:12px
 }
 details>summary {
-  font-size:11px;
+  font-size:12px;
   color:var(--teal);
   cursor:pointer;
   padding:8px 0;
@@ -1203,7 +1185,7 @@ details[open]>summary {
   margin-bottom:17px
 }
 .field label,.field-label {
-  font-size:11px;
+  font-size:12px;
   font-weight:600
 }
 input:not([type=checkbox]),textarea,select {
@@ -1231,7 +1213,7 @@ textarea {
   gap:8px
 }
 .help-text {
-  font-size:11px;
+  font-size:14px;
   color:var(--muted);
   line-height:1.9
 }
@@ -1239,7 +1221,7 @@ textarea {
   display:flex;
   align-items:flex-start;
   gap:8px;
-  font-size:10px;
+  font-size:12px;
   line-height:1.9;
   margin:16px 0 20px;
   cursor:pointer
@@ -1253,13 +1235,13 @@ textarea {
 }
 .checkbox strong {
   display:block;
-  font-size:11px;
+  font-size:12px;
   font-weight:600
 }
 .inline-message {
   background:#ecf0e3;
   padding:13px;
-  font-size:11px;
+  font-size:12px;
   color:#4d6745;
   line-height:1.9;
   margin:15px 0;
@@ -1302,7 +1284,7 @@ textarea {
   overflow-wrap:anywhere
 }
 .inquiry-heading p {
-  font-size:10px;
+  font-size:12px;
   color:var(--muted);
   margin-top:5px
 }
@@ -1310,7 +1292,7 @@ textarea {
   flex-shrink:0
 }
 .inquiry-response {
-  font-size:12px;
+  font-size:14px;
   line-height:1.9;
   color:#4b6349;
   margin-top:15px
@@ -1324,11 +1306,11 @@ textarea {
   display:grid;
   grid-template-columns:45px minmax(0,1fr);
   gap:12px;
-  font-size:11px;
+  font-size:12px;
   line-height:1.9
 }
 .transcript-item strong {
-  font-size:10px;
+  font-size:12px;
   color:var(--teal)
 }
 .transcript-item p {
@@ -1369,7 +1351,7 @@ textarea {
   gap:10px
 }
 .cost-result-top p {
-  font-size:11px
+  font-size:12px
 }
 .cost-result-top strong {
   font-size:27px;
@@ -1384,7 +1366,7 @@ textarea {
 }
 .unknown-costs {
   color:var(--muted);
-  font-size:11px;
+  font-size:12px;
   line-height:1.9;
   margin-top:14px
 }
@@ -1405,7 +1387,7 @@ textarea {
   font-weight:600
 }
 .plan-stop p {
-  font-size:11px;
+  font-size:12px;
   color:var(--muted);
   line-height:1.9;
   margin-top:6px
@@ -1421,7 +1403,7 @@ textarea {
   align-items:flex-start;
   gap:8px;
   color:#5d694e;
-  font-size:11px;
+  font-size:12px;
   line-height:1.9;
   padding:14px 0 19px;
   border-bottom:1px solid var(--line);
@@ -1450,7 +1432,7 @@ textarea {
   gap:15px;
   padding:12px 0;
   border-bottom:1px solid var(--line);
-  font-size:11px
+  font-size:12px
 }
 .data-facts dt {
   color:var(--muted)
@@ -1460,7 +1442,7 @@ textarea {
   margin:0
 }
 .data-dates {
-  font-size:10px;
+  font-size:12px;
   color:var(--muted);
   line-height:1.9;
   padding:0 0 17px
@@ -1471,7 +1453,7 @@ textarea {
   color:#5b6851
 }
 .data-profile h3 {
-  font-size:11px;
+  font-size:12px;
   margin:15px 0 10px
 }
 .capability-tags {
@@ -1480,7 +1462,7 @@ textarea {
   gap:6px
 }
 .capability-tags>span {
-  font-size:9px;
+  font-size:12px;
   display:flex;
   align-items:center;
   gap:4px;
@@ -1497,7 +1479,7 @@ textarea {
   margin-top:17px
 }
 .data-rights {
-  font-size:10px;
+  font-size:12px;
   line-height:1.9;
   color:var(--muted)
 }
@@ -1515,7 +1497,7 @@ textarea {
   margin-top:1px
 }
 .candidate-count {
-  font-size:10px;
+  font-size:12px;
   line-height:1.9;
   color:var(--muted);
   margin-top:24px
@@ -1540,14 +1522,14 @@ textarea {
   overflow-wrap:anywhere
 }
 .hospital-candidate p {
-  font-size:11px;
+  font-size:14px;
   line-height:1.9;
   color:var(--muted);
   margin-top:10px
 }
 .hospital-candidate>span,.hospital-candidate>small {
   display:block;
-  font-size:10px;
+  font-size:12px;
   color:var(--muted);
   line-height:1.9;
   margin-top:5px
@@ -1560,7 +1542,7 @@ textarea {
   margin-top:14px
 }
 .candidate-actions .text-button {
-  font-size:10px
+  font-size:12px
 }
 .hospital-import-more {
   border-top:1px solid var(--line);
@@ -1590,11 +1572,11 @@ textarea {
   font-size:12px
 }
 .file-drop>span {
-  font-size:10px;
+  font-size:12px;
   color:var(--muted)
 }
 .file-drop input {
-  font-size:10px;
+  font-size:12px;
   max-width:235px;
   background:transparent;
   border:0;
@@ -1609,12 +1591,12 @@ textarea {
   margin-bottom:9px
 }
 .import-empty p {
-  font-size:11px;
+  font-size:12px;
   color:var(--muted);
   line-height:1.9
 }
 .import-status {
-  font-size:10px;
+  font-size:12px;
   color:var(--teal);
   line-height:1.9
 }
@@ -1626,7 +1608,7 @@ textarea {
   border-top:1px solid var(--line);
   margin-top:35px;
   padding-top:20px;
-  font-size:9px;
+  font-size:12px;
   color:var(--muted);
   line-height:1.9
 }
@@ -1641,7 +1623,7 @@ textarea {
   margin-top:2px
 }
 .footnote .text-button {
-  font-size:10px;
+  font-size:12px;
   flex-shrink:0;
   padding-top:0
 }
@@ -1674,11 +1656,9 @@ textarea {
     padding:0 54px
   }
   .case-intro {
-    grid-template-columns:minmax(0,1fr) 360px
+    grid-template-columns:minmax(0,1fr)
   }
-  .hero.care-scene {
-    height:165px
-  }
+
 
 }
 @media(max-width:1199px) {
@@ -1702,7 +1682,7 @@ textarea {
     padding:0 31px
   }
   .case-intro {
-    grid-template-columns:minmax(0,1fr) 250px;
+    grid-template-columns:minmax(0,1fr);
     gap:20px
   }
   .intro-copy h1 {
@@ -1711,9 +1691,7 @@ textarea {
   .intro-copy h1 br {
     display:block
   }
-  .hero.care-scene {
-    height:125px
-  }
+
   .case-workspace,.context-grid {
     grid-template-columns:minmax(0,1.7fr) minmax(245px,1fr);
     gap:28px
@@ -1799,10 +1777,10 @@ textarea {
   }
   .case-context {
     gap:7px 10px;
-    font-size:10px
+    font-size:12px
   }
   .case-settings {
-    font-size:10px
+    font-size:12px
   }
   .subpage-grid {
     grid-template-columns:minmax(0,1fr)
@@ -1843,21 +1821,17 @@ textarea {
     padding-left:0
   }
   .case-intro {
-    grid-template-columns:minmax(0,1fr) 215px
+    grid-template-columns:minmax(0,1fr)
   }
-  .hero.care-scene {
-    height:120px
-  }
+
   .mission-action {
     flex-direction:row;
     align-items:center
   }
-  .case-visual>span {
-    font-size:10px
-  }
+
   .step {
     flex-direction:column;
-    font-size:9px;
+    font-size:12px;
     gap:8px
   }
   .step:not(:last-child):after {
@@ -1919,7 +1893,7 @@ textarea {
     flex-direction:column;
     gap:5px;
     padding:6px 2px;
-    font-size:9px;
+    font-size:12px;
     border-radius:2px
   }
   .nav-label {
@@ -1965,7 +1939,7 @@ textarea {
     gap:1px
   }
   .demo-pill {
-    font-size:8px;
+    font-size:12px;
     gap:4px
   }
   .demo-pill:before {
@@ -1988,7 +1962,7 @@ textarea {
   }
   .case-intro {
     display:grid;
-    grid-template-columns:1fr;
+    grid-template-columns:minmax(0,1fr);
     gap:17px;
     padding-bottom:22px;
     margin-bottom:22px
@@ -2001,30 +1975,22 @@ textarea {
     display:none
   }
   .intro-copy>p {
-    font-size:11px;
+    font-size:14px;
     margin-top:11px;
     line-height:1.8
   }
   .case-context {
-    font-size:10px;
+    font-size:12px;
     gap:6px 10px;
     margin-top:14px
   }
   .case-settings {
-    font-size:9px;
+    font-size:12px;
     margin-top:3px
   }
-  .case-visual {
-    display:block
-  }
-  .case-visual>span {
-    display:none
-  }
-  .hero.care-scene {
-    height:87px;
-    background-size:100% auto;
-    background-position:center
-  }
+
+
+
   .mission-meta {
     margin-bottom:12px
   }
@@ -2032,7 +1998,7 @@ textarea {
     font-size:13px
   }
   .mission-step {
-    font-size:10px
+    font-size:12px
   }
   .mission-card h3 {
     font-size:22px;
@@ -2040,7 +2006,7 @@ textarea {
     max-width:24ch
   }
   .mission-description {
-    font-size:11px;
+    font-size:14px;
     margin-top:8px
   }
   .mission-outputs {
@@ -2048,7 +2014,7 @@ textarea {
     margin-top:15px
   }
   .mission-outputs>span {
-    font-size:10px
+    font-size:12px
   }
   .mission-outputs .icon {
     width:12px;
@@ -2061,7 +2027,7 @@ textarea {
     margin-top:22px
   }
   .mission-action>span {
-    font-size:9px
+    font-size:12px
   }
   .button.mission-button {
     min-height:46px;
@@ -2083,7 +2049,7 @@ textarea {
     font-size:14px
   }
   .panel-meta {
-    font-size:9px
+    font-size:12px
   }
   .care-place {
     gap:14px
@@ -2094,7 +2060,7 @@ textarea {
   .place-route span {
     width:33px;
     height:33px;
-    font-size:9px
+    font-size:12px
   }
   .place-route i {
     left:16px;
@@ -2107,28 +2073,28 @@ textarea {
     align-items:flex-start
   }
   .badge {
-    font-size:8px;
+    font-size:12px;
     padding:3px 5px
   }
   .care-place p {
-    font-size:11px;
+    font-size:14px;
     line-height:1.9;
     margin-top:8px
   }
   .place-purpose {
-    font-size:9px
+    font-size:12px
   }
   .connection-bridge {
     padding-left:48px;
     gap:5px;
-    font-size:9px
+    font-size:12px
   }
   .connection-bridge>.icon {
     width:13px;
     height:13px
   }
   .connection-bridge .text-button {
-    font-size:9px
+    font-size:12px
   }
   .activity-panel {
     margin-top:24px;
@@ -2139,16 +2105,16 @@ textarea {
     gap:10px
   }
   .activity-panel .panel-meta {
-    font-size:8px
+    font-size:12px
   }
   .activity-text strong {
-    font-size:10px
+    font-size:12px
   }
   .activity-text p {
-    font-size:9px
+    font-size:12px
   }
   .activity-time {
-    font-size:9px
+    font-size:12px
   }
   .case-aside {
     display:block;
@@ -2164,19 +2130,19 @@ textarea {
     padding:19px
   }
   .doc-title {
-    font-size:11px
+    font-size:14px
   }
   .doc-source {
-    font-size:9px
+    font-size:12px
   }
   .doc-row {
     padding:12px 0
   }
   .doc-row .badge {
-    font-size:8px
+    font-size:12px
   }
   .family-task strong {
-    font-size:11px
+    font-size:14px
   }
   .case-aside .source-summary {
     margin-top:22px
@@ -2194,7 +2160,7 @@ textarea {
     font-size:21px
   }
   .location-note p {
-    font-size:11px
+    font-size:12px
   }
   .map-canvas {
     height:220px
@@ -2215,10 +2181,10 @@ textarea {
     font-size:28px
   }
   .page-title-row p {
-    font-size:11px
+    font-size:12px
   }
   .page-description {
-    font-size:11px;
+    font-size:14px;
     margin-bottom:22px
   }
   .date-note {
@@ -2235,7 +2201,7 @@ textarea {
     margin-bottom:23px
   }
   .progress-panel .step {
-    font-size:8px
+    font-size:12px
   }
   .full-doc-heading {
     flex-wrap:wrap;
@@ -2248,7 +2214,7 @@ textarea {
     margin-left:auto
   }
   .full-doc p {
-    font-size:11px
+    font-size:14px
   }
   .inquiry-heading {
     gap:8px
@@ -2257,20 +2223,20 @@ textarea {
     font-size:12px
   }
   .inquiry-heading .badge {
-    font-size:8px
+    font-size:12px
   }
   .inquiry-heading>.icon {
     width:18px;
     height:18px
   }
   .inquiry-heading p {
-    font-size:9px
+    font-size:12px
   }
   .cost-grid {
     gap:15px 12px
   }
   .field label {
-    font-size:10px
+    font-size:12px
   }
   input:not([type=checkbox]),textarea,select {
     font-size:12px
@@ -2279,10 +2245,10 @@ textarea {
     grid-template-columns:1fr
   }
   .checkbox {
-    font-size:10px
+    font-size:12px
   }
   .data-banner {
-    font-size:10px;
+    font-size:12px;
     gap:7px;
     margin-bottom:22px
   }
@@ -2294,32 +2260,32 @@ textarea {
     font-size:13px
   }
   .hospital-candidate p {
-    font-size:10px
+    font-size:14px
   }
   .hospital-candidate>span,.hospital-candidate>small {
-    font-size:9px
+    font-size:12px
   }
   .candidate-actions {
     gap:7px 12px
   }
   .candidate-actions .text-button {
-    font-size:9px
+    font-size:12px
   }
   .footnote {
     flex-direction:column;
     gap:8px;
     padding-top:18px;
     margin-top:28px;
-    font-size:9px
+    font-size:12px
   }
   .footnote>.text-button {
     align-self:flex-end;
-    font-size:10px
+    font-size:12px
   }
   .toast {
     left:50%;
     bottom:80px;
-    font-size:11px;
+    font-size:12px;
     width:max-content;
     max-width:calc(100vw - 32px);
     padding:12px 16px

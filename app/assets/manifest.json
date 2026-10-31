@@ -17,7 +17,7 @@
       "createdAt": "2026-10-31",
       "tool": "ChatGPT built-in Imagegen / GPT Image family",
       "modelId": "not exposed by tool",
-      "usage": "보호자 워크스페이스의 사람·협진 연결 중심 배너",
+      "usage": "사용자의 이미지 부조화 피드백으로 화면에서 제거; 이전 디자인 이력용 원본 보관",
       "referenceImages": [
         "jeju-coast.png"
       ],

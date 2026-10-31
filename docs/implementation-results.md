@@ -35,7 +35,7 @@
 | 부담 계산 | 가정 비용·null 미확인·동행 공백 | 방문3·동행1→공백2 대조 |
 | 공공데이터 도구 | 실제 13곳·20행 집계 로드·출처 검증, 선택적 JSON/CSV 메모리 처리 | 실제 snapshot 검사와 합성 경계값 검사를 구분 |
 | 지도 | Leaflet·OSM 배경, 합성 마커, Google Maps URLs 외부 링크 | 실제 지도 배경·가상 지점 구분, 타일 실패 안내. Google Embed 미구현 |
-| 생성 이미지 | 사람 중심 v2 보조 장면·투명 PNG 이미지 로고 | `app/assets/manifest.json`의 원본·정확 프롬프트·도구·날짜, 화면과 ZIP 포함 |
+| 생성 이미지 | 투명 PNG 이미지 로고. 의사·가족 일러스트는 화면에서 제거 | `app/assets/manifest.json`의 원본·정확 프롬프트·도구·날짜, 화면과 ZIP 포함 |
 | AWS 호스팅 | 비공개 S3·CloudFront HTTPS 공개 데모 | [사이트](https://d1mfksxrj025bx.cloudfront.net), `/api/health`, `/deployment.json` |
 | CI/CD | 검사·빌드한 같은 artifact, production OIDC·제한된 배포 역할·revision 검사 | 실제 Actions 완료와 공개 revision의 일치 |
 | 런타임 LLM·실제 전화·병원 전송·예약 | 미연동 | 모델 추론·발신 성공·기관 참여를 주장하지 않음 |

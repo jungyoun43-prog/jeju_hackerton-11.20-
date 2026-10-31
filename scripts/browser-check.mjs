@@ -32,9 +32,10 @@ try {
  record('생성한 이미지 로고 로드',await page.locator('.brand img').evaluate(e=>e.complete && e.naturalWidth>0 && e.src.endsWith('/assets/jeju-mark-v1.png')));
  record('제목용 한국어 폰트 로드',await page.evaluate(async()=>{await document.fonts.ready;return [...document.fonts].some(font=>font.family.replaceAll('"','')==='MaruBuri' && font.status==='loaded');}));
  proof.desktop.noOverflow=await overflow(page);record('PC 가로 넘침 없음',proof.desktop.noOverflow);
- record('배너 이미지 로드',await page.evaluate(async()=>{const image=new Image();image.src=getComputedStyle(document.querySelector('.hero')).backgroundImage.match(/url\(["']?(.*?)["']?\)/)[1];await image.decode();return image.naturalWidth>0;}));
+ record('의사·가족 일러스트 제거',await page.locator('.hero,.care-scene,.case-visual').count()===0);
  proof.map.liveTiles=await initialMap(page);
  record('실제 지도 UI와 가상 두 지점',await page.locator('.leaflet-container').count()===1 && await page.locator('.care-marker').count()===2);
+ await page.screenshot({path:resolve(root,shots+'/desktop-viewport.png'),fullPage:false});
  await page.screenshot({path:resolve(root,proof.desktop.screenshot),fullPage:true});
  // 최초 보이는 영역만 타일을 조회한다. 반복 기능 검사에서 타일을 재수집하지 않는다.
  await page.route('https://tile.openstreetmap.org/**',route=>route.abort());
@@ -101,6 +102,7 @@ try {
  const mobileTiles=await initialMap(mobile);proof.map.mobileLiveTiles=mobileTiles;
  proof.mobile.noOverflow=await overflow(mobile);record('모바일 가로 넘침 없음',proof.mobile.noOverflow);
  record('모바일 첫 화면 주 행동',await primaryInViewport(mobile));
+ await mobile.screenshot({path:resolve(root,shots+'/mobile-viewport.png'),fullPage:false});
  await mobile.screenshot({path:resolve(root,proof.mobile.screenshot),fullPage:true});
  await mobile.route('https://tile.openstreetmap.org/**',route=>route.abort());
  for(const view of ['documents','calls','plan','data']) {await mobile.locator(`.nav-item[data-nav=${view}]`).click();record(`모바일 ${view} 넘침 없음`,await overflow(mobile));}
