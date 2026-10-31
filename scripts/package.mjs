@@ -14,18 +14,24 @@ const selected = ['README.md','AGENTS.md','PRODUCT.md','DESIGN.md','THIRD_PARTY.
 const code = `import json,sys,zipfile,pathlib
 root=pathlib.Path(sys.argv[1]); dest=pathlib.Path(sys.argv[2]); selected=json.loads(sys.argv[3])
 safe_evidence={'orchestration/runs/aws-deployment.json','orchestration/runs/browser.json','orchestration/runs/conversation-browser.json','orchestration/runs/latest-eval.json','orchestration/runs/release.json','orchestration/runs/rollback.json','orchestration/runs/llm-live-check.json','orchestration/runs/aws-llm-live-check.json','orchestration/runs/aws-durable-store-check.json','orchestration/runs/caregiver-local-live-check.json','orchestration/runs/caregiver-deployed-live-check.json','orchestration/runs/patient-workspace-layout.json','orchestration/runs/patient-workspace-deployed.json','orchestration/runs/call-workflow-deployed.json','orchestration/runs/call-workflow-live-check.json','orchestration/runs/journey-browser.json','orchestration/runs/care-journey-deployed.json','orchestration/runs/care-journey-live-check.json','orchestration/runs/public-data-live-check.json','orchestration/runs/public-data-browser.json','orchestration/runs/preparation-board-browser.json','orchestration/runs/preparation-board-deployed.json','orchestration/runs/preparation-board-live-check.json'}
+entries=[]
+for name in selected:
+ p=root/name
+ if p.is_symlink(): raise ValueError('심볼릭 링크는 패키징할 수 없습니다: '+name)
+ if not p.exists(): continue
+ files=[p] if p.is_file() else sorted(p.rglob('*'))
+ for f in files:
+  rel=f.relative_to(root)
+  if f.is_symlink(): raise ValueError('심볼릭 링크는 패키징할 수 없습니다: '+str(rel))
+  if not f.is_file(): continue
+  if any(s in ['node_modules','.git','__pycache__'] for s in rel.parts): continue
+  if 'runs' in rel.parts and rel.as_posix() not in safe_evidence: continue
+  if f.name.startswith('.env') and f.name!='.env.example': continue
+  entries.append((f,rel))
+# 링크 검사에 실패하면 기존 ZIP을 보존한다.
 with zipfile.ZipFile(dest,'w',zipfile.ZIP_DEFLATED) as z:
- for name in selected:
-  p=root/name
-  if not p.exists(): continue
-  files=[p] if p.is_file() else sorted(p.rglob('*'))
-  for f in files:
-   if not f.is_file(): continue
-   rel=f.relative_to(root)
-   if any(s in ['node_modules','.git','__pycache__'] for s in rel.parts): continue
-   if 'runs' in rel.parts and rel.as_posix() not in safe_evidence: continue
-   if f.name.startswith('.env') and f.name!='.env.example': continue
-   z.write(f,str(pathlib.Path('jeju-care-compass-mvp')/rel))
+ for f,rel in entries:
+  z.write(f,str(pathlib.Path('jeju-care-compass-mvp')/rel))
 print(dest)
 `;
 execFileSync('python3',['-c',code,root,zipPath,JSON.stringify(selected)],{stdio:'inherit'});
