@@ -1,6 +1,6 @@
 {
   "baseCommit": "e1e7e44",
-  "updatedAt": "2026-10-31T12:31:09.688586+00:00",
+  "updatedAt": "2026-10-31T12:37:56.908862+00:00",
   "tasks": {
     "ui": {
       "phase": "verified",
@@ -114,51 +114,66 @@
       "integrationCommits": [
         "35e4cfb"
       ],
-      "note": "provider 주입·검증 도구 루프·고정 preview·일반 요청503. 실제 LLM 연결은 사용자 요청으로 보류"
+      "note": "provider 주입·도구 루프·한도·원문 비저장 검사23개와 전체122개 통과. 실제 LLM은 사용자 요청으로 보류"
     },
     "conversation-ui": {
-      "phase": "in_progress",
+      "phase": "verified",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-conversation-ui",
       "integrationCommits": [
-        "9c4f72e"
+        "9c4f72e",
+        "3ad044c",
+        "dfd0df2"
       ],
-      "note": "대화/브라우저 음성 입력·읽기 요약·실제 API 통합과 화면 검증 중"
+      "note": "실제 API 대화 브라우저40/40·수동47/47. 최신 PC/모바일 독립 검토 SHIP; 실제 마이크·LLM 품질 검증 아님"
     },
     "agent-api": {
       "phase": "verified",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-agent-api",
       "integrationCommits": [
-        "0a6ebfe"
+        "0a6ebfe",
+        "53bbc74"
       ],
-      "note": "Lambda IAM URL·CloudFront OAC·분리 ZIP CI, 모델/영속저장 기본 비활성. 실제 배포는 root 확인 중"
+      "note": "실제 API200/preview200/일반503/직접원점403. CloudFront 헤더 제한 수정 뒤 UPDATE_COMPLETE, 모델/DB 비활성"
     },
     "conversation-docs": {
-      "phase": "in_progress",
+      "phase": "verified",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-conversation-docs",
-      "integrationCommits": [],
-      "note": "대화 우선 PRDv0.6·모델 후속 연결·실제 데이터3종과 넓은 조사 범위 동기화"
+      "integrationCommits": [
+        "0ffe0a0"
+      ],
+      "note": "README·PRDv0.6·사용법·모델후속연결·허브3종/전수카탈로그감사 범위 동기화"
     }
   },
   "review": {
-    "phase": "pending",
+    "phase": "verified",
     "role": "대화 우선 제품 흐름·API 미연결·실제 preview·PC/모바일 독립 검토",
     "findings": [
-      "사용자가 폼과 수동 클릭 대신 텍스트·음성 요청에서 시작하는 Agent를 요청함",
-      "LLM 실제 연결은 사용자 명시에 따라 후속으로 보류함"
+      "대화 중심 UI와 모델 미연결/합성 예시 범위에서 P0/P1 없음",
+      "공단 설정을 보호자 작업처럼 보인 문구와 도외 주치의 연결 목적을 수정",
+      "진찰 수행과 진찰 문서 준비의 비슷한 제목은 작은 문구 개선 한계"
     ],
-    "resolution": "실제 고정 preview/503·공개 배포와 최신 화면을 검토하며 실제 모델·마이크·기관 발신 검증으로 확대하지 않는다."
+    "resolution": "최신 캡처·실제 viewport·소스 delta를 읽기 전용 독립 검토하여 SHIP. 실제 임상/모델/마이크 검증은 별도"
   },
   "awsDeployment": {
-    "phase": "verified",
+    "phase": "api_verified",
     "region": "ap-northeast-2",
     "profile": "jeju-deploy",
     "githubAuthenticated": true,
     "liveUrl": "https://d1mfksxrj025bx.cloudfront.net",
     "authenticated": true,
     "stackStatus": "UPDATE_COMPLETE",
-    "ciWorkflow": "passed",
+    "ciWorkflow": "new_revision_pending",
     "evidence": "orchestration/runs/aws-deployment.json",
     "ciRun": "https://github.com/jungyoun43-prog/jeju_hackerton-11.20-/actions/runs/41198341223",
-    "verifiedRevision": "60ad28fb0ad6a160d73a4690e51b3111746cde49"
+    "verifiedRevision": "60ad28fb0ad6a160d73a4690e51b3111746cde49",
+    "apiStack": "CREATE_COMPLETE",
+    "apiRevision": "183962a",
+    "apiChecks": {
+      "capabilities": 200,
+      "fixedPreview": 200,
+      "normalInput": 503,
+      "directOrigin": 403
+    },
+    "note": "API와 OAC는 실제 확인. 새 main 정적 UI+API 동일revision의 자동 배포 최종 확인은 진행 중"
   }
 }
