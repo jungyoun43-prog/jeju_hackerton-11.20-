@@ -107,8 +107,12 @@ try {
  await mobile.route('https://tile.openstreetmap.org/**',route=>route.abort());
  for(const view of ['documents','calls','plan','data']) {await mobile.locator(`.nav-item[data-nav=${view}]`).click();record(`모바일 ${view} 넘침 없음`,await overflow(mobile));}
  await mobile.screenshot({path:resolve(root,shots+'/data-mobile.png'),fullPage:true});
- await mobile.locator('[data-select-hospital]').first().click();
- record('긴 실제 기관명 모바일 문의 넘침 없음',await overflow(mobile));
+ const longestHospital=await mobile.locator('.hospital-candidate').evaluateAll(elements=>elements.map(e=>({name:e.querySelector('h3').textContent,id:e.querySelector('[data-select-hospital]').dataset.selectHospital})).sort((a,b)=>b.name.length-a.name.length)[0]);
+ await mobile.locator(`[data-select-hospital="${longestHospital.id}"]`).click();
+ record('긴 실제 기관명 모바일 문의 넘침 없음',(await mobile.locator('#inquiry-jeju').textContent()).includes(longestHospital.name) && await overflow(mobile),longestHospital.name);
+ await mobile.evaluate(()=>{document.activeElement?.blur();window.scrollTo(0,0);});
+ await mobile.waitForFunction(()=>window.scrollY===0);
+ await mobile.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
  await mobile.screenshot({path:resolve(root,shots+'/calls-mobile.png'),fullPage:true});
  record('실행 JS 오류 없음',errors.length===0,errors.join('; '));
  if(checks.every(check=>check.status==='pass') && errors.length===0) proof.result='pass';

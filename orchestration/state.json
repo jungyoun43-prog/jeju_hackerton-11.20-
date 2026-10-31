@@ -1,6 +1,6 @@
 {
   "baseCommit": "e1e7e44",
-  "updatedAt": "2026-10-31T11:24:30.268748+00:00",
+  "updatedAt": "2026-10-31T11:47:07.476044+00:00",
   "tasks": {
     "ui": {
       "phase": "verified",
@@ -67,25 +67,33 @@
       "note": "데이터 기능 통합; 사용자가 시각 결과를 거부해 editorial-ui에서 대체"
     },
     "editorial-ui": {
-      "phase": "in_progress",
+      "phase": "integrated",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-editorial-ui",
-      "integrationCommits": [],
-      "note": "이미지 로고·사례 중심 구조로 사용자 시각 피드백 반영 중"
+      "integrationCommits": [
+        "8ccba6d",
+        "c2c572e"
+      ],
+      "note": "의사 일러스트 제거·이미지 로고·12–14px 설명·대비 수정. 브라우저33개 통과, 최종 독립 화면 검토 중"
     },
     "docs-sync": {
-      "phase": "in_progress",
+      "phase": "verified",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-docs-sync",
-      "integrationCommits": [],
-      "note": "실제 공개 자료 활용과 현재 구현·제약을 문서 동기화 중"
+      "integrationCommits": [
+        "88286ea"
+      ],
+      "note": "README·PRD v0.4·사용법·실제 공개 후보13개·데이터시점·폰트/로고 명세 동기화"
     }
   },
   "review": {
-    "phase": "pending",
+    "phase": "fix_verification",
     "role": "새 시각 결과의 독립 검토",
     "findings": [
-      "사용자가 기존 UI가 AI slop처럼 보인다고 지적"
+      "사용자 요청으로 의사 일러스트 제거",
+      "작은 글씨와 낮은 보조 글자 대비",
+      "과거 업로드 선행 조건 안내",
+      "선택 기관 캡처의 스크롤 아티팩트"
     ],
-    "resolution": "이전 ship은 과거 MVP 검증 이력이며 현재 재설계 승인으로 사용하지 않는다."
+    "resolution": "앞의 세 수정은 독립 검토 resolved, 마지막 긴 기관명·문서 top 캡처 증거 보완 중"
   },
   "awsDeployment": {
     "phase": "trust_updated_ci_pending",
