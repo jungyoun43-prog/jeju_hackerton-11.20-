@@ -9,7 +9,7 @@ import { runtimeFingerprint } from '../orchestration/checks.mjs';
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const servedRoot=process.env.QA_SERVED_SOURCE_ROOT?resolve(process.env.QA_SERVED_SOURCE_ROOT):root;
 const require=createRequire(import.meta.url);
-const directory='.impeccable/review/grid/journey';
+const directory='.impeccable/review/task-first/journey';
 const scenarioIds=['missing_record','jeju_unavailable','time_changed'];
 const recoveryScenarioIds=['call_no_answer','call_ai_declined','call_identity_required','call_documents_or_schedule'];
 const allowedScenarioIds=[...scenarioIds,...recoveryScenarioIds];
@@ -135,6 +135,20 @@ async function clickWithConfirm(page,locator,accept) {
   try {await locator.click();await settle(page);}
   finally {page.off('dialog',handler);}
   return dialogs;
+}
+
+async function verifyMainContinuation(page,summary,posts,prefix) {
+  const input=page.locator('#request-input'),before=posts.length,existing='결과를 읽으며 직접 작성한 다음 요청입니다.';
+  await input.fill(existing);
+  await page.locator('#return-to-request').click();
+  const focusedVisible=()=>input.evaluate(node=>{const r=node.getBoundingClientRect();return document.activeElement===node && r.top>=0 && r.bottom<=innerHeight && r.width>0;});
+  record(`${prefix} 결과의 입력 복귀는 기존 초안·focus·viewport를 보존하며 POST 없음`,await input.inputValue()===existing && await focusedVisible() && posts.length===before);
+  const next=summary.nextActions?.[0],button=page.locator('#next-request-draft');
+  if(!next?.requestDraft)throw new Error('검사할 다음 문의 초안이 없습니다.');
+  const denied=await clickWithConfirm(page,button,false);
+  record(`${prefix} 메인 다음 문의 초안 교체 취소는 기존 입력과 요청 수 유지`,denied.length===1 && denied[0].type==='confirm' && await input.inputValue()===existing && posts.length===before);
+  const accepted=await clickWithConfirm(page,button,true);
+  record(`${prefix} 메인 다음 문의는 같은 nextAction 초안만 채우고 바로 입력 가능`,accepted.length===1 && accepted[0].type==='confirm' && normalized(await input.inputValue())===normalized(next.requestDraft.trim().slice(0,1600)) && await focusedVisible() && await input.isEditable() && posts.length===before);
 }
 
 async function readPlan(page) {
@@ -419,6 +433,7 @@ try {
       const {preview,data,summary}=await runPreview(page,panel.locator(`[data-journey-scenario="${id}"]`),id,posts,prefix);
       record(`${prefix} API 상태의 활성 상황·합성 안내가 화면에 반영`,summary.activeScenario?.id===id && data.caseState && /합성|시연/.test(data.reply) && /합성|예시|미리보기/.test(await page.locator('#conversation-status').innerText()));
       if(await panel.isVisible())await closeJourney(page);
+      if(id===scenarioIds[0])await verifyMainContinuation(page,summary,posts,prefix);
       panel=await openJourney(page);
       await verifySummary(page,panel,summary,prefix);
       verifyScenario(summary,data.caseState,await page.locator('#care-journey-content').innerText(),prefix,id);
@@ -455,6 +470,7 @@ try {
       const {preview,data,summary}=await runPreview(page,panel.locator(`[data-call-recovery-scenario="${id}"]`),id,posts,prefix);
       record(`${prefix} 인계는 실제 preview 상태의 합성 결과`,Array.isArray(summary.handoffs) && summary.handoffs.length>0 && /합성|시연/.test(data.reply) && /합성|예시|미리보기/.test(await page.locator('#conversation-status').innerText()));
       if(await panel.isVisible())await closeContact(page);
+      if(id===recoveryScenarioIds[0])await verifyMainContinuation(page,summary,posts,prefix);
       panel=await openContact(page);await expandDetails(panel);
       const rows=await handoffRows(panel);
       verifyHandoffs(summary,rows,prefix);

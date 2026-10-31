@@ -17,7 +17,7 @@ catch {throw new Error('선택 QA 도구 Playwright가 필요합니다. README�
 const base=new URL(process.env.BASE_URL||'http://127.0.0.1:4173');
 // 이 검사는 실제 503/고정 preview와 주입 응답을 함께 쓴다. 공개 유료 서버에서는 실행하지 않는다.
 if(!['localhost','127.0.0.1','[::1]'].includes(base.hostname) || !['http:','https:'].includes(base.protocol) || base.username || base.password)throw new Error('BASE_URL은 키를 끈 localhost QA 서버여야 합니다.');
-const directory='.impeccable/review/grid/conversation';
+const directory='.impeccable/review/task-first/conversation';
 const storageKey='jeju-care-preferences-v1';
 const fixtureSessionId='q'.repeat(43);
 const configuredCaps={llm:true,model:'gpt-6.1-sol',phone:'simulation',healthRecords:'demo',voiceInput:'browser'};
@@ -252,9 +252,9 @@ try {
     try {
       proof[label].noOverflow=await overflow(page);
       proof[label].screenshot=await screenshot(page,`initial-${label}`);
-      record(`${width}px 가로 넘침과 문서 흐름의 입력 접근`,proof[label].noOverflow && (await reachable(page.locator('#request-input'))).reachable && (await reachable(page.locator('#send-request'))).reachable);
-      const stageNames=await page.locator('#stage-navigation').textContent();
-      record(`${width}px 네 작업칸은 모두 보이고 네 요약에서 자료·병원·이동·답변으로 이동`,await page.locator('#preparation-board>[data-stage-id]').evaluateAll(nodes=>nodes.length===4 && nodes.every(node=>node.checkVisibility())) && await page.locator('#stage-navigation [data-open-stage]').count()===4 && await page.locator('[data-stage-id="plan"]').isVisible() && await page.locator('#preparation-details').count()===0 && await page.locator('[data-case-status]').count()===4 && ['자료','병원','이동'].every(term=>stageNames.includes(term)));
+      const initialComposer=await page.locator('#request-input,#send-request').evaluateAll(nodes=>nodes.map(node=>{const r=node.getBoundingClientRect();return {id:node.id,top:r.top,bottom:r.bottom,inViewport:r.top>=0 && r.bottom<=innerHeight && r.width>0 && r.height>0};}));
+      record(`${width}px 가로 넘침 없이 입력·보내기가 첫 viewport에 표시`,proof[label].noOverflow && initialComposer.every(item=>item.inViewport),JSON.stringify(initialComposer));
+      record(`${width}px 네 작업칸·상태는 한 번씩 보이고 첫3 상세만 접힘`,await page.locator('#preparation-board>[data-stage-id]').evaluateAll(nodes=>nodes.length===4 && nodes.every(node=>node.checkVisibility())) && await page.locator('#stage-navigation').count()===0 && await page.locator('#preparation-board>.stage-pane>.stage-pane-header .signal-mark').count()===4 && await page.locator('[data-stage-details]').evaluateAll(nodes=>nodes.length===3 && nodes.every(node=>node instanceof HTMLDetailsElement && !node.open)) && await page.locator('[data-stage-id="plan"]').isVisible() && await page.locator('#preparation-details').count()===0 && await page.locator('[data-case-status]').count()===4);
       record(`${width}px 로고·자가 호스팅 Pretendard·제주 배경, 인물사진 비노출`,await page.locator('.brand img').first().evaluate(e=>e.complete && e.naturalWidth>0) && await backgroundLoaded(page) && await page.locator('.welcome-photo').count()===0 && await page.evaluate(()=>getComputedStyle(document.body).fontFamily.includes('Pretendard') && [...document.fonts].some(font=>font.family.replaceAll('"','')==='Pretendard' && font.status==='loaded')));
       record(`${width}px 설정은 선택이며 준비 대화에 필수 수동 폼 없음`,await page.locator('#conversation-form select,#conversation-form input[type=checkbox]').count()===0 && await page.locator('#preferences-form [required]').count()===0 && await page.locator('#preferences-form select').count()===1);
       record(`${width}px 입력 가까이 실제 연락·예약 한계 표시`,await disclosure(page));
@@ -365,6 +365,7 @@ try {
       record(`${width}px Markdown 제목·목록·강조와 안전한 링크 표시`,await answer.locator('h3').count()===1 && await answer.locator('ul ul').count()===1 && await answer.locator('strong').count()>0 && !(await answer.innerText()).includes('# 준비한 내용') && !(await answer.innerText()).includes('**택시') && await answer.locator('a').evaluateAll(links=>links.length===1 && links.every(a=>a.protocol==='https:' && a.target==='_blank' && a.rel.includes('noopener'))));
       record(`${width}px 모델 HTML·javascript 링크는 실행하지 않음`,await answer.locator('img,script,iframe,a[href^="javascript:"]').count()===0 && await page.evaluate(()=>window.__qaXss===undefined));
       record(`${width}px 새 답변의 시작은 문서에 표시하고 도구 기록은 접어 둠`,(await reachable(answer.locator('h3'))).reachable && await page.locator('#conversation-scroll').evaluate(node=>getComputedStyle(node).overflowY==='visible' && node.scrollHeight<=node.clientHeight+2) && await page.locator('.tool-records').evaluateAll(nodes=>nodes.every(node=>!node.open)));
+      record(`${width}px 응답 뒤 키보드 초점은 화면 밖 입력으로 강제하지 않음`,await page.evaluate(()=>{const node=document.activeElement,r=node?.getBoundingClientRect();return node!==document.body && r?.width>0 && r?.height>0 && r.top<innerHeight && r.bottom>0;}));
       const summary=getVisitSupportSummary(state);
       await openVisitSummary(page);
       record(`${width}px fixture caseState와 방문 요약의 실제 상태 일치`,(await page.locator('[data-case-status="택시 이동"]').innerText()).includes(summary.taxi.label) && (await page.locator('[data-case-status="택시 이동"]').innerText()).includes(summary.taxi.providerName) && (await page.locator('[data-case-status="병원 동행"]').innerText()).includes(summary.companion.label));
@@ -456,6 +457,10 @@ try {
       record('음성 인식 fixture는 검토 가능한 초안으로 남고 자동 전송하지 않음',requests.length===0 && /확인|고친/.test(await page.locator('#voice-help').textContent()) && await page.locator('#send-request').isEnabled());
       await send(page,'11월 20일 어머니 이동을 준비해 주세요.');
       record('인식 내용을 수정한 뒤 보내야 요청됨',requests.length===1 && json(requests[0]).message==='11월 20일 어머니 이동을 준비해 주세요.' && hashMatches(requests[0]),'실제 음성 서비스·모델 호출 아님');proof.fixtureCoverage.voiceReview=true;
+      await page.locator('#return-to-request').click();await page.locator('#voice-request').click();
+      record('음성 중 다음 문의 초안도 비활성·추가 전송 없음',await page.locator('#next-request-draft').isDisabled() && requests.length===1);
+      await page.locator('#voice-request').click();
+      record('음성 중지 후 다음 문의 초안은 다시 사용 가능',await page.locator('#next-request-draft').isEnabled() && requests.length===1);
     } finally {await context.close();}
   });
   await scenario('음성 취소·새 대화 뒤 늦은 이벤트 fixture',async()=>{
@@ -554,6 +559,7 @@ try {
       if(kind==='normal')await page.locator('#send-request').click();else await confirmAction(page,'#preview-button');
       const first=await deferredCall(page,0),beforeMessages=await page.locator('.message').count();
       record(`${kind} 대기 중 중지 버튼과 진행 상태 제공`,await page.locator('#cancel-request').isVisible() && await page.locator('#conversation-form').getAttribute('aria-busy')==='true' && deferredHashMatches(first));
+      record(`${kind} 대기 중 입력·중지는 viewport 안이고 다음 초안은 비활성`,await page.locator('#request-input,#cancel-request').evaluateAll(nodes=>nodes.every(node=>{const r=node.getBoundingClientRect();return r.top>=0 && r.bottom<=innerHeight && r.height>0;})) && await page.locator('#next-request-draft').isDisabled());
       await page.locator('#cancel-request').click();
       await page.waitForFunction(()=>document.querySelector('#conversation-form').getAttribute('aria-busy')==='false');
       const stoppedCopy=await page.locator('#conversation-status').innerText(),stopped=await deferredCall(page,0);
