@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "name": "혼디 · 보호자 진료 준비",
   "mode": "operate",
-  "direction": "제주 배경 위의 대화·확인 후 전송할 입력 예시·단일 방문 요약과 읽기 전용 환자 기록/전화 준비를 갖춘 보호자 작업 공간",
+  "direction": "제주 배경 위의 대화·현재 진료 연결/다음 행동·확인 후 전송할 입력 예시·단일 방문 요약과 읽기 전용 환자 기록/전화 준비/진료 연결 여정을 갖춘 보호자 작업 공간",
   "seedReference": "seed:a25f97f1d883646c",
   "colors": {
     "background": "#F4F7F5",
@@ -73,7 +73,16 @@
     "실패 재시도는 원래 본문·ID·설정 snapshot을 유지하며 첫응답전 재실행 한계를 고지",
     "전화·협진 준비는 공통 call-policy 기반 네 대상의 읽기 전용 thin details",
     "최소 전달 항목은 허용 범위를 더 확인할 내용이며 실제 위임/인증/기록 처리 완료로 표시하지 않음",
-    "전화 계획 초안 버튼은 현재 초안 보호 후 입력만 채우고 발신/예약/배차를 확정하지 않음"
+    "전화 계획 초안 버튼은 현재 초안 보호 후 입력만 채우고 발신/예약/배차를 확정하지 않음",
+    "진료 연결 여정은 공유 summary의 현재 상태·다음 행동을 대화 앞 얇은 행으로 보여 주며 새 필수 입력 단계를 만들지 않음",
+    "도내 전환·부분 제주 진행·도외 유지는 의료진 근거 전 모두 미확인이며 접수 거절을 임상 판단으로 바꾸지 않음",
+    "여정 할 일은 담당·의존 조건·원문 발췌·작성일·확인 여부를 보존하며 합성 전화 응답과 실제 처리를 구분",
+    "일정·지역·기관·휠체어 조건 변경의 이유와 이동·동행 재확인을 표시하고 이전 가능 응답을 실제 예약으로 유지하지 않음",
+    "허브859·327·254와 별도 공식 안내2건의 후보수·질문·출처를 구분하고 현재 제공 가능으로 해석하지 않음",
+    "여정 초안은 입력만 채우고 세 상황 버튼만 명시적 합성 preview를 실행하며 초안 보호·취소·늦은 응답·modal 포커스를 유지",
+    "전화 실패·인계는 이유·합성 시도·정책·공개 문의처·질문·남은 일·담당자를 보존하고 실제 자동 발신 예약이나 인증 성공으로 표시하지 않음",
+    "전화 재시도는 기본 미설정이며 명시된 최초 포함 횟수/시간과 누적 기록을 보이고 AI거절/본인확인은 자동 반복 문의 중단·사람 인계로 표시",
+    "별도 네 실패 상황은 전화 준비 창의 접힌 예시에서만 합성 preview로 실행하고 인계 초안은 noPOST·현재초안 보호를 공유"
   ],
   "spacing": {
     "workspaceGapPx": 25,
@@ -85,18 +94,22 @@
       "caregiver-case-and-optional-preferences-rail",
       "compact-case-heading",
       "short-welcome-without-person-imagery",
+      "compact-current-care-pathway-and-next-action-in-conversation-scroll",
       "scrolling-conversation",
       "request-examples-directly-above-composer",
       "caregiver-text-or-reviewed-browser-voice",
       "formatted-assistant-answer-with-collapsed-api-events",
       "single-white-visit-panel-with-thin-preparation-rows",
       "read-only-patient-records-dialog-with-explicit-unconnected-service",
-      "read-only-call-and-collaboration-plan-dialog-with-four-collapsed-targets"
+      "read-only-call-and-collaboration-plan-dialog-with-four-collapsed-targets",
+      "read-only-care-journey-dialog-with-evidence-dependent-tasks-and-three-explicit-synthetic-scenarios",
+      "conditional-call-failure-handoffs-and-collapsed-four-recovery-examples"
     ],
     "preview": [
       "explicit-fixed-scenario-action",
       "authored-example-label",
-      "api-returned-synthetic-state-and-real-public-facts"
+      "api-returned-synthetic-state-and-real-public-facts",
+      "explicit-missing-record-jeju-unavailable-time-changed-scenarios-with-existing-preview-preserved"
     ],
     "developmentWorkspace": "/workspace.html"
   },

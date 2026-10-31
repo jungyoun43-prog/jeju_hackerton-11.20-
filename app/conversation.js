@@ -4,6 +4,7 @@ import { icon } from './icons.js';
 import { DEFAULT_CARE_PREFERENCES, normalizeCarePreferences, getTaxiPreferenceOptions } from './care-preferences.js';
 import { formatMessage } from './message-format.js';
 import { buildCallPlan, CALL_TARGETS } from './call-policy.js';
+import { getCareJourneySummary, JOURNEY_SCENARIOS, CALL_RECOVERY_SCENARIOS } from './care-journey.js';
 
 const API = '/api/agent';
 const MAX_MESSAGE = 1600;
@@ -46,6 +47,7 @@ let drawerOpen = false;
 let drawerReturnFocus;
 let patientRecordsReturnFocus;
 let contactPlanReturnFocus;
+let careJourneyReturnFocus;
 const failedRequests = new Map();
 
 function loadCarePreferences() {
@@ -180,6 +182,7 @@ function renderContactPlans() {
       </div>
     </details>`;
   }).join('');
+  renderCallRecovery();
   if(focusTarget && focusSelector && document.getElementById('contact-plan-dialog').open)host.querySelector(`[data-contact-target="${focusTarget}"] ${focusSelector}`)?.focus({preventScroll:true});
 }
 
@@ -192,6 +195,93 @@ function openContactPlan() {
   document.body.classList.add('records-dialog-open');
   document.getElementById('contact-plan-body').scrollTop=0;
   document.getElementById('contact-plan-title').focus({preventScroll:true});
+}
+
+function journeyEvidenceMarkup(items=[]) {
+  if(!items.length)return '<p class="journey-note">근거가 제공되지 않았습니다. 확인 전에는 준비 완료나 진료 경로를 확정하지 않습니다.</p>';
+  return `<ul class="journey-evidence">${items.map(item=>`<li data-journey-evidence="${escape(item.documentId)}"><strong>${escape(item.label || '근거 자료')} · ${item.isSimulation===true?'합성 자료':'출처 확인 필요'}</strong><blockquote>${escape(item.excerpt || '원문 발췌가 제공되지 않았습니다.')}</blockquote><dl><div><dt>작성일</dt><dd>${escape(item.authoredAt || '작성일 미상')}</dd></div><div><dt>확인 여부</dt><dd>${item.confirmation==='demo_confirmed'?'합성 시연에서 확인':'미확인'} · ${escape(item.confirmedAt || '확인일 없음')}</dd></div></dl>${item.sourceUrl?`<div class="journey-source">${safeSource(item.sourceUrl)}</div>`:''}</li>`).join('')}</ul>`;
+}
+
+function callHandoffsMarkup(handoffs=[]) {
+  const reasonLabels={no_answer:'무응답',unreachable:'연결되지 않음',ai_declined:'AI 응대 거절',identity_required:'환자 본인 확인 필요',missing_documents:'필요 서류 부족',no_slots:'요청 일정 예약 불가',not_participating:'이번 요청 접수 미참여',answered:'응답 확인 · 합성'};
+  const statusLabels={policy_required:'재시도 정책 미설정',retry_allowed:'허용 범위 내 합성 재시도 가능',retry_exhausted:'허용 횟수 도달 · 인계 필요',retry_expired:'허용 시간 종료 · 인계 필요',handed_off:'자동 반복 문의 중단 · 사람 인계',blocked:'선행 작업 필요 · 문의 중단',waiting_user:'보호자 허용 범위 확인',followup_required:'이전 실패 후 남은 일 확인'};
+  const list=items=>`<ul class="journey-list">${items.map(item=>`<li>${escape(item)}</li>`).join('')}</ul>`;
+  return handoffs.map(item=>{
+    const policy=item.retryPolicy,attempts=item.attempts;
+    return `<article class="call-handoff" data-call-recovery="${escape(item.id)}" data-call-handoff="${escape(item.id)}" data-status="${escape(item.status)}" data-owner="${escape(item.owner)}" data-target="${escape(item.target)}" data-stop-automatic="${item.stopAutomatic===true}" data-actual-call-placed="false">
+      <div class="call-handoff-heading"><h4>${escape(item.title)}</h4><span>${escape(statusLabels[item.status] || item.status)}</span></div>
+      <dl class="call-handoff-facts"><div><dt>실패 이유</dt><dd>${escape(reasonLabels[item.reason] || item.reason)}</dd></div><div><dt>인계 담당</dt><dd>${escape(item.owner)}</dd></div><div><dt>공개 문의처</dt><dd>${escape(item.contact.name || '담당 문의처 확인 필요')}<span class="contact-meta">${escape(item.contact.phone || '공개 번호 미확인')} · 실제 연결 확인 전</span>${item.contact.sourceUrl?`<span class="journey-source">${safeSource(item.contact.sourceUrl)}</span>`:''}</dd></div></dl>
+      <p class="journey-detail">${escape(item.detail)}</p>
+      <h5>합성 시도 내역</h5>${attempts.length?`<ol class="call-attempts">${attempts.map(attempt=>`<li data-call-attempt="${escape(attempt.number)}" data-outcome="${escape(attempt.outcome)}" data-at="${escape(attempt.at)}"><strong>${escape(attempt.number)}차 · ${escape(reasonLabels[attempt.outcome] || attempt.outcome)}</strong><span>${escape(attempt.at || '시도 시각 미상')}</span><span>${attempt.isSimulation===true?'합성 시도 기록':'기록 출처 확인 필요'} · 실제 발신 없음</span></li>`).join('')}</ol>`:'<p class="journey-note">이 사례에 시도 내역이 제공되지 않았습니다. 실제 통화를 시도했다고 표시하지 않습니다.</p>'}
+      <div class="call-retry-policy" data-call-retry-policy><h5>재시도 정책과 현재 시도</h5><p>${policy.configured?`최초 시도 포함 최대 ${escape(policy.maxAttempts)}회 · ${escape(policy.windowMinutes)}분 이내`:'미설정 · 자동 재시도하지 않음'}</p><p>누적 ${escape(attempts.length)}건${attempts.length?` · 마지막 ${escape(attempts.at(-1).number)}차`:''}의 합성 기록</p>${policy.configured?`<dl><div><dt>허용 시작</dt><dd>${escape(policy.startsAt || '시작 시각 미설정')}</dd></div><div><dt>허용 종료</dt><dd>${escape(policy.expiresAt || '종료 시각 미설정')}</dd></div></dl>`:''}<p class="journey-note">${item.stopAutomatic?'자동 반복 문의는 중단 상태입니다. 담당자가 다음 절차를 확인해야 합니다.':'표시된 허용 범위를 넘겨 반복 문의하지 않습니다.'} 실제 자동 재시도 예약·발신은 없습니다.</p></div>
+      ${item.questions.length?`<h5>사람이 이어서 물을 질문</h5>${list(item.questions)}`:''}<h5>남은 일과 인계 내용</h5>${item.remainingTasks.length?list(item.remainingTasks):'<p class="journey-note">다음 담당자에게 남은 절차를 확인해 주세요.</p>'}
+      ${item.requestDraft?`<div class="journey-draft"><p>${escape(item.requestDraft)}</p><button type="button" class="contact-draft-button" data-call-handoff-draft="${escape(item.id)}" data-journey-draft="${escape(item.id)}" ${pending || activeRecognition?'disabled':''}>인계 요청을 입력창에 넣기${icon('arrow')}</button><p class="journey-note">내용을 확인·수정한 뒤 직접 보내세요. 이 버튼은 기관에 연락하거나 동의를 확인하지 않습니다.</p></div>`:''}
+    </article>`;
+  }).join('');
+}
+
+function renderCallRecovery() {
+  let handoffs=[];
+  try {handoffs=getCareJourneySummary(caseState).handoffs || [];} catch { /* 현재 대화는 유지하고 확인되지 않은 실패 기록을 만들지 않는다. */ }
+  document.getElementById('call-handoffs').innerHTML=handoffs.length?`<h3>연결되지 않은 문의와 사람 인계</h3><p class="journey-note">실패 이유·시도·남은 일을 보존한 합성 기록입니다. 실제 발신·예약·본인 확인·위임 검증은 수행하지 않았습니다.</p>${callHandoffsMarkup(handoffs)}`:'<p class="journey-note">현재 대화에 실패·인계 기록은 없습니다. 문의가 막히면 이유와 시도 내역, 남은 일과 담당자를 함께 남깁니다.</p>';
+  document.getElementById('call-recovery-options').innerHTML=CALL_RECOVERY_SCENARIOS.map(item=>`<button type="button" data-call-recovery-scenario="${escape(item.id)}" ${pending || activeRecognition?'disabled':''}><span><strong>${escape(item.label)}</strong><span>${escape(item.description)}</span></span>${icon('chevron')}</button>`).join('');
+}
+
+function renderCareJourney() {
+  const host=document.getElementById('care-journey-content');
+  let journey;
+  try {journey=getCareJourneySummary(caseState);} catch { /* 기존 상태도 안전하게 읽고, 실패를 완료로 바꾸지 않는다. */ }
+  document.getElementById('care-journey-current').textContent=journey?.pathway?.label || '진료 연결 미확인';
+  const next=journey?.nextActions?.[0];
+  document.getElementById('care-journey-next').textContent=next?.title || '대화에서 필요한 준비를 확인해 주세요.';
+  if(!journey){host.innerHTML='<p class="journey-note">진료 여정을 읽지 못했어요. 현재 대화는 유지됩니다. 대화에서 준비 상태를 다시 확인해 주세요.</p>';return;}
+  const openItems=new Set([...host.querySelectorAll('details[data-journey-task][open],details[data-journey-data][open]')].map(node=>node.dataset.journeyTask || node.dataset.journeyData));
+  const focused=document.activeElement;
+  const focusId=focused?.closest('[data-journey-task],[data-journey-data]')?.dataset;
+  const focusItem=focusId?.journeyTask || focusId?.journeyData;
+  const focusSelector=focused?.closest('[data-journey-draft]')?'[data-journey-draft]':focused?.matches('summary')?'summary':null;
+  const statusLabels={todo:'할 일',blocked:'선행 확인 필요',ready:'합성 준비됨',recheck:'재확인 필요'};
+  const disabled=pending || Boolean(activeRecognition);
+  const list=items=>`<ul class="journey-list">${items.map(item=>`<li>${escape(item)}</li>`).join('')}</ul>`;
+  const draftButton=item=>item.requestDraft?`<div class="journey-draft"><p data-journey-request-draft>${escape(item.requestDraft)}</p><button type="button" class="contact-draft-button" data-journey-draft="${escape(item.id)}" ${disabled?'disabled':''}>입력창에 초안 넣기${icon('arrow')}</button></div>`:'';
+  const schedule=journey.schedule;
+  const scheduleStatus=value=>({not_requested:'문의 전',not_contacted:'문의 전',not_selected:'문의처 선택 전',selected:'공개 문의처 선택',prepared:'문의 준비 · 응답 전',available_demo:'합성 가능 응답 · 예약 미확정',unavailable_demo:'합성 불가 응답',unreachable_demo:'합성 연락 실패',needs_recheck:'조건 변경 · 재확인 필요',pending:'확인 필요',unconfirmed:'미확인',recheck:'재확인 필요',recheck_required:'재확인 필요',confirmed:'합성 가능 응답 · 예약 미확정',ready:'합성 가능 응답 · 예약 미확정'}[value] || value || '미확인');
+  host.innerHTML=`
+    <section class="journey-section journey-outcome" aria-labelledby="journey-outcome-title"><h3 id="journey-outcome-title">${escape(journey.pathway.label)}</h3><p class="journey-detail">${escape(journey.pathway.detail)}</p>${journey.activeScenario?`<p class="journey-active-scenario" data-journey-active-scenario="${escape(journey.activeScenario.id)}"><strong>합성 상황 · ${escape(journey.activeScenario.label)}</strong><span>${escape(journey.activeScenario.summary)}</span></p>`:''}<p class="journey-note">자료 준비 → 두 병원 문의 → 이동·동행 후속 확인을 이어갑니다. 실제 통화·예약·배차·진료 수락·외부 기록 연결은 수행하지 않습니다.</p></section>
+    <section class="journey-section" aria-labelledby="journey-pathways-title"><h3 id="journey-pathways-title">의료진이 확인할 세 가지 진료 경로</h3><p class="journey-note">환자별 진료 경로는 제주·기존 도외 의료진과 기관이 확인합니다. 접수 창구의 거절만으로 진료 경로를 결정하지 않습니다.</p><ul class="journey-pathways">${journey.pathways.map(item=>`<li data-journey-pathway="${escape(item.id)}" data-selected="${item.selected===true}"><div><strong>${escape(item.label)}</strong><span class="journey-pathway-state">${item.selected && journey.pathway.status==='demo_confirmed'?'합성 근거로 확인':'미확인'}</span></div><p>${escape(item.detail)}</p></li>`).join('')}</ul><details class="journey-proof"><summary>진료 경로 판단의 근거${icon('chevron')}</summary>${journeyEvidenceMarkup(journey.pathway.evidence)}</details></section>
+    <section class="journey-section" aria-labelledby="journey-tasks-title"><h3 id="journey-tasks-title">이어지는 할 일과 담당</h3><p class="journey-note">선행 자료와 문의 결과를 확인한 뒤 다음 일을 준비합니다. 아래 초안은 입력창에서 고친 뒤 직접 보내세요.</p><div class="journey-tasks">${journey.tasks.map((item,index)=>`<details class="journey-task" data-journey-task="${escape(item.id)}" data-status="${escape(item.status)}" ${openItems.has(item.id) || (!host.children.length && index===0)?'open':''}><summary><span class="journey-task-heading"><strong>${escape(item.title)}</strong><span>${escape(item.owner)}</span></span><span class="journey-task-state" data-status="${escape(item.status)}">${statusLabels[item.status] || '확인 필요'}</span>${icon('chevron')}</summary><div class="journey-task-content"><p class="journey-detail">${escape(item.detail)}</p><h4>요청의 근거와 원문</h4>${journeyEvidenceMarkup(item.evidence)}${draftButton(item)}</div></details>`).join('')}</div></section>
+    <section class="journey-section" aria-labelledby="journey-findings-title"><h3 id="journey-findings-title">합성 전화 응답과 후속 질문</h3>${journey.findings.length?`<ol class="journey-findings">${journey.findings.map(item=>`<li data-journey-finding="${escape(item.id)}"><strong>${escape(item.label)}</strong><span class="journey-note">${item.isSimulation===true?'합성 응답':'출처 확인 필요'} · ${escape(item.at || '응답일 미상')}</span><p class="journey-detail">${escape(item.detail)}</p></li>`).join('')}</ol>`:'<p class="journey-note">아직 이 사례에 합성 문의 응답이 없습니다. 문의에서 확인된 조건은 후속 할 일과 질문에 반영합니다.</p>'}</section>
+    ${(journey.handoffs || []).length?`<section class="journey-section journey-handoffs" aria-labelledby="journey-handoffs-title"><h3 id="journey-handoffs-title">실패한 문의와 사람에게 남긴 일</h3><p class="journey-note">실패를 성공으로 바꾸지 않고 인계 이유·시도 내역·담당과 남은 일을 보존합니다.</p>${callHandoffsMarkup(journey.handoffs)}</section>`:''}
+    <section class="journey-section" aria-labelledby="journey-schedule-title"><h3 id="journey-schedule-title">일정과 이동·동행 재확인</h3><dl class="journey-schedule"><div><dt>시연 일정</dt><dd>${escape(schedule.date || '날짜 미정')} · ${escape(schedule.time || '시각 미정')} <span>(변경 ${escape(schedule.revision ?? 0)}회)</span></dd></div><div><dt>택시 이동</dt><dd data-journey-taxi-status>${escape(scheduleStatus(schedule.taxiStatus))}</dd></div><div><dt>병원 동행</dt><dd data-journey-companion-status>${escape(scheduleStatus(schedule.companionStatus))}</dd></div></dl>${schedule.recheckReasons.length?`<div class="journey-recheck" data-journey-recheck><h4>이전 조건으로 진행할 수 없는 이유</h4>${list(schedule.recheckReasons)}</div>`:'<p class="journey-note">일정·기관·출발 지역·휠체어 조건이 바뀌면 이전 이동·동행 문의 결과를 다시 확인합니다.</p>'}</section>
+    <section class="journey-section" aria-labelledby="journey-data-title"><h3 id="journey-data-title">공공자료가 바꾼 문의 후보와 질문</h3><p class="journey-note">공개 등록 자료로 문의 후보를 좁힙니다. 현재 진료 수용·임상 적합성·차량·동행 인력의 확보 여부는 별도 확인입니다.</p><div class="journey-data">${journey.dataImpact.map(item=>`<details class="journey-data-item" data-journey-data="${escape(item.id)}" ${openItems.has(item.id)?'open':''}><summary><span><strong>${escape(item.title)}</strong><span>${escape(item.datasetId || '별도 공식 안내')}${Number.isFinite(item.candidateCount)?` · 공개 후보 ${escape(item.candidateCount)}곳`:''}</span></span>${icon('chevron')}</summary><div class="journey-data-content"><p class="journey-detail">${escape(item.detail)}</p>${item.questions.length?`<h4>이 자료로 더 확인할 질문</h4>${list(item.questions)}`:''}<div class="journey-source">${safeSource(item.sourceUrl)}</div></div></details>`).join('')}</div></section>
+    <section class="journey-section" aria-labelledby="journey-next-title"><h3 id="journey-next-title">다음 요청으로 이어가기</h3><ul class="journey-next-actions">${journey.nextActions.map(item=>`<li><strong>${escape(item.title)}</strong><p class="journey-note">${escape(item.detail)}</p>${draftButton(item)}</li>`).join('')}</ul><p class="journey-note">초안 버튼은 대화를 전송하거나 기관에 연락하지 않습니다.</p></section>
+    <section class="journey-section" aria-labelledby="journey-scenarios-title"><h3 id="journey-scenarios-title">세 가지 상황 미리보기</h3><p class="journey-note">작성된 합성 예시로 현재 대화를 바꾸어 봅니다. 실제 모델·환자 기록 조회·전화는 실행하지 않습니다.</p><div class="journey-scenarios">${JOURNEY_SCENARIOS.map(item=>`<button type="button" data-journey-scenario="${escape(item.id)}" ${disabled?'disabled':''}><span><strong>${escape(item.label)}</strong><span>${escape(item.description)}</span></span>${icon('chevron')}</button>`).join('')}</div></section>`;
+  if(focusItem && focusSelector && document.getElementById('care-journey-dialog').open)host.querySelector(`[data-journey-task="${CSS.escape(focusItem)}"], [data-journey-data="${CSS.escape(focusItem)}"]`)?.querySelector(focusSelector)?.focus({preventScroll:true});
+}
+
+function openCareJourney() {
+  const dialog=document.getElementById('care-journey-dialog');
+  if(dialog.open)return;
+  careJourneyReturnFocus=mobileRail.matches && document.getElementById('care-rail').contains(document.activeElement)?document.getElementById('open-care-menu'):document.activeElement;
+  closeCareMenu({restoreFocus:false});renderCareJourney();
+  dialog.returnValue='';dialog.showModal();
+  document.body.classList.add('records-dialog-open');
+  document.getElementById('care-journey-content').scrollTop=0;
+  document.getElementById('care-journey-title').focus({preventScroll:true});
+}
+
+function trapDialogFocus(event,dialog) {
+  if(event.key!=='Tab')return;
+  const items=[...dialog.querySelectorAll('a[href],button:not(:disabled),summary,[tabindex]:not([tabindex="-1"])')].filter(node=>{
+    if(!node.getClientRects().length || getComputedStyle(node).visibility==='hidden')return false;
+    for(let ancestor=node.parentElement;ancestor && ancestor!==dialog;ancestor=ancestor.parentElement) {
+      if(ancestor.tagName==='DETAILS' && !ancestor.open && !ancestor.querySelector(':scope > summary')?.contains(node))return false;
+    }
+    return true;
+  });
+  const first=items[0],last=items.at(-1);
+  if(event.shiftKey && (document.activeElement===first || !items.includes(document.activeElement))){event.preventDefault();last?.focus();}
+  else if(!event.shiftKey && document.activeElement===last){event.preventDefault();first?.focus();}
 }
 
 function hasConversationWork() {
@@ -259,6 +349,7 @@ function updateCapabilities(next) {
 function renderSnapshot() {
   renderPatientRecords();
   renderContactPlans();
+  renderCareJourney();
   const snapshot = safeSummary();
   if (!snapshot) {
     document.getElementById('case-content').innerHTML = '<p class="quiet">준비 상태를 확인하지 못했어요. 대화에서 다시 확인을 요청해 주세요.</p>';
@@ -335,7 +426,7 @@ function resizeInput() {
   input.style.height = `${Math.min(input.scrollHeight,160)}px`;
   document.getElementById('send-request').disabled = pending || Boolean(activeRecognition) || !input.value.trim();
   document.getElementById('character-count').textContent = `${input.value.length}/${MAX_MESSAGE}`;
-  for(const button of document.querySelectorAll('[data-contact-draft]'))button.disabled=pending || Boolean(activeRecognition);
+  for(const button of document.querySelectorAll('[data-contact-draft],[data-journey-draft],[data-journey-scenario],[data-call-recovery-scenario]'))button.disabled=pending || Boolean(activeRecognition);
   updateConversationLayout();
 }
 
@@ -378,7 +469,7 @@ function setPending(value) {
   document.getElementById('conversation-form').setAttribute('aria-busy',String(value));
   document.getElementById('send-request').setAttribute('aria-label',value?'요청 응답을 기다리는 중':'요청 보내기');
   for (const button of document.querySelectorAll('[data-example]')) button.disabled=value;
-  for (const button of document.querySelectorAll('[data-contact-draft]')) button.disabled=value || Boolean(activeRecognition);
+  for (const button of document.querySelectorAll('[data-contact-draft],[data-journey-draft],[data-journey-scenario],[data-call-recovery-scenario]')) button.disabled=value || Boolean(activeRecognition);
   updateConversationLayout();
   if (value) scrollToLatest();
 }
@@ -477,10 +568,15 @@ async function callAgent(path,body,signal) {
   return normalizeResponse(raw);
 }
 
-async function showPreview() {
+async function showPreview(scenarioId='aewol-parent-visit') {
   if(pending || activeRecognition)return;
+  if(!['aewol-parent-visit',...JOURNEY_SCENARIOS.map(item=>item.id),...CALL_RECOVERY_SCENARIOS.map(item=>item.id)].includes(scenarioId))return;
   if(hasConversationWork() && !window.confirm('고정 예시를 열면 현재 대화와 작성 중인 요청이 사라집니다. 미리보기를 열까요?'))return;
-  const body=failedPreviewRequest || {scenarioId:'aewol-parent-visit',requestId:makeId()};
+  const body=failedPreviewRequest?.scenarioId===scenarioId?failedPreviewRequest:{scenarioId,requestId:makeId()};
+  const journeyDialog=document.getElementById('care-journey-dialog');
+  if(journeyDialog.open)journeyDialog.close('preview');
+  const contactDialog=document.getElementById('contact-plan-dialog');
+  if(contactDialog.open)contactDialog.close('preview');
   const request=beginRequest('preview',{body},30000);
   const button=document.getElementById('preview-button');
   const notice=document.getElementById('mode-notice');
@@ -656,6 +752,7 @@ function mount() {
         </section>
         <nav class="rail-nav" aria-label="준비 화면 이동">
           <a href="#main" id="nav-preparation" class="active" aria-current="location">${icon('compass')}<span>진료 준비</span>${icon('chevron')}</a>
+          <a href="#care-journey-dialog" id="nav-care-journey" aria-haspopup="dialog" aria-controls="care-journey-dialog">${icon('file')}<span>진료 연결 여정</span>${icon('chevron')}</a>
           <a href="#patient-records-dialog" id="nav-patient-records" aria-haspopup="dialog" aria-controls="patient-records-dialog">${icon('folder')}<span>환자 정보·건강 기록</span>${icon('chevron')}</a>
           <a href="#contact-plan-dialog" id="nav-contact-plan" aria-haspopup="dialog" aria-controls="contact-plan-dialog">${icon('phone')}<span>전화·협진 준비</span>${icon('chevron')}</a>
           <a href="#care-preferences" id="nav-preferences">${icon('car')}<span>이동·동행 설정</span>${icon('chevron')}</a>
@@ -687,6 +784,7 @@ function mount() {
               <div class="chat-toolbar"><h2 id="conversation-title">혼디와 준비하기</h2><button type="button" id="preview-button" class="preview-button">대화 흐름 미리보기${icon('chevron')}</button></div>
               <p class="mode-notice" id="mode-notice">연결 범위를 확인하고 있어요.</p>
               <div class="conversation-scroll" id="conversation-scroll">
+                <section class="care-journey-summary" id="care-journey-summary" aria-label="현재 진료 연결과 다음 행동"><div class="journey-summary-state"><h3>현재</h3><strong id="care-journey-current">미확인</strong></div><button type="button" id="open-care-journey" aria-haspopup="dialog" aria-controls="care-journey-dialog">여정·할 일 보기${icon('chevron')}</button><p class="journey-summary-next"><span>다음</span><strong id="care-journey-next"></strong></p><p class="journey-summary-flow">자료 → 병원 문의 → 이동·동행 후속 확인</p></section>
                 <div class="message-list" id="message-list" role="log" aria-label="진료 준비 대화" aria-live="polite" aria-relevant="additions"></div>
               </div>
               <div class="pending-message" id="pending-message" hidden><div class="pending-summary"><span class="working-mark"></span><p role="status">요청 응답을 기다리고 있어요.</p></div><button type="button" id="cancel-request" class="cancel-request">응답 대기 중지</button><p class="pending-note">이 화면의 대기만 중지해요. 서버 처리는 계속될 수 있습니다.</p></div>
@@ -727,8 +825,14 @@ function mount() {
         <div class="patient-records-body" id="contact-plan-body">
           <section class="contact-overview" aria-labelledby="contact-overview-title"><h3 id="contact-overview-title">두 병원에 문의할 준비를 이어가요</h3><p>기존 도외 병원의 협진·회송 창구와 제주 병원의 현지 진찰·자료 전달 절차를 확인합니다. 실제 진찰 소견·의뢰서 작성과 진료 수락은 의료진과 기관이 담당합니다.</p><p>아래는 현재 가상 사례의 읽기 전용 계획입니다. 실환자 본인의 위임·본인인증·동의를 확인한 상태가 아니며, 전화 서비스 계정은 연결하지 않았습니다.</p></section>
           <div class="contact-plans" id="contact-plans"></div>
+          <section class="call-handoffs" id="call-handoffs" aria-label="실패한 문의와 인계"></section>
+          <details class="call-recovery-examples" id="call-recovery-examples"><summary><span>연결되지 않았을 때</span>${icon('chevron')}</summary><p class="journey-note">무응답·AI 응대 거절·본인 확인·서류/예약이 막힌 네 상황의 작성된 합성 예시입니다. 선택하면 현재 대화를 바꾸며 실제 모델·전화·동의 확인은 실행하지 않습니다.</p><div class="journey-scenarios" id="call-recovery-options"></div></details>
           <p class="records-memory-note">${icon('lock')}문의 계획은 현재 대화에서만 표시해요. 실제 환자 개인정보를 자동 전달하거나 이 기기에 저장하지 않습니다.</p>
         </div>
+      </dialog>
+      <dialog class="patient-records-dialog care-journey-dialog" id="care-journey-dialog" aria-labelledby="care-journey-title" aria-describedby="care-journey-description">
+        <header class="patient-records-header"><div><h2 id="care-journey-title" tabindex="-1">진료 연결 여정</h2><p id="care-journey-description">자료·문의·이동을 잇는 합성 준비 흐름 · 의료진 판단 전 미확인</p></div><button type="button" id="close-care-journey" class="close-records" aria-label="진료 연결 여정 닫기">${icon('close')}</button></header>
+        <div class="patient-records-body" id="care-journey-content"></div>
       </dialog>
     </div>`;
   welcomeMessage();renderSnapshot();updateCapabilities();
@@ -740,38 +844,55 @@ function mount() {
   document.getElementById('voice-request').addEventListener('click',startVoice);
   document.getElementById('cancel-request').addEventListener('click',cancelRequest);
   document.getElementById('new-conversation').addEventListener('click',()=>resetConversation());
-  document.getElementById('preview-button').addEventListener('click',showPreview);
+  document.getElementById('preview-button').addEventListener('click',()=>showPreview());
   document.getElementById('save-report').addEventListener('click',saveReport);
   document.getElementById('nav-patient-records').addEventListener('click',event=>{event.preventDefault();openPatientRecords();});
   document.getElementById('nav-contact-plan').addEventListener('click',event=>{event.preventDefault();openContactPlan();});
+  document.getElementById('nav-care-journey').addEventListener('click',event=>{event.preventDefault();openCareJourney();});
+  document.getElementById('open-care-journey').addEventListener('click',openCareJourney);
   const recordsDialog=document.getElementById('patient-records-dialog');
   document.getElementById('close-patient-records').addEventListener('click',()=>recordsDialog.close());
   recordsDialog.addEventListener('close',()=>{document.body.classList.remove('records-dialog-open');const target=mobileRail.matches?document.getElementById('open-care-menu'):patientRecordsReturnFocus;if(target?.isConnected)target.focus({preventScroll:true});});
   const contactDialog=document.getElementById('contact-plan-dialog');
   document.getElementById('close-contact-plan').addEventListener('click',()=>contactDialog.close());
   contactDialog.addEventListener('close',()=>{
+    if(contactDialog.open)return;
     document.body.classList.remove('records-dialog-open');
-    const target=contactDialog.returnValue==='draft'?input:mobileRail.matches?document.getElementById('open-care-menu'):contactPlanReturnFocus;
+    const target=contactDialog.returnValue==='draft'?input:contactDialog.returnValue==='preview' && pending?document.getElementById('cancel-request'):mobileRail.matches?document.getElementById('open-care-menu'):contactPlanReturnFocus;
     if(target?.isConnected){target.focus({preventScroll:true});if(contactDialog.returnValue==='draft')target.scrollIntoView({block:'nearest',behavior:'instant'});}
   });
-  contactDialog.addEventListener('keydown',event=>{
-    if(event.key!=='Tab')return;
-    const items=[...contactDialog.querySelectorAll('a[href],button:not(:disabled),summary,[tabindex]:not([tabindex="-1"])')].filter(node=>{
-      if(!node.getClientRects().length || getComputedStyle(node).visibility==='hidden')return false;
-      for(let ancestor=node.parentElement;ancestor && ancestor!==contactDialog;ancestor=ancestor.parentElement) {
-        if(ancestor.tagName==='DETAILS' && !ancestor.open && !ancestor.querySelector(':scope > summary')?.contains(node))return false;
-      }
-      return true;
-    });
-    const first=items[0],last=items.at(-1);
-    if(event.shiftKey && (document.activeElement===first || !items.includes(document.activeElement))){event.preventDefault();last?.focus();}
-    else if(!event.shiftKey && document.activeElement===last){event.preventDefault();first?.focus();}
-  });
+  contactDialog.addEventListener('keydown',event=>trapDialogFocus(event,contactDialog));
   document.getElementById('contact-plans').addEventListener('click',event=>{
     const button=event.target.closest('[data-contact-draft]');
     if(!button || !CALL_TARGETS.includes(button.dataset.contactDraft))return;
     const plan=buildCallPlan(caseState,button.dataset.contactDraft);
     if(fillRequestDraft(plan.requestDraft,{source:'문의 준비 문구',focus:false}))contactDialog.close('draft');
+  });
+  document.getElementById('contact-plan-body').addEventListener('click',event=>{
+    const scenario=event.target.closest('[data-call-recovery-scenario]');
+    if(scenario){showPreview(scenario.dataset.callRecoveryScenario);return;}
+    const button=event.target.closest('[data-call-handoff-draft]');
+    if(!button)return;
+    const item=(getCareJourneySummary(caseState).handoffs || []).find(item=>item.id===button.dataset.callHandoffDraft);
+    if(item && fillRequestDraft(item.requestDraft,{source:'사람 인계 초안',focus:false}))contactDialog.close('draft');
+  });
+  const journeyDialog=document.getElementById('care-journey-dialog');
+  document.getElementById('close-care-journey').addEventListener('click',()=>journeyDialog.close());
+  journeyDialog.addEventListener('close',()=>{
+    if(journeyDialog.open)return;
+    document.body.classList.remove('records-dialog-open');
+    const target=journeyDialog.returnValue==='draft'?input:journeyDialog.returnValue==='preview' && pending?document.getElementById('cancel-request'):careJourneyReturnFocus;
+    if(target?.isConnected){target.focus({preventScroll:true});if(journeyDialog.returnValue==='draft')target.scrollIntoView({block:'nearest',behavior:'instant'});}
+  });
+  journeyDialog.addEventListener('keydown',event=>trapDialogFocus(event,journeyDialog));
+  document.getElementById('care-journey-content').addEventListener('click',event=>{
+    const scenario=event.target.closest('[data-journey-scenario]');
+    if(scenario){showPreview(scenario.dataset.journeyScenario);return;}
+    const button=event.target.closest('[data-journey-draft]');
+    if(!button)return;
+    const journey=getCareJourneySummary(caseState);
+    const item=[...journey.tasks,...journey.nextActions,...(journey.handoffs || [])].find(item=>item.id===button.dataset.journeyDraft);
+    if(item && fillRequestDraft(item.requestDraft,{source:'다음 할 일 초안',focus:false}))journeyDialog.close('draft');
   });
   document.getElementById('preferences-form').addEventListener('submit',event=>event.preventDefault());
   document.getElementById('preferences-form').addEventListener('change',changePreferences);
