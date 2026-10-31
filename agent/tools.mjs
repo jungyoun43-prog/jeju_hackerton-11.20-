@@ -9,7 +9,7 @@ import { AgentError, fail } from './errors.mjs';
 import { validateSchema } from './validation.mjs';
 import { normalizeCarePreferences } from '../app/care-preferences.js';
 import { CALL_TARGETS, buildCallPlan } from '../app/call-policy.js';
-import { CALL_RECOVERY_SCENARIOS, CALL_FAILURE_REASONS, getCallAttemptGate, getCallRecoveryHandoffs } from '../app/call-recovery.js';
+import { CALL_RECOVERY_SCENARIOS, CALL_FAILURE_REASONS, callRecipientId, getCallAttemptGate, getCallRecoveryHandoffs } from '../app/call-recovery.js';
 import { getCareJourneySummary, JOURNEY_SCENARIOS } from '../app/care-journey.js';
 
 const registry = validateSupportRegistry(supportData);
@@ -36,7 +36,7 @@ const objectSchema = (properties = {}, required = [], extra = {}) => ({type:'obj
 const shortText = maxLength => ({type:'string', maxLength});
 const kindSchema = {type:'string', enum:['taxi','companion']};
 export const AGENT_TOOLS = Object.freeze([
-  {name:'update_call_retry_policy',description:'사용자가 이번 요청에서 N분 안에 최초 포함 최대 M회 재시도를 명시한 경우에만 합성 문의 허용 범위를 설정한다. 총1~3회·1~120분. 기존 시도·시계는 초기화하지 않으며 실제 자동 발신 예약·환자 위임이 아니다. AI거절·본인확인 중단을 해제하지 못한다.',inputSchema:objectSchema({target:{type:'string',enum:CALL_TARGETS},maxAttempts:{type:'integer',minimum:1,maximum:3},windowMinutes:{type:'integer',minimum:1,maximum:120}},['target','maxAttempts','windowMinutes'])},
+  {name:'update_call_retry_policy',description:'사용자가 이번 요청의 같은 절에서 문의 대상과 N분 안에 최초 포함 최대 M회 재시도해 달라는 긍정 요청을 명시한 경우에만 합성 문의 허용 범위를 설정한다. 총1~3회·1~120분. 기존 시도·시계는 초기화하지 않으며 실제 자동 발신 예약·환자 위임이 아니다. AI거절·본인확인 중단을 해제하지 못한다.',inputSchema:objectSchema({target:{type:'string',enum:CALL_TARGETS},maxAttempts:{type:'integer',minimum:1,maximum:3},windowMinutes:{type:'integer',minimum:1,maximum:120}},['target','maxAttempts','windowMinutes'])},
   {name:'run_call_recovery_demo',description:'사용자가 무응답/AI응대거절/본인확인/서류·일정 막힘 중 특정 상황의 합성 시연 실행을 명시한 때만 고정 전화 실패·인계 예시를 실행한다. 실제 전화·인증·예약이나 재시도 발신 예약은 하지 않는다.',inputSchema:objectSchema({scenarioId:{type:'string',enum:CALL_RECOVERY_SCENARIOS.map(item=>item.id)}},['scenarioId'])},
   {name:'get_care_journey', description:'현재 진료 연결 근거, 요구 문서·일정과 보유자료 비교, 발급·제출 문의, 휠체어·귀가·동행 후속 작업과 조건 변경 재확인을 읽는다. 의료진 근거 없는 결과를 선택하지 않는다.', inputSchema:objectSchema()},
   {name:'run_journey_demo', description:'사용자가 특정 상황의 합성 시연·미리보기 실행을 명시적으로 요청했을 때만 고정 자료 누락/제주 접수 거절/진료 시각 변경 예시를 실행한다. 현재 합성 사례를 해당 고정 예시로 바꾸며 실제 결과·원문·날짜를 받지 않는다. 일반 방문 준비 요청에서는 사용하지 않는다.', inputSchema:objectSchema({scenarioId:{type:'string',enum:JOURNEY_SCENARIOS.map(item => item.id)}}, ['scenarioId'])},
@@ -107,13 +107,79 @@ function explicitJourneyDemo(message, scenarioId) {
   const terms = { call_no_answer:/무응답|call_no_answer/,call_ai_declined:/AI.{0,8}(?:응대\s*)?거절|call_ai_declined/i,call_identity_required:/본인\s*확인|call_identity_required/,call_documents_or_schedule:/서류.{0,8}일정|서류.{0,8}막힘|call_documents_or_schedule/,missing_record:/자료\s*(?:누락|부족)|판독문\s*(?:누락|없)|missing_record/, jeju_unavailable:/제주.{0,12}(?:접수\s*)?거절|접수\s*거절|jeju_unavailable/, time_changed:/(?:진료\s*)?(?:시각|시간|일정)\s*변경|time_changed/ };
   return requested && terms[scenarioId].test(request);
 }
-function explicitRetryPolicy(message,input) {
-  const request = typeof message === 'string' ? message : '';
-  if (!/재시도|다시\s*(?:문의|연락|시도)/.test(request) || /재시도(?:는|를)?\s*(?:하지|말|금지|없이)/.test(request)) return false;
-  const match = /(\d{1,3})\s*분\s*(?:안|이내).{0,25}(?:최대|총)\s*(\d)\s*(?:회|번)/.exec(request);
-  return Boolean(match && Number(match[1]) === input.windowMinutes && Number(match[2]) === input.maxAttempts);
+const REQUEST_ENDING = String.raw`(?:해\s*(?:줘(?:요)?|주세요|주십시오|주셔요)|하(?:세요|십시오)|(?:를\s*)?허용(?:해\s*(?:줘(?:요)?|주세요)|합니다|할게요))(?=\s*$)`;
+const RETRY_ACTION = String.raw`(?:재시도|다시\s*(?:문의|연락|시도))(?:를|는|만|도)?\s*`;
+const INQUIRY_ACTION = String.raw`(?:문의|확인)(?:을|를|는|만|도)?\s*`;
+const FORBIDDEN_RESULT = String.raw`(?:안\s*(?:돼|되|됩|됨)|않|금지|불허|원치|원하지|말아)`;
+const PROHIBITION = String.raw`(?:절대\s*|자동으로\s*)?(?:하지|안\s*해|안\s*하|말(?:아|고|라)|금지|불허|원치|원하지|필요\s*없|(?:하(?:면|시면|는\s*것은|는\s*건|는\s*걸|는\s*것을|기는)|해(?:도|서는|선|\s*주면|\s*줘서는|\s*줘도))\s*${FORBIDDEN_RESULT}|해\s*주지)`;
+const actionMentions={retry:new RegExp(RETRY_ACTION),inquiry:new RegExp(INQUIRY_ACTION)};
+const negativeActions = {
+  retry: new RegExp(`${RETRY_ACTION}${PROHIBITION}`),
+  inquiry: new RegExp(`${INQUIRY_ACTION}${PROHIBITION}`),
+};
+const quotedOrTagged = /["'“”‘’「」『』`<>\[\]]|^\s*>|&(?:lt|gt|quot|apos|#\d+|#x[0-9a-f]+);|(?:예시|인용|설명|문구|문장|프롬프트|도구\s*결과)/i;
+const regexText = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+function authorizationTargets(state, clause) {
+  const labels = {
+    mainland: [String.raw`기존\s*도외\s*(?:치료\s*)?병원`, String.raw`도외\s*(?:치료\s*)?병원`, String.raw`서울\s*(?:기존\s*)?(?:치료\s*)?병원`],
+    jeju: [String.raw`(?:제주|도내|현지)\s*(?:협진\s*)?병원`],
+    taxi: [String.raw`택시`, String.raw`교통약자\s*(?:이동\s*)?지원센터`, String.raw`이동\s*지원(?:센터|\s*문의처)`],
+    companion: [String.raw`병원\s*동행`, String.raw`동행\s*(?:지원|문의처|기관|업체)`],
+  };
+  const names = { mainland:state.patient?.existingHospital, jeju:state.selectedHospital?.companyName ?? state.patient?.localHospital, taxi:state.visitSupport?.taxi?.provider?.name, companion:state.visitSupport?.companion?.provider?.name };
+  for(const [target,name] of Object.entries(names)) if(typeof name==='string'&&name.trim()) labels[target].push(regexText(name.replace(/\s*\(가상\)/g,'').trim()));
+  return Object.entries(labels).filter(([,aliases])=>new RegExp(aliases.join('|')).test(clause)).map(([target])=>target);
 }
-const alternativeDatesPermitted = message => /(?:다른|대체)\s*(?:날짜|일자|일정).{0,25}(?:문의|확인|알아)/.test(message) && !/(?:다른|대체)\s*(?:날짜|일자|일정).{0,15}(?:말|하지|금지)/.test(message);
+/** 인용·태그는 허용 근거가 아니다. 다른 대상이나 다른 문장의 숫자/명령을 합치지 않는다. */
+function authorizationClauses(message,state) {
+  if(typeof message!=='string') return [];
+  const plain = message.normalize('NFKC').replace(/(?:```|~~~)[\s\S]*?(?:(?:```|~~~)|$)/g,'');
+  const clauses=[];
+  for(const line of plain.split(/[\r\n]+/)) {
+    if(quotedOrTagged.test(line)) continue;
+    for(const sentence of line.split(/[.!?;]+/)) {
+      let conditionalTarget=[];
+      for(const part of sentence.split(/[,]+/)) {
+        const clause=part.trim();if(!clause)continue;
+        const named=authorizationTargets(state,clause),targets=named.length?named:conditionalTarget;
+        clauses.push({clause,targets});
+        // "택시가 무응답이면, ..."처럼 같은 문장의 조건절만 이어 읽는다.
+        conditionalTarget=targets.length===1&&/(?:면|경우|때)\s*$/.test(clause)?targets:[];
+      }
+    }
+  }
+  return clauses;
+}
+function targetAuthorization(message,state,target,kind,positive) {
+  let permitted=false;
+  for(const {clause,targets} of authorizationClauses(message,state)) {
+    const negative=negativeActions[kind].test(clause);
+    if(negative&&(!targets.length||targets.includes(target))) return false;
+    if(targets.length!==1||targets[0]!==target) continue;
+    // 부정 부사를 동작 직전에 둔 "안 문의해 줘"도 긍정 요청으로 해석하지 않는다.
+    if(kind==='retry'&&/안\s*(?:재시도|다시\s*(?:문의|연락|시도))/.test(clause)) return false;
+    if(kind==='inquiry'&&/안\s*(?:문의|확인)/.test(clause)) return false;
+    if(positive(clause)) permitted=true;
+    else if(actionMentions[kind].test(clause)) return false;
+  }
+  return permitted;
+}
+function recipientScopeMatches(state,target) {
+  const previous=state.callRecovery?.targets[target]?.recipientId;
+  return previous===null||previous===undefined||previous===callRecipientId(state,target);
+}
+function explicitRetryPolicy(message,input,state) {
+  const expression=new RegExp(String.raw`(\d{1,3})\s*분\s*(?:안(?:에)?|이내(?:에)?)\s*(?:최초\s*(?:시도\s*)?포함\s*)?(?:최대|총)\s*(\d)\s*(?:회|번)(?:까지|만|로만|로)?\s*${RETRY_ACTION}${REQUEST_ENDING}`,'g');
+  return targetAuthorization(message,state,input.target,'retry',clause=>{
+    const policies=[...clause.matchAll(expression)];
+    const ranges=[...clause.matchAll(/(\d{1,3})\s*분\s*(?:안(?:에)?|이내(?:에)?)\s*(?:최초\s*(?:시도\s*)?포함\s*)?(?:최대|총)\s*(\d)\s*(?:회|번)/g)];
+    return policies.length===1&&ranges.length>0&&ranges.every(match=>Number(match[1])===input.windowMinutes&&Number(match[2])===input.maxAttempts);
+  });
+}
+function alternativeDatesPermitted(message,target,state) {
+  const expression=new RegExp(String.raw`(?:다른|대체)\s*(?:날짜|일자|일정)(?:로|에|를|도|는|만|도\s*한번)?\s*${INQUIRY_ACTION}${REQUEST_ENDING}`);
+  return targetAuthorization(message,state,target,'inquiry',clause=>expression.test(clause));
+}
 async function runCallRecoveryScenario(scenarioId) {
   const fixedClock = () => Date.parse('2026-10-31T12:00:00Z');
   const phoneAdapter = { isSimulation:true,
@@ -122,13 +188,13 @@ async function runCallRecoveryScenario(scenarioId) {
   };
   const dispatch = createToolDispatcher({phoneAdapter,clock:fixedClock});
   let state = createDemoCase(); const events=[],pendingActions=[];
-  const message = `${CALL_RECOVERY_SCENARIOS.find(item=>item.id===scenarioId).label} 상황을 고정 합성 시연으로 실행해 줘. 무응답이면 15분 안에 최대 2회까지 재시도해 줘.`;
+  const message = `${CALL_RECOVERY_SCENARIOS.find(item=>item.id===scenarioId).label} 상황을 고정 합성 시연으로 실행해 줘. 택시가 무응답이면 15분 안에 최대 2회까지 재시도해 줘.`;
   const steps = scenarioId === 'call_documents_or_schedule' ? [['request_hospital_contact',{target:'mainland'}],['request_hospital_contact',{target:'jeju'}],['request_hospital_contact',{target:'jeju'}]]
     : scenarioId === 'call_identity_required' ? [['request_hospital_contact',{target:'mainland'}],['request_hospital_contact',{target:'mainland'}]]
     : [['prepare_inquiries',{kind:'taxi'}],...(scenarioId === 'call_no_answer' ? [['update_call_retry_policy',{target:'taxi',maxAttempts:2,windowMinutes:15}]] : []),['request_support_contact',{kind:'taxi'}],['request_support_contact',{kind:'taxi'}],...(scenarioId === 'call_no_answer' ? [['request_support_contact',{kind:'taxi'}]] : [])];
   for (const [name,input] of steps) { const result=await dispatch({name,input,state,userMessage:message,requestId:'fixed-call-recovery-001'});state=result.state;events.push(...result.events);pendingActions.push(...result.pendingActions); }
   if (scenarioId === 'call_documents_or_schedule') {
-    const result=await dispatch({name:'request_hospital_contact',input:{target:'jeju'},state,userMessage:'다른 날짜도 문의해 줘. 날짜 선택·예약은 하지 말고 안내만 확인해 줘.',requestId:'fixed-call-recovery-alt-002'});
+    const result=await dispatch({name:'request_hospital_contact',input:{target:'jeju'},state,userMessage:'제주 병원에 예약이 안 되면 다른 날짜도 문의해 줘. 날짜 선택·예약은 하지 말고 안내만 확인해 줘.',requestId:'fixed-call-recovery-alt-002'});
     state=result.state;events.push(...result.events);pendingActions.push(...result.pendingActions);
   }
   return {state,events,pendingActions};
@@ -175,7 +241,7 @@ export function createToolDispatcher({phoneAdapter = createPhoneSimulationAdapte
     let attemptedAt;
     const checkCallGate = target => {
       attemptedAt=callAt();
-      if (alternativeDatesPermitted(userMessage) && next.callRecovery?.targets[target].reason === 'no_slots') next=applyAction(next,{type:'CALL_ALLOW_ALTERNATIVE_DATES',target,requestId});
+      if (recipientScopeMatches(next,target) && alternativeDatesPermitted(userMessage,target,next) && next.callRecovery?.targets[target].reason === 'no_slots') next=applyAction(next,{type:'CALL_ALLOW_ALTERNATIVE_DATES',target,requestId});
       next=applyAction(next,{type:'CALL_CHECK_GATE',target,at:attemptedAt});
       const gate=getCallAttemptGate(next,target,attemptedAt);
       if (!gate.allowed) {
@@ -188,7 +254,7 @@ export function createToolDispatcher({phoneAdapter = createPhoneSimulationAdapte
     };
     switch (name) {
       case 'update_call_retry_policy':
-        fail(explicitRetryPolicy(userMessage,input),'EXPLICIT_RETRY_POLICY_REQUIRED','재시도는 이번 요청에서 N분 안에 최초 포함 최대 M회로 명시한 범위만 설정할 수 있습니다.');
+        fail(recipientScopeMatches(next,input.target) && explicitRetryPolicy(userMessage,input,next),'EXPLICIT_RETRY_POLICY_REQUIRED','재시도할 문의 대상과 N분 안에 최초 포함 최대 M회 재시도해 달라는 긍정 요청을 같은 문장에 명시해 주세요.');
         next=applyAction(next,{type:'CALL_SET_RETRY_POLICY',...input,at:callAt()});
         data={retryPolicy:{configured:true,...next.callRecovery.targets[input.target].retryPolicy,scheduled:false},handoffs:getCallRecoveryHandoffs(next),...realCallStatus};
         events.push(event(name,'명시한 합성 재시도 범위 반영',`최초 포함 총 ${input.maxAttempts}회·${input.windowMinutes}분입니다. 기존 시도·시작/종료 시각과 AI거절·본인확인 중단은 보존하며 실제 발신 예약은 하지 않았습니다.`,{isSimulation:true,source:'이번 요청에 명시한 합성 문의 범위'}));

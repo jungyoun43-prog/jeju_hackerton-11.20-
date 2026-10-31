@@ -14,7 +14,7 @@ function fixture(reason='no_answer') {
   return {dispatch,calls:()=>calls,advance:minutes=>{clock+=minutes*60000;},answer:()=>{answer=true;}};
 }
 const contact=(f,state,target='mainland',extra={})=>f.dispatch({name:'request_hospital_contact',input:{target},state,...extra});
-const policy=(f,state,maxAttempts=2,windowMinutes=15,extra={})=>f.dispatch({name:'update_call_retry_policy',input:{target:'mainland',maxAttempts,windowMinutes},state,userMessage:`무응답이면 ${windowMinutes}분 안에 최초 포함 최대 ${maxAttempts}회까지 재시도해 줘.`,...extra});
+const policy=(f,state,maxAttempts=2,windowMinutes=15,extra={})=>f.dispatch({name:'update_call_retry_policy',input:{target:'mainland',maxAttempts,windowMinutes},state,userMessage:`기존 도외 병원이 무응답이면 ${windowMinutes}분 안에 최초 포함 최대 ${maxAttempts}회까지 재시도해 줘.`,...extra});
 
 test('기본 무응답은 정책 미설정으로 두 번째 adapter 실행 전에 막고 이력·담당·남은 일을 보존한다',async()=>{
   const f=fixture();let result=await contact(f,createDemoCase());result=await contact(f,result.state);
@@ -75,8 +75,8 @@ test('서류 부족은 자료 태스크에 연결하고 자료 보완 뒤 합성
 test('예약 불가 뒤 다른 날짜 문의는 새 사용자 요청의 명시 허용으로만 한 번 열고 날짜를 선택하지 않는다',async()=>{
   const f=fixture('no_slots');let result=await contact(f,createDemoCase(),'jeju');const date=result.state.patient.nextVisit;
   result=await contact(f,result.state,'jeju');assert.equal(f.calls(),1);
-  result=await contact(f,result.state,'jeju',{userMessage:'다른 날짜도 문의해 줘.',requestId:'allowed-alternate-0001'});assert.equal(f.calls(),2);
-  result=await contact(f,result.state,'jeju',{userMessage:'다른 날짜도 문의해 줘.',requestId:'allowed-alternate-0001'});assert.equal(f.calls(),2);
+  result=await contact(f,result.state,'jeju',{userMessage:'제주 병원에 다른 날짜도 문의해 줘.',requestId:'allowed-alternate-0001'});assert.equal(f.calls(),2);
+  result=await contact(f,result.state,'jeju',{userMessage:'제주 병원에 다른 날짜도 문의해 줘.',requestId:'allowed-alternate-0001'});assert.equal(f.calls(),2);
   const handoff=getCallRecoveryHandoffs(result.state)[0];assert.equal(handoff.reason,'no_slots');assert.equal(handoff.status,'waiting_user');
   assert.equal(handoff.attempts.length,2);assert.equal(result.state.patient.nextVisit,date);assert.match(handoff.detail,/임의 선택/);
 });
@@ -111,7 +111,7 @@ test('새 기관 명시 선택 뒤에도 이전 수신처 실패·공개 연락�
   result=await f.dispatch({name:'select_hospital_contact',input:{hospitalId:'hospital-13'},state:result.state,userMessage:'제주선한병원으로 문의해줘'});
   result=await contact(f,result.state,'jeju');const handoff=getCallRecoveryHandoffs(result.state)[0];
   assert.equal(f.calls(),1);assert.deepEqual(handoff.contact,original.contact);assert.equal(handoff.contact.name,'제주우리병원');
-  assert.equal(result.state.patient.localHospital,'제주선한병원');assert.match(handoff.detail,/새 기관의 거절로 해석하지/);
+  assert.equal(result.state.patient.localHospital,'제주선한병원');assert.match(handoff.detail,/새 기관의 응답이나 거절로 해석하지/);
   assert.equal(handoff.attempts.length,1);
 });
 
@@ -119,7 +119,7 @@ test('새 기관 명시 선택 뒤에도 이전 수신처 실패·공개 연락�
 test('허용 시간 안에 시작한 느린 합성 문의도 시도 이력을 남기고 같은 서류 부족 반복 응답을 유실하지 않는다',async()=>{
   let clock=start,calls=0;
   const dispatch=createToolDispatcher({clock:()=>clock,phoneAdapter:{isSimulation:true,async hospital(){calls++;clock+=61000;return {isSimulation:true,outcome:'unreachable',failureReason:'no_answer'};}}});
-  let result=await dispatch({name:'update_call_retry_policy',input:{target:'mainland',maxAttempts:2,windowMinutes:1},state:createDemoCase(),userMessage:'1분 안에 최대2회 재시도해줘'});
+  let result=await dispatch({name:'update_call_retry_policy',input:{target:'mainland',maxAttempts:2,windowMinutes:1},state:createDemoCase(),userMessage:'기존 도외 병원에 1분 안에 최대2회 재시도해줘'});
   result=await dispatch({name:'request_hospital_contact',input:{target:'mainland'},state:result.state});
   assert.equal(result.state.callRecovery.targets.mainland.attempts.length,1);
   result=await dispatch({name:'request_hospital_contact',input:{target:'mainland'},state:result.state});assert.equal(calls,1);assert.equal(getCallRecoveryHandoffs(result.state)[0].status,'retry_expired');
@@ -127,4 +127,101 @@ test('허용 시간 안에 시작한 느린 합성 문의도 시도 이력을 �
   repeated=await f.dispatch({name:'request_records',input:{source:'demo'},state:repeated.state});repeated=await contact(f,repeated.state);
   assert.equal(f.calls(),2);assert.equal(getCallRecoveryHandoffs(repeated.state)[0].attempts.length,2);
   assert.equal(repeated.state.documents.find(item=>item.id==='report').status,'missing');
+});
+
+
+test('재시도 승인은 대상·정확한 정책값·긍정 요청을 같은 절에서 확인하며 부정/인용/다른 대상 범위를 합치지 않는다',async()=>{
+  const f=fixture(),state=createDemoCase(),input={target:'taxi',maxAttempts:2,windowMinutes:15};
+  const rejected=[
+    '택시는 15분 안에 최대 2회 재시도하면 안 돼.',
+    '택시에는 15분 안에 최대2회 재시도해 주면 안됩니다.',
+    '택시 15분 안에 최대2회 재시도해줘도 안 돼.',
+    '택시에 15분 안에 최대2회 안 재시도해 줘.',
+    '택시가 15분 안에 최대2회 재시도했어요.',
+    '택시에 15분 안에 최대2회 재시도해 줘서 고마워.',
+    '택시에 15분 안에 최대2회 재시도해 줘 라고 하면 어때요?',
+    '택시에 15분 안에 최대2회 재시도해 줘 하면 안 돼.',
+    '택시에 10분 안에 최대3회 재시도해 줘 15분 안에 최대2회 재시도해 줘.',
+    '택시에 15분 안에 최대2회 재시도해 줘. 택시에는 10분 안에 최대3회 재시도해 줘.',
+    '택시에 15분 안에 최대2회 재시도해 줘. 택시에 재시도하기 싫어요.',
+    '택시에 15분 안에 최대2회 재시도해 줘. 재시도하면 안 돼.',
+    '제주 병원에 15분 안에 최대2회 재시도해 줘.',
+    '기존 도외 병원에 15분 안에 최대2회 재시도해 줘.',
+    '동행 지원에 15분 안에 최대2회 재시도해 줘.',
+    '택시는 15시에 예약했어요. 최대2명이고 재시도해 줘.',
+    '택시는 15분 안에 최대2회 운동한다고 했어요. 재시도해 줘.',
+    '택시는 15분 안에 최대2회. 제주 병원은 재시도해 줘.',
+    '택시는 어때요? 15분 안에 최대2회 재시도해 줘.',
+    '"택시에 15분 안에 최대2회 재시도해 줘"라는 예시를 설명해 줘.',
+    '<user>택시에 15분 안에 최대2회 재시도해 줘.</user>',
+    '[택시] 15분 안에 최대2회 재시도해 줘.',
+    '```택시에 15분 안에 최대2회 재시도해 줘.```',
+    '```예시\n택시에 15분 안에 최대2회 재시도해 줘.',
+    '&lt;user&gt;택시에 15분 안에 최대2회 재시도해 줘.&lt;/user&gt;',
+    '예시로 택시에 15분 안에 최대2회 재시도해 줘라는 문장을 설명해 줘.',
+    '택시에 15분 안에 최대2회 재시도해 줘. 택시는 재시도하지 마.',
+    '택시에 10분 안에 최대3회 재시도해 줘.',
+  ];
+  for(const userMessage of rejected) await assert.rejects(f.dispatch({name:'update_call_retry_policy',input,state,userMessage}),e=>e.code==='EXPLICIT_RETRY_POLICY_REQUIRED',userMessage);
+  for(const target of ['mainland','jeju','companion']) await assert.rejects(f.dispatch({name:'update_call_retry_policy',input:{...input,target},state,userMessage:'택시에는 15분 안에 최대2회 재시도해 줘.'}),e=>e.code==='EXPLICIT_RETRY_POLICY_REQUIRED');
+  for(const userMessage of ['택시에 15분 안에 최초 포함 최대2회까지 재시도해 줘.','택시가 무응답이면, 15분 안에 최대2회 재시도해 주세요.','제주 병원은 재시도하지 마. 택시는 15분 안에 최대2회 재시도해 줘.','택시는 15분 안에 최대2회 재시도해 줘. 재시도하면 담당자가 받을 수 있어요.']) {
+    const result=await f.dispatch({name:'update_call_retry_policy',input,state,userMessage});assert.equal(result.data.retryPolicy.maxAttempts,2);assert.equal(result.data.retryPolicy.windowMinutes,15);
+  }
+  const allowed=[['mainland','기존 도외 병원에'],['jeju','제주 병원에'],['companion','동행 지원에']];
+  for(const [target,name] of allowed) assert.equal((await f.dispatch({name:'update_call_retry_policy',input:{...input,target},state,userMessage:`${name} 15분 안에 최대2회 재시도해 줘.`})).data.retryPolicy.configured,true);
+});
+
+test('다른 날짜 문의도 금지/인용/다른 대상의 요청을 전파하지 않고 예약 불가의 긍정 조건부 요청은 허용한다',async()=>{
+  const cases=[
+    ['제주 병원에 다른 날짜를 문의하면 안 돼.',false],
+    ['제주 병원에 다른 날짜를 문의해 주면 안 돼.',false],
+    ['제주 병원에 다른 날짜를 안 문의해 줘.',false],
+    ['제주 병원에 다른 날짜를 문의해 줘도 안 돼.',false],
+    ['제주 병원에 다른 날짜를 문의했어요.',false],
+    ['제주 병원에 다른 날짜를 문의해 줘서 고마워.',false],
+    ['제주 병원에 다른 날짜를 문의해 줘 라고 하면 어때요?',false],
+    ['제주 병원에 다른 날짜를 문의해 줘 하면 안 돼.',false],
+    ['다른 날짜를 문의해 줘.',false],
+    ['기존 도외 병원에 다른 날짜를 문의해 줘.',false],
+    ['택시에 다른 날짜를 문의해 줘.',false],
+    ['동행 지원에 다른 날짜를 문의해 줘.',false],
+    ['제주 병원은 그대로 둬. 기존 도외 병원에 다른 날짜를 문의해 줘.',false],
+    ['"제주 병원에 다른 날짜를 문의해 줘"라는 예시입니다.',false],
+    ['<request>제주 병원에 다른 날짜를 문의해 줘.</request>',false],
+    ['제주 병원에 다른 날짜를 문의해 줘. 문의하면 안 돼.',false],
+    ['제주 병원에 다른 날짜를 문의해 줘. 제주 병원에 문의하기 싫어요.',false],
+    ['제주 병원에 예약이 안 되면 다른 날짜를 문의해 줘.',true],
+    ['제주 병원에 예약이 안 되면, 다른 날짜도 문의해 주세요.',true],
+    ['제주 병원에 다른 날짜를 문의해 줘. 실제 예약은 하지 마.',true],
+  ];
+  for(const [userMessage,allowed] of cases) {
+    const f=fixture('no_slots');let result=await contact(f,createDemoCase(),'jeju');
+    result=await contact(f,result.state,'jeju',{userMessage,requestId:'alternate-guard-unit-001'});
+    assert.equal(f.calls(),allowed?2:1,userMessage);assert.equal(result.state.callRecovery.targets.jeju.attempts.length,allowed?2:1,userMessage);
+    assert.equal(result.state.patient.nextVisit,'2026-11-12');
+  }
+});
+
+test('A의 합성 성공 뒤 B를 선택해도 B의 첫 실패를 A에 귀속시키지 않고 새 범위 확인으로 호출 전에 막는다',async()=>{
+  let calls=0;const f={dispatch:createToolDispatcher({clock:()=>start,phoneAdapter:{isSimulation:true,async hospital(){calls++;return calls===1?{isSimulation:true,outcome:'documents'}:{isSimulation:true,outcome:'unreachable',failureReason:'no_answer'};}}})};
+  let result=await f.dispatch({name:'select_hospital_contact',input:{hospitalId:'hospital-4'},state:createDemoCase(),userMessage:'제주우리병원에 문의해줘'});
+  result=await contact(f,result.state,'jeju');assert.equal(calls,1);assert.equal(getCallRecoveryHandoffs(result.state).length,0);
+  result=await f.dispatch({name:'select_hospital_contact',input:{hospitalId:'hospital-13'},state:result.state,userMessage:'제주선한병원에 문의해줘'});
+  result=await contact(f,result.state,'jeju');assert.equal(calls,1);
+  const handoff=getCallRecoveryHandoffs(result.state)[0];assert.equal(handoff.reason,'recipient_changed');assert.equal(handoff.status,'handed_off');
+  assert.equal(handoff.contact.name,'제주우리병원');assert.deepEqual(handoff.attempts.map(x=>x.outcome),['answered']);assert.equal(handoff.stopAutomatic,true);
+  assert.match(handoff.remainingTasks.join(' '),/새.*대행 범위/);assert.match(handoff.questions.join(' '),/제주선한병원/);
+  assert.equal(result.state.inquiries.jeju.status,'not_contacted');assert.equal(result.state.callRecovery.targets.jeju.reason,null);
+});
+
+
+test('수신처 변경 뒤 새 대상의 정책·다른 날짜 허용을 이전 수신처의 대행 범위로 옮기지 않는다',async()=>{
+  const f=fixture('no_slots');let result=await f.dispatch({name:'select_hospital_contact',input:{hospitalId:'hospital-4'},state:createDemoCase(),userMessage:'제주우리병원에 문의해줘'});
+  result=await contact(f,result.state,'jeju');
+  result=await f.dispatch({name:'select_hospital_contact',input:{hospitalId:'hospital-13'},state:result.state,userMessage:'제주선한병원에 문의해줘'});
+  await assert.rejects(f.dispatch({name:'update_call_retry_policy',input:{target:'jeju',maxAttempts:2,windowMinutes:15},state:result.state,userMessage:'제주선한병원에 15분 안에 최대2회 재시도해 줘.'}),e=>e.code==='EXPLICIT_RETRY_POLICY_REQUIRED');
+  result=await contact(f,result.state,'jeju',{userMessage:'제주선한병원에 다른 날짜를 문의해 줘.',requestId:'different-recipient-001'});
+  assert.equal(f.calls(),1);assert.equal(result.state.callRecovery.targets.jeju.alternativeDatesAllowed,false);assert.equal(result.state.callRecovery.targets.jeju.alternativeDateRequestId,null);
+  result=await f.dispatch({name:'select_hospital_contact',input:{hospitalId:'hospital-4'},state:result.state,userMessage:'제주우리병원에 문의해줘'});
+  result=await contact(f,result.state,'jeju');assert.equal(f.calls(),1);assert.equal(getCallRecoveryHandoffs(result.state)[0].status,'waiting_user');
 });

@@ -11,6 +11,7 @@ export const CALL_FAILURE_REASONS = Object.freeze(['no_answer', 'ai_declined', '
 const TARGETS = ['mainland', 'jeju', 'taxi', 'companion'];
 const OUTCOMES = ['answered', ...CALL_FAILURE_REASONS];
 const REASONS = {
+  recipient_changed:{title:'문의처 변경 · 새 대행 범위 확인',owner:'보호자',detail:'이전 문의처에서 합성 응답을 받은 뒤 수신처가 바뀌었습니다. 이전 연락처·시도 이력을 새 기관의 응답이나 실패로 옮기지 않고 새 대행 범위와 사람의 문의 단계를 확인합니다.'},
   no_answer: { title: '무응답 · 허용 범위 확인', owner: '보호자', detail: '연락이 닿지 않은 합성 시도입니다. 명시적으로 정한 총 횟수·시간 안에서만 다음 문의를 시연할 수 있으며, 기본 미설정이면 자동 재시도하지 않습니다.' },
   ai_declined: { title: 'AI 응대 거절 · 보호자 인계', owner: '보호자', detail: '기관 역할이 AI 응대를 거절했습니다. 자동 반복 문의를 중단하고 공개 문의번호·문의 내용·남은 일을 보호자에게 넘깁니다. 재시도 정책으로 이 중단을 해제하지 않습니다.' },
   identity_required: { title: '본인확인 요구 · 환자 직접 단계', owner: '환자 본인', detail: '기관 역할이 본인확인을 요구했습니다. 환자가 기관의 공식 절차를 직접 진행해야 하며 Agent는 인증정보를 받거나 본인확인·재시도를 완료하지 않습니다.' },
@@ -57,7 +58,7 @@ function contactFor(state, target, recipientId) {
 export function getCallAttemptGate(state, target, at) {
   assert(TARGETS.includes(target) && timestamp(at));
   const entry = recoveryOf(state).targets[target], policy = entry.retryPolicy;
-  if(entry.reason && entry.recipientId!==null && callRecipientId(state,target)!==entry.recipientId) return {allowed:false,status:'handed_off',stopAutomatic:true,detail:`이전 문의처 ${contactFor(state,target,entry.recipientId).name}의 실패·인계를 보존합니다. 현재 선택한 새 기관의 거절로 해석하지 않습니다. 이 합성 시연은 대상별 한 수신처의 복구를 다루므로 새 기관에는 사람이 확인할 문의 초안을 준비합니다.`};
+  if(entry.recipientId!==null && callRecipientId(state,target)!==entry.recipientId) return {allowed:false,status:'handed_off',stopAutomatic:true,detail:`이전 문의처 ${contactFor(state,target,entry.recipientId).name}의 합성 응답·실패 여부와 시도 이력을 보존합니다. 현재 선택한 새 기관의 응답이나 거절로 해석하지 않습니다. 이 합성 시연은 대상별 한 수신처의 복구를 다루므로 새 기관에는 사람이 확인할 문의 초안을 준비합니다.`};
   if (['ai_declined', 'identity_required', 'not_participating'].includes(entry.reason)) return { allowed: false, status: 'handed_off', stopAutomatic: true, detail: REASONS[entry.reason].detail };
   if (entry.reason && entry.attempts.at(-1)?.outcome === 'answered') return { allowed:false, status:'followup_required',stopAutomatic:true,detail:'실패 뒤 합성 후속 안내를 받았으며 이전 실패·시도 이력과 사람이 마칠 작업을 보존합니다. 실제 예약·발급·본인확인으로 덮지 않습니다.' };
   if (entry.reason === 'missing_documents' && state.documents?.find(item => item.id === 'report')?.status !== 'ready') return { allowed: false, status: 'blocked', stopAutomatic: true, detail: '판독문 원본 확보 작업이 남아 있어 같은 문의를 자동 반복하지 않습니다.' };
@@ -73,6 +74,7 @@ export function applyCallRecoveryAction(state, action) {
   assert(TARGETS.includes(action.target));
   const next = structuredClone(state); next.callRecovery = structuredClone(recoveryOf(state));
   const entry = next.callRecovery.targets[action.target];
+  if (['CALL_SET_RETRY_POLICY','CALL_ALLOW_ALTERNATIVE_DATES'].includes(action.type)) assert(entry.recipientId===null||entry.recipientId===callRecipientId(next,action.target),'이전 문의처와 새 문의처의 대행 범위를 혼합하지 않습니다. 사람이 새 범위를 확인해 주세요.');
   if (action.type === 'CALL_SET_RETRY_POLICY') {
     assert(keys(action, ['type', 'target', 'maxAttempts', 'windowMinutes', 'at']) && timestamp(action.at));
     assert(Number.isSafeInteger(action.maxAttempts) && action.maxAttempts >= 1 && action.maxAttempts <= 3 && Number.isSafeInteger(action.windowMinutes) && action.windowMinutes >= 1 && action.windowMinutes <= 120);
@@ -111,19 +113,20 @@ export function applyCallRecoveryAction(state, action) {
 export function getCallRecoveryHandoffs(state) {
   const recovery = recoveryOf(state), handoffs = [];
   for (const target of TARGETS) {
-    const entry = recovery.targets[target]; if (!entry.reason) continue;
-    const reason = REASONS[entry.reason], at = entry.checkedAt ?? entry.attempts.at(-1)?.at;
+    const entry = recovery.targets[target],changed=entry.recipientId!==null&&callRecipientId(state,target)!==entry.recipientId;
+    if (!entry.reason&&!changed) continue;
+    const reasonId=entry.reason??'recipient_changed',reason=REASONS[reasonId],at = entry.checkedAt ?? entry.attempts.at(-1)?.at;
     const gate = getCallAttemptGate(state, target, at), contact = contactFor(state, target, entry.recipientId);
-    const remainingTasks = entry.reason === 'missing_documents' ? ['요구 문서와 보유 목록 비교', '기존 병원 판독문 발급 창구·본인/대리 확인', '원본과 작성일 확보', '제주 제출 방식·수신 확인']
+    const remainingTasks = reasonId === 'recipient_changed' ? ['이전 수신처의 합성 응답·시도 이력 보존','새 지정 기관의 문의 창구와 새 대행 범위를 보호자가 직접 확인','새 기관의 공개 문의 초안을 사람이 검토'] : entry.reason === 'missing_documents' ? ['요구 문서와 보유 목록 비교', '기존 병원 판독문 발급 창구·본인/대리 확인', '원본과 작성일 확보', '제주 제출 방식·수신 확인']
       : entry.reason === 'no_slots' ? ['보호자가 허용한 다른 날짜 문의 범위 확인', '기관의 가능한 일자 안내 확인', '보호자의 날짜 선택', '변경 뒤 이동·동행 재확인']
       : entry.reason === 'identity_required' ? ['환자가 기관 공식 창구에서 직접 본인확인', '기관이 확인한 뒤 남은 자료·일정 문의를 사람에게 인계']
       : entry.reason === 'ai_declined' ? ['보호자가 공개 문의번호와 질문 확인', '사람이 문의할 창구로 직접 연락', '진행 결과와 남은 자료·일정 확인']
       : entry.reason === 'not_participating' ? ['기존 의료진 계획 유지', '거절 기관을 제외한 공개 문의 후보 확인', '기관 종류·접수 조건과 자료 제출 방식 문의']
       : [gate.allowed ? '허용 횟수·시간 안에서만 다음 합성 문의 시연' : '자동 재시도 중단·보호자의 다음 문의 범위 확인', '접수 창구와 가능한 연락 시간 확인'];
-    const questions = [entry.reason === 'identity_required' ? '환자 본인이 직접 진행해야 할 공식 본인확인 절차와 창구는 어디인가요?' : entry.reason === 'ai_declined' ? '보호자가 직접 문의할 수 있는 창구·공개 번호·응대 시간은 무엇인가요?' : entry.reason === 'missing_documents' ? '누락한 판독문의 발급·제출 형식, 작성일과 수신 확인 절차는 무엇인가요?' : entry.reason === 'no_slots' ? '보호자가 허용한 범위의 다른 날짜를 안내받을 수 있나요? 날짜 선택·예약은 별도로 확인하겠습니다.' : '접수 가능한 창구·연락 시간과 남은 준비 자료는 무엇인가요?',
+    const questions = [reasonId === 'recipient_changed' ? `현재 지정한 ${contactFor(state,target,callRecipientId(state,target)).name}에 새로 문의할 창구·범위를 보호자가 확인했나요? 이전 기관의 응답을 새 기관에 적용하지 않습니다.` : entry.reason === 'identity_required' ? '환자 본인이 직접 진행해야 할 공식 본인확인 절차와 창구는 어디인가요?' : entry.reason === 'ai_declined' ? '보호자가 직접 문의할 수 있는 창구·공개 번호·응대 시간은 무엇인가요?' : entry.reason === 'missing_documents' ? '누락한 판독문의 발급·제출 형식, 작성일과 수신 확인 절차는 무엇인가요?' : entry.reason === 'no_slots' ? '보호자가 허용한 범위의 다른 날짜를 안내받을 수 있나요? 날짜 선택·예약은 별도로 확인하겠습니다.' : '접수 가능한 창구·연락 시간과 남은 준비 자료는 무엇인가요?',
       '실제 전화·본인확인·발급·예약은 아직 하지 않았습니다. 필요한 사람의 다음 단계만 안내해 주세요.'];
     const requestDraft = `${contact.name}${contact.phone ? ` (${contact.phone}, 공개 등록번호·연결 미확인)` : ' (실제 문의번호 확인 필요)'} 문의를 ${reason.owner}에게 넘길 수 있도록 ${reason.title}의 시도 내역·질문·남은 일을 정리해 줘. 자동 반복 문의나 실제 인증·예약은 진행하지 말아 줘.`;
-    handoffs.push({ id: `call-${target}-${entry.reason}`, target, reason: entry.reason, status: gate.status, title: reason.title, detail: `${reason.detail} ${gate.detail} 문의 이력은 합성 시연이며 실제 발신이 아닙니다.`, attempts: entry.attempts.map(item => ({ ...item })),
+    handoffs.push({ id: `call-${target}-${reasonId}`, target, reason: reasonId, status: gate.status, title: reason.title, detail: `${reason.detail} ${gate.detail} 문의 이력은 합성 시연이며 실제 발신이 아닙니다.`, attempts: entry.attempts.map(item => ({ ...item })),
       retryPolicy: { configured: entry.retryPolicy.maxAttempts !== null, ...entry.retryPolicy, scheduled: false }, owner: reason.owner, contact, questions, remainingTasks, requestDraft, stopAutomatic: gate.stopAutomatic, actualCallPlaced: false });
   }
   return handoffs;
