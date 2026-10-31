@@ -339,3 +339,28 @@ QA 서버가 종료된 첫 실행의 마지막 모바일 단계 실패는 전체
 실행 지문은 `e5fcd7636893d8d8fef9e470a8ca06542f5cd6b5f89e62919658ab612faf0bf5`다. 네 브라우저와 빌드·eval을 각 소유 TTY의 직접 node 명령으로 실행해 모두 종료0을 확인했다. 네 proof는 pass/errors[]·현재 sourceHash이며 준비판 finalSourceHash도 일치한다. 실제 좌표의 PC1440×900/1280×800은2×2, 모바일390×844/360×780/390×500/가로768×512는1열4칸이다. 긴 답변이 plan 칸과 문서 높이를 함께 늘리는 단언과 내부Y스크롤 없음을 확인했다. 현재 캡처는 `.impeccable/review/grid/board/`·`grid/journey/`, 이전 reading 캡처는 이전 버전 이력이다. 실제 스마트폰/마이크·OS확대·Safari/Firefox·스크린리더는 미검증이다.
 
 최신 공개 UI의 실제 고정 preview14건·정적/API revision·소스 바이트는 `preparation-board-deployed.json`·`aws-deployment.json`을 따른다. 이번에는 유료 모델을 재호출하지 않는다. 이전 `9fc11bc`의 실제 Sol1건·DynamoDB 진행9회/최종완료 증거는 `preparation-board-live-check.json`의 원래 revision/sourceHash를 유지하며 새 격자의 실모델 실행으로 바꾸지 않는다. 배포 검증은 이전 모델 증거 이후 runtime 변경이 UI3파일·agentREADME뿐인지 Git으로 대조한다. 재생성 ZIP의 독립 설치·360개 검사/빌드는 `release.json`, 최신 포함 증거·CRC·소스 지문은 `output/final-archive-check.json`을 따른다. 실제 발신·개인기록·예약/배차·의료진 수락·의료법률·센터실기기/최종대회제출의 상태는 바뀌지 않았다.
+
+
+## 3.13 입력부터 시작하고 핵심만 읽는 UI
+
+사용자가 사용자 관점의 UI를 다시 거부해, [설계·흐름 검토 A](reviews/2026-10-31-task-first-assessment-a.md)와 [브라우저 관측 B](reviews/2026-10-31-task-first-assessment-b.md)를 격리해 수행했다. 기존 자동 검사의 통과를 사용성 승인으로 재사용하지 않았다. [감사 기록](reviews/2026-10-31-task-first-audit.md)의 주요 문제는 첫 입력이 PC 약1,214px·모바일 약1,765px 아래에 있다는 점과, 결과 이후 다음 문의로 이어가기 어렵다는 점이었다.
+
+공통 입력·예시·개인정보 안내를 네 칸 위로 옮겼다. PC2×2·모바일1열4칸·페이지 스크롤은 보존한다. 첫 세 칸은 핵심 사실2개와 추가 확인 건수를 먼저 보여 주고 전체 사실·누락·근거·기록은 native 자세히 보기로 펼친다. 중복 상태 탐색을 제거해 상태는 네 칸 제목에서 확인한다. 0건 이력과 빈 안내도 숨긴다. 답변은 네 번째 칸에서 전부 읽으며 기존 nextActions.requestDraft를 같은 입력창에 채우거나, 작성 중인 문장을 보존해 입력으로 돌아올 수 있다. 두 동작은 자동 요청·발신을 하지 않는다. 첫 요청 뒤 초기 인사말은 제거한다.
+
+입력 위치가 바뀐 데 맞춰 대기·중지를 입력 가까이에 두고 요청 시작에 한 번만 보이게 한다. 진행 이벤트로 계속 스크롤하지 않으며 답변·오류 도착 때 해당 메시지를 보이는 위치에서 읽도록 포커스를 옮긴다. 출처를 읽던 사용자의 같은 DOM·초점·위치 보존과 새 답변 알림은 유지한다. 전체 누락4건 중3개만 표시하던 projection과 중복된 ‘문의처 선택 전’도 바로잡았다. API·모델·진행 DTO 정규화·위임·전화/기록 경계는 바꾸지 않았다. 생산 UI3파일은89줄 추가·95줄 삭제이며 새 의존성·이미지는 없다.
+
+| 검증 | 동결 통합본 결과와 범위 |
+| --- | --- |
+| 단위·서버 | 360/360. 기존 assertion에 전체 누락 목록·중복 문구 회귀 추가 |
+| 대화 | 186/186. 입력 복귀·실제 답변·대기/취소·오류/재시도·음성·설정·기록·안전 경계 |
+| 여정·전화 인계 | 236/236. 실제 keyless preview14건·일반 모델 POST0·다음 문의 초안/복귀 noPOST |
+| 개발용 수동 화면 | 47/47 |
+| 준비판·입력·문서·진행 | 212/212. 6viewport·실제2×2/1열4칸·첫 화면 입력/보내기·핵심/상세·전체 누락·장문/표/200%글자·출처 같은 node/focus/위치±2px |
+| 자동 규칙·빌드 | 60/60·누적46개 등록 worktree 중 이번 개발2개. Lambda bundle 생성 통과 |
+| 구현 후 독립 검토 | [같은 A의 재검토](reviews/2026-10-31-task-first-after.md): 이전 첫 요청·후속 문의 P1 해결, 새 차단 문제 없음. 실제 환자 사용성 시험과 구분 |
+
+실행 지문은 `d08f861032f2e76b30f4dea959567ab291dbf624881ec0dbb941e4e8f3b54d0f`다. 네 브라우저 프로세스의 종료0과 pass/errors[]·동일 sourceHash·준비판 finalSourceHash를 별도로 확인한 뒤 eval60/60을 실행했다. PC1440×900·1280×800, 모바일390×844·360×780·390×500·가로768×512에서 입력과 보내기가 첫 화면에 보인다. 관측한 입력 상단은 PC 약264px·390px 모바일 약299px, 보내기 하단은 각각368px·403px다. 첫 세 상세는 기본 닫힘이며 전체 내용을 열어도 내부Y스크롤이 없다. 캡처는 `.impeccable/review/task-first/board/`·`task-first/journey/`를 따른다.
+
+첫 대화 검사에서 초기 인사말을 assistant 답변 수에 포함하던 기존 단언5개가 실패했다. 해당 실행은 소유 TTY에서130으로 중지하고 로그를 보존했다. 실제 답변 `:not(.greeting)`·고유 fixture 원문·요청 본문/ID/SHA 확인으로 단언을 강화해 focused35/35 후 영향받은 대화만 전체 재실행했다. 같은 실행 지문에서 이미 통과한 다른 세 브라우저 검사는 반복하지 않았다. 누락 목록 회귀는 수정 전11통과/1실패, 수정 후12/12였다.
+
+Impeccable detector·slug는 각각 권한 오류126으로 실행되지 않았으므로 발견0건/자동 디자인 합격으로 표시하지 않았다. 직접 브라우저·독립 검토로 보완했으며 실기기·실마이크·Safari/Firefox·스크린리더·실환자/임상·법률·센터 PC·15페이지 PDF/대회 제출은 미검증이다. 이번 UI 수정은 유료 모델을 재호출하지 않는다. 이전9fc11bc의 실제 Sol/DynamoDB 증거는 원래 revision과 지문을 유지한다. 새 공개 고정 preview·소스/revision·첫 화면/그리드 증거는 `preparation-board-deployed.json`·`aws-deployment.json`·`.impeccable/review/task-first/deployed/layout.json`, 독립 ZIP 설치/검사·최종 CRC와 지문은 `release.json`·`output/final-archive-check.json`을 따른다. 배포 검증은 shared stage 모듈이 감사한 화면 표시3곳만 달라졌는지도 대조한다.

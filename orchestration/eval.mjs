@@ -135,6 +135,7 @@ await check('preparation-board-browser-evidence','verification',async()=>{
  requireThat(proof.viewports?.length>=6 && proof.viewports.every(view=>view.noOverflow) && proof.viewports.some(view=>view.width>=1280) && proof.viewports.some(view=>view.width===390&&view.height===500),'PC/모바일/짧은화면의 접근·넘침 검사가 필요합니다.');
  requireThat(proof.viewports.every(view=>view.documentFlow===true && view.initialSignalSummary===true),'모든 viewport에서 문서 흐름·내부 세로 스크롤 없음·기호 요약 검사가 필요합니다.');
  requireThat(proof.viewports.every(view=>view.gridLayout===(view.width>900?'2x2':'1x4')),'실제 좌표로 PC2×2·모바일1열4칸 검사가 필요합니다.');
+ requireThat(proof.viewports.every(view=>view.composerFirst===true && view.compactSummary===true),'첫 요청 접근과 각 칸 핵심/상세 분리의 실제 viewport 검사가 필요합니다.');
  for(const view of proof.viewports){const bytes=await readFile(resolve(root,view.screenshot));requireThat(bytes.readUInt32BE(0)===0x89504e47,'읽기 UI PNG 증거가 필요합니다.');}
  return `${proof.checks.length}개 2×2·문서 스크롤·기호 요약·실제 keyless 진행 API·진행/취소 fixture와6개viewport. 실제모델·DDB 진행은 별도공개증거.`;
 });

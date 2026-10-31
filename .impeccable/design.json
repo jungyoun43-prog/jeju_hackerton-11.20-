@@ -2,12 +2,12 @@
   "schemaVersion": 1,
   "name": "혼디 · 보호자 진료 준비",
   "mode": "operate",
-  "direction": "인물 없는 제주 배경 위 네 작업칸(PC2×2·모바일전체1열)·○△×상태·문서전체스크롤·공통텍스트/음성입력·기존기록/전화/여정창을 갖춘 보호자 작업 공간",
+  "direction": "상단 공통 텍스트/음성 요청→PC2×2·모바일4칸 핵심 요약→각 칸 native 상세·실제답변→기존다음문의초안/입력복귀의 보호자 작업 공간. 혼디브랜드/제주배경/○△×와 문서스크롤 유지.",
   "seedReference": "seed:a25f97f1d883646c",
   "layoutAuthority": {
-    "contract": "docs/grid-flow-contract.md",
+    "contract": "docs/task-first-ui-contract.md",
     "seed": "none (user-pinned)",
-    "scope": "사용자 정정: 2×2 유지·칸 내부 세로 스크롤만 제거. 단일 본문으로 그리드를 없앤 중간 변경을 바로잡는다. 브랜드 seed와 현재 의미 색을 유지한다."
+    "scope": "사용자 관점 개선: 입력과 예시를 먼저 두고 네 칸은 핵심/상세로 분리한다. 2×2와 내부Y스크롤 없음은 유지하며 중복 상태 nav를 제거한다. 새 브랜드/모델/API를 만들지 않는다."
   },
   "colors": {
     "background": "#F3F5F8",
@@ -49,7 +49,9 @@
     "inputPx": 16,
     "mobileInputPx": 16,
     "importantNoticePx": 14,
-    "brandFontBoundary": "현재 로고는 PNG. 브랜드 텍스트용 MaruBuri 레거시 규칙은 실제 사례·본문 제목 글꼴이 아님."
+    "brandFontBoundary": "현재 로고는 PNG. 브랜드 텍스트용 MaruBuri 레거시 규칙은 실제 사례·본문 제목 글꼴이 아님.",
+    "requestHeadingPx": 20,
+    "mobileRequestHeadingPx": 18
   },
   "shape": {
     "surfaceRadiusPx": 12,
@@ -113,7 +115,7 @@
     "전화·협진 준비는 공통 call-policy 기반 네 대상의 읽기 전용 thin details",
     "최소 전달 항목은 허용 범위를 더 확인할 내용이며 실제 위임/인증/기록 처리 완료로 표시하지 않음",
     "전화 계획 초안 버튼은 현재 초안 보호 후 입력만 채우고 발신/예약/배차를 확정하지 않음",
-    "진료 연결 여정은 첫 답변 뒤 공유 summary의 현재 상태·다음 행동을 대화 앞 얇은 행으로 보여 주며 첫 답변 전에는 숨기고 새 필수 입력 단계를 만들지 않음",
+    "진료 연결 여정은 첫 답변 뒤 공유 summary의 현재 상태·다음 행동을 대화 다음 얇은 행으로 보여 주며 첫 답변 전에는 숨기고 새 필수 입력 단계를 만들지 않음",
     "도내 전환·부분 제주 진행·도외 유지는 의료진 근거 전 모두 미확인이며 접수 거절을 임상 판단으로 바꾸지 않음",
     "여정 할 일은 담당·의존 조건·원문 발췌·작성일·확인 여부를 보존하며 합성 전화 응답과 실제 처리를 구분",
     "일정·지역·기관·휠체어 조건 변경의 이유와 이동·동행 재확인을 표시하고 이전 가능 응답을 실제 예약으로 유지하지 않음",
@@ -126,7 +128,9 @@
     "문의 전·필요 없음은 중립 대시와 상태 문장으로 표시하며 미확인을 문의 실패나 임상 판단으로 바꾸지 않음",
     "활동 행은 응답 대기 중에만 표시하고 가짜 진행·완료 상태를 생성하지 않음",
     "긴 표의 가로 스크롤·최대160px 입력칸·사용자가 연 native dialog와 설정 탐색의 표준 스크롤을 보존",
-    "확정 이력·출처의 DOM과 진행 목록을 분리하고 동일한 내용의 출처 링크를 진행 갱신만으로 다시 만들지 않음"
+    "확정 이력·출처의 DOM과 진행 목록을 분리하고 동일한 내용의 출처 링크를 진행 갱신만으로 다시 만들지 않음",
+    "첫 요청과 다음 요청이 보이는 입력으로 이어지고 입력은 복제하지 않음",
+    "전체 누락건수와 펼친 목록 일치·같은 문의처 선택 상태 중복 없음"
   ],
   "spacing": {
     "mainTopPx": 24,
@@ -134,19 +138,21 @@
     "workspaceMaxWidthPx": 1080,
     "summaryGapPx": 24,
     "mobileSummaryGapPx": 12,
-    "preparationSectionPadding": "20px",
-    "mobilePreparationSectionPadding": "18px 16px",
-    "paneBodyPadding": "16px 0 0",
-    "answerPadding": "20px 20px 26px",
+    "preparationSectionPadding": "18px 20px 4px",
+    "mobilePreparationSectionPadding": "16px 16px 3px",
+    "paneBodyPadding": "details:8px 0 14px",
+    "answerPadding": "18px 20px 26px",
     "mobileAnswerPadding": "18px 16px 22px",
-    "promptMarginTopPx": 18,
-    "mobilePromptMarginTopPx": 16,
-    "composerMarginTopPx": 10,
+    "promptMarginTopPx": 6,
+    "mobilePromptMarginTopPx": 3,
+    "composerMarginTopPx": 8,
     "mobileComposerMarginTopPx": 8,
     "visitPanelPadding": "20px 24px",
     "mobileVisitPanelPadding": "16px",
     "desktopRailPx": 240,
-    "narrowDesktopRailPx": 230
+    "narrowDesktopRailPx": 230,
+    "composerPadding": "16px 18px 11px",
+    "mobileComposerPadding": "13px 13px 10px"
   },
   "elevation": {
     "preparationPane": "none",
@@ -181,9 +187,9 @@
       "mobileGapPx": 14,
       "alignItems": "start"
     },
-    "desktopSummary": "네 항목의 얇은 가로 탐색, min-height52px, 항목 간격24px",
-    "compactSummary": "같은 네 항목 유지, 항목 안 기호/문장 세로 배치, min-height48px, 간격12px",
-    "preparationDetails": "전역 접힌 wrapper 없음. 칸별 처리기록 native details만 문서 높이로 펼침.",
+    "desktopSummary": "네 칸 header의 상태4개만. 별도 상태 nav 없음.",
+    "compactSummary": "첫3칸은 핵심사실2행·추가확인건수, native 자세히 보기로 전체 사실/누락/근거/기록",
+    "preparationDetails": "각 first3 [data-stage-details] native details 기본닫힘; 모든칸 제목/상태/핵심은항상보임, 펼침은문서높이를늘림.",
     "workspacePaddingAt1150": "22px 24px 28px",
     "workspacePaddingAt1050": "20px 24px 28px",
     "workspacePaddingAt900": "16px 16px 24px",
@@ -199,35 +205,41 @@
       "긴 표의 가로 스크롤",
       "사용자가 연 읽기 전용 native dialog",
       "설정 탐색"
-    ]
+    ],
+    "composerFirst": "1440x900/1280x800/390x844/360x780 첫viewport 입력/보내기, 짧은390x500도측정."
   },
   "composition": {
     "conversation": [
       "caregiver-case-and-optional-preferences-rail",
       "compact-case-heading",
+      "request-examples-and-one-common-composer-with-disclosure-before-the-board",
       "pending-only-observed-progress-activity",
-      "four-semantic-status-reading-anchors",
-      "four-direct-stage-children-visible-in-two-by-two-natural-height-grid",
+      "four-direct-stage-children-in-natural-height-grid-with-first-three-native-details",
       "plan-answer-in-fourth-cell-with-document-scroll-and-no-inner-y-scroll",
       "care-journey-current-and-next-action-hidden-before-first-response",
       "actual-observed-progress-separate-from-last-confirmed-case-facts",
       "confirmed-event-dom-preserved-with-separate-observed-progress-list",
       "manual-reading-focus-and-expanded-details-preserved-during-progress",
-      "request-examples-directly-above-single-common-composer",
-      "common-text-or-reviewed-browser-voice-and-document-reachable-disclosure",
       "collapsed-visit-details-below-common-input-and-notices",
       "optional-read-only-answer-dialog-snapshot-without-action-buttons",
       "read-only-patient-records-dialog-with-explicit-unconnected-service",
       "read-only-call-and-collaboration-plan-dialog-with-four-collapsed-targets",
       "read-only-care-journey-dialog-with-evidence-dependent-tasks-and-three-explicit-synthetic-scenarios",
-      "conditional-call-failure-handoffs-and-collapsed-four-recovery-examples"
+      "conditional-call-failure-handoffs-and-collapsed-four-recovery-examples",
+      "header-only-four-status-markers-with-no-duplicate-navigation",
+      "existing-next-action-request-draft-to-visible-composer-without-api-post",
+      "return-to-request-preserves-draft-and-brings-input-into-view",
+      "pending-and-cancel-near-composer-on-start-not-on-progress",
+      "visible-final-message-focus-instead-of-forced-offscreen-input-focus"
     ],
     "mobile": [
+      "initial-composer-and-send-visible-in-first-viewport",
       "same-four-stage-cells-visible-in-one-column",
       "full-conversation-and-answer-readable-through-document-scroll",
       "manual-reading-preserved-with-new-answer-notice",
       "optional-preferences-drawer-and-single-common-composer",
-      "document-scroll-to-send-controls-and-disclosure"
+      "document-scroll-to-send-controls-and-disclosure",
+      "compact-stage-facts-with-expandable-full-details"
     ],
     "preview": [
       "explicit-fixed-scenario-action",
@@ -254,10 +266,10 @@
     "storage": "memory or existing DynamoDB progress#sha256(token), fixed enum metadata, TTL120s",
     "failureBehavior": "마지막 확인 사실을 유지하고 실제 응답은 계속 기다림",
     "signals": {
-      "available": "○ · 준비 결과 있음. 진료·예약·배차 확정 아님.",
+      "available": "○ · 자료/문의 준비 결과 또는 plan 답변 있음. 진료·예약·배차 확정 아님.",
       "attention": "△ · 미확인·부분 준비·재확인.",
       "blocked": "× · 기록된 문의 실패·사람 인계.",
-      "waiting": "— · 확인 전.",
+      "waiting": "— · 문의 전 / 답변 전.",
       "not_needed": "— · 필요 없음."
     },
     "activityVisibility": "응답 대기 중에만 표시. 유효한 running 메타데이터와 준비 상태를 분리."
@@ -265,19 +277,22 @@
   "evidence": {
     "checkedOn": "2026-10-31",
     "sources": [
-      "docs/grid-flow-contract.md",
+      "docs/task-first-ui-contract.md",
       "app/conversation.css",
       "app/conversation.js",
       "app/preparation-board-view.js",
       "app/preparation-stages.js"
     ],
-    "captures": ".impeccable/review/grid/board/: latest integrated six viewport grid captures",
+    "captures": ".impeccable/review/task-first/board/: latest integrated initial/expanded/result/long/large screenshots",
     "geometryRecord": "orchestration/runs/preparation-board-browser.json",
-    "observations": "동일 sourceHash의 최종 proof에서 PC2×2·모바일1열4칸의 실제 좌표, height auto/max-height none/overflow visible, 긴 답변·200% 글자·출처 focus를 확인한다.",
-    "previousCaptures": ".impeccable/review/reading/ 및 .impeccable/review/board/: 이전 배치 보관 이력",
+    "observations": "독립A 실제 흐름 재검토에서 첫입력/전송PC·모바일viewport, 다음문의초안→보이는입력,수정초안보존,전체누락목록건수일치 확인. rootfresh4suite지문/결과는latest runs와구분한다.",
+    "previousCaptures": ".impeccable/review/grid/, reading/, board/: 이전 배치 이력",
     "limits": "기존 context CLI126/manual context를 유지. 현재판 검증은 최종 fresh sourceHash와 proof 확인 후 확정. 실모델·DynamoDB는 검증 revision별로 구분하며 실전화·개인기록·실마이크/센터 실기기/의료법률은 미검증.",
     "progressDomSource": "app/preparation-board-view.js의 확정/진행 목록 분리와 WeakMap 문자열 guard를 소스로 대조. 최종 root 브라우저 QA 결과와 구분.",
-    "uiSourceRevision": "57e9732"
+    "uiSourceRevision": "7bf5bfa",
+    "uxAuditBefore": "docs/reviews/2026-10-31-task-first-audit.md",
+    "uxAuditAfter": "docs/reviews/2026-10-31-task-first-after.md",
+    "cliDetector": "실제 detect/slug126 Permission denied, 결정적 findings 미확보. 자동통과 아님."
   },
   "references": {
     "observedOn": "2026-10-31",

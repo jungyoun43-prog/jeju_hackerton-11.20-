@@ -388,16 +388,21 @@
       "note": "사용자정정범위PC2×2복원/모바일1열4칸·칸내부Y스크롤없음. 단위360/360·대화180/180·여정224/224(실preview14,일반POST0)·수동47/47·그리드193/193·규칙58/58·Lambda빌드/전부종료0. 동일지문e5fcd7636893d8d8fef9e470a8ca06542f5cd6b5f89e62919658ab612faf0bf5. 독립source/docs차단0. API/모델로직변경없어실모델은9fc11bc기존증거로구분하며재호출없음. 공개/ZIP은최신runs증거기준."
     },
     "task-ui": {
-      "phase": "implementing",
+      "phase": "verified",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-task-ui",
-      "integrationCommits": [],
-      "note": "사용자관점: 입력상단·2×2핵심·native상세·다음요청직결. docs/task-first-ui-contract.md 기준"
+      "integrationCommits": [
+        "7bf5bfa"
+      ],
+      "note": "입력상단·PC2×2/모바일4칸 핵심/native상세·상태4개·기존nextActions초안/복귀noPOST·보이는대기/완료focus 통합. 독립A 이전 첫요청/후속문의P1 해결·새차단0. 동결지문 d08f861032f2e76b30f4dea959567ab291dbf624881ec0dbb941e4e8f3b54d0f 에서 단위360/360·대화186/186·여정236/236(실preview14/일반POST0)·수동47/47·준비판212/212·규칙60/60·Lambda빌드/전부종료0. oldgreeting 포함 대화count 실패는 실제답변/고유원문/본문ID와SHA 보존 단언으로 강화해 영향받은 대화만 재실행. 공개/ZIP은 최신runs 증거 기준. 실제모델은9fc11bc 기존증거로 구분하며 재호출없음."
     },
     "task-qa": {
-      "phase": "implementing",
+      "phase": "verified",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-task-qa",
-      "integrationCommits": [],
-      "note": "사용자관점: 입력상단·2×2핵심·native상세·다음요청직결. docs/task-first-ui-contract.md 기준"
+      "integrationCommits": [
+        "450586e",
+        "c547877"
+      ],
+      "note": "입력상단·PC2×2/모바일4칸 핵심/native상세·상태4개·기존nextActions초안/복귀noPOST·보이는대기/완료focus 통합. 독립A 이전 첫요청/후속문의P1 해결·새차단0. 동결지문 d08f861032f2e76b30f4dea959567ab291dbf624881ec0dbb941e4e8f3b54d0f 에서 단위360/360·대화186/186·여정236/236(실preview14/일반POST0)·수동47/47·준비판212/212·규칙60/60·Lambda빌드/전부종료0. oldgreeting 포함 대화count 실패는 실제답변/고유원문/본문ID와SHA 보존 단언으로 강화해 영향받은 대화만 재실행. 공개/ZIP은 최신runs 증거 기준. 실제모델은9fc11bc 기존증거로 구분하며 재호출없음."
     }
   },
   "review": {
