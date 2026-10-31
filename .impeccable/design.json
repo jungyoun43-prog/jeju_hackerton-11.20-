@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "name": "제주 진료 나침반 · 보호자 진료 준비",
   "mode": "operate",
-  "direction": "제주 배경 위의 대화·입력 예시·단일 방문 요약과 읽기 전용 환자 기록을 갖춘 보호자 작업 공간",
+  "direction": "제주 배경 위의 대화·확인 후 전송할 입력 예시·단일 방문 요약과 읽기 전용 환자 기록/전화 준비를 갖춘 보호자 작업 공간",
   "seedReference": "seed:a25f97f1d883646c",
   "colors": {
     "background": "#F4F7F5",
@@ -19,9 +19,10 @@
     "body": "Pretendard, Apple SD Gothic Neo, Malgun Gothic, sans-serif",
     "desktopTitlePx": 27,
     "mobileTitlePx": 23,
-    "metadataMinimumPx": 12,
+    "metadataMinimumPx": 13,
     "descriptiveTextPx": 15,
-    "mobileInputPx": 16
+    "mobileInputPx": 16,
+    "importantNoticePx": 14
   },
   "shape": {
     "surfaceRadiusPx": 14,
@@ -39,7 +40,10 @@
     "1440x900",
     "390x844",
     "360x780",
-    "768x1024"
+    "768x1024",
+    "390x500",
+    "360x500",
+    "768x512"
   ],
   "constraints": [
     "현재 작업과 부족 자료를 우선 표시",
@@ -60,7 +64,15 @@
     "사용자 후속 요청에 따라 인물 사진·caption을 제거하고 바다·현무암 배경을 작업면에 은은하게 사용",
     "우측 전체 방문 요약은 하나의 흰 패널과 soft shadow로 구분하고 모바일은 정상 흐름 유지",
     "환자 정보·건강 기록은 현재 합성 상태의 읽기 전용 dialog이며 열기만으로 조회·인증하지 않음",
-    "건강정보 고속도로는 특정 connector 미구현으로 항상 미연결·불러온 기록 없음이며 generic healthRecords와 구분"
+    "건강정보 고속도로는 특정 connector 미구현으로 항상 미연결·불러온 기록 없음이며 generic healthRecords와 구분",
+    "예시는 보이는 문장만 초안으로 채우고 날짜·시각 추가/자동 POST 없이 확인 후 전송",
+    "짧은 높이·긴 입력·큰 글자에서 강제 대화 높이를 풀어 문서 스크롤로 입력/전송/고지 접근",
+    "일반 요청·미리보기 응답 대기 중지와 원문 보존을 제공하고 서버/실제발신 중단과 구분",
+    "요청 토큰·대화 버전으로 늦은 응답/오류/finally가 새 초안과 대화를 덮지 않게 보호",
+    "실패 재시도는 원래 본문·ID·설정 snapshot을 유지하며 첫응답전 재실행 한계를 고지",
+    "전화·협진 준비는 공통 call-policy 기반 네 대상의 읽기 전용 thin details",
+    "최소 전달 항목은 허용 범위를 더 확인할 내용이며 실제 위임/인증/기록 처리 완료로 표시하지 않음",
+    "전화 계획 초안 버튼은 현재 초안 보호 후 입력만 채우고 발신/예약/배차를 확정하지 않음"
   ],
   "spacing": {
     "workspaceGapPx": 25,
@@ -77,7 +89,8 @@
       "caregiver-text-or-reviewed-browser-voice",
       "formatted-assistant-answer-with-collapsed-api-events",
       "single-white-visit-panel-with-thin-preparation-rows",
-      "read-only-patient-records-dialog-with-explicit-unconnected-service"
+      "read-only-patient-records-dialog-with-explicit-unconnected-service",
+      "read-only-call-and-collaboration-plan-dialog-with-four-collapsed-targets"
     ],
     "preview": [
       "explicit-fixed-scenario-action",

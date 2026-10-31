@@ -3,6 +3,7 @@ import { getVisitSupportSummary } from './visit-support.js';
 import { icon } from './icons.js';
 import { DEFAULT_CARE_PREFERENCES, normalizeCarePreferences, getTaxiPreferenceOptions } from './care-preferences.js';
 import { formatMessage } from './message-format.js';
+import { buildCallPlan, CALL_TARGETS } from './call-policy.js';
 
 const API = '/api/agent';
 const MAX_MESSAGE = 1600;
@@ -21,6 +22,10 @@ let caseState = createDemoCase();
 let sessionId;
 let history = [];
 let pending = false;
+let activeRequest;
+let failedPreviewRequest;
+let conversationVersion = 0;
+let layoutFrame;
 let capabilityState = 'checking';
 let capabilities = {llm:null,model:'',phone:'not_connected',healthRecords:'not_connected',voiceInput:'browser'};
 let latestActions = [];
@@ -40,6 +45,7 @@ let preferencesNeedApply = true;
 let drawerOpen = false;
 let drawerReturnFocus;
 let patientRecordsReturnFocus;
+let contactPlanReturnFocus;
 const failedRequests = new Map();
 
 function loadCarePreferences() {
@@ -148,6 +154,46 @@ function openPatientRecords() {
   document.getElementById('patient-records-title').focus({preventScroll:true});
 }
 
+function renderContactPlans() {
+  const host=document.getElementById('contact-plans');
+  const openTargets=[...host.querySelectorAll('[data-contact-target][open]')].map(node=>node.dataset.contactTarget);
+  const focused=document.activeElement;
+  const focusTarget=focused?.closest('[data-contact-target]')?.dataset.contactTarget;
+  const focusSelector=focused?.closest('[data-contact-draft]')?'[data-contact-draft]':focused?.matches('summary')?'summary':null;
+  const labels={mainland:'기존 도외 병원',jeju:'제주 병원',taxi:'택시·휠체어 이동',companion:'병원 동행'};
+  const checkLabels={missing:'누락',unverified:'미확인',simulation:'합성 사례'};
+  const list=items=>`<ul>${items.map(item=>`<li>${escape(item)}</li>`).join('')}</ul>`;
+  const recordLabel=value=>value==='not_configured'?'미설정':value==='not_verified'?'미확인':'확인 필요';
+  host.innerHTML=CALL_TARGETS.map(target=>{
+    const plan=buildCallPlan(caseState,target);
+    return `<details class="contact-plan" data-contact-target="${target}" ${openTargets.includes(target)?'open':''}>
+      <summary><span class="contact-recipient"><strong>${escape(plan.recipient.name)}</strong><span>${labels[target]}</span></span><span class="contact-status">${escape(plan.simulation.label)}</span>${icon('chevron')}</summary>
+      <div class="contact-plan-content">
+        <dl class="contact-facts"><div><dt>문의 목적</dt><dd data-contact-purpose>${escape(plan.purpose)}</dd></div><div><dt>문의처</dt><dd data-contact-recipient>${escape(plan.recipient.phone || '공개 대표번호 미확인')}<span class="contact-meta">실제 상대·연결 여부 미확인</span>${plan.recipient.source?`<span class="contact-meta">${escape(plan.recipient.source)}</span>`:''}${plan.recipient.sourceUrl?`<span class="contact-source">${safeSource(plan.recipient.sourceUrl)}</span>`:''}</dd></div><div><dt>전달 범위</dt><dd data-contact-disclosure><p>허용 범위를 확인할 최소 전달 항목</p>${plan.minimumDisclosure.length?list(plan.minimumDisclosure.map(item=>`${item.label} · ${item.value}`)):'전달 항목 확인 필요'}</dd></div><div><dt>자동 제외</dt><dd data-contact-excluded>${escape(plan.excludedInformation.join(' · '))}</dd></div></dl>
+        <section class="contact-section"><h4>확인할 질문</h4><div data-contact-questions>${list(plan.questions)}</div></section>
+        <section class="contact-section"><h4>AI가 먼저 알릴 예정 문구</h4><p data-contact-opening>${escape(plan.openingScript)}</p><p class="contact-meta">위임·고지·기록 처리 조건을 확인한 뒤 사용할 계획입니다. 실제 통화에서 고지한 기록이 아닙니다.</p></section>
+        <section class="contact-section" data-contact-records><h4>통화 기록 처리</h4><dl class="contact-records"><div><dt>녹음</dt><dd>${recordLabel(plan.recordHandling.recording)}</dd></div><div><dt>전사</dt><dd>${recordLabel(plan.recordHandling.transcription)}</dd></div><div><dt>보관</dt><dd>${recordLabel(plan.recordHandling.retention)}</dd></div><div><dt>국외 이전</dt><dd>${recordLabel(plan.recordHandling.overseasTransfer)}</dd></div></dl><p>${escape(plan.recordHandling.notice)}</p></section>
+        <section class="contact-section"><h4>실제 발신 전에 필요한 확인</h4><ul class="contact-checks" data-contact-checks>${plan.preCallChecks.map(check=>`<li><strong>${checkLabels[check.status] || '확인 필요'} · ${escape(check.label)}</strong><span>${escape(check.detail)}</span></li>`).join('')}</ul></section>
+        <section class="contact-section" data-contact-simulation><h4>합성 진행 결과</h4><p><strong>${escape(plan.simulation.label)}</strong> · ${escape(plan.simulation.detail)}</p></section>
+        <section class="contact-section"><h4>다음 행동과 담당</h4><div data-contact-next-actions>${list(plan.nextActions)}</div></section>
+        <div class="contact-draft"><p data-contact-request-draft>${escape(plan.requestDraft)}</p><button type="button" class="contact-draft-button" data-contact-draft="${target}" ${pending || activeRecognition?'disabled':''}>이 내용으로 문의 준비${icon('arrow')}</button><p class="contact-meta">입력창에서 확인·수정한 뒤 직접 보내세요. 이 버튼은 발신하거나 요청을 전송하지 않습니다.</p></div>
+      </div>
+    </details>`;
+  }).join('');
+  if(focusTarget && focusSelector && document.getElementById('contact-plan-dialog').open)host.querySelector(`[data-contact-target="${focusTarget}"] ${focusSelector}`)?.focus({preventScroll:true});
+}
+
+function openContactPlan() {
+  const dialog=document.getElementById('contact-plan-dialog');
+  if(dialog.open)return;
+  contactPlanReturnFocus=document.getElementById(mobileRail.matches?'open-care-menu':'nav-contact-plan');
+  closeCareMenu({restoreFocus:false});renderContactPlans();
+  dialog.returnValue='';dialog.showModal();
+  document.body.classList.add('records-dialog-open');
+  document.getElementById('contact-plan-body').scrollTop=0;
+  document.getElementById('contact-plan-title').focus({preventScroll:true});
+}
+
 function hasConversationWork() {
   return Boolean(document.getElementById('request-input')?.value.trim() || document.querySelector('.message.user') || responseCount);
 }
@@ -212,6 +258,7 @@ function updateCapabilities(next) {
 
 function renderSnapshot() {
   renderPatientRecords();
+  renderContactPlans();
   const snapshot = safeSummary();
   if (!snapshot) {
     document.getElementById('case-content').innerHTML = '<p class="quiet">준비 상태를 확인하지 못했어요. 대화에서 다시 확인을 요청해 주세요.</p>';
@@ -264,12 +311,22 @@ function appendMessage({role,text,id=makeId(),events=[],greeting=false,isExample
 
 function scrollToLatest() {
   const scroll = document.getElementById('conversation-scroll');
-  requestAnimationFrame(()=>{scroll.scrollTop=scroll.scrollHeight;});
+  const request=activeRequest;
+  requestAnimationFrame(()=>{
+    if(request && activeRequest!==request)return;
+    if(document.querySelector('.chat-workspace').classList.contains('flow-layout'))document.getElementById('pending-message').scrollIntoView({block:'nearest',behavior:'instant'});
+    else scroll.scrollTop=scroll.scrollHeight;
+  });
 }
 
 function scrollToMessage(node) {
   if(!node)return;
-  requestAnimationFrame(()=>{const scroll=document.getElementById('conversation-scroll');scroll.scrollTop+=node.getBoundingClientRect().top-scroll.getBoundingClientRect().top-22;});
+  requestAnimationFrame(()=>{
+    if(!node.isConnected)return;
+    const scroll=document.getElementById('conversation-scroll');
+    if(document.querySelector('.chat-workspace').classList.contains('flow-layout'))node.scrollIntoView({block:'start',behavior:'instant'});
+    else scroll.scrollTop+=node.getBoundingClientRect().top-scroll.getBoundingClientRect().top-22;
+  });
 }
 
 function resizeInput() {
@@ -278,6 +335,36 @@ function resizeInput() {
   input.style.height = `${Math.min(input.scrollHeight,160)}px`;
   document.getElementById('send-request').disabled = pending || Boolean(activeRecognition) || !input.value.trim();
   document.getElementById('character-count').textContent = `${input.value.length}/${MAX_MESSAGE}`;
+  for(const button of document.querySelectorAll('[data-contact-draft]'))button.disabled=pending || Boolean(activeRecognition);
+  updateConversationLayout();
+}
+
+// 작은 높이·확대 글꼴에서는 대화/입력/고지를 문서 흐름으로 함께 읽는다.
+function updateConversationLayout() {
+  cancelAnimationFrame(layoutFrame);
+  layoutFrame=requestAnimationFrame(()=>{
+    const workspace=document.querySelector('.chat-workspace');
+    const scroll=document.getElementById('conversation-scroll');
+    if(!workspace || !scroll)return;
+    const viewportHeight=Math.min(window.innerHeight,window.visualViewport?.height ?? window.innerHeight);
+    const shortScreen=viewportHeight<=720;
+    workspace.classList.remove('flow-layout');
+    const style=getComputedStyle(scroll);
+    const readingHeight=scroll.clientHeight-parseFloat(style.paddingTop)-parseFloat(style.paddingBottom);
+    workspace.classList.toggle('flow-layout',shortScreen || readingHeight<112 || workspace.scrollHeight>workspace.clientHeight+1);
+  });
+}
+
+function fillRequestDraft(text,{source='요청 예시',focus=true}={}) {
+  if(pending || activeRecognition)return false;
+  const input=document.getElementById('request-input');
+  const draft=String(text || '').trim().slice(0,MAX_MESSAGE);
+  if(!draft)return false;
+  if(input.value.trim() && input.value.trim()!==draft && !window.confirm('입력창에 작성 중인 요청이 있어요. 선택한 문구로 바꿀까요? 취소하면 기존 초안을 유지합니다.'))return false;
+  input.value=draft;resizeInput();
+  voiceMessage(`${source}를 입력창에 넣었어요. 날짜·대상을 확인하고 고친 뒤 보내 주세요.`);
+  if(focus){input.focus({preventScroll:true});input.scrollIntoView({block:'nearest',behavior:'instant'});}
+  return true;
 }
 
 function setPending(value) {
@@ -291,7 +378,61 @@ function setPending(value) {
   document.getElementById('conversation-form').setAttribute('aria-busy',String(value));
   document.getElementById('send-request').setAttribute('aria-label',value?'요청 응답을 기다리는 중':'요청 보내기');
   for (const button of document.querySelectorAll('[data-example]')) button.disabled=value;
+  for (const button of document.querySelectorAll('[data-contact-draft]')) button.disabled=value || Boolean(activeRecognition);
+  updateConversationLayout();
   if (value) scrollToLatest();
+}
+
+function requestIsCurrent(request) {
+  return activeRequest===request && request.version===conversationVersion;
+}
+
+function beginRequest(kind,values,timeout) {
+  const request={...values,kind,version:conversationVersion,controller:new AbortController()};
+  activeRequest=request;
+  request.timer=setTimeout(()=>{if(requestIsCurrent(request))cancelRequest({timedOut:true});},timeout);
+  setPending(true);
+  return request;
+}
+
+function finishRequest(request) {
+  clearTimeout(request.timer);
+  if(!requestIsCurrent(request))return false;
+  activeRequest=undefined;setPending(false);
+  if(request.kind==='preview')document.getElementById('preview-button').textContent='대화 흐름 미리보기';
+  return true;
+}
+
+function showRequestProblem(request,copy,{uncertain=false}={}) {
+  failedRequests.set(request.requestId,{text:request.text,body:request.body});
+  const firstRequestWarning=uncertain && !request.body.sessionId ? '첫 응답을 받기 전이라 재시도하면 서버에서 같은 일을 한 번 더 처리하고 시연 이용 횟수가 추가될 수 있어요.' : '';
+  const node=request.messageNode;
+  if(node?.isConnected) {
+    node.classList.add('failed');node.querySelector('.request-error')?.remove();
+    const problem=document.createElement('div');problem.className='request-error';problem.setAttribute('role','alert');
+    problem.innerHTML=`<p>${escape(copy)}</p>${firstRequestWarning?`<p>${escape(firstRequestWarning)}</p>`:''}<button type="button" class="text-button" data-retry="${escape(request.requestId)}">같은 요청 다시 확인${icon('refresh')}</button>`;
+    node.append(problem);
+  }
+  const input=document.getElementById('request-input');
+  input.value=request.text;resizeInput();
+}
+
+function cancelRequest({timedOut=false}={}) {
+  const request=activeRequest;
+  if(!request || !requestIsCurrent(request))return;
+  request.stopReason=timedOut?'timeout':'user';request.controller.abort();
+  if(request.kind==='message') {
+    const copy=timedOut?'응답을 오래 기다려 이 화면의 대기를 마치고 요청을 복원했어요.':'응답 대기를 중지하고 요청을 입력창에 복원했어요.';
+    showRequestProblem(request,copy+' 서버 처리는 계속될 수 있습니다. 실제 발신을 중단했다는 뜻은 아니며, 현재 실제 전화는 연결되어 있지 않습니다.',{uncertain:true});
+  } else {
+    failedPreviewRequest=request.body;
+    const notice=document.getElementById('mode-notice');
+    notice.hidden=false;notice.textContent=(timedOut?'미리보기 응답을 오래 기다려 이 화면의 대기를 마쳤어요.':'미리보기 응답 대기를 중지했어요.')+' 현재 대화와 초안은 유지됩니다. 서버 처리는 계속될 수 있습니다.';
+  }
+  document.getElementById('conversation-status').textContent='이 화면의 응답 대기를 중지했습니다. 서버 처리 중단을 확인한 것은 아닙니다.';
+  finishRequest(request);
+  if(request.messageNode)scrollToMessage(request.messageNode);
+  document.getElementById('request-input').focus({preventScroll:true});
 }
 
 function errorCopy(code) {
@@ -306,7 +447,7 @@ function errorCopy(code) {
   if (/SESSION/.test(code)) return '이 대화 연결이 만료됐어요. 새 대화에서 다시 시작해 주세요.';
   if (/TIMEOUT|ABORT/.test(code)) return '응답을 기다리는 시간이 길어졌어요. 같은 요청을 다시 확인할 수 있습니다.';
   if (/VALIDATION|INVALID_MESSAGE/.test(code)) return '요청을 짧게 다시 말씀해 주세요. 주민번호·인증정보는 입력하지 마세요.';
-  return '현재 Agent와 연결하지 못했어요. 요청 내용은 입력창에 남겨두었습니다. 잠시 뒤 다시 보내주세요.';
+  return '대화 서비스에 연결하지 못했어요. 요청 내용은 입력창에 남겨두었습니다. 잠시 뒤 다시 보내주세요.';
 }
 
 function normalizeResponse(data) {
@@ -339,20 +480,21 @@ async function callAgent(path,body,signal) {
 async function showPreview() {
   if(pending || activeRecognition)return;
   if(hasConversationWork() && !window.confirm('고정 예시를 열면 현재 대화와 작성 중인 요청이 사라집니다. 미리보기를 열까요?'))return;
-  setPending(true);
+  const body=failedPreviewRequest || {scenarioId:'aewol-parent-visit',requestId:makeId()};
+  const request=beginRequest('preview',{body},30000);
   const button=document.getElementById('preview-button');
   const notice=document.getElementById('mode-notice');
   button.textContent='미리보기 불러오는 중';
-  const controller=new AbortController();
-  const timer=setTimeout(()=>controller.abort(),30000);
   try {
-    const data=await callAgent(API+'/preview',{scenarioId:'aewol-parent-visit',requestId:makeId()},controller.signal);
+    const data=await callAgent(API+'/preview',request.body,request.controller.signal);
+    if(!requestIsCurrent(request))return;
     if(data.isPreview!==true || !Array.isArray(data.previewMessages) || !data.previewMessages.length)throw new Error('INVALID_PREVIEW');
     const messages=data.previewMessages.slice(0,12).filter(message=>['user','assistant'].includes(message.role) && typeof message.text==='string' && message.text.trim()).map(message=>({role:message.role,text:message.text.slice(0,16000)}));
     if(!messages.length)throw new Error('INVALID_PREVIEW');
     const last=messages.at(-1);
     if(last.role!=='assistant' || last.text!==data.reply)messages.push({role:'assistant',text:data.reply});
     previewMode=true;sessionId=undefined;history=[];failedRequests.clear();
+    failedPreviewRequest=undefined;
     caseState=data.caseState;latestActions=data.pendingActions;latestEvents=data.events;responseCount=1;
     document.getElementById('request-input').value='';resizeInput();
     document.getElementById('message-list').replaceChildren();
@@ -363,21 +505,26 @@ async function showPreview() {
     document.getElementById('conversation-status').textContent='고정된 합성 대화 예시를 불러왔습니다. 실제 모델 응답과 전화는 아닙니다.';
     requestAnimationFrame(()=>{document.getElementById('conversation-scroll').scrollTop=0;});
   } catch {
+    if(!requestIsCurrent(request))return;
+    failedPreviewRequest=request.body;
     notice.hidden=false;notice.textContent='미리보기를 불러오지 못했어요. 연결 상태를 확인한 뒤 다시 눌러주세요.';
     document.getElementById('conversation-status').textContent=notice.textContent;
   } finally {
-    clearTimeout(timer);setPending(false);button.textContent='대화 흐름 미리보기';
+    finishRequest(request);
   }
 }
 
 async function sendRequest(text,retryId) {
   if (pending || activeRecognition) return;
   const input=document.getElementById('request-input');
-  text=String(text ?? input.value).trim();
+  const failed=retryId?failedRequests.get(retryId):undefined;
+  if(retryId && !failed)return;
+  text=String(failed?.text ?? text ?? input.value).trim();
   if (!text || text.length>MAX_MESSAGE) return;
+  if(retryId && input.value.trim() && input.value.trim()!==text && !window.confirm('같은 요청을 다시 확인하면 작성 중인 새 초안을 원래 요청으로 바꿉니다. 계속할까요?'))return;
   if(previewMode)resetConversation({focus:false,force:true});
   const requestId=retryId || makeId();
-  const requestBody=retryId && failedRequests.has(retryId) ? failedRequests.get(retryId).body : {message:text,...(sessionId?{sessionId}:{}),history:normalizeHistory(history),requestId,preferences:{...carePreferences},applyPreferences:preferencesNeedApply};
+  const requestBody=failed ? failed.body : {message:text,...(sessionId?{sessionId}:{}),history:normalizeHistory(history),requestId,preferences:{...carePreferences},applyPreferences:preferencesNeedApply};
   let messageNode,replyNode;
   if (retryId) {
     messageNode=document.querySelector(`[data-message-id="${requestId}"]`);
@@ -385,11 +532,11 @@ async function sendRequest(text,retryId) {
     messageNode?.classList.remove('failed');
   } else messageNode=appendMessage({role:'user',text,id:requestId});
   document.getElementById('starter-prompts').hidden=true;
-  input.value='';resizeInput();setPending(true);
-  const controller=new AbortController();
-  const timer=setTimeout(()=>controller.abort(),65000);
+  input.value='';resizeInput();
+  const request=beginRequest('message',{text,requestId,body:requestBody,messageNode},65000);
   try {
-    const data=await callAgent(API,requestBody,controller.signal);
+    const data=await callAgent(API,requestBody,request.controller.signal);
+    if(!requestIsCurrent(request))return;
     caseState=data.caseState;sessionId=data.sessionId;latestActions=data.pendingActions;latestEvents=data.events;responseCount++;
     history=normalizeHistory([...history,{role:'user',text},{role:'assistant',text:data.reply}]);
     failedRequests.delete(requestId);
@@ -398,21 +545,17 @@ async function sendRequest(text,retryId) {
     updateCapabilities(data.capabilities);renderSnapshot();
     document.getElementById('conversation-status').textContent=data.needsInput?'필요한 내용을 이어서 말씀해 주세요.':'준비 내용을 갱신했습니다.';
   } catch(error) {
+    if(!requestIsCurrent(request))return;
     const code=error.name==='AbortError'?'MODEL_TIMEOUT':error.message || 'CONNECTION_ERROR';
-    const copy=errorCopy(code);
-    failedRequests.set(requestId,{text,body:requestBody});
-    if (messageNode) {
-      messageNode.classList.add('failed');
-      const problem=document.createElement('div');problem.className='request-error';problem.setAttribute('role','alert');
-      problem.innerHTML=`<p>${escape(copy)}</p><button type="button" class="text-button" data-retry="${escape(requestId)}">같은 요청 다시 확인${icon('refresh')}</button>`;
-      messageNode.append(problem);
-    }
-    input.value=text;resizeInput();
+    const copy=errorCopy(code)+(request.stopReason==='timeout'?' 이 화면의 대기만 끝났으며 서버 처리는 계속될 수 있습니다.':'' );
+    showRequestProblem(request,copy,{uncertain:request.stopReason==='timeout'});
     document.getElementById('conversation-status').textContent='요청 전송을 확인하지 못했습니다.';
     updateCapabilities(/MODEL_NOT_CONFIGURED|MODEL_DISABLED|LLM_NOT_CONFIGURED|MODEL_NOT_CONNECTED/.test(code)?{llm:false}:undefined);
   } finally {
-    clearTimeout(timer);setPending(false);scrollToMessage(replyNode || messageNode);
-    if (window.matchMedia('(min-width:961px)').matches)input.focus({preventScroll:true});
+    if(finishRequest(request)) {
+      scrollToMessage(replyNode || messageNode);
+      if (window.matchMedia('(min-width:961px)').matches)input.focus({preventScroll:true});
+    }
   }
 }
 
@@ -472,6 +615,7 @@ function resetConversation({focus=true,force=false}={}) {
   if(pending)return false;
   if(!force && hasConversationWork() && !window.confirm('현재 대화와 작성 중인 요청이 사라집니다. 새 가상 사례를 시작할까요?'))return false;
   if(activeRecognition){recognitionCancelled=true;activeRecognition.abort();activeRecognition=undefined;resetVoiceButton();}
+  conversationVersion++;failedPreviewRequest=undefined;
   caseState=createDemoCase();sessionId=undefined;history=[];latestActions=[];latestEvents=[];responseCount=0;previewMode=false;failedRequests.clear();
   preferencesNeedApply=true;
   document.getElementById('message-list').replaceChildren();
@@ -513,6 +657,7 @@ function mount() {
         <nav class="rail-nav" aria-label="준비 화면 이동">
           <a href="#main" id="nav-preparation" class="active" aria-current="location">${icon('compass')}<span>진료 준비</span>${icon('chevron')}</a>
           <a href="#patient-records-dialog" id="nav-patient-records" aria-haspopup="dialog" aria-controls="patient-records-dialog">${icon('folder')}<span>환자 정보·건강 기록</span>${icon('chevron')}</a>
+          <a href="#contact-plan-dialog" id="nav-contact-plan" aria-haspopup="dialog" aria-controls="contact-plan-dialog">${icon('phone')}<span>전화·협진 준비</span>${icon('chevron')}</a>
           <a href="#care-preferences" id="nav-preferences">${icon('car')}<span>이동·동행 설정</span>${icon('chevron')}</a>
         </nav>
         <section class="preference-panel" id="care-preferences" aria-labelledby="preferences-heading" tabindex="-1">
@@ -543,19 +688,19 @@ function mount() {
               <p class="mode-notice" id="mode-notice">연결 범위를 확인하고 있어요.</p>
               <div class="conversation-scroll" id="conversation-scroll">
                 <div class="message-list" id="message-list" role="log" aria-label="진료 준비 대화" aria-live="polite" aria-relevant="additions"></div>
-                <div class="pending-message" id="pending-message" role="status" hidden><span class="working-mark"></span><p>요청을 정리하고 필요한 도구를 확인하고 있어요.</p></div>
               </div>
+              <div class="pending-message" id="pending-message" hidden><div class="pending-summary"><span class="working-mark"></span><p role="status">요청 응답을 기다리고 있어요.</p></div><button type="button" id="cancel-request" class="cancel-request">응답 대기 중지</button><p class="pending-note">이 화면의 대기만 중지해요. 서버 처리는 계속될 수 있습니다.</p></div>
               <div class="starter-prompts" id="starter-prompts"><p>이렇게 요청해 보세요</p>
-                  <button type="button" data-example="11월 12일 오전 10시에 어머니 진료가 있어요. 저는 동행이 어려워요. 병원 문의와 택시·동행 준비를 도와주세요."><span>저는 동행이 어려워요.<br> 자료와 이동도 준비해 주세요.</span>${icon('arrow')}</button>
-                  <button type="button" class="secondary-prompt" data-example="어머니가 휠체어를 이용하세요. 진료 준비와 이동에 무엇을 확인해야 할까요?"><span>어머니가 휠체어를 이용하세요.<br> 무엇을 확인해야 할까요?</span>${icon('arrow')}</button>
+                  <button type="button" data-example="저는 동행이 어려워요. 자료와 이동도 준비해 주세요."><span>저는 동행이 어려워요.<br> 자료와 이동도 준비해 주세요.</span>${icon('arrow')}</button>
+                  <button type="button" class="secondary-prompt" data-example="어머니가 휠체어를 이용하세요. 무엇을 확인해야 할까요?"><span>어머니가 휠체어를 이용하세요.<br> 무엇을 확인해야 할까요?</span>${icon('arrow')}</button>
                 </div>
               <form id="conversation-form" class="conversation-form" aria-busy="false">
                 <label for="request-input" class="visually-hidden">진료 준비 요청</label>
-                <textarea id="request-input" name="message" rows="2" maxlength="${MAX_MESSAGE}" placeholder="예: 어머니 진료 자료와 이동·동행을 준비해줘." autocomplete="off" aria-describedby="composer-disclosure" required></textarea>
+                <textarea id="request-input" name="message" rows="2" maxlength="${MAX_MESSAGE}" placeholder="예: 어머니 진료 자료와 이동·동행을 준비해줘." autocomplete="off" aria-describedby="composer-disclosure privacy-note voice-help" required></textarea>
                 <div class="composer-actions"><button type="button" id="voice-request" class="voice-button" aria-label="음성으로 요청하기" aria-pressed="false" aria-describedby="voice-help" ${SpeechRecognition?'':'disabled'}>${micIcon}<span>말로 요청</span></button><span class="keyboard-hint">Enter로 전송 · Shift+Enter 줄바꿈</span><span class="character-count" id="character-count">0/${MAX_MESSAGE}</span><button type="submit" class="send-button" id="send-request" aria-label="요청 보내기" disabled>${icon('arrow')}<span>보내기</span></button></div>
                 <p class="voice-help" id="voice-help" role="status">${SpeechRecognition?'음성은 인식한 내용을 확인한 뒤 보내요.':'음성 미지원 브라우저예요. 텍스트로 요청해 주세요.'}</p>
               </form>
-              <div class="composer-notes"><p class="composer-disclosure" id="composer-disclosure">${icon('info')}가상 사례 · 실제 연락·예약 없음</p><p class="privacy-note">주민번호·인증정보·실제 의료기록 입력 금지 · 대화는 새로고침하면 사라져요.</p></div>
+              <div class="composer-notes"><p class="composer-disclosure" id="composer-disclosure">${icon('info')}가상 사례 · 실제 연락·예약 없음</p><p class="privacy-note" id="privacy-note">주민번호·인증정보·실제 의료기록 입력 금지 · 대화는 새로고침하면 사라져요.</p></div>
             </section>
             <aside class="case-sidebar" aria-label="대화에서 준비한 내용">
               <details class="case-summary" id="case-summary" ${window.matchMedia('(min-width:901px)').matches?'open':''}><summary><span>${icon('calendar')}이번 방문 준비</span>${icon('chevron')}</summary><div id="case-content"></div></details>
@@ -577,6 +722,14 @@ function mount() {
           <p class="records-memory-note">${icon('lock')}환자 정보와 진료 자료는 현재 대화에서만 표시합니다. 이 창에서는 수정하거나 기기에 저장하지 않습니다.</p>
         </div>
       </dialog>
+      <dialog class="patient-records-dialog contact-plan-dialog" id="contact-plan-dialog" aria-labelledby="contact-plan-title" aria-describedby="contact-plan-description">
+        <header class="patient-records-header"><div><h2 id="contact-plan-title" tabindex="-1">전화·협진 준비</h2><p id="contact-plan-description">문의 계획·합성 결과 · 실제 전화 미연결</p></div><button type="button" id="close-contact-plan" class="close-records" aria-label="전화·협진 준비 닫기">${icon('close')}</button></header>
+        <div class="patient-records-body" id="contact-plan-body">
+          <section class="contact-overview" aria-labelledby="contact-overview-title"><h3 id="contact-overview-title">두 병원에 문의할 준비를 이어가요</h3><p>기존 도외 병원의 협진·회송 창구와 제주 병원의 현지 진찰·자료 전달 절차를 확인합니다. 실제 진찰 소견·의뢰서 작성과 진료 수락은 의료진과 기관이 담당합니다.</p><p>아래는 현재 가상 사례의 읽기 전용 계획입니다. 실환자 본인의 위임·본인인증·동의를 확인한 상태가 아니며, 전화 서비스 계정은 연결하지 않았습니다.</p></section>
+          <div class="contact-plans" id="contact-plans"></div>
+          <p class="records-memory-note">${icon('lock')}문의 계획은 현재 대화에서만 표시해요. 실제 환자 개인정보를 자동 전달하거나 이 기기에 저장하지 않습니다.</p>
+        </div>
+      </dialog>
     </div>`;
   welcomeMessage();renderSnapshot();updateCapabilities();
   const form=document.getElementById('conversation-form'),input=document.getElementById('request-input');
@@ -585,13 +738,41 @@ function mount() {
   input.addEventListener('compositionstart',()=>{composing=true;});input.addEventListener('compositionend',()=>{composing=false;resizeInput();});
   input.addEventListener('keydown',event=>{if(event.key==='Enter' && !event.shiftKey && !event.isComposing && !composing && event.keyCode!==229){event.preventDefault();if(!pending)sendRequest();}});
   document.getElementById('voice-request').addEventListener('click',startVoice);
+  document.getElementById('cancel-request').addEventListener('click',cancelRequest);
   document.getElementById('new-conversation').addEventListener('click',()=>resetConversation());
   document.getElementById('preview-button').addEventListener('click',showPreview);
   document.getElementById('save-report').addEventListener('click',saveReport);
   document.getElementById('nav-patient-records').addEventListener('click',event=>{event.preventDefault();openPatientRecords();});
+  document.getElementById('nav-contact-plan').addEventListener('click',event=>{event.preventDefault();openContactPlan();});
   const recordsDialog=document.getElementById('patient-records-dialog');
   document.getElementById('close-patient-records').addEventListener('click',()=>recordsDialog.close());
   recordsDialog.addEventListener('close',()=>{document.body.classList.remove('records-dialog-open');const target=mobileRail.matches?document.getElementById('open-care-menu'):patientRecordsReturnFocus;if(target?.isConnected)target.focus({preventScroll:true});});
+  const contactDialog=document.getElementById('contact-plan-dialog');
+  document.getElementById('close-contact-plan').addEventListener('click',()=>contactDialog.close());
+  contactDialog.addEventListener('close',()=>{
+    document.body.classList.remove('records-dialog-open');
+    const target=contactDialog.returnValue==='draft'?input:mobileRail.matches?document.getElementById('open-care-menu'):contactPlanReturnFocus;
+    if(target?.isConnected){target.focus({preventScroll:true});if(contactDialog.returnValue==='draft')target.scrollIntoView({block:'nearest',behavior:'instant'});}
+  });
+  contactDialog.addEventListener('keydown',event=>{
+    if(event.key!=='Tab')return;
+    const items=[...contactDialog.querySelectorAll('a[href],button:not(:disabled),summary,[tabindex]:not([tabindex="-1"])')].filter(node=>{
+      if(!node.getClientRects().length || getComputedStyle(node).visibility==='hidden')return false;
+      for(let ancestor=node.parentElement;ancestor && ancestor!==contactDialog;ancestor=ancestor.parentElement) {
+        if(ancestor.tagName==='DETAILS' && !ancestor.open && !ancestor.querySelector(':scope > summary')?.contains(node))return false;
+      }
+      return true;
+    });
+    const first=items[0],last=items.at(-1);
+    if(event.shiftKey && (document.activeElement===first || !items.includes(document.activeElement))){event.preventDefault();last?.focus();}
+    else if(!event.shiftKey && document.activeElement===last){event.preventDefault();first?.focus();}
+  });
+  document.getElementById('contact-plans').addEventListener('click',event=>{
+    const button=event.target.closest('[data-contact-draft]');
+    if(!button || !CALL_TARGETS.includes(button.dataset.contactDraft))return;
+    const plan=buildCallPlan(caseState,button.dataset.contactDraft);
+    if(fillRequestDraft(plan.requestDraft,{source:'문의 준비 문구',focus:false}))contactDialog.close('draft');
+  });
   document.getElementById('preferences-form').addEventListener('submit',event=>event.preventDefault());
   document.getElementById('preferences-form').addEventListener('change',changePreferences);
   document.getElementById('open-care-menu').addEventListener('click',openCareMenu);
@@ -613,9 +794,15 @@ function mount() {
   closeCareMenu({restoreFocus:false});
   window.addEventListener('beforeunload',event=>{if(hasConversationWork()){event.preventDefault();event.returnValue='';}});
   document.addEventListener('click',event=>{
-    const example=event.target.closest('[data-example]');if(example && !pending)sendRequest(example.dataset.example);
+    const example=event.target.closest('[data-example]');if(example && !pending)fillRequestDraft(example.dataset.example);
     const retry=event.target.closest('[data-retry]');if(retry && failedRequests.has(retry.dataset.retry))sendRequest(failedRequests.get(retry.dataset.retry).text,retry.dataset.retry);
   });
+  const layoutObserver=new ResizeObserver(updateConversationLayout);
+  for(const node of document.querySelectorAll('.chat-toolbar,.mode-notice,.starter-prompts,.conversation-form,.composer-notes,.pending-message'))layoutObserver.observe(node);
+  window.addEventListener('resize',updateConversationLayout);
+  window.visualViewport?.addEventListener('resize',updateConversationLayout);
+  document.fonts.ready.then(updateConversationLayout);
+  resizeInput();
   fetch(API+'/capabilities',{cache:'no-store'}).then(response=>{if(!response.ok)throw new Error('unavailable');return response.json();}).then(data=>updateCapabilities(data.capabilities || data)).catch(()=>updateCapabilities({llm:false}));
 }
 
