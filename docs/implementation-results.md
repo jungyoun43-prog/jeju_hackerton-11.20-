@@ -1,6 +1,6 @@
 # MVP 구현·검증 결과 기록
 
-기준일: 2026-10-31 · 현재 범위: 대화 UI·허브 계보3종·OpenAI Sol 공개 AWS 연결·DynamoDB 세션/전역 한도. 최신 실제 호출·저장 검증은3.3절이다. 3절과3.1–3.2절의 이전 버전 결과는 당시 범위를 보존한다.
+기준일: 2026-10-31 · 현재 범위: 대화 UI·허브 계보3종·OpenAI Sol 공개 AWS 연결·DynamoDB 세션/전역 한도. 최신 화면·환자 기록 창 검증은3.5절, 실제 모델·저장 검증은3.3–3.4절과 별도 공개 실행 증거를 따른다. 이전 결과는 해당 버전의 범위를 보존한다.
 
 개발 환경은 Linux·Node v22.23.2·npm 10.9.8, 브라우저 QA는 Playwright 1.64.1·Chromium이다. 실행 소스 지문·검사 수·캡처는 검증한 버전의 `orchestration/runs/` 증거를 따른다. 이전 버전의 통과 결과를 새 UI·데이터 버전의 검증으로 대신하지 않는다.
 
@@ -114,6 +114,27 @@ DynamoDB는 UTC 하루80개 대화 요청을 원자적으로 차감하며 실패
 실모델 기록은 orchestration/runs/caregiver-local-live-check.json의 모델·시간·HTTP·도구명/상태·응답 존재·설정 결과만 보존한다. 키·reasoning·공급자 원문은 없다. 이는 로컬 메모리 저장소에서의 실제 모델 검증이며 새 공개 AWS·DynamoDB 버전의 확인을 대신하지 않는다. 해당 공개 배포와 동일 revision 검증은 최신 Actions와 orchestration/runs/aws-deployment.json·caregiver-deployed-live-check.json을 따른다.
 
 개인 기록·문의 회신은 계속 합성이다. 실제 전화·예약·배차·동행 배정·공단 개인 기록·마이크 품질·일반 모델 품질·센터 실기기는 별도이며 새 UI가 실제 의료 처리를 완료했다고 주장하지 않는다. 가족 사진은 독자 생성한 가상 인물이며 원본/정확 prompt와 글꼴 license를 포함한다.
+
+## 3.5 환자 기록 창·제주 배경·입력 예시·방문 패널
+
+사용자 후속 요청 네 가지를 반영했다. 요청 예시는 대화 스크롤 밖에서 입력 바로 위에 두고, 가상 인물 사진과 caption은 제거했다. 독자 생성한 제주 바다·현무암 배경 위에 우측 방문 상태를 하나의 흰 패널로 묶었다. PC는 sticky, 모바일은 대화 아래 정상 흐름의 펼침 요약이다.
+
+왼쪽 환자 정보·건강 기록은 현재 caseState의 기본정보·방문·문서 상태·출처·본문을 읽는 native dialog다. 건강정보 고속도로는 실제 미연결이며 최근 수신이 없다. 기록 보기를 모델·본인인증·기록조회로 구현하지 않으며 기존 localStorage 세 설정만 유지한다. 공식 서비스/API/이용신청 안내 세 건을 insane-search로 확인한 범위는 [조사 기록](../research/healthway_integration_2026-10-31.md), 상세 계약은 [기록 창 계약](patient-records-contract.md)에 있다.
+
+| 확인 | 통합본 결과·범위 |
+| --- | --- |
+| 전체 단위·서버 검사 | 220/220, 유료 모델 호출 없음 |
+| 대화·기록 창 | 115/115. 실제 keyless503/preview와 응답·음성 fixture. 기록 상태 갱신·출처/본문·문자 escape·외부조회 없는 열기·PC/모바일 포커스·특정 연계 미연결 경계 포함 |
+| 기존 수동 준비 화면 | 47/47 |
+| 배치 실측 | 1440/1200/1024/768/390/360px 6종. 예시→입력 PC10px·모바일8px, 좌우 경계 차이0, 가로 넘침 없음·보내기 보임·44px 예시·PCsticky/모바일static·인물 DOM 없음 |
+| 자동 규칙 eval | 37/37, 전용 worktree25개. 임상·법률·전체 데이터 권리·최종 제출 판정과 구분 |
+| 실행 지문 | 세 브라우저/배치 proof와 현재 소스 a4b982d64e8e9e88c98fc10f41aa81ad47f7f0b599fd41e3092293a9b4b7ec7a 일치 |
+| 독립 마감 검토 | 현재 소스·새 캡처·완료된 proof를 대조해 ship. [검토 기록](reviews/2026-10-31-patient-workspace.md) |
+| Impeccable | 지침·layout/polish 기준을 적용. CLI detect는 전후 모두 Permission denied/126이므로 자동 검사 통과로 인용하지 않음 |
+
+실제 Agent backend·prompt·도메인·공개 snapshot 코드는 이전920f8c6과 같다. 그 버전의 공개 Sol 복합 요청16,836ms·날짜 변경10,872ms 증거는 caregiver-deployed-live-check.json이며, 이번 UI 검사에서 새 유료 추론을 수행하지 않았다. 실제 전화·개인 건강정보 조회·동의·예약·배차는 계속 미연동이다. 새 공개 화면과 API의 동일 revision 확인은 최신 Actions 및 orchestration/runs/patient-workspace-deployed.json·aws-deployment.json을 따른다.
+
+새 배경은1672×941 PNG 원본과228,456B WebP를 보관한다. 생성에 built-in image_gen을 사용했고 특정 모델ID는 도구가 공개하지 않았다. 정확 prompt·원본·변환 범위는 app/assets/manifest.json에 있다. 센터 실기기·실제 마이크·모델 전반 품질·승인된 개인 기록 연계는 이번 UI 검증에 포함하지 않는다.
 
 ## 4. 보존한 이전 검증 이력
 

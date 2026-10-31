@@ -290,6 +290,26 @@
       "allow": [
         "scripts/conversation-browser-check.mjs"
       ]
+    },
+    {
+      "id": "starter-prompts-position",
+      "branch": "fix/starter-prompts-position",
+      "baseCommit": "920f8c6d154a0a40a86ab314fd15cbf64254a720",
+      "allow": [
+        "app/conversation.js",
+        "app/conversation.css",
+        "DESIGN.md",
+        "app/patient-records.js",
+        ".impeccable/design.json"
+      ]
+    },
+    {
+      "id": "patient-records-qa",
+      "branch": "test/patient-records-panel",
+      "baseCommit": "920f8c6d154a0a40a86ab314fd15cbf64254a720",
+      "allow": [
+        "scripts/conversation-browser-check.mjs"
+      ]
     }
   ],
   "rules": [

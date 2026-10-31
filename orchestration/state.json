@@ -201,6 +201,22 @@
         "245ed28"
       ],
       "note": "단일소유 QA스크립트, A keyless화면104/104. 최종root sourceHash/캡처 재생성 필요."
+    },
+    "starter-prompts-position": {
+      "phase": "verified",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-starter-prompts-position",
+      "integrationCommits": [
+        "36df579"
+      ],
+      "note": "입력 위 예시·읽기 전용 기록 창·인물제거·제주 배경·single sticky 방문패널. root115/47/6viewport 동일지문·독립ship·규칙37 통과."
+    },
+    "patient-records-qa": {
+      "phase": "verified",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-patient-records-qa",
+      "integrationCommits": [
+        "36b2e84"
+      ],
+      "note": "root 실제 keyless503/preview+fixture115/115, 오류0, 최종 지문과 캡처 일치. 특정 고속도로 미연결/외부조회 없는 열기/상태갱신/escape/포커스 검사."
     }
   },
   "review": {

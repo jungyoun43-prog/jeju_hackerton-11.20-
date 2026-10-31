@@ -20,7 +20,8 @@
 | 제주데이터허브 327 → 공공데이터포털15056321 | [콜택시업체현황](https://jejudatahub.net/data/view/data/327)의 [연결 공식 파일](https://www.data.go.kr/data/15056321/fileData.do), 기준 2026-03-19 | 익명 공개 다운로드34업체의 지역·명칭·전화·기준일 최소 변환. 원출처의 이용허락범위 제한없음 표기 확인. 허브2020 미리보기 45행과 구분, 가입대수·빈차·운임 미사용 |
 | 제주데이터허브 254 | [노인돌봄서비스시설현황](https://jejudatahub.net/data/view/data/254), 기준 2020-04-17 공개 19행 | 지역·기관·대표번호·주소·등록구분으로 문의 후보 구성. 현재 병원동행 제공 여부·대상·배정 가능은 미확인 |
 | 공식 이동·동행 서비스 소개 | [제주시니어클럽 아름동행](https://www.jjcsc.co.kr/Business/Market), [교통약자 이동지원센터](https://www.jejuhappycall.com/?mcode=guide01), 확인2026-10-31 | 전자는 병원동행·이동지원 소개, 후자는 차량 이용대상·회원등록 안내. 각각 기관 대표문의이며 실시간 배정 API 아님. 허브 데이터셋 수에 포함하지 않음 |
-| GPT Image 계열 | ChatGPT 내장 Imagegen. 상세 모델 ID 미공개 | PNG 로고·이전 일러스트와 새 가상 제주 어머니 사진. 새 사진은 원본 PNG 보존·동일 크기 WebP 형식 변환, 실제 환자/기관 사진 아님. 정확 prompt는 app/assets/manifest.json |
+| GPT Image 계열 | ChatGPT 내장 Imagegen. 상세 모델 ID 미공개 | PNG 로고·제주 바다/현무암 작업면 배경. 새 배경은 원본 PNG 보존·같은1672×941 WebP 형식 변환. 이전 인물·의사 이미지는 화면에서 제거하고 이력만 보존. 정확 prompt는 app/assets/manifest.json |
+| 건강정보 고속도로 | 한국보건의료정보원 공식 서비스·API·이용신청 공개 안내, 확인2026-10-31 | 환자 기록 창의 공식 안내 링크와 연계 범위 조사. 실제 개인 기록·인증·동의·의료정보 API 미연결. 일반 LLM 설정과 구분 |
 | Codex | 이 세션에 제공된 코딩 에이전트 | 기획 정리·소스 작성·서브에이전트 병렬 개발·검사. 서비스 런타임 모델이 아님 |
 | 서비스 런타임 LLM | OpenAI `gpt-6.1-sol` 기본, `gpt-6.1-terra` 선택 | Native fetch Responses API. Sol 로컬5.5초·공개AWS5.2초의 단일 도구 스모크200. Terra·일반 품질 미검증 |
 | Amazon Bedrock 접근 확인 | 2026-10-31, 서울 리전·APAC Nova profile 목록 조회와 합성 Converse 요청 | 실제 요청은 계정 Error 002로 실패. 사용 가능·한국어 tool-use 검증 완료로 기록하지 않고 추가 시도 중단. 후보 APAC profile은 6개 리전 범위를 갖지만 기본 handler에서 미활성 |

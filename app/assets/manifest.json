@@ -41,11 +41,29 @@
       "createdAt": "2026-10-31",
       "tool": "ChatGPT built-in Imagegen / GPT Image family",
       "modelId": "not exposed by tool",
-      "usage": "의료 서비스 참고를 반영한 보호자 진료 준비 환영 영역",
+      "usage": "사용자 인물 사진 제거 요청으로 현재 화면에서 제외. 생성 이력·원본 보존용.",
       "referenceImages": [],
       "prompt": "Use case: photorealistic-natural. Asset type: original editorial lifestyle photograph for a Korean family-care healthcare web workspace. Primary request: convey a daughter who lives far away helping her older mother in Jeju prepare for an outpatient visit, through an intimate credible everyday moment. Scene: a bright, modest modern Jeju home in soft morning daylight. A Korean mother in her late sixties, healthy ordinary appearance and natural gray-streaked short hair, wearing a muted sage cardigan over an ivory shirt, sits beside a window and quietly checks a smartphone held in her hands; a simple closed document folder and canvas day bag rest on the nearby table ready for her outing. Her expression is calm and reassured, not a posed advertising grin; she is looking at the phone, never at the camera. A small out-of-focus basalt garden wall and one citrus plant outside suggest Jeju subtly. Style: high-end candid editorial photography, natural skin and linen textures, believable hands, gentle depth of field, fresh and understated. Palette: warm ivory, deep forest green, soft sage, a tiny restrained tangerine accent. Composition: landscape 3:2, medium shot with the person on the right half and soft uncluttered light wall/window space to the left; frame safely so it works as a wide cropped welcome image as well as a compact crop. Constraints: this is a photo asset only, not a web page mockup. No readable phone screen, no medical records or personal data, no logos, no captions, no text, no watermark. No doctor, nurse, white coat, stethoscope, clinical equipment, giant landscape, sea panorama, distressed or helpless patient. The subject is fictional and must not resemble a known person.",
       "originalFile": "care-journey-v3.png",
       "notes": "휴대전화로 가족과 연결되는 제주 어머니의 가상 일상 사진. 실제 환자·의료기관·파트너의 증거가 아니다. 원본 PNG를 보존하고 같은 크기의 WebP로 형식만 변환했다."
+    },
+    {
+      "file": "jeju-workspace-background-v1.webp",
+      "type": "generated_photographic_background",
+      "createdAt": "2026-10-31",
+      "tool": "ChatGPT built-in Imagegen / GPT Image family",
+      "modelId": "not exposed by tool",
+      "usage": "인물 사진을 대신하는 제주 바다·현무암 작업면 배경. 대화·방문 패널의 흰 표면 뒤에 사용",
+      "referenceImages": [],
+      "prompt": "Use case: photorealistic-natural\nAsset type: quiet full-page background for a Korean caregiver healthcare web application, landscape composition.\nPrimary request: a calm, natural Jeju Island coastal background with black volcanic basalt, muted turquoise sea and a little soft coastal grass. No people.\nScene/backdrop: looking along a low Jeju basalt stone wall toward the sea on a softly overcast bright morning; distant low coastline and an open pale sky. Authentic volcanic rock texture, gentle sea, a few wind-shaped coastal plants, restrained colors.\nComposition/framing: wide horizontal landscape. Broad quiet pale sky and sea across the upper and central two thirds; the low dark stone wall and grasses mainly along the bottom edge and far edges. The website will place opaque white chat and visit-summary panels on top, so avoid busy central details. Read unmistakably as Jeju without tourism landmarks or a poster aesthetic.\nLighting/mood: soft diffuse daylight, peaceful, modest, photographic, no dramatic sunset, no heavy contrast.\nColor palette: pale cool gray-green, muted sea turquoise, charcoal basalt, natural grass green.\nText: none.\nConstraints: no people, no faces, no doctors, no human silhouettes, no buildings with text, no signage, no logos, no UI or cards, no watermark, no airplanes, no illustrated icons, no artificial gradients. This is a background photograph, not a hero banner or finished website.",
+      "originalFile": "jeju-workspace-background-v1.png",
+      "dimensions": {
+        "width": 1672,
+        "height": 941
+      },
+      "bytes": 228456,
+      "sha256": "dbb82304a614873cc1bd3b92f26010b2bef11c131bbf96446beb1ef8c1d966c1",
+      "notes": "실제 특정 해안·기관·환자 위치의 증거가 아닌 독자 생성 배경. 인물·문구 없음. PNG 원본 보존, Chromium canvas로 같은 픽셀 크기에서 WebP 형식만 변환."
     }
   ]
 }
