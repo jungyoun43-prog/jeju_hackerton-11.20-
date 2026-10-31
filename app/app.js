@@ -35,9 +35,6 @@ function button(text, attributes = '', variant = 'primary', symbol = 'arrow') { 
 function pageTitle(title, description) {
   return `<div class="page-title-row"><div><h1>${escape(title)}</h1><p>${escape(description)}</p></div><div class="date-note">${icon('calendar')}2026년 10월 31일 · 시연 기준</div></div>`;
 }
-function patientStrip() {
-  return `<section class="patient-strip" aria-label="진료 대상자"><div class="patient-avatar">${icon('user')}</div><div><div class="patient-name"><h2>${escape(state.patient.name)} 님</h2>${badge('가상 환자')}<small>${escape(state.patient.age)}세</small></div><p class="patient-details"><span>${escape(state.patient.area)}</span><span>${escape(state.patient.purpose)}</span></p></div><button class="text-button" data-nav="plan" data-focus="patient-settings">정보 보기${icon('chevron')}</button></section>`;
-}
 function progressPanel() {
   const progress = getProgress(state);
   return `<section class="progress-panel" aria-label="협진 준비 진행 단계"><div class="panel-top"><h2>진료 연결 현황</h2><span class="panel-meta">${escape(progress.label)}</span></div><ol class="steps">${progress.steps.map((step, i) => `<li class="step ${step.status}" ${step.status === 'current' ? 'aria-current="step"' : ''}><span class="step-dot">${step.status === 'done' ? icon('check') : i + 1}</span><span>${escape(step.label)}</span></li>`).join('')}</ol></section>`;
@@ -45,11 +42,6 @@ function progressPanel() {
 function actionButton(task, secondary = false) {
   const labels = { call: '병원 문의 시연', document: '필요 자료 준비', submit: '검토 접수 준비', wait: '의료진 회신 확인', plan: '가족 실행 계획' };
   return `<button class="${secondary ? 'text-button' : 'button primary'}" data-task="${escape(task.action)}" data-target="${escape(task.target || '')}">${escape(secondary ? '확인하기' : labels[task.action] || '다음 단계 보기')}${icon(secondary ? 'chevron' : 'arrow')}</button>`;
-}
-function tasksPanel() {
-  const tasks = getTasks(state);
-  const first = tasks[0];
-  return `<section class="panel" aria-labelledby="task-title"><div class="panel-top"><h2 class="action-heading" id="task-title">${icon('spark')}지금 할 일</h2>${badge(`${tasks.length}개 확인`)}</div>${first ? `<div class="priority-task"><h3>${escape(first.title)}</h3><p>${escape(first.description)}</p></div><div class="task-footer"><span class="owner">${icon('user')}담당 · ${escape(first.owner)}</span>${actionButton(first)}</div><div class="secondary-tasks">${tasks.slice(1, 3).map(task => `<div class="secondary-task"><span>${icon('clock')}${escape(task.title)}</span>${actionButton(task, true)}</div>`).join('')}</div>` : '<p class="empty-note">현재 준비할 작업을 모두 확인했어요. 의료진이 안내한 일정에 맞춰 다음 진료를 준비해 주세요.</p>'}</section>`;
 }
 function documentRows() {
   return state.documents.filter(doc => doc.id !== 'referral' || isRequired('referral') || doc.status === 'ready').map(doc => {
@@ -86,14 +78,6 @@ function missionPanel() {
   const details = first?.action === 'call' ? '어느 창구로 연락할지, 어떤 자료를 준비할지 확인합니다.' : first?.description || '의료진이 안내한 계획에 맞춰 다음 일정을 준비합니다.';
   const result = first?.action === 'call' ? ['접수 창구', '필요 서류', '의뢰·회신 경로'] : first?.action === 'document' ? ['자료 출처', '누락 항목', '준비 담당자'] : first?.action === 'plan' ? ['후속 일정', '가족 동행', '미확인 비용'] : ['요청 자료', '회신', '다음 준비'];
   return `<section class="mission-card" aria-labelledby="task-title"><div class="mission-meta"><h2 id="task-title">지금 할 일</h2><span class="mission-step">${escape(progress.label)}</span></div><h3>${escape(title)}</h3><p class="mission-description">${escape(details)}</p><div class="mission-outputs">${result.map(label=>`<span>${icon('check')}${escape(label)}</span>`).join('')}</div><div class="mission-action">${first ? `<button id="mission-primary" class="button mission-button" data-task="${escape(first.action)}" data-target="${escape(first.target || '')}">${escape({call:'병원 문의 시연',document:'필요 자료 준비',submit:'검토 접수 준비',wait:'의료진 회신 확인',plan:'가족 실행 계획'}[first.action] || '다음 단계 보기')}${icon('arrow')}</button>` : '<button id="mission-primary" class="button mission-button" data-nav="plan">실행 계획 보기</button>'}<span>전화·자료 전달은 시연입니다.</span></div></section>`;
-}
-function familyTasks() {
-  const tasks=getTasks(state).filter(task=>task.action !== 'call').slice(0,2);
-  return `<section class="family-tasks"><div class="panel-top"><h2>가족과 의료진의 준비</h2></div>${tasks.length ? tasks.map(task=>`<div class="family-task"><div><small>${escape(task.owner)}</small><strong>${escape(task.title.replace(/(?:을|를) 준비해 주세요[.]?$/, ' 준비').replace(/해 주세요[.]?$/, ''))}</strong>${actionButton(task,true)}</div></div>`).join('') : `<p class="help-text">접수와 회신 상태를 확인하세요.</p>`}<p class="family-boundary">진찰과 진료 계획은 의료진이 결정합니다.</p></section>`;
-}
-function connectionPanel() {
-  const progress=getProgress(state), answered=Object.values(state.inquiries).filter(item=>item.status==='confirmed').length;
-  return `<section class="connection-panel" aria-labelledby="connection-title"><div class="panel-top"><h2 id="connection-title">두 병원 사이, 준비 기록</h2><span class="panel-meta">절차 ${answered}/2곳 확인</span></div><div class="care-connection"><article class="care-place"><div class="place-route"><span>제주</span><i></i></div><div class="place-record"><div class="place-title"><h3>현지 대면 진찰</h3>${badge(inquiryStatus[state.inquiries.jeju.status][0],state.inquiries.jeju.status==='confirmed'?'green':'neutral')}</div><p>${escape(state.patient.localHospital)}</p><span class="place-purpose">진찰 소견 · 검사 자료 · 의뢰서</span><div class="place-actions"><button class="text-button" data-nav="calls" data-focus="inquiry-jeju">문의 기록${icon('chevron')}</button><button class="text-button" data-nav="data">기관 찾기${icon('chevron')}</button></div></div></article><div class="connection-bridge">${icon('folder')}<strong>검토할 자료</strong><span>${progress.prepared}/${progress.total} 준비</span><button class="text-button" data-nav="documents">자료 보기${icon('chevron')}</button></div><article class="care-place"><div class="place-route"><span>도외</span></div><div class="place-record"><div class="place-title"><h3>기존 주치의·전문의 검토</h3>${badge(state.review.status==='completed'?'합성 회신 확인':state.review.status==='pending'?'회신 대기':inquiryStatus[state.inquiries.mainland.status][0],state.review.status==='completed'?'green':'neutral')}</div><p>${escape(state.patient.existingHospital)}</p><span class="place-purpose">기록 검토 · 추가 요청 · 후속 계획</span><button class="text-button" data-nav="calls" data-focus="inquiry-mainland">문의 기록${icon('chevron')}</button></div></article></div></section>`;
 }
 function visitDateLabel() {
   const value = state.patient.nextVisit;

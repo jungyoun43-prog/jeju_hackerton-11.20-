@@ -494,9 +494,6 @@ input,textarea {
 .mission-button {
   min-width:167px
 }
-.connection-panel {
-  padding-top:27px
-}
 .panel-top {
   display:flex;
   align-items:center;
@@ -513,98 +510,6 @@ input,textarea {
   font-size:12px;
   color:var(--muted);
   white-space:nowrap
-}
-.care-connection {
-  display:grid
-}
-.care-place {
-  display:flex;
-  gap:18px;
-  min-width:0
-}
-.place-route {
-  position:relative;
-  flex:0 0 38px;
-  padding-top:2px
-}
-.place-route span {
-  display:grid;
-  place-items:center;
-  width:36px;
-  height:36px;
-  border:1px solid #c5c9b9;
-  border-radius:50%;
-  font-size:12px;
-  color:#4b5c48;
-  background:var(--ground);
-  position:relative;
-  z-index:1
-}
-.place-route i {
-  position:absolute;
-  top:38px;
-  bottom:-55px;
-  left:17px;
-  width:1px;
-  background:#d0d1c3
-}
-.place-record {
-  min-width:0;
-  flex:1;
-  padding:3px 0 13px
-}
-.place-title {
-  display:flex;
-  flex-wrap:wrap;
-  align-items:center;
-  justify-content:space-between;
-  gap:7px
-}
-.place-title h3 {
-  font-size:13px;
-  font-weight:650
-}
-.care-place p {
-  font-size:14px;
-  font-weight:500;
-  line-height:1.8;
-  margin-top:10px;
-  overflow-wrap:anywhere
-}
-.place-purpose {
-  display:block;
-  font-size:12px;
-  color:var(--muted);
-  line-height:1.8;
-  margin-top:3px
-}
-.place-actions {
-  display:flex;
-  gap:18px
-}
-.place-record>.text-button,.place-actions .text-button {
-  font-size:12px
-}
-.connection-bridge {
-  display:flex;
-  align-items:center;
-  flex-wrap:wrap;
-  gap:7px;
-  padding:11px 0 13px 56px;
-  font-size:12px;
-  color:var(--muted)
-}
-.connection-bridge>.icon {
-  width:15px;
-  height:15px
-}
-.connection-bridge strong {
-  font-weight:500;
-  color:#4f6150
-}
-.connection-bridge .text-button {
-  margin-left:auto;
-  font-size:12px
 }
 .badge {
   display:inline-flex;
@@ -630,40 +535,6 @@ input,textarea {
 .badge .icon {
   width:11px;
   height:11px
-}
-.family-tasks {
-  padding:24px 0;
-  border-top:1px solid var(--line);
-  margin-top:23px
-}
-.family-task {
-  padding:11px 0;
-  border-top:1px solid #e3e2d8
-}
-.family-task:first-of-type {
-  border-top:0;
-  padding-top:0
-}
-.family-task small {
-  display:block;
-  font-size:12px;
-  color:var(--muted);
-  margin-bottom:6px
-}
-.family-task strong {
-  display:block;
-  font-weight:500;
-  font-size:14px;
-  line-height:1.9
-}
-.family-task .text-button {
-  font-size:12px
-}
-.family-boundary {
-  font-size:12px;
-  color:var(--muted);
-  line-height:1.8;
-  margin-top:9px
 }
 .panel {
   min-width:0;
@@ -1813,11 +1684,6 @@ textarea {
     grid-template-columns:1fr 1fr;
     gap:25px
   }
-  .case-aside .family-tasks {
-    border:0;
-    padding:0;
-    margin:0
-  }
   .case-aside .source-summary {
     grid-column:1/-1
   }
@@ -1853,12 +1719,6 @@ textarea {
   }
   .intro-copy h1 {
     font-size:30px
-  }
-  .care-place {
-    gap:18px
-  }
-  .connection-bridge {
-    padding-left:56px
   }
   .page-description {
     max-width:none
@@ -2046,62 +1906,15 @@ textarea {
   .case-workspace {
     gap:25px
   }
-  .connection-panel {
-    padding-top:24px
-  }
-  .connection-panel .panel-top {
-    margin-bottom:18px
-  }
   .panel-top h2 {
     font-size:14px
   }
   .panel-meta {
     font-size:12px
   }
-  .care-place {
-    gap:14px
-  }
-  .place-route {
-    flex-basis:34px
-  }
-  .place-route span {
-    width:33px;
-    height:33px;
-    font-size:12px
-  }
-  .place-route i {
-    left:16px;
-    top:35px
-  }
-  .place-title h3 {
-    font-size:12px
-  }
-  .place-title {
-    align-items:flex-start
-  }
   .badge {
     font-size:12px;
     padding:3px 5px
-  }
-  .care-place p {
-    font-size:14px;
-    line-height:1.9;
-    margin-top:8px
-  }
-  .place-purpose {
-    font-size:12px
-  }
-  .connection-bridge {
-    padding-left:48px;
-    gap:5px;
-    font-size:12px
-  }
-  .connection-bridge>.icon {
-    width:13px;
-    height:13px
-  }
-  .connection-bridge .text-button {
-    font-size:12px
   }
   .activity-panel {
     margin-top:24px;
@@ -2127,11 +1940,6 @@ textarea {
     display:block;
     padding-top:22px
   }
-  .case-aside .family-tasks {
-    padding:22px 0;
-    border-top:1px solid var(--line);
-    margin-top:20px
-  }
   .case-aside .assistant-panel {
     margin-top:0;
     padding:19px
@@ -2147,9 +1955,6 @@ textarea {
   }
   .doc-row .badge {
     font-size:12px
-  }
-  .family-task strong {
-    font-size:14px
   }
   .case-aside .source-summary {
     margin-top:22px
