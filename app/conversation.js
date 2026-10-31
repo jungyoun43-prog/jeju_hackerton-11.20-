@@ -1,4 +1,4 @@
-import { createDemoCase, getProgress, getTasks, buildReport } from './domain.js';
+import { createDemoCase, getProgress, getTasks, buildReport, DOCUMENT_DEFINITIONS } from './domain.js';
 import { getVisitSupportSummary } from './visit-support.js';
 import { icon } from './icons.js';
 import { DEFAULT_CARE_PREFERENCES, normalizeCarePreferences, getTaxiPreferenceOptions } from './care-preferences.js';
@@ -39,6 +39,7 @@ let carePreferences = loadCarePreferences();
 let preferencesNeedApply = true;
 let drawerOpen = false;
 let drawerReturnFocus;
+let patientRecordsReturnFocus;
 const failedRequests = new Map();
 
 function loadCarePreferences() {
@@ -106,6 +107,47 @@ function openCareMenu() {
   document.getElementById('mobile-app-header').inert=true;
 }
 
+function renderPatientRecords() {
+  const patient=caseState.patient || {};
+  const provided=value=>typeof value==='string' && value.trim()?value:'현재 사례에 정보가 제공되지 않았습니다.';
+  const fields=[
+    ['name','이름',provided(patient.name)],
+    ['age','나이',Number.isFinite(patient.age)?`${patient.age}세`:'현재 사례에 정보가 제공되지 않았습니다.'],
+    ['area','지역',provided(patient.area)],
+    ['caregiver','보호자',provided(patient.caregiver)],
+    ['existingHospital','기존 도외 병원',provided(patient.existingHospital)],
+    ['localHospital','제주 병원',provided(patient.localHospital)],
+    ['nextVisit','방문일 · 시연 일정',provided(patient.nextVisit)],
+    ['purpose','준비 목적',provided(patient.purpose)],
+  ];
+  document.getElementById('patient-basics').innerHTML=fields.map(([key,label,value])=>`<div data-patient-field="${key}" class="${['existingHospital','localHospital','purpose'].includes(key)?'wide':''}"><dt>${label}</dt><dd>${escape(value)}</dd></div>`).join('');
+  for(const definition of DOCUMENT_DEFINITIONS) {
+    const record=caseState.documents?.find(item=>item.id===definition.id);
+    const node=document.querySelector(`[data-record-document-id="${definition.id}"]`);
+    const source=typeof record?.source==='string'?record.source:'';
+    const content=typeof record?.content==='string'?record.content:'';
+    const status=record?.status==='ready' ? source.trim()?'준비됨 표시 · 합성 자료':'준비됨 표시 · 출처 미확인' : record?.status==='missing'?'사례 자료 미준비':record?.status==='not_performed'?'사례상 시행 전':'상태가 제공되지 않았습니다.';
+    node.querySelector('[data-record-label]').textContent=record?.label || definition.label;
+    node.querySelector('[data-record-status]').textContent=status;
+    node.querySelector('[data-record-status]').dataset.status=record?.status || 'unknown';
+    node.querySelector('[data-record-status]').classList.toggle('unverified',record?.status==='ready' && !source.trim());
+    node.querySelector('[data-record-source]').textContent=source.trim()?source:'출처가 제공되지 않았습니다.';
+    node.querySelector('[data-record-content]').textContent=content.trim()?content:'이 사례에 표시할 내용이 제공되지 않았습니다.';
+  }
+}
+
+function openPatientRecords() {
+  const dialog=document.getElementById('patient-records-dialog');
+  if(dialog.open)return;
+  patientRecordsReturnFocus=document.getElementById(mobileRail.matches?'open-care-menu':'nav-patient-records');
+  closeCareMenu({restoreFocus:false});
+  renderPatientRecords();
+  dialog.showModal();
+  document.body.classList.add('records-dialog-open');
+  document.getElementById('patient-records-body').scrollTop=0;
+  document.getElementById('patient-records-title').focus({preventScroll:true});
+}
+
 function hasConversationWork() {
   return Boolean(document.getElementById('request-input')?.value.trim() || document.querySelector('.message.user') || responseCount);
 }
@@ -169,6 +211,7 @@ function updateCapabilities(next) {
 }
 
 function renderSnapshot() {
+  renderPatientRecords();
   const snapshot = safeSummary();
   if (!snapshot) {
     document.getElementById('case-content').innerHTML = '<p class="quiet">준비 상태를 확인하지 못했어요. 대화에서 다시 확인을 요청해 주세요.</p>';
@@ -213,7 +256,7 @@ function appendMessage({role,text,id=makeId(),events=[],greeting=false,isExample
   const node = document.createElement('article');
   node.className = `message ${role} ${greeting?'greeting':''}`;
   node.dataset.messageId = id;
-  const body=greeting?`<div class="welcome-content"><h2>이번 진료에 필요한 일,<br>편하게 말씀해 주세요.</h2><div class="welcome-copy">${formatMessage(text)}</div><figure class="welcome-photo"><img src="/assets/care-journey-v3.webp" alt="제주 집에서 휴대전화를 확인하는 가상의 어머니" width="1536" height="1024"/><figcaption>가상 인물로 만든 이미지</figcaption></figure></div>`:formatMessage(text);
+  const body=greeting?`<div class="welcome-content"><h2>이번 진료에 필요한 일,<br>편하게 말씀해 주세요.</h2><div class="welcome-copy">${formatMessage(text)}</div></div>`:formatMessage(text);
   node.innerHTML = `<div class="message-meta">${role==='assistant'?'<img src="/assets/jeju-mark-v1.png" alt="" width="23" height="23"/>':''}<strong>${role==='user'?'보호자':'나침반'}</strong>${isExample?'<span class="example-label">작성된 예시</span>':greeting?'':`<time>${escape(timeLabel(new Date()))}</time>`}</div><div class="message-body">${body}</div>${eventsMarkup(events)}`;
   document.getElementById('message-list').append(node);
   return node;
@@ -469,6 +512,7 @@ function mount() {
         </section>
         <nav class="rail-nav" aria-label="준비 화면 이동">
           <a href="#main" id="nav-preparation" class="active" aria-current="location">${icon('compass')}<span>진료 준비</span>${icon('chevron')}</a>
+          <a href="#patient-records-dialog" id="nav-patient-records" aria-haspopup="dialog" aria-controls="patient-records-dialog">${icon('folder')}<span>환자 정보·건강 기록</span>${icon('chevron')}</a>
           <a href="#care-preferences" id="nav-preferences">${icon('car')}<span>이동·동행 설정</span>${icon('chevron')}</a>
         </nav>
         <section class="preference-panel" id="care-preferences" aria-labelledby="preferences-heading" tabindex="-1">
@@ -499,12 +543,12 @@ function mount() {
               <p class="mode-notice" id="mode-notice">연결 범위를 확인하고 있어요.</p>
               <div class="conversation-scroll" id="conversation-scroll">
                 <div class="message-list" id="message-list" role="log" aria-label="진료 준비 대화" aria-live="polite" aria-relevant="additions"></div>
-                <div class="starter-prompts" id="starter-prompts"><p>이렇게 요청해 보세요</p>
+                <div class="pending-message" id="pending-message" role="status" hidden><span class="working-mark"></span><p>요청을 정리하고 필요한 도구를 확인하고 있어요.</p></div>
+              </div>
+              <div class="starter-prompts" id="starter-prompts"><p>이렇게 요청해 보세요</p>
                   <button type="button" data-example="11월 12일 오전 10시에 어머니 진료가 있어요. 저는 동행이 어려워요. 병원 문의와 택시·동행 준비를 도와주세요."><span>저는 동행이 어려워요.<br> 자료와 이동도 준비해 주세요.</span>${icon('arrow')}</button>
                   <button type="button" class="secondary-prompt" data-example="어머니가 휠체어를 이용하세요. 진료 준비와 이동에 무엇을 확인해야 할까요?"><span>어머니가 휠체어를 이용하세요.<br> 무엇을 확인해야 할까요?</span>${icon('arrow')}</button>
                 </div>
-                <div class="pending-message" id="pending-message" role="status" hidden><span class="working-mark"></span><p>요청을 정리하고 필요한 도구를 확인하고 있어요.</p></div>
-              </div>
               <form id="conversation-form" class="conversation-form" aria-busy="false">
                 <label for="request-input" class="visually-hidden">진료 준비 요청</label>
                 <textarea id="request-input" name="message" rows="2" maxlength="${MAX_MESSAGE}" placeholder="예: 어머니 진료 자료와 이동·동행을 준비해줘." autocomplete="off" aria-describedby="composer-disclosure" required></textarea>
@@ -524,6 +568,15 @@ function mount() {
           <p id="conversation-status" class="visually-hidden" role="status" aria-live="polite"></p>
         </main>
       </div>
+      <dialog class="patient-records-dialog" id="patient-records-dialog" aria-labelledby="patient-records-title" aria-describedby="patient-records-description">
+        <header class="patient-records-header"><div><h2 id="patient-records-title" tabindex="-1">환자 정보·건강 기록</h2><p id="patient-records-description">가상 사례 · 합성 정보 · 읽기 전용</p></div><button type="button" id="close-patient-records" class="close-records" aria-label="환자 정보·건강 기록 닫기">${icon('close')}</button></header>
+        <div class="patient-records-body" id="patient-records-body">
+          <section class="records-section" aria-labelledby="patient-basics-title"><h3 id="patient-basics-title">현재 준비 대상</h3><dl class="patient-basics" id="patient-basics"></dl><p class="records-note">방문일은 시연 일정이며 실제 예약이 확정된 상태가 아닙니다.</p></section>
+          <section class="records-section health-highway" aria-labelledby="health-highway-title"><div class="records-section-heading"><h3 id="health-highway-title">건강정보 고속도로</h3><span class="connector-state" id="health-highway-status">미연결</span></div><dl class="connector-facts"><div><dt>최근 불러오기</dt><dd id="health-highway-last-sync">불러온 기록 없음</dd></div><div><dt>현재 표시 자료</dt><dd>가상 사례의 합성 자료</dd></div></dl><p class="records-note">현재 자료는 건강정보 고속도로·공단에서 조회한 기록이 아닙니다. 연결되지 않아 실제 건강 상태는 확인되지 않았습니다.</p><details class="highway-help" id="health-highway-help"><summary>연결 안내와 현재 범위${icon('chevron')}</summary><p>이 화면에는 건강정보 고속도로의 본인인증·동의·기록 연계 기능이 없습니다. 이 창을 여는 것만으로 인증이나 기록 조회를 요청하지 않습니다.</p><a href="https://www.myhealthway.go.kr/portal/index?page=Individual%2FPortal%2FMediMyData%2FMydataService" target="_blank" rel="noopener noreferrer">공식 서비스 소개${icon('external')}</a></details></section>
+          <section class="records-section" aria-labelledby="record-documents-title"><h3 id="record-documents-title">현재 진료 자료</h3><p class="records-note">이 대화에 반영된 합성 자료의 상태·출처·내용입니다. 준비됨 표시는 실제 기관이 확인했다는 뜻이 아닙니다.</p><div class="record-documents" id="patient-record-documents">${DOCUMENT_DEFINITIONS.map(item=>`<details class="record-document" data-record-document-id="${item.id}"><summary><span data-record-label>${escape(item.label)}</span><span data-record-status></span>${icon('chevron')}</summary><dl><div><dt>출처</dt><dd data-record-source></dd></div><div><dt>내용</dt><dd data-record-content></dd></div></dl></details>`).join('')}</div></section>
+          <p class="records-memory-note">${icon('lock')}환자 정보와 진료 자료는 현재 대화에서만 표시합니다. 이 창에서는 수정하거나 기기에 저장하지 않습니다.</p>
+        </div>
+      </dialog>
     </div>`;
   welcomeMessage();renderSnapshot();updateCapabilities();
   const form=document.getElementById('conversation-form'),input=document.getElementById('request-input');
@@ -535,6 +588,10 @@ function mount() {
   document.getElementById('new-conversation').addEventListener('click',()=>resetConversation());
   document.getElementById('preview-button').addEventListener('click',showPreview);
   document.getElementById('save-report').addEventListener('click',saveReport);
+  document.getElementById('nav-patient-records').addEventListener('click',event=>{event.preventDefault();openPatientRecords();});
+  const recordsDialog=document.getElementById('patient-records-dialog');
+  document.getElementById('close-patient-records').addEventListener('click',()=>recordsDialog.close());
+  recordsDialog.addEventListener('close',()=>{document.body.classList.remove('records-dialog-open');const target=mobileRail.matches?document.getElementById('open-care-menu'):patientRecordsReturnFocus;if(target?.isConnected)target.focus({preventScroll:true});});
   document.getElementById('preferences-form').addEventListener('submit',event=>event.preventDefault());
   document.getElementById('preferences-form').addEventListener('change',changePreferences);
   document.getElementById('open-care-menu').addEventListener('click',openCareMenu);
