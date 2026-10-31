@@ -1,0 +1,323 @@
+import { createRequire } from 'node:module';
+import { createHash } from 'node:crypto';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { runtimeFingerprint } from '../orchestration/checks.mjs';
+
+// 실제 localhost keyless preview만 검사한다. 일반 요청·공급자 응답 fixture는 쓰지 않는다.
+const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
+const require=createRequire(import.meta.url);
+const directory='.impeccable/review/journey';
+const scenarioIds=['missing_record','jeju_unavailable','time_changed'];
+const viewports=[{label:'desktop',width:1440,height:900},{label:'mobile',width:390,height:844}];
+const checks=[],errors=[],allPosts=[];
+const proof={
+  result:'fail',checkedAt:new Date().toISOString(),url:'',sourceHash:'',checks,errors,
+  apiLive:false,modelInvoked:false,phoneInvoked:false,healthRecordsQueried:false,scenarioIds,
+  desktop:{width:1440,noOverflow:false,screenshot:null},mobile:{width:390,noOverflow:false,screenshot:null},
+  scenarios:[],screenshots:[],shortViewport:[],
+  scope:{localhostKeylessOnly:true,fixtures:false,modelInvoked:false,phone:false,externalRecords:false,normalAgentPostAttempts:0,previewRequests:0},
+  sourceHashScope:'invoking checkout; rerun after integration when server source differs',
+};
+let base,browser;
+const normalized=value=>String(value??'').replace(/\s+/g,' ').trim();
+const includes=(text,value)=>!value || normalized(text).includes(normalized(value));
+const record=(name,ok,detail='')=>{
+  checks.push({name,status:ok?'pass':'fail',detail});
+  console.log(`${ok?'PASS':'FAIL'} ${name}${detail?' · '+detail:''}`);
+};
+const settle=page=>page.evaluate(()=>new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(done))));
+const noOverflow=page=>page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1);
+const boundarySafe=summary=>['actualCallPlaced','reservationConfirmed','clinicalAcceptanceConfirmed','externalRecordsConnected'].every(key=>summary.boundary?.[key]===false);
+const summaryText=summary=>[
+  summary.pathway?.detail,...(summary.tasks??[]).map(task=>`${task.title} ${task.detail}`),
+  ...(summary.findings??[]).map(finding=>`${finding.label} ${finding.detail}`),
+  ...(summary.dataImpact??[]).map(item=>`${item.title} ${item.detail} ${(item.questions??[]).join(' ')}`),
+  ...(summary.nextActions??[]).map(action=>`${action.title} ${action.detail}`),
+].join(' ');
+
+async function scenario(name,run) {
+  try {await run();}
+  catch(error) {errors.push(`${name}: ${error.message}`);record(name,false,error.message);}
+}
+
+async function screenshot(page,name) {
+  await settle(page);
+  const path=`${directory}/${name}.png`;
+  await page.screenshot({path:resolve(root,path),fullPage:true});
+  proof.screenshots.push(path);
+  return path;
+}
+
+async function open(width,height,label) {
+  const context=await browser.newContext({viewport:{width,height},reducedMotion:'reduce',locale:'ko-KR',serviceWorkers:'block'});
+  const posts=[];
+  await context.route('**/*',async route=>{
+    const request=route.request(),url=new URL(request.url());
+    if(url.origin!==base.origin)return route.abort('blockedbyclient');
+    if(!['GET','HEAD'].includes(request.method())) {
+      let scenarioId;
+      try {scenarioId=JSON.parse(request.postData()??'{}').scenarioId;} catch {}
+      const post={path:url.pathname,method:request.method(),scenarioId};
+      posts.push(post);allPosts.push(post);
+      if(url.pathname==='/api/agent') {
+        proof.scope.normalAgentPostAttempts++;
+        return route.abort('blockedbyclient');
+      }
+      if(request.method()!=='POST' || url.pathname!=='/api/agent/preview' || !scenarioIds.includes(scenarioId)) {
+        errors.push(`${label}: 허용하지 않은 변경 요청 ${request.method()} ${url.pathname}`);
+        return route.abort('blockedbyclient');
+      }
+      proof.scope.previewRequests++;
+    }
+    return route.continue();
+  });
+  const page=await context.newPage();
+  page.setDefaultTimeout(8000);
+  page.on('pageerror',error=>errors.push(`${label}: ${error.message}`));
+  try {
+    await page.goto(base.href,{waitUntil:'networkidle'});
+    await page.locator('#request-input').waitFor();
+    await page.waitForFunction(()=>document.querySelector('#connection-state')?.textContent==='AI 모델 미연결');
+    await page.evaluate(()=>document.fonts.ready);
+    return {page,context,posts};
+  } catch(error) {await context.close();throw error;}
+}
+
+async function openJourney(page) {
+  if(await page.locator('#open-care-menu').isVisible())await page.locator('#open-care-menu').click();
+  await page.locator('#nav-care-journey').click();
+  const panel=page.locator('#care-journey-dialog');
+  await panel.waitFor();
+  return panel;
+}
+
+async function closeJourney(page,{escape=false}={}) {
+  if(escape)await page.keyboard.press('Escape');
+  else await page.locator('#close-care-journey').click();
+  await page.locator('#care-journey-dialog').waitFor({state:'hidden'});
+  const expected=await page.locator('#open-care-menu').isVisible()?'open-care-menu':'nav-care-journey';
+  await page.waitForFunction(id=>document.activeElement?.id===id,expected);
+}
+
+async function expandDetails(panel) {
+  const details=panel.locator('details');
+  for(let i=0;i<await details.count();i++) {
+    const item=details.nth(i);
+    if(!await item.evaluate(node=>node.open))await item.locator('summary').first().click();
+  }
+}
+
+async function clickWithConfirm(page,locator,accept) {
+  const dialogs=[];
+  const handler=async dialog=>{
+    dialogs.push({type:dialog.type(),message:dialog.message()});
+    if(accept)await dialog.accept();else await dialog.dismiss();
+  };
+  page.on('dialog',handler);
+  try {await locator.click();await settle(page);}
+  finally {page.off('dialog',handler);}
+  return dialogs;
+}
+
+// overflow:hidden인 조상을 강제로 스크롤해야만 나타나는 버튼은 접근 가능으로 보지 않는다.
+async function reachable(locator) {
+  const before=await locator.evaluate(node=>{
+    const ancestors=[];
+    for(let parent=node.parentElement;parent;parent=parent.parentElement)ancestors.push({top:parent.scrollTop,left:parent.scrollLeft,locked:/^(hidden|clip)$/.test(getComputedStyle(parent).overflowY)});
+    return ancestors;
+  });
+  try {await locator.scrollIntoViewIfNeeded({timeout:3000});}
+  catch(error) {return {reachable:false,reason:error.message};}
+  return locator.evaluate((node,before)=>{
+    const rect=node.getBoundingClientRect(),style=getComputedStyle(node);
+    let top=0,bottom=innerHeight,left=0,right=innerWidth,hiddenScroll=false,index=0;
+    for(let parent=node.parentElement;parent;parent=parent.parentElement,index++) {
+      const s=getComputedStyle(parent),r=parent.getBoundingClientRect(),old=before[index];
+      if(old?.locked && (Math.abs(parent.scrollTop-old.top)>1 || Math.abs(parent.scrollLeft-old.left)>1))hiddenScroll=true;
+      if(/^(hidden|clip|auto|scroll)$/.test(s.overflowY)){top=Math.max(top,r.top+parent.clientTop);bottom=Math.min(bottom,r.top+parent.clientTop+parent.clientHeight);}
+      if(/^(hidden|clip|auto|scroll)$/.test(s.overflowX)){left=Math.max(left,r.left+parent.clientLeft);right=Math.min(right,r.left+parent.clientLeft+parent.clientWidth);}
+    }
+    const selfClipped=/^(hidden|clip)$/.test(style.overflowY) && node.scrollHeight>node.clientHeight+2;
+    return {reachable:style.display!=='none' && style.visibility!=='hidden' && rect.width>0 && rect.height>0 && rect.top>=top-2 && rect.bottom<=bottom+2 && rect.left>=left-2 && rect.right<=right+2 && !hiddenScroll && !selfClipped,hiddenScroll,selfClipped};
+  },before);
+}
+
+async function verifyModal(page,panel,prefix) {
+  const native=await panel.evaluate(node=>node instanceof HTMLDialogElement && node.open && node.matches(':modal') && node.contains(document.activeElement) && Boolean(document.getElementById(node.getAttribute('aria-labelledby'))?.textContent.trim()));
+  await page.locator('#request-input').evaluate(node=>node.focus());
+  const backgroundBlocked=await panel.evaluate(node=>node.contains(document.activeElement));
+  const mobile=await page.locator('#open-care-menu').isVisible();
+  const railReleased=!mobile || await page.locator('#care-rail').evaluate(node=>node.inert && node.getAttribute('role')!=='dialog');
+  await page.locator('#close-care-journey').focus();
+  await page.keyboard.press('Shift+Tab');
+  const backwards=await panel.evaluate(node=>node.contains(document.activeElement) && document.activeElement.id!=='close-care-journey');
+  await page.keyboard.press('Tab');
+  const forwards=await page.locator('#close-care-journey').evaluate(node=>document.activeElement===node);
+  await closeJourney(page,{escape:true});
+  record(`${prefix} 이름·focus·배경 inert·양방향 Tab·Escape 복원`,native && backgroundBlocked && railReleased && backwards && forwards);
+}
+
+async function verifySummary(page,panel,summary,prefix) {
+  await expandDetails(panel);
+  const content=page.locator('#care-journey-content'),text=await content.innerText();
+  const pathways=await panel.locator('[data-journey-pathway]').evaluateAll(nodes=>nodes.map(node=>({id:node.dataset.journeyPathway,selected:node.dataset.selected,text:node.innerText})));
+  const expectedIds=['local_transfer','shared_care','mainland_continues'];
+  record(`${prefix} 세 경로는 추천·임상 확정 없이 미확인`,summary.isSimulation===true && summary.pathway?.status==='unconfirmed' && summary.pathway?.outcome==='unconfirmed' && expectedIds.every(id=>summary.pathways?.some(item=>item.id===id && item.selected===false)) && pathways.length===3 && pathways.every(row=>row.selected==='false' && summary.pathways.some(item=>item.id===row.id && includes(row.text,item.label) && includes(row.text,item.detail))) && /미확인/.test(text) && boundarySafe(summary));
+
+  const rows=await panel.locator('[data-journey-task]').evaluateAll(nodes=>nodes.map(node=>({id:node.dataset.journeyTask,status:node.dataset.status,text:node.innerText})));
+  record(`${prefix} 후속 할 일·담당·상태·조건을 실제 DTO와 대조`,summary.tasks?.length>0 && rows.length===summary.tasks.length && summary.tasks.every(task=>rows.some(row=>row.id===task.id && row.status===task.status && includes(row.text,task.title) && includes(row.text,task.owner) && includes(row.text,task.detail))));
+
+  const evidence=[...(summary.pathway?.evidence??[]),...(summary.tasks??[]).flatMap(task=>task.evidence??[])];
+  const evidenceOK=evidence.length>0 && evidence.every(item=>item.isSimulation===true && ['unverified','demo_confirmed'].includes(item.confirmation) && Object.hasOwn(item,'authoredAt') && Object.hasOwn(item,'confirmedAt') && [item.authoredAt,item.confirmedAt].every(value=>value===null || typeof value==='string') && includes(text,item.label) && includes(text,item.excerpt) && [item.authoredAt,item.confirmedAt].filter(Boolean).every(value=>includes(text,value.slice(0,10))));
+  record(`${prefix} 원문 발췌·작성일·확인일·합성/미확인 근거 보존`,evidenceOK && /합성|시연/.test(text) && /미확인|미상|제공되지|제공 안/.test(text),`근거 ${evidence.length}건 · 실제 의료기록 조회 아님`);
+
+  const impact=summary.dataImpact??[],hrefs=await content.locator('a[href]').evaluateAll(nodes=>nodes.map(node=>node.href));
+  const canonical=value=>{try {return new URL(value).href;} catch {return '';}};
+  const publicData=['859','327','254'].every(id=>impact.some(item=>String(item.datasetId)===id));
+  const official=['jejuhappycall.com','jjcsc.co.kr'].every(host=>impact.some(item=>{try {return new URL(item.sourceUrl).hostname.endsWith(host);} catch {return false;}}));
+  const sources=impact.length>=5 && impact.every(item=>canonical(item.sourceUrl) && hrefs.includes(canonical(item.sourceUrl)) && Number.isInteger(item.candidateCount) && item.candidateCount>=0 && typeof item.detail==='string' && item.detail.trim() && includes(text,item.title) && includes(text,item.detail));
+  const contextual=impact.filter(item=>['859','327','254'].includes(String(item.datasetId))).every(item=>/지역|기관|후보|휠체어|거절|조건|애월|등록/.test(item.detail));
+  record(`${prefix} 허브3종·공식2건의 출처·후보수·조건별 사용 이유`,publicData && official && sources && contextual && /공개|등록|표본|snapshot/.test(text) && /예약|배차|현재.*(?:차량|인력|수용)/.test(text));
+
+  const questions=summaryText(summary);
+  const wheelchair=['휠체어','대여','수령','반납','승하차','동행','지연','귀가'].every(term=>questions.includes(term)) && /앉은\s*채.*탑승|탑승.*앉은\s*채/.test(questions) && /재조정|다시.*(?:동행|귀가)|(?:동행|귀가).*다시/.test(questions);
+  record(`${prefix} 휠체어 대여·수령/반납·탑승·지연 재조정 질문`,wheelchair && ['대여','반납','지연'].every(term=>text.includes(term)));
+}
+
+function verifyScenario(summary,state,text,prefix,id) {
+  const all=summaryText(summary);
+  if(id==='missing_record') {
+    const missing=state.documents?.find(document=>document.id==='report')?.status!=='ready';
+    const issuance=summary.tasks.some(task=>/판독문/.test(`${task.title} ${task.detail}`) && /발급/.test(`${task.title} ${task.detail}`));
+    const dependent=summary.tasks.some(task=>task.status==='blocked' && /제출/.test(`${task.title} ${task.detail}`) && /발급|누락|미준비|필요|먼저|후/.test(task.detail));
+    const inquiry=summary.findings.some(item=>/발급/.test(`${item.label} ${item.detail}`)) && summary.findings.some(item=>/제출/.test(`${item.label} ${item.detail}`));
+    record(`${prefix} 누락 자료의 발급→제주 제출 의존 할 일·문의 반영`,missing && issuance && dependent && inquiry && /판독문/.test(text));
+  } else if(id==='jeju_unavailable') {
+    const rejection=summary.findings.some(item=>item.target==='jeju' && /거절|미참여|참여하지|접수.*불가/.test(`${item.label} ${item.detail}`));
+    const followup=summary.nextActions.some(item=>/다른|다음|대안|후보/.test(`${item.title} ${item.detail}`) && /문의|접수|절차/.test(`${item.title} ${item.detail}`));
+    record(`${prefix} 제주 접수 거절은 행정 상태·다음 후보 문의로 연결`,rejection && followup && summary.pathway.status==='unconfirmed' && summary.pathway.outcome==='unconfirmed' && /임상|의료진|진료 판단/.test(`${summary.pathway.detail} ${all}`) && /거절|미참여|접수.*불가/.test(text));
+  } else {
+    const schedule=summary.schedule,reasons=(schedule.recheckReasons??[]).join(' '),times=new Set(reasons.match(/\b\d{1,2}:\d{2}\b/g)??[]);
+    const both=['taxi','companion'].every(kind=>state.visitSupport?.[kind]?.status==='needs_recheck') && ['recheck','needs_recheck'].includes(schedule.taxiStatus) && ['recheck','needs_recheck'].includes(schedule.companionStatus);
+    const oldFindings=['taxi','companion'].every(target=>summary.findings.some(item=>item.target===target && item.isSimulation===true));
+    const tasks=summary.tasks.filter(task=>task.status==='recheck').map(task=>`${task.title} ${task.detail}`).join(' ');
+    record(`${prefix} 시각 변경은 이전 이동·동행 안내를 재확인으로 전환`,both && schedule.revision>0 && times.size>=2 && includes(reasons,schedule.time) && oldFindings && /이동|택시/.test(tasks) && /동행/.test(tasks) && includes(text,reasons),`재확인 이유 ${schedule.recheckReasons?.length??0}건 · 실제 예약 없음`);
+  }
+}
+
+async function verifyDrafts(page,panel,summary,posts,prefix,{cancelScenario=false}={}) {
+  const actions=new Map([...(summary.tasks??[]),...(summary.nextActions??[])].filter(item=>item.requestDraft).map(item=>[item.id,item.requestDraft]));
+  const ids=await panel.locator('[data-journey-draft]').evaluateAll(nodes=>nodes.map(node=>node.dataset.journeyDraft));
+  record(`${prefix} 문의 준비 버튼은 DTO의 명시적 초안에 연결`,ids.length>0 && ids.every(id=>actions.has(id)));
+  if(!ids.length || !actions.has(ids[0]))throw new Error('검사할 문의 초안 버튼이 없습니다.');
+  await closeJourney(page);
+  const input=page.locator('#request-input'),existing='보호자가 먼저 적어 둔 요청입니다. 이 내용은 취소하면 보존해 주세요.';
+  await input.fill(existing);
+  panel=await openJourney(page);await expandDetails(panel);
+  const before=posts.length,button=panel.locator('[data-journey-draft]').first();
+  const denied=await clickWithConfirm(page,button,false);
+  record(`${prefix} 초안 교체 취소는 기존 입력과 dialog를 보존`,denied.length===1 && denied[0].type==='confirm' && await panel.isVisible() && await input.inputValue()===existing && posts.length===before);
+  const accepted=await clickWithConfirm(page,button,true);
+  await panel.waitFor({state:'hidden'});
+  await page.waitForFunction(()=>document.activeElement?.id==='request-input');
+  const draft=await input.inputValue();
+  record(`${prefix} 문의 준비는 수정 가능한 초안만 채우고 POST 없음`,accepted.length===1 && accepted[0].type==='confirm' && normalized(draft)===normalized(actions.get(ids[0]).trim().slice(0,1600)) && await input.isEditable() && posts.length===before);
+  if(cancelScenario) {
+    panel=await openJourney(page);
+    const deniedPreview=await clickWithConfirm(page,panel.locator('[data-journey-scenario]').first(),false);
+    record(`${prefix} 상황 preview 교체 취소도 새 초안·현재 상태 보존`,deniedPreview.length===1 && deniedPreview[0].type==='confirm' && await panel.isVisible() && await input.inputValue()===draft && posts.length===before);
+    await closeJourney(page);
+  }
+}
+
+async function verifyShortViewport(page,width,prefix) {
+  await page.setViewportSize({width,height:500});await settle(page);
+  const panel=await openJourney(page);await expandDetails(panel);
+  const dimensions=await panel.evaluate(node=>{const r=node.getBoundingClientRect();return r.left>=-1 && r.top>=-1 && r.right<=innerWidth+1 && r.bottom<=innerHeight+1 && node.scrollWidth<=node.clientWidth+1;});
+  const last=await reachable(panel.locator('[data-journey-draft]').last());
+  const close=await reachable(page.locator('#close-care-journey'));
+  const overflow=await noOverflow(page);
+  await page.locator('#care-journey-content').evaluate(node=>node.scrollTop=0);
+  const path=await screenshot(page,`${width}-short-dialog`);
+  await closeJourney(page,{escape:true});
+  const composer=await reachable(page.locator('#request-input'));
+  const disclosure=await reachable(page.locator('#composer-disclosure'));
+  const result={width,height:500,dimensions,last,close,composer,disclosure,noOverflow:overflow,screenshot:path};
+  proof.shortViewport.push(result);
+  record(`${prefix} 500px 높이에서 마지막 문의·닫기·복귀 입력 접근`,dimensions && last.reachable && close.reachable && composer.reachable && disclosure.reachable && overflow && await noOverflow(page));
+}
+
+try {
+  await mkdir(resolve(root,directory),{recursive:true});
+  await mkdir(resolve(root,'orchestration/runs'),{recursive:true});
+  proof.sourceHash=await runtimeFingerprint(root);
+  base=new URL(process.env.BASE_URL||'http://127.0.0.1:4173');
+  if(!['localhost','127.0.0.1','[::1]'].includes(base.hostname) || !['http:','https:'].includes(base.protocol) || base.username || base.password || base.pathname!=='/' || base.search || base.hash)throw new Error('BASE_URL은 키를 끈 localhost QA 서버의 루트 주소여야 합니다.');
+  proof.url=base.href;
+  const response=await fetch(new URL('/api/agent/capabilities',base),{redirect:'error',signal:AbortSignal.timeout(8000)});
+  const caps=await response.json();
+  const keyless=response.status===200 && caps.llm===false && ['simulation','not_connected'].includes(caps.phone) && ['demo','not_connected'].includes(caps.healthRecords);
+  record('실제 localhost API의 모델 미연결·전화/개인기록 합성 경계',keyless && response.headers.get('cache-control')==='no-store');
+  if(!keyless)throw new Error('keyless 상태를 확인하지 못해 preview 검사를 시작하지 않습니다.');
+  proof.apiLive=true;
+  const moduleResponse=await fetch(new URL('/care-journey.js',base),{redirect:'error',signal:AbortSignal.timeout(8000)});
+  const moduleReady=moduleResponse.status===200 && /(?:text|application)\/javascript/.test(moduleResponse.headers.get('content-type')??'');
+  record('진료연결 공유 요약 모듈을 실제 서버에서 제공',moduleReady,`HTTP ${moduleResponse.status}`);
+  if(!moduleReady)throw new Error('진료연결 backend/UI를 통합한 로컬 서버에서 다시 실행해야 합니다.');
+  let chromium;
+  try {({chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright'));}
+  catch {throw new Error('선택 QA 도구 Playwright가 필요합니다. PLAYWRIGHT_MODULE로 기존 설치 경로를 지정할 수 있습니다.');}
+  browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH||undefined,args:['--no-sandbox','--disable-dev-shm-usage']});
+  for(const viewport of viewports)for(const id of scenarioIds)await scenario(`${viewport.width}px ${id}`,async()=>{
+    const prefix=`${viewport.width}px ${id}`,{page,context,posts}=await open(viewport.width,viewport.height,prefix);
+    try {
+      let panel=await openJourney(page);
+      record(`${prefix} 상황 버튼3개·열기만으로 요청 없음`,(await panel.locator('[data-journey-scenario]').evaluateAll(nodes=>nodes.map(node=>node.dataset.journeyScenario))).sort().join(',')===[...scenarioIds].sort().join(',') && posts.length===0);
+      const [preview]=await Promise.all([
+        page.waitForResponse(response=>new URL(response.url()).pathname==='/api/agent/preview' && response.request().method()==='POST'),
+        clickWithConfirm(page,panel.locator(`[data-journey-scenario="${id}"]`),true),
+      ]);
+      const data=await preview.json(),request=preview.request();
+      await page.waitForFunction(()=>document.querySelector('#conversation-form')?.getAttribute('aria-busy')==='false');
+      const body=JSON.parse(request.postData()??'{}');
+      const hash=createHash('sha256').update(request.postDataBuffer()).digest('hex');
+      const actual=preview.status()===200 && data.isPreview===true && data.capabilities?.llm===false && body.scenarioId===id && request.headers()['x-amz-content-sha256']===hash && posts.length===1 && posts[0].path==='/api/agent/preview';
+      record(`${prefix} 실제 keyless preview API·정확한 scenarioId·요청 해시`,actual,`HTTP ${preview.status()} · 응답 fixture 없음`);
+      if(!actual)throw new Error('실제 preview 응답 계약이 맞지 않습니다.');
+      const summary=await page.evaluate(async state=>(await import('/care-journey.js')).getCareJourneySummary(state),data.caseState);
+      record(`${prefix} API 상태의 활성 상황·합성 안내가 화면에 반영`,summary.activeScenario?.id===id && data.caseState && /합성|시연/.test(data.reply) && /합성|예시|미리보기/.test(await page.locator('#conversation-status').innerText()));
+      if(await panel.isVisible())await closeJourney(page);
+      panel=await openJourney(page);
+      await verifySummary(page,panel,summary,prefix);
+      verifyScenario(summary,data.caseState,await page.locator('#care-journey-content').innerText(),prefix,id);
+      const overflow=await noOverflow(page);
+      record(`${prefix} 가로 넘침 없음`,overflow);
+      proof[viewport.label].noOverflow=id===scenarioIds[0]?overflow:proof[viewport.label].noOverflow && overflow;
+      await page.locator('#care-journey-content').evaluate(node=>node.scrollTop=0);
+      const path=await screenshot(page,`${viewport.label}-${id}`);
+      if(id===scenarioIds[0])proof[viewport.label].screenshot=path;
+      proof.scenarios.push({viewport:viewport.label,width:viewport.width,height:viewport.height,id,status:preview.status(),isPreview:data.isPreview,activeScenario:summary.activeScenario?.id,boundary:summary.boundary,pathway:summary.pathway.status,tasks:summary.tasks.map(task=>({id:task.id,status:task.status})),screenshot:path});
+      if(id===scenarioIds[0]) {
+        await verifyModal(page,panel,prefix);
+        panel=await openJourney(page);await expandDetails(panel);
+      }
+      await verifyDrafts(page,panel,summary,posts,prefix,{cancelScenario:id===scenarioIds[0]});
+      if(id===scenarioIds.at(-1))await verifyShortViewport(page,viewport.width,prefix);
+      record(`${prefix} 전체 상호작용의 일반 모델 POST 시도0`,posts.every(post=>post.path==='/api/agent/preview') && posts.length===1);
+    } finally {await context.close();}
+  });
+  record('실제 preview3개를 PC·모바일에서 모두 완료',proof.scenarios.length===6 && viewports.every(viewport=>scenarioIds.every(id=>proof.scenarios.some(item=>item.viewport===viewport.label && item.id===id))));
+  record('전체 일반 POST /api/agent 시도0·preview6건만 허용',proof.scope.normalAgentPostAttempts===0 && allPosts.length===6 && allPosts.every(post=>post.method==='POST' && post.path==='/api/agent/preview'));
+  record('브라우저 실행 오류 없음',errors.length===0,errors.join('; '));
+  if(checks.every(check=>check.status==='pass') && errors.length===0)proof.result='pass';
+} catch(error) {
+  errors.push(error.message);record('진료연결 브라우저 검사 완료',false,error.message);
+} finally {
+  try {await browser?.close();} catch(error) {errors.push(error.message);proof.result='fail';}
+  await mkdir(resolve(root,'orchestration/runs'),{recursive:true});
+  await writeFile(resolve(root,'orchestration/runs/journey-browser.json'),JSON.stringify(proof,null,2)+'\n');
+  console.log(`진료연결 브라우저 검증: ${checks.filter(check=>check.status==='pass').length}/${checks.length} · 실제 LLM·전화·개인기록 조회 없음`);
+  if(proof.result!=='pass')process.exitCode=1;
+}
