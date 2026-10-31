@@ -543,6 +543,7 @@ try {
       const fixture={...response(first,previewEvidence.caseState,previewEvidence.reply),events:previewEvidence.events,pendingActions:previewEvidence.pendingActions};
       await release(page,first,fixture);
       await page.waitForFunction(()=>document.querySelector('#conversation-form').getAttribute('aria-busy')==='false');
+      const previousProgressReads=(await calls(page,'/api/agent/progress')).length;
       const second=await begin(page,'출처를 읽는 동안 다음 준비를 확인합니다.',1);
       await readStage(page,'records');
       for(const id of summaryIds) {
@@ -564,16 +565,17 @@ try {
       record(width+'px 실제 preview 근거를 normal 응답 fixture로 표시·병원 출처 focus',before.connected && before.active && before.stage==='hospitals' && actualPosts.length===0,'preview→일반 요청 초기화 경계는 기존 검사로 별도 보존');
       let focusPreserved=before.connected && before.active;
       for(const [index,sequence] of [4,8].entries()) {
-        const stage=['records','hospitals'][index],poll=await advancePoll(page,index);await release(page,poll,progress(stage,sequence));
+        const stage=['records','hospitals'][index],poll=await advancePoll(page,previousProgressReads+index);await release(page,poll,progress(stage,sequence));
         const after=await snapshot();
-        const preserved=after.connected && after.active && after.stage===before.stage && after.scrollCalls===0 && Math.abs(after.top-before.top)<=2 && Math.abs(after.left-before.left)<=1;
+        const sameRequest=JSON.parse(poll.body).progressToken===JSON.parse(second.body).progressToken;
+        const preserved=sameRequest && after.connected && after.active && after.stage===before.stage && after.scrollCalls===0 && Math.abs(after.top-before.top)<=2 && Math.abs(after.left-before.left)<=1;
         focusPreserved &&=preserved;
-        record(width+'px '+stage+' 진행'+sequence+'는 같은 병원 출처 노드·focus·화면 위치를 보존',preserved,JSON.stringify({before,after}));
+        record(width+'px '+stage+' 진행'+sequence+'는 같은 병원 출처 노드·focus·화면 위치를 보존',preserved,JSON.stringify({sameRequest,before,after}));
       }
       await shot(page,width+'-static-source-live');
       await finish(page,second,previewEvidence.caseState,'출처를 읽은 뒤 받은 합성 최종 답변입니다.');
       record(width+'px 출처 focus 회귀는 일반 실제 POST 없이 기존 답변 경로 유지',actualPosts.length===0 && (await calls(page,'/api/agent')).length===2 && (await page.locator('#message-list').innerText()).includes('출처를 읽은 뒤'));
-      proof.progressScenarios.push({id:'static-source-focus-'+width,mainRequests:2,progressReads:2,sourceIdentityAndFocus:focusPreserved,rawTokensStored:false});
+      proof.progressScenarios.push({id:'static-source-focus-'+width,mainRequests:(await calls(page,'/api/agent')).length,progressReads:(await calls(page,'/api/agent/progress')).length-previousProgressReads,sourceIdentityAndFocus:focusPreserved,rawTokensStored:false});
     } finally {await context.close();}
   });
 
