@@ -109,6 +109,12 @@ export function getPreparationBoard(state,{events=[],progress=null,pending=false
     responseCount?'확인된 준비와 남은 일을 함께 읽어 보세요.':'아래 입력창에 필요한 준비를 한 번에 말씀해 주세요.',
     [{label:'다음 확인',value:journey.nextActions[0]?.title||'요청하실 내용을 말씀해 주세요.'}],[]);
   const stages=[records,hospitals,mobility,plan];
+  // 기호는 자료·문의 준비만 요약한다. 미확인은 문의 실패나 임상 부적합이 아니다.
+  records.signal=recordGaps.length?'attention':'available';
+  hospitals.signal=hospitalBlocked?'blocked':confirmed===inquiries.length?'available':confirmed?'attention':'waiting';
+  const missingSupport=['taxi','companion'].some(kind=>support[kind].status==='not_selected');
+  mobility.signal=!support.totalNeeded?'not_needed':recheck?'attention':supportBlocked?'blocked':selected?(missingSupport?'attention':'available'):'waiting';
+  plan.signal=responseCount?'available':'waiting';
   for(const event of Array.isArray(events)?events:[]){
     if(!event||typeof event!=='object')continue;
     const id=PREPARATION_STAGE_IDS.includes(event.stage)?event.stage:event.tool==='analyze_public_data'&&/이동|동행/.test(event.label)?'support':getToolStage(event.tool);
@@ -127,7 +133,7 @@ export function getPreparationBoard(state,{events=[],progress=null,pending=false
       stage.live=!!live&&stage.id===activeStageId;
     }
   }
-  if(requestProblem){plan.status='needs_input';plan.label='응답 확인 필요';plan.summary=requestProblem;activeStageId='plan';}
+  if(requestProblem){plan.status='needs_input';plan.signal='attention';plan.label='응답 확인 필요';plan.summary=requestProblem;activeStageId='plan';}
   return {version:1,activeStageId,stages,pending,hasResponse:responseCount>0,progressAvailable:!!progress,
     boundary:journey.boundary,overallLabel:pending?(progress?'준비 도구의 진행 상태를 확인하고 있어요.':'요청을 전달하고 답변을 기다리고 있어요.'):'실제 전화·예약·배차는 연결 전 · 현재 합성 사례',
   };
