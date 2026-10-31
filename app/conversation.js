@@ -246,7 +246,7 @@ async function sendRequest(text,retryId) {
   document.getElementById('starter-prompts').hidden=true;
   input.value='';resizeInput();setPending(true);
   const controller=new AbortController();
-  const timer=setTimeout(()=>controller.abort(),45000);
+  const timer=setTimeout(()=>controller.abort(),65000);
   try {
     const data=await callAgent(API,requestBody,controller.signal);
     caseState=data.caseState;sessionId=data.sessionId;latestActions=data.pendingActions;latestEvents=data.events;responseCount++;

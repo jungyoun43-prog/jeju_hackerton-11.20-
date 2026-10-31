@@ -1,6 +1,6 @@
 {
   "baseCommit": "e1e7e44",
-  "updatedAt": "2026-10-31T12:57:29.878528+00:00",
+  "updatedAt": "2026-10-31T13:17:27.309332+00:00",
   "tasks": {
     "ui": {
       "phase": "verified",
@@ -150,6 +150,31 @@
         "8d81169"
       ],
       "note": "Responses 어댑터 전용21개·키/env/config/service 통합5개. 실제 키·유료 네트워크 미사용. 전체147개+추가env실행1개 검사 통과"
+    },
+    "aws-cloud-runtime": {
+      "phase": "verified",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-aws-cloud-runtime",
+      "integrationCommits": [
+        "9afbf02",
+        "4eea6c4"
+      ],
+      "note": "Secrets Manager 실행 시 조회·lazy cache·키 비노출·저장소 필수 게이트"
+    },
+    "aws-dynamodb-store": {
+      "phase": "verified",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-aws-dynamodb-store",
+      "integrationCommits": [
+        "0bbe7f2"
+      ],
+      "note": "조건부 전역80turn/day·영속 세션·lease·정규화합성상태만 저장"
+    },
+    "aws-openai-infra": {
+      "phase": "verified",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-aws-openai-infra",
+      "integrationCommits": [
+        "5c5b222"
+      ],
+      "note": "정확 Secret IAM·기존DDB활성화·원점보존·키없는CI배포/검증"
     }
   },
   "review": {

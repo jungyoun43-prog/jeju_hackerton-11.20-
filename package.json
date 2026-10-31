@@ -23,6 +23,9 @@
   },
   "dependencies": {
     "@aws-sdk/client-bedrock-runtime": "3.1161.0",
+    "@aws-sdk/client-dynamodb": "3.1161.0",
+    "@aws-sdk/client-secrets-manager": "3.1161.0",
+    "@aws-sdk/lib-dynamodb": "3.1161.0",
     "leaflet": "1.9.4"
   },
   "devDependencies": {

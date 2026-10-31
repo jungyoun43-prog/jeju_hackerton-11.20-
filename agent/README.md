@@ -29,3 +29,11 @@ OpenAI 기본 한도는 reasoning low, 호출당 최대 출력4,096토큰, 호�
 기본 한도는 요청24KiB·메시지4,000자·최근이력8개/각2,000자·세션20턴·도구12개·루프6회·45초·하루80턴(인스턴스 기준)입니다. `DEMO_DAILY_TURN_LIMIT`만 1~1,000 사이에서 조정할 수 있습니다. 메모리 한도는 분산 Lambda의 전역 유료 호출 quota가 아니므로 실제 모델 공개 연결 전에는 영속 budget store 등을 붙여야 합니다. 현재 DynamoDB는 연결하지 않습니다. 미래 저장소는 pk String과 expiresAt epoch seconds TTL 규약을 따릅니다.
 
 `APP_REVISION=<커밋SHA> node scripts/build-agent.mjs`는 esbuild·Python3를 사용해 `output/agent-lambda.zip`을 만듭니다. ZIP에는 `index.mjs`와 `deployment.json`이 있고 Handler는 `index.handler`입니다. metadata는 `{revision,runtime:'lambda',mode:'synthetic'}`이며 capabilities/revision 및 x-app-revision과 일치합니다. 비밀키와 .env는 포함하지 않습니다. SDK·공공 JSON·prompt는 Lambda bundle에 포함됩니다.
+
+## AWS 연결·재시도 운영 범위
+
+AWS 연결은 Secrets Manager의 전용 Secret ARN과 DynamoDB 저장소를 함께 요구합니다. Lambda의 평문 키만으로 모델을 활성화할 수 없습니다. 로컬 .env는 자동 배포하지 않으며 scripts/aws-agent-key.mjs가 소유 계정·stack·Secret을 확인한 후 값을 메모리 파이프로만 전송합니다. 키는 CLI 인자·임시 파일·Lambda 환경변수·GitHub에 넣지 않습니다.
+
+DynamoDB의 조건부 갱신으로 UTC 하루80개 대화 요청을 모델 호출 전에 차감합니다. 한 요청 내부 Responses 호출은 최대8회이며 API 호출80회나 금액 한도를 뜻하지 않습니다. 실패한 요청도 차감합니다. 합성 준비 상태의 TTL은1시간이며 원문·답변·reasoning은 저장하지 않습니다.
+
+중복 방지는 sessionId가 있는 세션 안에서만 적용합니다. 첫 요청의 응답을 받지 못해 sessionId가 없는 채 재시도하면 새 세션과 추가 유료 턴이 생길 수 있습니다. 실제 외부 작업은 아직 없고 전역80턴 한도는 유지됩니다. 브라우저 대기는65초로 cloud 준비8초·처리45초·정리2.5초보다 길게 둡니다. 키를 교체하면 warm cache 갱신을 위해 코드 재게시 또는 새 실행환경 시작도 필요합니다.

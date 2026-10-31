@@ -220,6 +220,37 @@
         "agent/openai-provider.mjs",
         "tests/openai-provider.test.mjs"
       ]
+    },
+    {
+      "id": "aws-cloud-runtime",
+      "branch": "feature/aws-cloud-runtime",
+      "baseCommit": "3f2c6e1",
+      "allow": [
+        "agent/cloud-runtime.mjs",
+        "agent/handler.mjs",
+        "tests/cloud-runtime.test.mjs"
+      ]
+    },
+    {
+      "id": "aws-dynamodb-store",
+      "branch": "feature/aws-dynamodb-store",
+      "baseCommit": "3f2c6e1",
+      "allow": [
+        "agent/dynamodb-store.mjs",
+        "tests/dynamodb-store.test.mjs"
+      ]
+    },
+    {
+      "id": "aws-openai-infra",
+      "branch": "deploy/aws-openai-infra",
+      "baseCommit": "3f2c6e1",
+      "allow": [
+        "infra/aws-agent-api.yaml",
+        "scripts/aws-agent-bootstrap.mjs",
+        "scripts/aws-agent-publish.mjs",
+        "tests/agent-infra.test.mjs",
+        ".github/workflows/deploy-aws.yml"
+      ]
     }
   ],
   "rules": [

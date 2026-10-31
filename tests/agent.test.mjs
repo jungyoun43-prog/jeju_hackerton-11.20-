@@ -214,6 +214,14 @@ test('마감시간을 지키지 않는 provider도 timeout으로 중단하고 �
   assert.equal(result.statusCode,504); assert.equal(json(result).error.code,'AGENT_TIMEOUT'); assert.equal(store.inspect()[0].turns,0);
 });
 
+test('전체 마감시간에 저장소 준비도 포함하고 지연된 저장소에서 유료 모델을 호출하지 않는다',async()=>{
+  let providerCalls=0,receivedSignal;
+  const store={async loadOrCreate(id,options){receivedSignal=options.signal;return new Promise(()=>{});}};
+  const provider={connected:true,model:'fixture-model',async respond(){providerCalls++;return done('실행되면 안 됨');}};
+  const result=await post(createAgentService({store,provider,config:{deadlineMs:20}}));
+  assert.equal(result.statusCode,504);assert.equal(providerCalls,0);assert.equal(receivedSignal.aborted,true);
+});
+
 test('세션 TTL·세션 수·턴·날짜별 budget 상한을 강제한다',async () => {
   let now = 0; const store = createMemorySessionStore({now:() => now,ttlSeconds:1,maxSessions:1});
   const first = await store.loadOrCreate(); await assert.rejects(store.loadOrCreate(),error => error.code === 'SESSION_LIMIT');

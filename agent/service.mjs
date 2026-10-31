@@ -49,17 +49,20 @@ export function createAgentService({provider = createDisconnectedProvider(),stor
   async function runTurn(request) {
     // 미연결 상태에서는 세션·budget·모델·DDB를 전혀 접근하지 않는다.
     fail(provider.connected === true,'MODEL_NOT_CONNECTED','대화 모델 API를 아직 연결하지 않았습니다. 입력은 보존되며 고정 대화 예시를 확인할 수 있습니다.',503);
-    let session = await store.loadOrCreate(request.sessionId);
-    await store.acquire(session.sessionId);
     const controller = new AbortController(), timer = setTimeout(() => controller.abort(),limits.deadlineMs);
+    let session, acquired=false;
     try {
-      session = await store.loadOrCreate(session.sessionId);
+      const options={signal:controller.signal};
+      session=await bounded(Promise.resolve().then(()=>store.loadOrCreate(request.sessionId,options)),controller.signal);
+      await bounded(Promise.resolve().then(()=>store.acquire(session.sessionId,options)),controller.signal);
+      acquired=true;
+      session=await bounded(Promise.resolve().then(()=>store.loadOrCreate(session.sessionId,options)),controller.signal);
       if (session.requestIds.includes(request.requestId)) return {
         sessionId:session.sessionId,requestId:request.requestId,reply:'이미 처리한 요청입니다. 저장된 준비 상태를 다시 표시합니다.',caseState:session.state,
         events:[],pendingActions:getPendingActions(session.state),capabilities:getCapabilities(),needsInput:false,
       };
       fail(session.turns < limits.maxTurns,'TURN_LIMIT','이 대화의 요청 한도에 도달했습니다. 새 대화를 시작해 주세요.',429);
-      await store.consumeTurn(limits.dailyTurns);
+      await bounded(Promise.resolve().then(()=>store.consumeTurn(limits.dailyTurns,options)),controller.signal);
       let state = session.state;
       const events = [], pending = [], usedIds = new Set();
       let toolCount = 0;
@@ -75,7 +78,7 @@ export function createAgentService({provider = createDisconnectedProvider(),stor
           fail(output.stopReason === 'end_turn' || output.stopReason === 'stop_sequence', 'INVALID_MODEL_RESPONSE','모델이 응답을 완료하지 못했습니다. 다시 시도해 주세요.',502);
           const reply = output.content.map(block => block.text ?? '').join('\n').trim();
           fail(reply.length > 0,'INVALID_MODEL_RESPONSE','모델 응답을 확인하지 못했습니다.',502);
-          await store.save({...session,state,turns:session.turns + 1,requestIds:[...session.requestIds,request.requestId]});
+          await bounded(Promise.resolve().then(()=>store.save({...session,state,turns:session.turns + 1,requestIds:[...session.requestIds,request.requestId]},options)),controller.signal);
           const allPending = dedupe([...pending,...getPendingActions(state)]);
           return {sessionId:session.sessionId,requestId:request.requestId,reply,caseState:state,events,pendingActions:allPending,capabilities:getCapabilities(),needsInput:allPending.length > 0 || events.some(item => item.status !== 'completed')};
         }
@@ -104,7 +107,12 @@ export function createAgentService({provider = createDisconnectedProvider(),stor
     } finally {
       clearTimeout(timer);
       controller.abort();
-      await store.release(session.sessionId);
+      if(acquired) {
+        const cleanup=AbortSignal.timeout(2500);
+        // 저장 결과는 유지하고, 정리 실패 시 만료 lease로 회복한다. 원문·SDK 오류는 기록하지 않는다.
+        try {await bounded(Promise.resolve().then(()=>store.release(session.sessionId,{signal:cleanup})),cleanup);}
+        catch { /* 영속 lease는 Lambda 수명보다 긴 65초 후 다시 획득할 수 있다. */ }
+      }
     }
   }
 
