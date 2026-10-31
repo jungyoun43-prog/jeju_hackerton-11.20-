@@ -4,7 +4,8 @@ import { icon } from './icons.js';
 
 const API = '/api/agent';
 const MAX_MESSAGE = 1600;
-const MAX_HISTORY = 12;
+const MAX_HISTORY = 8;
+const MAX_HISTORY_TEXT = 2000;
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 const escape = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 const micIcon = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="13" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3m-4 0h8"/></svg>';
@@ -42,6 +43,16 @@ function safeSource(value) {
     if (url.protocol === 'https:' && !url.username && !url.password) return `<a href="${escape(url.href)}" target="_blank" rel="noopener noreferrer">출처 · ${escape(url.hostname)}${icon('external')}</a>`;
   } catch { /* 출처 설명 문자열은 링크로 바꾸지 않는다. */ }
   return text ? `<span>출처 · ${escape(text)}</span>` : '';
+}
+
+function publicHospitalLocation(hospital) {
+  if (!hospital?.companyName || !hospital.address) return '';
+  const query = encodeURIComponent(`${hospital.companyName} ${hospital.address}`);
+  return `<div class="hospital-location"><span>공개 주소 · ${escape(hospital.address)}</span><a href="https://www.google.com/maps/search/?api=1&amp;query=${query}" target="_blank" rel="noopener noreferrer">지도에서 기관 보기${icon('external')}</a></div>`;
+}
+
+function normalizeHistory(items) {
+  return items.slice(-MAX_HISTORY).map(item=>({role:item.role,text:item.text.slice(0,MAX_HISTORY_TEXT)}));
 }
 
 function safeSummary() {
@@ -91,14 +102,14 @@ function renderSnapshot() {
   document.getElementById('case-heading').textContent = `${patient.name} 님의 진료 준비`;
   document.getElementById('case-caption').textContent = `${patient.area} · 보호자 ${patient.caregiver} · 합성 사례`;
   const items = [
-    {name:'병원 문의',value:`${confirmed}/2곳 절차 확인`,detail:caseState.selectedHospital?.companyName || '제주 기관 확인 필요',ready:confirmed===2,symbol:'hospital'},
+    {name:'병원 문의',value:`${confirmed}/2곳 절차 확인${confirmed?' · 합성':''}`,detail:caseState.selectedHospital?.companyName || '제주 기관 확인 필요',ready:confirmed===2,symbol:'hospital',location:publicHospitalLocation(caseState.selectedHospital)},
     {name:'진료 자료',value:`${progress.prepared}/${progress.total}개 준비`,detail:progress.prepared===progress.total?'요청 자료 준비됨':'요청된 자료를 확인합니다.',ready:progress.prepared===progress.total,symbol:'folder'},
     {name:'택시 이동',value:support.taxi.label,detail:support.taxi.providerName || '지역 문의처 확인',ready:support.taxi.ready,symbol:'car'},
     {name:'병원 동행',value:support.companion.label,detail:support.companion.providerName || '필요한 지원 확인',ready:support.companion.ready,symbol:'users'},
   ];
-  document.getElementById('mobile-case-summary').innerHTML = `<div class="mobile-summary-date"><strong>${escape(dateLabel(patient.nextVisit))}${time?` · ${escape(time)}`:''}</strong><span>시연 일정 · 예약 미확정</span></div><div class="mobile-summary-states"><span>병원 ${confirmed}/2</span><span>자료 ${progress.prepared}/${progress.total}</span><span>택시 ${support.taxi.ready?'준비':'확인 필요'}</span><span>동행 ${support.companion.ready?'준비':'확인 필요'}</span></div>`;
-  const pendingItems = latestActions.length ? latestActions.slice(0,4).map(item => ({title:item.label || '확인할 내용',reason:item.reason || ''})) : tasks.slice(0,2).map(task => ({title:task.title,reason:task.owner}));
-  document.getElementById('case-content').innerHTML = `<div class="visit-date">${icon('calendar')}<div><span>이번 방문 · 시연 일정</span><strong>${escape(dateLabel(patient.nextVisit))}</strong><small>${time?`${escape(time)} 시각 가정`:'진료 시각 미정'} · ${escape(patient.area)} 출발</small></div></div><div class="read-only-statuses">${items.map(item => `<div class="read-only-status ${item.ready?'ready':''}" data-case-status="${escape(item.name)}">${icon(item.symbol)}<div><span>${escape(item.name)}</span><strong>${escape(item.value)}</strong><small>${escape(item.detail)}</small></div>${item.ready?icon('check'):''}</div>`).join('')}</div><div class="next-confirmation"><h3>${responseCount?'다음 확인':'함께 확인할 내용'}</h3>${pendingItems.length ? `<ul>${pendingItems.map(item => `<li><strong>${escape(item.title)}</strong>${item.reason?`<span>${escape(item.reason)}</span>`:''}</li>`).join('')}</ul>` : '<p>현재 응답의 준비 내역을 확인해 주세요. 실제 예약·배정은 제공기관의 확인이 필요합니다.</p>'}</div><p class="snapshot-note">${icon('info')}이곳은 대화에서 준비한 내용을 보여줍니다. 수정할 내용도 말로 알려주세요.</p>`;
+  document.getElementById('mobile-case-summary').innerHTML = `<div class="mobile-summary-date"><strong>${escape(dateLabel(patient.nextVisit))}${time?` · ${escape(time)}`:''}</strong><span>시연 일정 · 예약 미확정</span></div><div class="mobile-summary-states"><span>병원 ${confirmed}/2${confirmed?'(합성)':''}</span><span>자료 ${progress.prepared}/${progress.total}</span><span>택시 ${support.taxi.ready?'시연 가능':'확인 필요'}</span><span>동행 ${support.companion.ready?'시연 가능':'확인 필요'}</span></div>`;
+  const pendingItems = latestActions.length ? latestActions.map(item => ({title:item.label || '확인할 내용',reason:item.reason || ''})) : tasks.slice(0,2).map(task => ({title:task.title,reason:task.owner}));
+  document.getElementById('case-content').innerHTML = `<div class="visit-date">${icon('calendar')}<div><span>이번 방문 · 시연 일정</span><strong>${escape(dateLabel(patient.nextVisit))}</strong><small>${time?`${escape(time)} 시각 가정`:'진료 시각 미정'} · ${escape(patient.area)} 출발</small></div></div><div class="read-only-statuses">${items.map(item => `<div class="read-only-status ${item.ready?'ready':''}" data-case-status="${escape(item.name)}">${icon(item.symbol)}<div><span>${escape(item.name)}</span><strong>${escape(item.value)}</strong><small>${escape(item.detail)}</small>${item.location || ''}</div>${item.ready?icon('check'):''}</div>`).join('')}</div><div class="next-confirmation"><h3>${responseCount?'다음 확인':'함께 확인할 내용'}</h3>${pendingItems.length ? `<ul>${pendingItems.map(item => `<li><strong>${escape(item.title)}</strong>${item.reason?`<span>${escape(item.reason)}</span>`:''}</li>`).join('')}</ul>` : '<p>현재 응답의 준비 내역을 확인해 주세요. 실제 예약·배정은 제공기관의 확인이 필요합니다.</p>'}</div><p class="snapshot-note">${icon('info')}이곳은 대화에서 준비한 내용을 보여줍니다. 수정할 내용도 말로 알려주세요.</p>`;
   const sourceItems = [];
   if (caseState.selectedHospital?.source) sourceItems.push({label:'제주 기관',source:caseState.selectedHospital.source.url});
   for (const kind of ['taxi','companion']) {
@@ -168,7 +179,7 @@ function normalizeResponse(data) {
     status:['completed','needs_input','not_connected','error'].includes(event.status)?event.status:'needs_input',
     detail:String(event.detail || '').slice(0,1600),isSimulation:event.isSimulation===true,source:typeof event.source==='string'?event.source.slice(0,1000):'',
   }));
-  const actions = (Array.isArray(data.pendingActions)?data.pendingActions:[]).slice(0,8).map(item=>({id:String(item.id || ''),kind:String(item.kind || ''),label:String(item.label || '').slice(0,240),reason:String(item.reason || '').slice(0,600)}));
+  const actions = (Array.isArray(data.pendingActions)?data.pendingActions:[]).slice(0,12).map(item=>({id:String(item.id || ''),kind:String(item.kind || ''),label:String(item.label || '').slice(0,240),reason:String(item.reason || '').slice(0,600)}));
   return {...data,events,pendingActions:actions};
 }
 
@@ -225,7 +236,7 @@ async function sendRequest(text,retryId) {
   if (!text || text.length>MAX_MESSAGE) return;
   if(previewMode)resetConversation({focus:false});
   const requestId=retryId || makeId();
-  const requestBody=retryId && failedRequests.has(retryId) ? failedRequests.get(retryId).body : {message:text,...(sessionId?{sessionId}:{}),history:history.slice(-MAX_HISTORY),requestId};
+  const requestBody=retryId && failedRequests.has(retryId) ? failedRequests.get(retryId).body : {message:text,...(sessionId?{sessionId}:{}),history:normalizeHistory(history),requestId};
   let messageNode;
   if (retryId) {
     messageNode=document.querySelector(`[data-message-id="${requestId}"]`);
@@ -239,7 +250,7 @@ async function sendRequest(text,retryId) {
   try {
     const data=await callAgent(API,requestBody,controller.signal);
     caseState=data.caseState;sessionId=data.sessionId;latestActions=data.pendingActions;latestEvents=data.events;responseCount++;
-    history=[...history,{role:'user',text},{role:'assistant',text:data.reply}].slice(-MAX_HISTORY);
+    history=normalizeHistory([...history,{role:'user',text},{role:'assistant',text:data.reply}]);
     failedRequests.delete(requestId);
     appendMessage({role:'assistant',text:data.reply,events:data.events});
     updateCapabilities(data.capabilities);renderSnapshot();
