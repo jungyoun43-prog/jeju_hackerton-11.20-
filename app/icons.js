@@ -1,0 +1,32 @@
+const paths = {
+  compass: '<circle cx="12" cy="12" r="9"/><path d="m16 8-2 6-6 2 2-6Z"/>',
+  home: '<path d="m3 10 9-7 9 7v10H3Z"/><path d="M9 20v-7h6v7"/>',
+  folder: '<path d="M3 7V5h6l2 2h10v13H3Z"/><path d="M3 10h18"/>',
+  phone: '<path d="m7 3 3 5-3 3a16 16 0 0 0 6 6l3-3 5 3c-1 5-5 5-9 3A24 24 0 0 1 4 12C2 8 2 4 7 3Z"/>',
+  calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v5m10-5v5M3 11h18m-14 4h3m4 0h3m-10 3h3"/>',
+  chevron: '<path d="m9 5 7 7-7 7"/>',
+  arrow: '<path d="M4 12h16m-6-6 6 6-6 6"/>',
+  check: '<path d="m5 12 4 4L19 6"/>',
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 6v6l4 2"/>',
+  file: '<path d="M14 3H5v18h14V8Z"/><path d="M14 3v5h5M8 12h8m-8 4h6"/>',
+  pin: '<path d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 0 1 14 0Z"/><circle cx="12" cy="10" r="2"/>',
+  hospital: '<path d="M4 21V7h16v14M2 21h20M9 3h6v7H9Zm-2 12h2m6 0h2m-7 6v-5h4v5"/>',
+  user: '<circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/>',
+  download: '<path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/>',
+  refresh: '<path d="M20 7v5h-5M4 17v-5h5"/><path d="M6 7a7 7 0 0 1 12-2l2 3M4 16l2 3a7 7 0 0 0 12-2"/>',
+  leaf: '<path d="M20 3C8 2 2 8 5 15s15 7 15-12Z"/><path d="m5 21 9-11"/>',
+  spark: '<path d="m12 3 2 6 6 3-6 2-2 7-2-7-6-2 6-3Z"/>',
+  info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10v1"/>',
+  lock: '<rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3m-4 4v3"/>',
+  external: '<path d="M14 3h7v7m0-7L10 14M10 3H3v18h18v-7"/>',
+  send: '<path d="m3 3 18 9-18 9 3-9Z"/><path d="M6 12h15"/>',
+  close: '<path d="m6 6 12 12M6 18 18 6"/>',
+  plus: '<path d="M12 4v16M4 12h16"/>',
+  bell: '<path d="M5 17V9a7 7 0 0 1 14 0v8l2 2H3Zm5 5h4"/>',
+  map: '<path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3Zm6-3v15m6-12v15"/>',
+  shield: '<path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6Z"/><path d="m8 12 3 3 5-6"/>',
+};
+
+export function icon(name, className = '') {
+  return `<svg class="icon ${className}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name] || paths.info}</svg>`;
+}
