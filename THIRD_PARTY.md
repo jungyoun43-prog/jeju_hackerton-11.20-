@@ -20,7 +20,7 @@
 | 공식 이동·동행 서비스 소개 | [제주시니어클럽 아름동행](https://www.jjcsc.co.kr/Business/Market), [교통약자 이동지원센터](https://www.jejuhappycall.com/?mcode=guide01), 확인2026-10-31 | 전자는 병원동행·이동지원 소개, 후자는 차량 이용대상·회원등록 안내. 각각 기관 대표문의이며 실시간 배정 API 아님. 허브 데이터셋 수에 포함하지 않음 |
 | GPT Image 계열 | ChatGPT 내장 Imagegen. 정확한 모델 ID는 도구에서 미공개 | 투명 PNG 이미지 로고와 이전 디자인의 제주 일러스트 생성. 인물 일러스트는 사용자 피드백으로 화면에서 제거함. 환자 기록 분석에는 사용하지 않음. 정확 프롬프트: `app/assets/manifest.json` |
 | Codex | 이 세션에 제공된 코딩 에이전트 | 기획 정리·소스 작성·서브에이전트 병렬 개발·검사. 서비스 런타임 모델이 아님 |
-| 서비스 런타임 LLM | 사용자 요청으로 연결 보류 | `createAgentService({provider})`에 공급자 주입. 도구 루프·인자/출처/한도 검증은 주입 테스트로 확인하며 일반 API는 미연결503. 별도 고정 예시는 모델을 호출하지 않음 |
+| 서비스 런타임 LLM | OpenAI `gpt-6.1-sol` 기본, `gpt-6.1-terra` 선택 | 키 설정 시 Responses API를 호출하는 템플릿 구현. Native fetch 사용. 실제 계정·유료 호출·품질 검증 미수행, 키 없는 고정 예시와 구분 |
 | Amazon Bedrock 접근 확인 | 2026-10-31, 서울 리전·APAC Nova profile 목록 조회와 합성 Converse 요청 | 실제 요청은 계정 Error 002로 실패. 사용 가능·한국어 tool-use 검증 완료로 기록하지 않고 추가 시도 중단. 후보 APAC profile은 6개 리전 범위를 갖지만 기본 handler에서 미활성 |
 | Agent prompt | `prompts/caregiver-system.mjs` | 허용 도구·의료진 역할·합성 경계·출처 조건을 담은 자체 프롬프트. 실제 모델 품질 검증과 구분 |
 | 전화·배차·동행 배정·결제·EMR·의료진 회신 | 미연동 | 문의 초안과 합성 응답으로 준비·변경 흐름 재현. 실제 발신·예약·결제·전송 없음 |

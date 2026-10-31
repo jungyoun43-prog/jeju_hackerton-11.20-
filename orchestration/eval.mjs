@@ -124,7 +124,7 @@ await check('rollback-boundary','rollback',()=>{
 });
 const passed=checks.filter(c=>c.status==='pass').length;
 const result={evaluatedAt:new Date().toISOString(),commit:git('rev-parse','HEAD'),automated:{passed,total:checks.length,rate:Math.round(passed/checks.length*1000)/10},checks,
- manualUnverified:['전체 운영 데이터 API·최신성·전체 원자료 재배포 조건 (허브계보3종 최소 사실은 실제 사용)','실제 전화·기관 접수·공단 기록 연계·의료진 참여','사용자가 보류한 실제 LLM 연결·품질과 실제 마이크 인식 (provider 주입 검사는 별도)','임상 유효성·실서비스 개인정보 처리·정책 검토','기획서 최종 PDF 15페이지 이내 및 센터 실기기 실행'],submissionReady:false};
+ manualUnverified:['전체 운영 데이터 API·최신성·전체 원자료 재배포 조건 (허브계보3종 최소 사실은 실제 사용)','실제 전화·기관 접수·공단 기록 연계·의료진 참여','OpenAI 키 입력형 템플릿의 실제 계정 접근·품질 및 실제 마이크 인식 (mock/provider 검사는 별도)','임상 유효성·실서비스 개인정보 처리·정책 검토','기획서 최종 PDF 15페이지 이내 및 센터 실기기 실행'],submissionReady:false};
 await mkdir(resolve(root,'orchestration/runs'),{recursive:true});
 await writeFile(resolve(root,'orchestration/runs/latest-eval.json'),JSON.stringify(result,null,2)+'\n');
 for(const item of checks) console.log(`${item.status==='pass'?'PASS':'FAIL'} ${item.id} · ${item.evidence}`);

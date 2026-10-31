@@ -42,3 +42,4 @@ UI·Workflow·문서가 각각 `mvp/ui`, `mvp/workflow`, `mvp/docs`에서 자기
 - API 계약: 화면 이력12개와 서버8개 제한이 달라 5턴 이후 요청이 실패할 수 있었다. 최근8개·각2,000자로 정규화하되 실제 화면의 답변을 자르지 않는다. 중요 동행 재문의가 앞4항목 제한으로 숨겨지지 않도록 반환된 확인 항목을 모두 표시한다.
 - CloudFront 실제 검증: cfn-lint·ValidateTemplate·구조 검사는 통과했지만 실제 서비스가 `X-Amz-Content-Sha256` 헤더의 명시 allowlist를 거부했다. `allExcept`로 `host`만 제외하고 쿠키·쿼리는 전달하지 않도록 수정한다. 실제 관리형 정책과 공식 API 정의를 대조했고, 수정 후 공개 POST와 직접 원점403을 별도로 확인한다. 템플릿 검사는 서비스의 모든 값 제약을 보장하지 않는다.
 - 복구 경계: 정상 복원된 `UPDATE_ROLLBACK_COMPLETE`는 재시도 가능한 안정 상태다. cleanup 진행 중이나 rollback 실패를 우회하지 않고 안정 상태에서만 수정 템플릿을 다시 적용하도록 검사한다. 기존 배포의 OIDC subject·원점 파라미터는 후속 bootstrap에서 보존한다.
+- 키 입력형 연결: 공급자 인터페이스만 두면 키를 입력해도 실행되지 않는다. 후속 요청으로 .env→런타임 설정→Sol/Terra Responses 변환을 연결하고, 실제 Node env-file 부팅까지 가짜 키·fetch fixture로 확인한다. 키가 구성된 상태와 계정 접근 성공은 UI에서 구분하며 실제 키나 유료 호출은 검증에 사용하지 않는다.

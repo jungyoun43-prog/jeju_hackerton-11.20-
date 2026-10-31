@@ -1,6 +1,6 @@
 # 제주 진료 나침반 기능 파이프라인
 
-작성일: 2026-10-31 · PRD v0.6 · 대화 UI·공급자 API 연결 준비
+작성일: 2026-10-31 · PRD v0.7 · 대화 UI·공급자 API 연결 준비
 
 **보호자가 말한 요청에서 병원·자료·택시·동행 준비가 이어지고, 무엇을 확인했고 무엇이 남았는지 설명한다.** 진찰·검사·진료 장소·치료 계획은 의료진이 판단한다.
 
@@ -10,7 +10,7 @@
 | --- | --- |
 | 텍스트·브라우저 음성 → 일반 API | `POST /api/agent`. 기본 공급자는 미연결이므로 `MODEL_NOT_CONNECTED`/503·입력 복원. 모델·DB 호출 없음 |
 | 대화 흐름 미리보기 | 별도 `POST /api/agent/preview`. 고정 scenarioId의 공개 snapshot 검색·도메인 상태 변경·합성 문의 실행. `isPreview:true`·작성된 예시·`llm:false` 유지 |
-| 공급자 주입 → 도구 루프 | `createAgentService({provider})`. 구조화된 tool-use를 검증하고 허용 도구 실행. 현재는 주입 테스트로 검증했고 실제 LLM 연결은 후속 보류 |
+| 공급자 주입 → 도구 루프 | `createAgentService({provider})`. 구조화된 tool-use를 검증하고 허용 도구 실행. OpenAI 키 설정 시 기본Sol/선택Terra의 Responses API로 실행. 실제 계정은 미검증이며 테스트는 mock fetch 사용 |
 | 기존 수동 UI | `/workspace.html`. 조건·자료·합성 응답 분기·변경을 직접 검사하는 개발용 화면 |
 
 고정 예시는 자유 입력을 해석하지 않으며 일반 세션으로 이어지지 않는다. SDK 설치·모델 목록·환경값을 실제 모델 연결 성공으로 간주하지 않는다. Bedrock 실호출은 계정 Error 002로 차단됐으며 추가 시도를 중단했다.
@@ -68,4 +68,4 @@
 - 통합 확인 중: PC·모바일 대화 화면, 음성 지원/실패 대안, 빌드·ZIP·공개 AWS 동일 revision. 실제 완료 상태는 [검증 기록](implementation-results.md)을 따름.
 - 후속: 선택 공급자의 실제 한국어 추론·tool-use, 영속 budget·외부 작업 중복 방지, 승인된 개인 기록 연계, 협조받은 번호의 실제 통화, 기관·의료진 검토와 센터 실기기 실행.
 
-상세한 API 연결은 [agent/README](../agent/README.md), 요구사항은 [PRD v0.6](prd.md), 상태 계약은 [대화 계약](conversation-agent-contract.md)·[방문 지원 계약](visit-support-contract.md), 출처는 [데이터 명세](data-sources.md)를 따른다.
+상세한 API 연결은 [agent/README](../agent/README.md), 요구사항은 [PRD v0.7](prd.md), 상태 계약은 [대화 계약](conversation-agent-contract.md)·[방문 지원 계약](visit-support-contract.md), 출처는 [데이터 명세](data-sources.md)를 따른다.

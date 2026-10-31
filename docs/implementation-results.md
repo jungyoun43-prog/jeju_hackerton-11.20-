@@ -1,6 +1,6 @@
 # MVP 구현·검증 결과 기록
 
-기준일: 2026-10-31 · 현재 범위: 대화 우선 UI·공급자 연결 인터페이스·허브 계보3종 도구·명시적 고정 예시. 실제 LLM 연결은 사용자 요청으로 보류했다. 최신 로컬 검사와 실제 AWS API를 확인했으며 새 main UI/API의 동일 revision 자동 배포는 아래 기록을 따른다. 이전 증거는4절에 보존한다.
+기준일: 2026-10-31 · 현재 범위: 대화 UI·허브 계보3종·고정 예시와 OpenAI 키 입력형 연결 템플릿. Sol 기본/Terra 선택 어댑터를 구현했으며 실제 계정·유료 모델 호출은 검증하지 않았다. 최신 템플릿 검증은3.1절, 이전 대화 UI·AWS 검증은3절에 기록한다.
 
 개발 환경은 Linux·Node v22.23.2·npm 10.9.8, 브라우저 QA는 Playwright 1.64.1·Chromium이다. 실행 소스 지문·검사 수·캡처는 검증한 버전의 `orchestration/runs/` 증거를 따른다. 이전 버전의 통과 결과를 새 UI·데이터 버전의 검증으로 대신하지 않는다.
 
@@ -50,6 +50,19 @@ AWS 첫 site 연결은 CloudFront가 SHA256 헤더의 명시 allowlist를 거부
 제출 스냅샷을 새 디렉터리에 풀어 CRC·비밀파일 제외·Agent/Prompt/출처/인프라 포함, `npm ci --ignore-scripts`·검사122개·정적 빌드·Lambda 번들 빌드를 확인했다. HTTP7경로에서 화면/스크립트/개발화면/health/capabilities/preview200과 일반입력503을 대조했다. 원본과 압축해제 소스의 실행 지문은 `1d4c3051fa5aad661f8ad7d9c090c44918c8f0ff0480907e70cd6a828d7045cb`로 일치한다. `orchestration/runs/release.json`에 기록한다. 센터 실기기 검증은 별도다.
 
 실제 [Actions41202034743](https://github.com/jungyoun43-prog/jeju_hackerton-11.20-/actions/runs/41202034743)에서 `32d0694` 동일 커밋의 검사·정적/서버 ZIP 빌드·분리 artifact·OIDC 인증·웹/API 게시·공개 revision·Lambda 코드 hash 확인이 모두 성공했다. API와 정적 앱의 배포 버전이 일치하며 모델은 미연결이다. 공개 CloudFront 주소에서도 대화40/40·개발용 수동47/47 브라우저 검사가 통과했다. PC·모바일 캡처·API·보고서·실행 지문을 보존한다.
+
+### 3.1 OpenAI 키 입력형 템플릿
+
+사용자 후속 요청에 따라 루트 `.env`의 OPENAI_API_KEY만 채워 실행할 수 있도록 Node env-file→config→Responses API→검증 도구→응답 경로를 구현했다. 기본은 gpt-6.1-sol, 선택은 gpt-6.1-terra이며 두 모델을 동시에 호출하거나 오류 시 다른 모델로 자동 대체하지 않는다. [공식 근거](../research/openai_api_setup_2026-10-31.md)를 기록했다.
+
+- Provider 전용21개와 config·reasoning·실제 Node env-file 부팅5개를 포함한 전체 **148/148** 통과. Node 부팅 검사는 임시 가짜 env와 fetch fixture만 사용한다.
+- 대화 화면 **42/42**·기존 수동 흐름 **47/47** 통과. 추가2개는 설정된 모델을 인증 성공으로 표시하지 않는 PC·모바일 capabilities fixture다. 실제 모델·마이크 검증으로 확대하지 않는다.
+- 자동규칙 **29/29**, 전용 worktree17개·소유권·출처·키 패턴·실행 지문·롤백 경계 확인. 단위검사와 정적/Lambda 빌드가 통과했다.
+- 빈 키 `.env`를 배타적 생성·0600 권한으로 만들고 Git 제외를 확인했다. 기존 파일이 있으면 내용을 읽거나 덮어쓰지 않는다. API 키는 Node 런타임에서만 읽고 브라우저·정적 빌드·제출 ZIP·Git에 포함하지 않는다.
+- 도구 호출의 reasoning/encrypted 항목은 요청별 opaque context로 이어주고 HTTP·세션 저장소에 넣지 않는다. 응답1MiB·요청2MiB·출력4,096토큰·40초 호출/45초 전체·8라운드/16도구를 제한한다.
+- 읽기 전용 독립 검토에서 설정과 인증의 표시 문제를 발견해 '대화 연결 설정됨·실제 응답은 요청 시 확인'으로 수정했다. 남은 material blocker 없이 ship 판정을 받았다. 검토자는 실제 키·인증파일을 읽거나 유료 호출을 수행하지 않았다.
+
+로컬 `.env`는 AWS에 자동 전송되지 않는다. 현재 공개 데모의 모델은 키 미설정 상태이며 실제 계정 접근·모델 품질·공개 유료 호출의 전역 budget 검증은 별도다.
 
 ## 4. 보존한 이전 검증 이력
 

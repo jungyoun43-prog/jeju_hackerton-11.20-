@@ -211,6 +211,15 @@
         "docs/submission-checklist.md",
         "docs/deployment.md"
       ]
+    },
+    {
+      "id": "openai-provider",
+      "branch": "feature/openai-provider",
+      "baseCommit": "36a354b",
+      "allow": [
+        "agent/openai-provider.mjs",
+        "tests/openai-provider.test.mjs"
+      ]
     }
   ],
   "rules": [

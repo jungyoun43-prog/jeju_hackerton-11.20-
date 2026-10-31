@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 
 test('로컬 서버는 시연 상태만 공개하고 비밀 파일·경로 이탈·쓰기 요청을 차단한다',async t=>{
- const child=spawn(process.execPath,['scripts/server.mjs'],{cwd:root,env:{...process.env,HOST:'127.0.0.1',PORT:'0',GOOGLE_MAPS_EMBED_KEY:''},stdio:['ignore','pipe','pipe']});
+ const child=spawn(process.execPath,['scripts/server.mjs'],{cwd:root,env:{...process.env,HOST:'127.0.0.1',PORT:'0',OPENAI_API_KEY:'',GOOGLE_MAPS_EMBED_KEY:''},stdio:['ignore','pipe','pipe']});
  t.after(async()=>{child.kill('SIGTERM');await once(child,'exit');});
  const base=await new Promise((resolve,reject)=>{
   const timeout=setTimeout(()=>reject(new Error('서버가 5초 안에 시작하지 않았습니다.')),5000);

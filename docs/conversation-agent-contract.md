@@ -6,7 +6,7 @@
 
 보호자 요청 → 기존 사례 확인 → 부족한 핵심 정보만 질문 → 공공데이터 검색 → 문의·자료·이동·동행 준비 도구 실행 → 처리 기록·다음 행동 설명. 사용자가 같은 정보를 다른 화면에 재입력하지 않는다. 날짜/지역/기관이 바뀌면 이전 문의 응답을 재확인한다. 진료 판단은 의료진의 역할이다.
 
-사용자는 실제 LLM 연결을 후속 작업으로 보류했다. 이번 범위는 공급자 주입 인터페이스와 도구 호출 루프·검증이며, 공급자가 없으면 일반 대화 요청은 `MODEL_NOT_CONNECTED`/503을 반환한다. 고정 예시는 별도 `POST /api/agent/preview`에만 두며 `scenarioId:'aewol-parent-visit'`과 requestId를 받는다. 자유 입력을 키워드로 처리한 뒤 실제 모델 응답처럼 표시하지 않는다. preview 응답은 아래 DTO에 `isPreview:true`, `previewMessages:[{role:'user'|'assistant',text:string}]`를 더한다. 마지막 assistant.text는 reply와 같다. 모델의 tool args는 검증하고 알려진 도구·출처·지원 상태만 사용한다. 기관 등록 정보에서 환자 적합성을 추론하거나 의료진 기록을 모델이 작성하지 않는다.
+후속 요청으로 사용자는 키만 넣으면 실행되는 OpenAI 템플릿과 Sol/Terra를 지정했다. 루트 .env의 OPENAI_API_KEY로 기본 gpt-6.1-sol 또는 선택 gpt-6.1-terra를 Responses API에 연결한다. 실제 키·계정은 검증하지 않으며 공급자가 없으면 일반 대화 요청은 `MODEL_NOT_CONNECTED`/503을 반환한다. 고정 예시는 별도 `POST /api/agent/preview`에만 두며 `scenarioId:'aewol-parent-visit'`과 requestId를 받는다. 자유 입력을 키워드로 처리한 뒤 실제 모델 응답처럼 표시하지 않는다. preview 응답은 아래 DTO에 `isPreview:true`, `previewMessages:[{role:'user'|'assistant',text:string}]`를 더한다. 마지막 assistant.text는 reply와 같다. 모델의 tool args는 검증하고 알려진 도구·출처·지원 상태만 사용한다. 기관 등록 정보에서 환자 적합성을 추론하거나 의료진 기록을 모델이 작성하지 않는다.
 
 본인 인증·동의·허용 사업자 연계가 필요한 공단 기록을 공개 API로 가져올 수 있다고 가정하지 않는다. 이번 버전의 개인 진료기록과 통화는 **합성 사례·시연 어댑터**이며 실제 연결 상태와 구분한다. 실제 통화·예약·배차·결제·의료기록 조회 완료를 거짓 표시하지 않는다. 실제 사업자 키·인증·의료기관 계약이 필요한 어댑터는 미설정 상태를 반환한다.
 
@@ -40,7 +40,7 @@ Lambda는 `agent/handler.mjs`의 `handler(event)`를 사용한다. 로컬 서버
 
 기존 app/domain.js·visit-support.js·support-data.js와 정적 snapshot을 재사용한다. Agent의 tool dispatcher가 validated action을 실행한다. 모델이 프런트 caseState를 임의로 신뢰하지 않는다. session store는 초기 합성 사례와 정규화된 준비 상태만 보관하고 입력 원문·실환자 기록·대화 전문을 로그/DB에 저장하지 않는다. 이력은 브라우저 메모리에만 둔다.
 
-AWS 런타임은 모델과 영속 저장을 기본 비활성화한다. Bedrock 실제 호출은 계정 Error 002로 차단됐으며 사용자 요청에 따라 추가 시도 없이 연결을 보류했다. 모델 목록 조회는 사용 가능 증거가 아니다. 공급자 어댑터는 후속 선택·검증 대상으로 남긴다. 이번 데모에 실제 공단 기록을 전송하지 않는다. 모델 API 키를 frontend에 넣지 않는다. 공급자 주입 테스트에서 세션/턴·도구 루프·maxTokens 상한을 검증한다. session store도 주입 인터페이스만 두며 DynamoDB 저장 어댑터는 구현·활성화하지 않는다.
+AWS 런타임은 모델과 영속 저장을 기본 비활성화한다. Bedrock 실제 호출은 계정 Error 002로 차단됐으며 사용자 요청에 따라 추가 시도 없이 연결을 보류했다. 모델 목록 조회는 사용 가능 증거가 아니다. OpenAI 어댑터는 키가 있을 때 구성하고 자동 대체 없이 지정 모델만 사용한다. 로컬 .env는 AWS에 자동 게시하지 않는다. 이번 데모에 실제 공단 기록을 전송하지 않는다. 모델 API 키를 frontend에 넣지 않는다. 공급자 주입 테스트에서 세션/턴·도구 루프·maxTokens 상한을 검증한다. session store도 주입 인터페이스만 두며 DynamoDB 저장 어댑터는 구현·활성화하지 않는다.
 
 ## UI
 
@@ -61,4 +61,8 @@ AWS 런타임은 모델과 영속 저장을 기본 비활성화한다. Bedrock �
 
 ## 검증
 
-고정 예시에서 실제 공공 snapshot 도구와 준비 상태 변경을 확인하고, 일반 입력의 연결 미설정 안내·입력 복원, 주입한 공급자의 tool loop·부족 정보 질문·날짜 변경 재확인·인자/출처 검증·오류·타임아웃·budget·중복 요청을 확인한다. 주입 테스트는 실제 모델 품질 검증과 다르다. 음성 API mock 검사는 실제 마이크 인식 검증과 구분한다. 실제 AWS 배포·동일 SHA·PC/모바일 대화 화면을 확인한다. 실제 LLM 추론·병원 발신·개인 기록 연계는 완료 조건에 포함하지 않고 후속으로 명시한다. 광범위 데이터 감사 결과는 별도 연구 자료로 보존하며 모두 구현하지 않는다.
+고정 예시에서 실제 공공 snapshot 도구와 준비 상태 변경을 확인하고, 일반 입력의 연결 미설정 안내·입력 복원, 주입한 공급자의 tool loop·부족 정보 질문·날짜 변경 재확인·인자/출처 검증·오류·타임아웃·budget·중복 요청을 확인한다. 주입 테스트는 실제 모델 품질 검증과 다르다. 음성 API mock 검사는 실제 마이크 인식 검증과 구분한다. 실제 AWS 배포·동일 SHA·PC/모바일 대화 화면을 확인한다. 템플릿 검사는 실제 LLM 추론을 뜻하지 않으며 실제 계정 호출·병원 발신·개인 기록 연계는 별도 후속 검증으로 명시한다. 광범위 데이터 감사 결과는 별도 연구 자료로 보존하며 모두 구현하지 않는다.
+
+## OpenAI 키 입력형 후속 범위
+
+2026-10-31. 기본 Sol·선택 Terra는 별도 ID이며 공식 원문은 research/openai_api_setup_2026-10-31.md에 기록했다. strict:false와 기존 dispatcher 검증을 함께 사용한다. request-scoped provider context로 reasoning/encrypted 항목을 다음 도구 결과와 replay하고, 이를 HTTP·세션·로그에 저장하지 않는다. Native fetch를 고정 공식 endpoint에만 보내며 redirect·자동 재시도·모델 fallback을 하지 않는다. 루트는 .env/config/handler/service/문서/통합을 담당하고 feature/openai-provider(기준36a354b)는 agent/openai-provider.mjs·tests/openai-provider.test.mjs만 수정한다. 실제 키를 읽거나 유료 API를 호출하지 않고 fixture로 검증한다.

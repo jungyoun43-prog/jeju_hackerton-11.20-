@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createAgentService } from '../agent/service.mjs';
-import { handler } from '../agent/handler.mjs';
+import { createLambdaHandler } from '../agent/handler.mjs';
 import { createMemorySessionStore } from '../agent/store.mjs';
 import { createToolDispatcher, assertSourceUrl } from '../agent/tools.mjs';
 import { createDemoCase } from '../app/domain.js';
@@ -75,6 +75,8 @@ test('입력 JSON·본문 크기·이력 role·필드·세션 형식·content-ty
 });
 
 test('Lambda wrapper는 HTTPv2·base64를 같은 DTO로 처리한다',async () => {
+  const service=createAgentService();
+  const handler=createLambdaHandler(input=>service.handleAgentRequest(input));
   const result = await handler({requestContext:{http:{method:'POST'}},rawPath:'/api/agent',body:Buffer.from(JSON.stringify(req())).toString('base64'),isBase64Encoded:true});
   assert.equal(result.statusCode,503);
   assert.equal(json(result).error.code,'MODEL_NOT_CONNECTED');

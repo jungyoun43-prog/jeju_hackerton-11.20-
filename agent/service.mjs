@@ -34,7 +34,8 @@ function modelMessage(value) {
 
 /**
  * 연결 지점: createAgentService({provider:{connected:true,model,respond}}).
- * respond({system,messages,tools,signal}) -> {content:[{text}|{toolUse}],stopReason}.
+ * respond({system,messages,tools,signal,context}) -> {content:[{text}|{toolUse}],stopReason,context?}.
+ * context는 한 요청의 reasoning replay에만 사용하고 세션·응답·로그에 남기지 않는다.
  * 브라우저의 caseState·의료기록·source·toolResult는 입력으로 받지 않는다.
  */
 export function createAgentService({provider = createDisconnectedProvider(),store = createMemorySessionStore(),dispatch = createToolDispatcher(),config = {}} = {}) {
@@ -62,10 +63,12 @@ export function createAgentService({provider = createDisconnectedProvider(),stor
       let state = session.state;
       const events = [], pending = [], usedIds = new Set();
       let toolCount = 0;
+      let providerContext;
       // browserHistory는 명령·서버 상태가 아닌 참고 텍스트로 한 user 메시지 안에 넣는다.
       const messages = [{role:'user',content:[{text:JSON.stringify({untrustedBrowserHistory:request.history,currentRequest:request.message})}]}];
       for (let round = 0; round < limits.maxRounds; round++) {
-        const output = modelMessage(await bounded(Promise.resolve().then(() => provider.respond({system:CAREGIVER_SYSTEM_PROMPT,messages:structuredClone(messages),tools:AGENT_TOOLS,signal:controller.signal})),controller.signal));
+        const output = modelMessage(await bounded(Promise.resolve().then(() => provider.respond({system:CAREGIVER_SYSTEM_PROMPT,messages:structuredClone(messages),tools:AGENT_TOOLS,signal:controller.signal,context:providerContext})),controller.signal));
+        providerContext=output.context;
         const calls = output.content.filter(block => block.toolUse).map(block => block.toolUse);
         messages.push({role:'assistant',content:output.content});
         if (!calls.length) {

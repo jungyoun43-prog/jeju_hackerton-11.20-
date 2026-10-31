@@ -1,6 +1,6 @@
 {
   "baseCommit": "e1e7e44",
-  "updatedAt": "2026-10-31T12:40:38.058609+00:00",
+  "updatedAt": "2026-10-31T12:57:29.878528+00:00",
   "tasks": {
     "ui": {
       "phase": "verified",
@@ -142,6 +142,14 @@
         "0ffe0a0"
       ],
       "note": "README·PRDv0.6·사용법·모델후속연결·허브3종/전수카탈로그감사 범위 동기화"
+    },
+    "openai-provider": {
+      "phase": "verified",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-openai-provider",
+      "integrationCommits": [
+        "8d81169"
+      ],
+      "note": "Responses 어댑터 전용21개·키/env/config/service 통합5개. 실제 키·유료 네트워크 미사용. 전체147개+추가env실행1개 검사 통과"
     }
   },
   "review": {

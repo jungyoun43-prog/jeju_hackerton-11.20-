@@ -110,6 +110,17 @@ try {
     record(`${width}px 새 대화 초기화`,await page.locator('.message').count()===1 && await input.inputValue()==='' && await page.locator('#save-report').isDisabled());
     await page.close();
   }
+  for(const [width,height] of [[1440,900],[390,844]]) {
+    const configured=await browser.newPage({viewport:{width,height},reducedMotion:'reduce'});
+    configured.on('pageerror',error=>errors.push(error.message));
+    await configured.route('**/api/agent/capabilities',route=>route.fulfill({json:{llm:true,model:'gpt-6.1-sol',phone:'simulation',healthRecords:'demo',voiceInput:'browser'}}));
+    await configured.goto(base,{waitUntil:'networkidle'});
+    await configured.waitForFunction(()=>document.querySelector('#connection-state').textContent==='대화 연결 설정됨');
+    await configured.locator('.connection-details>summary').click();
+    record(`${width}px 모델 설정과 실제 접근 성공을 구분`,(await configured.locator('#connection-details').innerText()).includes('실제 응답은 요청을 보낼 때') && await overflow(configured),'capabilities fixture·실제 모델 API 호출 아님');
+    await screenshot(configured,`configured-${width}`);
+    await configured.close();
+  }
   for(const [width,height] of [[360,780],[768,1024]]) {
     const page=await open(width,height);
     record(`${width}px 추가 반응형 가로 넘침 없음`,await overflow(page));
