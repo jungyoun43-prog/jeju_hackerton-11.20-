@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createDemoCase, applyAction, getTasks, getProgress, getSummary, calculateBurden, buildReport } from '../app/domain.js';
+import { parseHospitalImport } from '../app/datahub.js';
 
 const action = (state, type, values = {}) => applyAction(state, { type, ...values });
 function readyState() {
@@ -178,4 +179,47 @@ test('보고서는 시연·출처·미확인·모델 미연동을 공개하고 H
   const report = buildReport(state);
   for (const pattern of [/합성 환자/, /실제 통화/, /시연용 합성 치료 이력/, /미확인/, /런타임 AI 모델은 연결되지/]) assert.match(report, pattern);
   assert.doesNotMatch(report, /<script>/);
+});
+
+function importedHospital(name = '사용자 합성기관') {
+  return parseHospitalImport(JSON.stringify([{ companyName: name, addressDoro: '합성 주소', medicalSubject: '내과', openStatus: '영업/정상', updateAt: '2024-06-27' }]), 'example.json').records[0];
+}
+
+test('기관 변경은 이전 문의·검토를 무효화하고 의료자료와 도외 문의·위임은 보존한다', () => {
+  let state = reviewedState();
+  const original = structuredClone(state);
+  const hospital = importedHospital();
+  const next = action(state, 'SELECT_LOCAL_HOSPITAL', { hospital });
+  assert.deepEqual(state, original);
+  assert.equal(next.patient.localHospital, hospital.companyName);
+  assert.equal(next.selectedHospital.source.kind, 'user-import');
+  assert.equal(next.selectedHospital.inquiryStatus, 'unverified');
+  assert.equal(next.inquiries.jeju.status, 'not_contacted');
+  assert.deepEqual(next.inquiries.jeju.requestedDocuments, []);
+  assert.deepEqual(next.inquiries.mainland, original.inquiries.mainland);
+  assert.deepEqual(next.documents, original.documents);
+  assert.deepEqual(next.permissions, original.permissions);
+  assert.equal(next.packet.status, 'draft');
+  assert.equal(next.review.status, 'not_requested');
+  assert.throws(() => action(next, 'SUBMIT_PACKET'), /두 기관/);
+  const reconfirmed = action(next, 'RECORD_CALL', { target: 'jeju', outcome: 'documents' });
+  assert.equal(action(reconfirmed, 'SUBMIT_PACKET').review.status, 'pending');
+  hospital.departments.push('임의변경');
+  assert.deepEqual(next.selectedHospital.departments, ['내과']);
+  assert.match(buildReport(next), /사용자 가져오기 · 공식 운영 API 미검증/);
+  assert.match(buildReport(next), /현재 진료·예약·실시간 수용·협진 참여는 미확인/);
+});
+
+test('같은 기관을 다시 선택하면 회신을 유지하고 폐업·출처누락 기관 선택을 거부한다', () => {
+  const hospital = importedHospital();
+  const selected = action(readyState(), 'SELECT_LOCAL_HOSPITAL', { hospital });
+  const reconfirmed = action(selected, 'RECORD_CALL', { target: 'jeju', outcome: 'documents' });
+  const reviewed = action(action(reconfirmed, 'SUBMIT_PACKET'), 'RECORD_REVIEW', { outcome: 'local_followup' });
+  assert.equal(action(reviewed, 'SELECT_LOCAL_HOSPITAL', { hospital }).review.status, 'completed');
+  assert.throws(() => action(reviewed, 'SELECT_LOCAL_HOSPITAL', { hospital: { ...hospital, openStatus: '폐업' } }), /정상 등록/);
+  assert.throws(() => action(reviewed, 'SELECT_LOCAL_HOSPITAL', { hospital: { ...hospital, source: {} } }), /사용자가 가져온/);
+  const missing = createDemoCase();
+  const changed = action(missing, 'SELECT_LOCAL_HOSPITAL', { hospital });
+  assert.equal(changed.documents.find(doc => doc.id === 'exam').status, 'not_performed');
+  assert.equal(changed.review.outcome, null);
 });

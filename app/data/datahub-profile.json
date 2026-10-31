@@ -1,0 +1,192 @@
+{
+  "schemaVersion": 1,
+  "dataset": {
+    "id": "859",
+    "name": "병·의원 정보",
+    "provider": "LOCALDATA",
+    "sourceUrl": "https://jejudatahub.net/data/view/data/859",
+    "previewUrl": "https://jejudatahub.net/api/data/view?id=859&userId=",
+    "pageModifiedAt": "2025-10-28",
+    "displayedCollectionPeriod": {
+      "start": "2025-09-18",
+      "end": "2025-09-23"
+    }
+  },
+  "scope": "public-preview-aggregates",
+  "fetchedAt": "2026-10-31T11:29:19.458Z",
+  "totalRows": 20,
+  "activeRegistrationRows": 13,
+  "closedRows": 7,
+  "otherRows": 0,
+  "departments": [
+    {
+      "name": "가정의학과",
+      "count": 13
+    },
+    {
+      "name": "내과",
+      "count": 11
+    },
+    {
+      "name": "마취통증의학과",
+      "count": 3
+    },
+    {
+      "name": "병리과",
+      "count": 1
+    },
+    {
+      "name": "사상체질과",
+      "count": 3
+    },
+    {
+      "name": "산부인과",
+      "count": 1
+    },
+    {
+      "name": "성형외과",
+      "count": 1
+    },
+    {
+      "name": "소아청소년과",
+      "count": 2
+    },
+    {
+      "name": "소아치과",
+      "count": 1
+    },
+    {
+      "name": "신경과",
+      "count": 4
+    },
+    {
+      "name": "신경외과",
+      "count": 4
+    },
+    {
+      "name": "심장혈관흉부외과",
+      "count": 1
+    },
+    {
+      "name": "영상의학과",
+      "count": 3
+    },
+    {
+      "name": "예방치과",
+      "count": 1
+    },
+    {
+      "name": "외과",
+      "count": 4
+    },
+    {
+      "name": "응급의학과",
+      "count": 1
+    },
+    {
+      "name": "이비인후과",
+      "count": 1
+    },
+    {
+      "name": "재활의학과",
+      "count": 7
+    },
+    {
+      "name": "정신건강의학과",
+      "count": 1
+    },
+    {
+      "name": "정형외과",
+      "count": 5
+    },
+    {
+      "name": "치과교정과",
+      "count": 1
+    },
+    {
+      "name": "치과보존과",
+      "count": 1
+    },
+    {
+      "name": "치과보철과",
+      "count": 1
+    },
+    {
+      "name": "치주과",
+      "count": 1
+    },
+    {
+      "name": "침구과",
+      "count": 7
+    },
+    {
+      "name": "피부과",
+      "count": 2
+    },
+    {
+      "name": "한방내과",
+      "count": 7
+    },
+    {
+      "name": "한방부인과",
+      "count": 4
+    },
+    {
+      "name": "한방소아과",
+      "count": 3
+    },
+    {
+      "name": "한방신경정신과",
+      "count": 3
+    },
+    {
+      "name": "한방안·이비인후·피부과",
+      "count": 3
+    },
+    {
+      "name": "한방응급과",
+      "count": 2
+    },
+    {
+      "name": "한방재활의학과",
+      "count": 4
+    }
+  ],
+  "completeness": {
+    "addressRows": 20,
+    "departmentRows": 19,
+    "missingDepartmentRows": 1,
+    "addressRate": 1,
+    "departmentRate": 0.95
+  },
+  "time": {
+    "collectedAt": [
+      "2024-10-17 13:53"
+    ],
+    "earliestRowUpdate": "2018-08-31 23:59",
+    "latestRowUpdate": "2024-08-10 2:40",
+    "missingUpdateRows": 0,
+    "invalidUpdateRows": 0
+  },
+  "missingCapabilities": [
+    "전화번호",
+    "실시간 수용",
+    "예약 가능일",
+    "협진 참여",
+    "좌표"
+  ],
+  "rights": {
+    "rawRedistribution": "unverified",
+    "aggregateRedistribution": "unverified",
+    "publicationStatus": "rights-review-required",
+    "termsUrl": "https://jejudatahub.net/signup/step1",
+    "basis": "데이터 이용약관 제7조 출처·지침 준수, 제8조 통계정보 상업적 활용 허용을 확인했다. 일반약관 복제·제공 제한 및 센터 산출물 공표승인 규정과의 적용범위가 불명확해 미리보기 집계의 공개 재배포 허락은 미확인이다."
+  },
+  "limitations": [
+    "공개 미리보기 표본이며 전체 제주 의료기관 현황이 아닙니다.",
+    "행정상 영업/정상은 현재 진료·예약·협진 수락을 뜻하지 않습니다.",
+    "전체 운영 API·인증키·실시간 정보는 검증하지 않았습니다."
+  ],
+  "rawDataStored": false,
+  "generatedAt": "2026-10-31T11:29:19.458Z"
+}
