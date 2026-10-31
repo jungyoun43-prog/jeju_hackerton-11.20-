@@ -126,7 +126,7 @@ export function getCallRecoveryHandoffs(state) {
     const questions = [reasonId === 'recipient_changed' ? `현재 지정한 ${contactFor(state,target,callRecipientId(state,target)).name}에 새로 문의할 창구·범위를 보호자가 확인했나요? 이전 기관의 응답을 새 기관에 적용하지 않습니다.` : entry.reason === 'identity_required' ? '환자 본인이 직접 진행해야 할 공식 본인확인 절차와 창구는 어디인가요?' : entry.reason === 'ai_declined' ? '보호자가 직접 문의할 수 있는 창구·공개 번호·응대 시간은 무엇인가요?' : entry.reason === 'missing_documents' ? '누락한 판독문의 발급·제출 형식, 작성일과 수신 확인 절차는 무엇인가요?' : entry.reason === 'no_slots' ? '보호자가 허용한 범위의 다른 날짜를 안내받을 수 있나요? 날짜 선택·예약은 별도로 확인하겠습니다.' : '접수 가능한 창구·연락 시간과 남은 준비 자료는 무엇인가요?',
       '실제 전화·본인확인·발급·예약은 아직 하지 않았습니다. 필요한 사람의 다음 단계만 안내해 주세요.'];
     const requestDraft = `${contact.name}${contact.phone ? ` (${contact.phone}, 공개 등록번호·연결 미확인)` : ' (실제 문의번호 확인 필요)'} 문의를 ${reason.owner}에게 넘길 수 있도록 ${reason.title}의 시도 내역·질문·남은 일을 정리해 줘. 자동 반복 문의나 실제 인증·예약은 진행하지 말아 줘.`;
-    handoffs.push({ id: `call-${target}-${reasonId}`, target, reason: reasonId, status: gate.status, title: reason.title, detail: `${reason.detail} ${gate.detail} 문의 이력은 합성 시연이며 실제 발신이 아닙니다.`, attempts: entry.attempts.map(item => ({ ...item })),
+    handoffs.push({ id: `call-${target}-${reasonId}`, target, reason: reasonId, status: gate.status, title: reason.title, detail: [...new Set([reason.detail,gate.detail,'문의 이력은 합성 시연이며 실제 발신이 아닙니다.'])].join(' '), attempts: entry.attempts.map(item => ({ ...item })),
       retryPolicy: { configured: entry.retryPolicy.maxAttempts !== null, ...entry.retryPolicy, scheduled: false }, owner: reason.owner, contact, questions, remainingTasks, requestDraft, stopAutomatic: gate.stopAutomatic, actualCallPlaced: false });
   }
   return handoffs;

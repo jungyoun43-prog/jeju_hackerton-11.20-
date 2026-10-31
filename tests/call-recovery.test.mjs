@@ -225,3 +225,33 @@ test('수신처 변경 뒤 새 대상의 정책·다른 날짜 허용을 이전 
   result=await f.dispatch({name:'select_hospital_contact',input:{hospitalId:'hospital-4'},state:result.state,userMessage:'제주우리병원에 문의해줘'});
   result=await contact(f,result.state,'jeju');assert.equal(f.calls(),1);assert.equal(getCallRecoveryHandoffs(result.state)[0].status,'waiting_user');
 });
+
+
+test('재시도 숫자는 전체 정수 토큰만 검증하고 긴 정수·소수·쉼표·부호를 작은 허용값으로 줄이지 않는다',async()=>{
+  const f=fixture(),state=createDemoCase(),input={target:'taxi',maxAttempts:2,windowMinutes:15};
+  const invalidWindows=[['1015',15],['1120',120],['1000000000000000015',15],['1.5',5],['1. 5',5],['1,015',15],['1, 015',15],['1 , 015',15],['-15',15],['- 15',15],['마이너스 15',15],['음수15',15],['−15',15],['–15',15],['+15',15],['015',15],['0',1],['121',120],['10:15',15],['1e15',15],['1_15',15],['1/15',15]];
+  for(const [raw,windowMinutes] of invalidWindows) {
+    const userMessage=`택시에 ${raw}분 안에 최대2회 재시도해줘`;
+    await assert.rejects(f.dispatch({name:'update_call_retry_policy',input:{...input,windowMinutes},state,userMessage}),e=>e.code==='EXPLICIT_RETRY_POLICY_REQUIRED',userMessage);
+  }
+  const invalidAttempts=[['12',2],['1002',2],['1.2',2],['1. 2',2],['1,002',2],['1 , 002',2],['-2',2],['- 2',2],['−2',2],['+2',2],['02',2],['0',1],['4',3],['1e2',2],['1_2',2],['1/2',2]];
+  for(const [raw,maxAttempts] of invalidAttempts) {
+    const userMessage=`택시에 15분 안에 최대${raw}회 재시도해줘`;
+    await assert.rejects(f.dispatch({name:'update_call_retry_policy',input:{...input,maxAttempts},state,userMessage}),e=>e.code==='EXPLICIT_RETRY_POLICY_REQUIRED',userMessage);
+  }
+  for(const [windowMinutes,maxAttempts] of [[1,1],[15,2],[120,3]]) {
+    const result=await f.dispatch({name:'update_call_retry_policy',input:{...input,windowMinutes,maxAttempts},state,userMessage:`택시가 무응답이면, ${windowMinutes}분 안에 최대${maxAttempts}회 재시도해줘`});
+    assert.equal(result.data.retryPolicy.windowMinutes,windowMinutes);assert.equal(result.data.retryPolicy.maxAttempts,maxAttempts);
+  }
+  assert.equal(f.calls(),0);
+});
+
+test('AI거절·본인확인 인계에서 같은 설명을 연속 중복하지 않는다',async()=>{
+  for(const reason of ['ai_declined','identity_required']) {
+    const f=fixture(reason),result=await contact(f,createDemoCase()),handoff=getCallRecoveryHandoffs(result.state)[0];
+    const gate=getCallAttemptGate(result.state,'mainland',result.state.callRecovery.targets.mainland.checkedAt);
+    assert.equal(handoff.detail.split(gate.detail).length-1,1);
+    assert.equal(handoff.detail.split('문의 이력은 합성 시연이며 실제 발신이 아닙니다.').length-1,1);
+    assert.equal(handoff.reason,reason);assert.equal(handoff.stopAutomatic,true);assert.equal(handoff.attempts.length,1);
+  }
+});

@@ -130,6 +130,21 @@ function authorizationTargets(state, clause) {
   for(const [target,name] of Object.entries(names)) if(typeof name==='string'&&name.trim()) labels[target].push(regexText(name.replace(/\s*\(가상\)/g,'').trim()));
   return Object.entries(labels).filter(([,aliases])=>new RegExp(aliases.join('|')).test(clause)).map(([target])=>target);
 }
+// 소수·천 단위 구분의 점/쉼표를 절 구분자로 잘라 숫자의 일부가 새 값이 되지 않게 한다.
+function splitAuthorizationClauses(value,separators) {
+  const parts=[];let start=0;
+  for(let index=0;index<value.length;index++) {
+    if(!separators.includes(value[index])) continue;
+    if(value[index]==='.'||value[index]===',') {
+      let left=index-1,right=index+1;
+      while(left>=0&&/\s/.test(value[left])) left--;
+      while(right<value.length&&/\s/.test(value[right])) right++;
+      if(/\d/.test(value[left]??'')&&/\d/.test(value[right]??'')) continue;
+    }
+    parts.push(value.slice(start,index));start=index+1;
+  }
+  parts.push(value.slice(start));return parts;
+}
 /** 인용·태그는 허용 근거가 아니다. 다른 대상이나 다른 문장의 숫자/명령을 합치지 않는다. */
 function authorizationClauses(message,state) {
   if(typeof message!=='string') return [];
@@ -137,9 +152,9 @@ function authorizationClauses(message,state) {
   const clauses=[];
   for(const line of plain.split(/[\r\n]+/)) {
     if(quotedOrTagged.test(line)) continue;
-    for(const sentence of line.split(/[.!?;]+/)) {
+    for(const sentence of splitAuthorizationClauses(line,'.!?;')) {
       let conditionalTarget=[];
-      for(const part of sentence.split(/[,]+/)) {
+      for(const part of splitAuthorizationClauses(sentence,',')) {
         const clause=part.trim();if(!clause)continue;
         const named=authorizationTargets(state,clause),targets=named.length?named:conditionalTarget;
         clauses.push({clause,targets});
@@ -168,12 +183,19 @@ function recipientScopeMatches(state,target) {
   const previous=state.callRecovery?.targets[target]?.recipientId;
   return previous===null||previous===undefined||previous===callRecipientId(state,target);
 }
+// 전체 숫자 토큰만 캡처한다. 부호·소수·구분자·시간/지수 표기의 일부를 양수로 읽지 않는다.
+const POLICY_INTEGER = String.raw`(?<![\p{N}A-Za-z_.,:/+−\p{Pd}])((?:[+−-]\s*)?\d+)(?![\p{N}A-Za-z_.,:/+−\p{Pd}])`;
+const RETRY_RANGE = String.raw`${POLICY_INTEGER}\s*분\s*(?:안(?:에)?|이내(?:에)?)\s*(?:최초\s*(?:시도\s*)?포함\s*)?(?:최대|총)\s*${POLICY_INTEGER}\s*(?:회|번)`;
+function policyInteger(value,max) {
+  if(!/^[1-9]\d*$/.test(value)) return null;
+  const parsed=Number(value);
+  return Number.isSafeInteger(parsed)&&parsed<=max?parsed:null;
+}
 function explicitRetryPolicy(message,input,state) {
-  const expression=new RegExp(String.raw`(\d{1,3})\s*분\s*(?:안(?:에)?|이내(?:에)?)\s*(?:최초\s*(?:시도\s*)?포함\s*)?(?:최대|총)\s*(\d)\s*(?:회|번)(?:까지|만|로만|로)?\s*${RETRY_ACTION}${REQUEST_ENDING}`,'g');
+  const expression=new RegExp(String.raw`${RETRY_RANGE}(?:까지|만|로만|로)?\s*${RETRY_ACTION}${REQUEST_ENDING}`,'gu');
   return targetAuthorization(message,state,input.target,'retry',clause=>{
-    const policies=[...clause.matchAll(expression)];
-    const ranges=[...clause.matchAll(/(\d{1,3})\s*분\s*(?:안(?:에)?|이내(?:에)?)\s*(?:최초\s*(?:시도\s*)?포함\s*)?(?:최대|총)\s*(\d)\s*(?:회|번)/g)];
-    return policies.length===1&&ranges.length>0&&ranges.every(match=>Number(match[1])===input.windowMinutes&&Number(match[2])===input.maxAttempts);
+    const policies=[...clause.matchAll(expression)],ranges=[...clause.matchAll(new RegExp(RETRY_RANGE,'gu'))];
+    return policies.length===1&&ranges.length>0&&ranges.every(match=>!/(?:[\p{N}A-Za-z_.,:/+−\p{Pd}]|마이너스|음수)\s*$/u.test(clause.slice(0,match.index))&&policyInteger(match[1],120)===input.windowMinutes&&policyInteger(match[2],3)===input.maxAttempts);
   });
 }
 function alternativeDatesPermitted(message,target,state) {
