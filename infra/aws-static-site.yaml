@@ -7,7 +7,9 @@
       "https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-resource-iam-oidcprovider.html",
       "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-s3.html",
       "https://docs.github.com/en/actions/how-tos/secure-your-work/security-harden-deployments/oidc-in-aws",
-      "https://github.com/aws-actions/configure-aws-credentials#oidc-configuration"
+      "https://github.com/aws-actions/configure-aws-credentials#oidc-configuration",
+      "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-lambda.html",
+      "https://docs.aws.amazon.com/lambda/latest/dg/urls-auth.html"
     ],
     "Verification": "Official source bodies read through insane-search. Immutable subject behavior confirmed with authenticated repository customization/sub API on 2026-10-31. Account validation and actual deployment remain separate root operations.",
     "AWSToolsMetrics": {
@@ -49,6 +51,18 @@
       "Default": "",
       "AllowedPattern": "^$|repo:([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+|[A-Za-z0-9_.-]+@[1-9][0-9]*/[A-Za-z0-9_.-]+@[1-9][0-9]*):environment:production",
       "Description": "Exact production subject from repository OIDC settings; empty preserves legacy name-only template behavior"
+    },
+    "AgentOriginDomainName": {
+      "Type": "String",
+      "Default": "",
+      "AllowedPattern": "^$|[a-z0-9]+[.]lambda-url[.][a-z0-9-]+[.]on[.]aws",
+      "Description": "Optional AWS_IAM Lambda Function URL hostname, without scheme or path"
+    },
+    "AgentFunctionArn": {
+      "Type": "String",
+      "Default": "",
+      "AllowedPattern": "^$|arn:[a-z0-9-]+:lambda:[a-z0-9-]+:[0-9]{12}:function:[A-Za-z0-9-_]+",
+      "Description": "Exact function ARN for optional code-only GitHub deployment; never grants infrastructure changes"
     }
   },
   "Conditions": {
@@ -68,6 +82,34 @@
               "Ref": "GitHubOidcSubject"
             },
             ""
+          ]
+        }
+      ]
+    },
+    "HasAgentApi": {
+      "Fn::And": [
+        {
+          "Fn::Not": [
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AgentOriginDomainName"
+                },
+                ""
+              ]
+            }
+          ]
+        },
+        {
+          "Fn::Not": [
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AgentFunctionArn"
+                },
+                ""
+              ]
+            }
           ]
         }
       ]
@@ -253,6 +295,32 @@
               "S3OriginConfig": {
                 "OriginAccessIdentity": ""
               }
+            },
+            {
+              "Fn::If": [
+                "HasAgentApi",
+                {
+                  "Id": "PrivateAgentLambda",
+                  "DomainName": {
+                    "Ref": "AgentOriginDomainName"
+                  },
+                  "OriginAccessControlId": {
+                    "Ref": "AgentOriginAccessControl"
+                  },
+                  "CustomOriginConfig": {
+                    "HTTPSPort": 443,
+                    "OriginProtocolPolicy": "https-only",
+                    "OriginSSLProtocols": [
+                      "TLSv1.2"
+                    ],
+                    "OriginReadTimeout": 60,
+                    "OriginKeepaliveTimeout": 5
+                  }
+                },
+                {
+                  "Ref": "AWS::NoValue"
+                }
+              ]
             }
           ],
           "DefaultCacheBehavior": {
@@ -277,6 +345,44 @@
           },
           "ViewerCertificate": {
             "CloudFrontDefaultCertificate": true
+          },
+          "CacheBehaviors": {
+            "Fn::If": [
+              "HasAgentApi",
+              [
+                {
+                  "PathPattern": "/api/agent*",
+                  "TargetOriginId": "PrivateAgentLambda",
+                  "ViewerProtocolPolicy": "https-only",
+                  "AllowedMethods": [
+                    "GET",
+                    "HEAD",
+                    "OPTIONS",
+                    "PUT",
+                    "PATCH",
+                    "POST",
+                    "DELETE"
+                  ],
+                  "CachedMethods": [
+                    "GET",
+                    "HEAD"
+                  ],
+                  "Compress": true,
+                  "CachePolicyId": {
+                    "Ref": "AgentCachePolicy"
+                  },
+                  "OriginRequestPolicyId": {
+                    "Ref": "AgentOriginRequestPolicy"
+                  },
+                  "ResponseHeadersPolicyId": {
+                    "Ref": "SiteResponseHeaders"
+                  }
+                }
+              ],
+              {
+                "Ref": "AWS::NoValue"
+              }
+            ]
           }
         },
         "Tags": [
@@ -297,8 +403,9 @@
           "why": "Managed HTTPS URL for a serverless synthetic preview",
           "must": [
             "Private S3 origin with OAC",
-            "Redirect viewer HTTP to HTTPS",
-            "Read-only viewer methods"
+            "Redirect static viewer HTTP to HTTPS",
+            "Static behavior stays read only; optional agent path is uncached HTTPS Lambda OAC",
+            "Only handler-supported POST/GET/OPTIONS requests are accepted by the agent"
           ],
           "mutable": "change-with-constraints"
         }
@@ -511,6 +618,144 @@
             "Exact discovered or explicitly supplied repository production subject and sts audience; no wildcard; do not disable immutable IDs",
             "Dedicated bucket and distribution resources only",
             "No IAM or infrastructure mutation permissions"
+          ],
+          "mutable": "change-with-constraints"
+        }
+      }
+    },
+    "AgentOriginAccessControl": {
+      "Type": "AWS::CloudFront::OriginAccessControl",
+      "Condition": "HasAgentApi",
+      "Properties": {
+        "OriginAccessControlConfig": {
+          "Name": {
+            "Fn::Sub": "${AWS::StackName}-agent-oac"
+          },
+          "Description": "SigV4 requests to the private agent Lambda URL",
+          "OriginAccessControlOriginType": "lambda",
+          "SigningBehavior": "always",
+          "SigningProtocol": "sigv4"
+        }
+      },
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Authenticate only the agent origin without making its URL public",
+          "must": [
+            "Lambda URL must remain AWS_IAM",
+            "Always sign requests with SigV4"
+          ],
+          "mutable": "change-with-constraints"
+        }
+      }
+    },
+    "AgentCachePolicy": {
+      "Type": "AWS::CloudFront::CachePolicy",
+      "Condition": "HasAgentApi",
+      "Properties": {
+        "CachePolicyConfig": {
+          "Name": {
+            "Fn::Sub": "${AWS::StackName}-agent-uncached"
+          },
+          "Comment": "Never cache conversation or capability responses",
+          "DefaultTTL": 0,
+          "MinTTL": 0,
+          "MaxTTL": 0,
+          "ParametersInCacheKeyAndForwardedToOrigin": {
+            "EnableAcceptEncodingBrotli": false,
+            "EnableAcceptEncodingGzip": false,
+            "CookiesConfig": {
+              "CookieBehavior": "none"
+            },
+            "HeadersConfig": {
+              "HeaderBehavior": "none"
+            },
+            "QueryStringsConfig": {
+              "QueryStringBehavior": "none"
+            }
+          }
+        }
+      },
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Keep all agent responses out of shared edge caches",
+          "must": [
+            "All TTL values must be zero",
+            "No cookies or dialogue in cache keys"
+          ],
+          "mutable": "change-with-constraints"
+        }
+      }
+    },
+    "AgentOriginRequestPolicy": {
+      "Type": "AWS::CloudFront::OriginRequestPolicy",
+      "Condition": "HasAgentApi",
+      "Properties": {
+        "OriginRequestPolicyConfig": {
+          "Name": {
+            "Fn::Sub": "${AWS::StackName}-agent-request"
+          },
+          "Comment": "Forward JSON media type and client body hash for Lambda OAC; keep viewer Host private",
+          "CookiesConfig": {
+            "CookieBehavior": "none"
+          },
+          "HeadersConfig": {
+            "HeaderBehavior": "whitelist",
+            "Headers": [
+              "Content-Type",
+              "X-Amz-Content-Sha256"
+            ]
+          },
+          "QueryStringsConfig": {
+            "QueryStringBehavior": "none"
+          }
+        }
+      },
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Preserve the POST body hash required by Lambda OAC without forwarding viewer Host",
+          "must": [
+            "x-amz-content-sha256 forwarded for POST",
+            "No viewer Host, credentials or cookies forwarded"
+          ],
+          "mutable": "change-with-constraints"
+        }
+      }
+    },
+    "AgentCodeDeployPolicy": {
+      "Type": "AWS::IAM::Policy",
+      "Condition": "HasAgentApi",
+      "Properties": {
+        "PolicyName": "PublishOnlyThisAgentCode",
+        "Roles": [
+          {
+            "Ref": "DeployRole"
+          }
+        ],
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "InspectAndUpdateOnlyAgentCode",
+              "Effect": "Allow",
+              "Action": [
+                "lambda:GetFunctionConfiguration",
+                "lambda:ListTags",
+                "lambda:UpdateFunctionCode"
+              ],
+              "Resource": {
+                "Ref": "AgentFunctionArn"
+              }
+            }
+          ]
+        }
+      },
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Allow the existing exact production OIDC role to publish a validated backend ZIP",
+          "must": [
+            "Exact one-function ARN only",
+            "No invocation, IAM, configuration or infrastructure changes",
+            "Preserve existing immutable repository trust and OIDC provider ownership"
           ],
           "mutable": "change-with-constraints"
         }

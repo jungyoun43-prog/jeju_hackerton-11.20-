@@ -49,6 +49,8 @@ jobs:
       AWS_SITE_BUCKET: ${{ vars.AWS_SITE_BUCKET }}
       AWS_DISTRIBUTION_ID: ${{ vars.AWS_DISTRIBUTION_ID }}
       AWS_SITE_URL: ${{ vars.AWS_SITE_URL }}
+      AWS_AGENT_DEPLOY_ENABLED: ${{ vars.AWS_AGENT_DEPLOY_ENABLED }}
+      AWS_AGENT_FUNCTION_NAME: ${{ vars.AWS_AGENT_FUNCTION_NAME }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -63,6 +65,7 @@ jobs:
           node --input-type=module <<'JS'
           const required = ['AWS_REGION','AWS_SITE_BUCKET','AWS_DISTRIBUTION_ID','AWS_SITE_URL','AWS_DEPLOY_ROLE_ARN'];
           for (const key of required) if (!process.env[key]) throw new Error(`배포 변수 ${key}가 비어 있습니다.`);
+          if (process.env.AWS_AGENT_DEPLOY_ENABLED === 'true' && !process.env.AWS_AGENT_FUNCTION_NAME) throw new Error('AWS_AGENT_FUNCTION_NAME이 필요합니다.');
           const url = new URL(process.env.AWS_SITE_URL);
           if (url.protocol !== 'https:' || url.username || url.password) throw new Error('배포 주소는 공개 HTTPS URL이어야 합니다.');
           JS
@@ -89,6 +92,12 @@ jobs:
         with:
           name: jeju-static-${{ github.sha }}
           path: dist/
+      - name: Download the exact validated backend only when explicitly enabled
+        if: steps.latest.outputs.current == 'true' && env.AWS_AGENT_DEPLOY_ENABLED == 'true'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: jeju-agent-${{ github.sha }}
+          path: output/
       # https://api.github.com/repos/aws-actions/configure-aws-credentials/git/ref/tags/v6.3.0
       - name: Assume the production role with OIDC
         if: steps.latest.outputs.current == 'true'
@@ -98,6 +107,9 @@ jobs:
           role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
           role-session-name: jeju-${{ github.run_id }}
           mask-aws-account-id: true
+      - name: Publish the isolated backend ZIP directly to Lambda
+        if: steps.latest.outputs.current == 'true' && env.AWS_AGENT_DEPLOY_ENABLED == 'true'
+        run: node scripts/aws-agent-publish.mjs --apply
       - name: Publish only the static artifact
         if: steps.latest.outputs.current == 'true'
         run: node scripts/aws-publish.mjs --directory dist
@@ -133,6 +145,27 @@ jobs:
             } catch (error) {
               last = error;
               console.log(`배포 확인 대기 ${attempt + 1}/12: ${error.message}`);
+              if (attempt < 11) await new Promise(resolve => setTimeout(resolve, 5000));
+            }
+          }
+          if (last) throw last;
+          JS
+      - name: Verify backend code hash and public capabilities for the same revision
+        if: steps.latest.outputs.current == 'true' && env.AWS_AGENT_DEPLOY_ENABLED == 'true'
+        run: |
+          node --input-type=module <<'JS'
+          import { runAgentPublish } from './scripts/aws-agent-publish.mjs';
+          import { appendFile } from 'node:fs/promises';
+          let last;
+          for (let attempt = 0; attempt < 12; attempt++) {
+            try {
+              await runAgentPublish({args:['--verify']});
+              await appendFile(process.env.GITHUB_STEP_SUMMARY, `\n동일 커밋 Lambda ZIP의 hash와 공개 capabilities를 확인했습니다. 모델 API는 미연결이며 실제 전화·개인 진료기록 조회도 미연동입니다.\n`);
+              last = undefined;
+              break;
+            } catch (error) {
+              last = error;
+              console.log(`Agent 배포 확인 대기 ${attempt + 1}/12: ${error.message}`);
               if (attempt < 11) await new Promise(resolve => setTimeout(resolve, 5000));
             }
           }

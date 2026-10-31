@@ -35,12 +35,25 @@ jobs:
         run: npm run build
         env:
           APP_REVISION: ${{ github.sha }}
+      - name: Build the isolated Lambda ZIP
+        run: node scripts/build-agent.mjs
+        env:
+          APP_REVISION: ${{ github.sha }}
       # https://api.github.com/repos/actions/upload-artifact/git/ref/tags/v7.0.2
       - name: Keep the exact validated build
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: jeju-static-${{ github.sha }}
           path: dist/
+          if-no-files-found: error
+          retention-days: 7
+          include-hidden-files: false
+
+      - name: Keep the validated backend separate from public site files
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: jeju-agent-${{ github.sha }}
+          path: output/agent-lambda.zip
           if-no-files-found: error
           retention-days: 7
           include-hidden-files: false

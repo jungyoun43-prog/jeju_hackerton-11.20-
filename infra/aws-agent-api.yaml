@@ -1,0 +1,668 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Jeju Care Compass synthetic conversation API. Model invocation and persisted session state are disabled by default.",
+  "Metadata": {
+    "CheckedAt": "2026-10-31",
+    "AWSToolsMetrics": {
+      "AWSAgentToolkit": "aws-cloudformation@3"
+    },
+    "Sources": [
+      "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-lambda.html",
+      "https://docs.aws.amazon.com/lambda/latest/dg/urls-auth.html",
+      "https://docs.aws.amazon.com/bedrock/latest/userguide/inference-profiles-prereq.html",
+      "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/TTL.html"
+    ],
+    "com.aws.cloudformation.Context": {
+      "why": "Add an optional backend to the existing private static demo",
+      "must": [
+        "No real patient records or calls",
+        "Default disabled LLM is explicit, not simulated as a live model",
+        "Only root applies AWS changes"
+      ],
+      "mutable": "change-with-constraints"
+    }
+  },
+  "Parameters": {
+    "ProjectName": {
+      "Type": "String",
+      "Default": "jeju-care-compass",
+      "AllowedPattern": "[a-z][a-z0-9-]{2,29}"
+    },
+    "DistributionId": {
+      "Type": "String",
+      "AllowedPattern": "[A-Z0-9]{8,32}",
+      "Description": "Existing CloudFront distribution, sole origin access principal scope"
+    },
+    "EnableModel": {
+      "Type": "String",
+      "Default": "false",
+      "AllowedValues": [
+        "false",
+        "true"
+      ],
+      "Description": "Enable only after model access and the chosen adapter have been verified"
+    },
+    "EnableSessionStore": {
+      "Type": "String",
+      "Default": "false",
+      "AllowedValues": [
+        "false",
+        "true"
+      ],
+      "Description": "Optional normalized synthetic session and daily budget store; no raw messages"
+    },
+    "BedrockModelId": {
+      "Type": "String",
+      "Default": "apac.amazon.nova-lite-v1:0",
+      "AllowedValues": [
+        "apac.amazon.nova-lite-v1:0",
+        "apac.amazon.nova-micro-v1:0",
+        "apac.amazon.nova-pro-v1:0"
+      ],
+      "Description": "Candidate APAC cross-region profile. Profile listing is not proof of invocation access."
+    },
+    "DemoDailyTurnLimit": {
+      "Type": "Number",
+      "Default": 80,
+      "MinValue": 1,
+      "MaxValue": 80
+    }
+  },
+  "Conditions": {
+    "ModelEnabled": {
+      "Fn::Equals": [
+        {
+          "Ref": "EnableModel"
+        },
+        "true"
+      ]
+    },
+    "SessionStoreEnabled": {
+      "Fn::Equals": [
+        {
+          "Ref": "EnableSessionStore"
+        },
+        "true"
+      ]
+    }
+  },
+  "Resources": {
+    "SessionTable": {
+      "Type": "AWS::DynamoDB::Table",
+      "Condition": "SessionStoreEnabled",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "BillingMode": "PAY_PER_REQUEST",
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "pk",
+            "AttributeType": "S"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "pk",
+            "KeyType": "HASH"
+          }
+        ],
+        "TimeToLiveSpecification": {
+          "AttributeName": "expiresAt",
+          "Enabled": true
+        },
+        "SSESpecification": {
+          "SSEEnabled": true
+        },
+        "Tags": [
+          {
+            "Key": "Application",
+            "Value": "jeju-care-compass"
+          },
+          {
+            "Key": "Project",
+            "Value": {
+              "Ref": "ProjectName"
+            }
+          },
+          {
+            "Key": "DataMode",
+            "Value": "synthetic"
+          }
+        ]
+      },
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Optionally retain only normalized synthetic preparation state and atomic daily usage counters",
+          "must": [
+            "pk is the only key; session# and budget# prefixes",
+            "expiresAt is epoch seconds TTL; application also checks expiry",
+            "Never persist messages, conversation, actual health records or auth values"
+          ],
+          "mutable": "change-with-constraints"
+        }
+      }
+    },
+    "AgentLogGroup": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "LogGroupName": {
+          "Fn::Sub": "/aws/lambda/${AWS::StackName}-api"
+        },
+        "RetentionInDays": 7,
+        "Tags": [
+          {
+            "Key": "Application",
+            "Value": "jeju-care-compass"
+          },
+          {
+            "Key": "Project",
+            "Value": {
+              "Ref": "ProjectName"
+            }
+          },
+          {
+            "Key": "DataMode",
+            "Value": "synthetic"
+          }
+        ]
+      },
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Short operational logging without dialogue or patient contents",
+          "must": [
+            "Seven day retention",
+            "No request/response bodies or sensitive fields logged"
+          ],
+          "mutable": "change-with-constraints"
+        }
+      }
+    },
+    "AgentExecutionRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "Description": "Agent role: dedicated logs, optional one-table state and optional exact APAC model profile",
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "WriteOnlyDedicatedLogs",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${AWS::StackName}-api:log-stream:*"
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Application",
+            "Value": "jeju-care-compass"
+          },
+          {
+            "Key": "Project",
+            "Value": {
+              "Ref": "ProjectName"
+            }
+          },
+          {
+            "Key": "DataMode",
+            "Value": "synthetic"
+          }
+        ]
+      },
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Keep the default disabled backend free of model and data permissions",
+          "must": [
+            "No managed broad policy",
+            "Optional permissions are separate conditional policies",
+            "No plaintext keys in function environment"
+          ],
+          "mutable": "change-with-constraints"
+        }
+      }
+    },
+    "AgentSessionPolicy": {
+      "Type": "AWS::IAM::Policy",
+      "Condition": "SessionStoreEnabled",
+      "Properties": {
+        "PolicyName": "AccessOnlySyntheticSessionTable",
+        "Roles": [
+          {
+            "Ref": "AgentExecutionRole"
+          }
+        ],
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": [
+                "dynamodb:GetItem",
+                "dynamodb:PutItem",
+                "dynamodb:UpdateItem",
+                "dynamodb:DeleteItem"
+              ],
+              "Resource": {
+                "Fn::GetAtt": [
+                  "SessionTable",
+                  "Arn"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Enable selected key-based operations only when synthetic persistence is requested",
+          "must": [
+            "One table ARN only",
+            "No Scan or exports",
+            "Never store raw dialogue"
+          ],
+          "mutable": "change-with-constraints"
+        }
+      }
+    },
+    "AgentModelPolicy": {
+      "Type": "AWS::IAM::Policy",
+      "Condition": "ModelEnabled",
+      "Properties": {
+        "PolicyName": "InvokeOnlySelectedApacNovaProfile",
+        "Roles": [
+          {
+            "Ref": "AgentExecutionRole"
+          }
+        ],
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": [
+                "bedrock:InvokeModel"
+              ],
+              "Resource": {
+                "Fn::Sub": "arn:${AWS::Partition}:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/${BedrockModelId}"
+              }
+            },
+            {
+              "Effect": "Allow",
+              "Action": [
+                "bedrock:InvokeModel"
+              ],
+              "Resource": [
+                {
+                  "Fn::Sub": [
+                    "arn:${AWS::Partition}:bedrock:ap-southeast-2::foundation-model/${FoundationModelId}",
+                    {
+                      "FoundationModelId": {
+                        "Fn::Select": [
+                          1,
+                          {
+                            "Fn::Split": [
+                              "apac.",
+                              {
+                                "Ref": "BedrockModelId"
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                },
+                {
+                  "Fn::Sub": [
+                    "arn:${AWS::Partition}:bedrock:ap-northeast-1::foundation-model/${FoundationModelId}",
+                    {
+                      "FoundationModelId": {
+                        "Fn::Select": [
+                          1,
+                          {
+                            "Fn::Split": [
+                              "apac.",
+                              {
+                                "Ref": "BedrockModelId"
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                },
+                {
+                  "Fn::Sub": [
+                    "arn:${AWS::Partition}:bedrock:ap-south-1::foundation-model/${FoundationModelId}",
+                    {
+                      "FoundationModelId": {
+                        "Fn::Select": [
+                          1,
+                          {
+                            "Fn::Split": [
+                              "apac.",
+                              {
+                                "Ref": "BedrockModelId"
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                },
+                {
+                  "Fn::Sub": [
+                    "arn:${AWS::Partition}:bedrock:ap-northeast-2::foundation-model/${FoundationModelId}",
+                    {
+                      "FoundationModelId": {
+                        "Fn::Select": [
+                          1,
+                          {
+                            "Fn::Split": [
+                              "apac.",
+                              {
+                                "Ref": "BedrockModelId"
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                },
+                {
+                  "Fn::Sub": [
+                    "arn:${AWS::Partition}:bedrock:ap-southeast-1::foundation-model/${FoundationModelId}",
+                    {
+                      "FoundationModelId": {
+                        "Fn::Select": [
+                          1,
+                          {
+                            "Fn::Split": [
+                              "apac.",
+                              {
+                                "Ref": "BedrockModelId"
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                },
+                {
+                  "Fn::Sub": [
+                    "arn:${AWS::Partition}:bedrock:ap-northeast-3::foundation-model/${FoundationModelId}",
+                    {
+                      "FoundationModelId": {
+                        "Fn::Select": [
+                          1,
+                          {
+                            "Fn::Split": [
+                              "apac.",
+                              {
+                                "Ref": "BedrockModelId"
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              ],
+              "Condition": {
+                "StringEquals": {
+                  "bedrock:InferenceProfileArn": {
+                    "Fn::Sub": "arn:${AWS::Partition}:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/${BedrockModelId}"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Prepare exact non-streaming Converse permissions for an explicitly enabled APAC profile",
+          "must": [
+            "Default disabled; no model invocation rights until enabled",
+            "Six verified APAC model destination regions, no wildcard model or region",
+            "Actual account probe failed Error 002 on 2026-10-31; do not claim enabled or usable"
+          ],
+          "mutable": "change-with-constraints"
+        }
+      }
+    },
+    "AgentFunction": {
+      "Type": "AWS::Lambda::Function",
+      "DependsOn": [
+        "AgentLogGroup"
+      ],
+      "Properties": {
+        "FunctionName": {
+          "Fn::Sub": "${AWS::StackName}-api"
+        },
+        "Description": "Synthetic guardian conversation API; actual healthcare and telephone adapters are not connected",
+        "Runtime": "nodejs22.x",
+        "Handler": "index.handler",
+        "Architectures": [
+          "arm64"
+        ],
+        "MemorySize": 512,
+        "Timeout": 60,
+        "ReservedConcurrentExecutions": 2,
+        "Role": {
+          "Fn::GetAtt": [
+            "AgentExecutionRole",
+            "Arn"
+          ]
+        },
+        "Environment": {
+          "Variables": {
+            "BEDROCK_MODEL_ID": {
+              "Fn::If": [
+                "ModelEnabled",
+                {
+                  "Ref": "BedrockModelId"
+                },
+                ""
+              ]
+            },
+            "BEDROCK_REGION": {
+              "Ref": "AWS::Region"
+            },
+            "SESSION_TABLE_NAME": {
+              "Fn::If": [
+                "SessionStoreEnabled",
+                {
+                  "Ref": "SessionTable"
+                },
+                ""
+              ]
+            },
+            "DEMO_DAILY_TURN_LIMIT": {
+              "Ref": "DemoDailyTurnLimit"
+            }
+          }
+        },
+        "Code": {
+          "ZipFile": "exports.handler = async () => ({statusCode:503, headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}, body:JSON.stringify({error:{code:'AGENT_NOT_DEPLOYED',message:'대화 API 코드를 아직 게시하지 않았습니다.'}})});"
+        },
+        "Tags": [
+          {
+            "Key": "Application",
+            "Value": "jeju-care-compass"
+          },
+          {
+            "Key": "Project",
+            "Value": {
+              "Ref": "ProjectName"
+            }
+          },
+          {
+            "Key": "DataMode",
+            "Value": "synthetic"
+          }
+        ]
+      },
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Host the bounded agent adapter without exposing a public Lambda origin",
+          "must": [
+            "Code placeholder stays 503 until validated ZIP is uploaded directly",
+            "One request deadline is bounded; reserved concurrency two",
+            "Model disabled and no DDB provisioned by default"
+          ],
+          "mutable": "change-with-constraints"
+        }
+      }
+    },
+    "AgentFunctionUrl": {
+      "Type": "AWS::Lambda::Url",
+      "Properties": {
+        "AuthType": "AWS_IAM",
+        "TargetFunctionArn": {
+          "Fn::GetAtt": [
+            "AgentFunction",
+            "Arn"
+          ]
+        },
+        "InvokeMode": "BUFFERED"
+      },
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Expose an origin only signed callers can invoke",
+          "must": [
+            "AWS_IAM required; never AuthType NONE",
+            "CloudFront OAC authenticates browser requests"
+          ],
+          "mutable": "change-with-constraints"
+        }
+      }
+    },
+    "AllowCloudFrontFunctionUrl": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "Action": "lambda:InvokeFunctionUrl",
+        "FunctionName": {
+          "Ref": "AgentFunction"
+        },
+        "Principal": "cloudfront.amazonaws.com",
+        "SourceArn": {
+          "Fn::Sub": "arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${DistributionId}"
+        },
+        "FunctionUrlAuthType": "AWS_IAM"
+      },
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Grant URL invocation only to the specified distribution",
+          "must": [
+            "Exact distribution SourceArn",
+            "Service principal only; never public principal"
+          ],
+          "mutable": "change-with-constraints"
+        }
+      }
+    },
+    "AllowCloudFrontInvoke": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Ref": "AgentFunction"
+        },
+        "Principal": "cloudfront.amazonaws.com",
+        "SourceArn": {
+          "Fn::Sub": "arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${DistributionId}"
+        },
+        "InvokedViaFunctionUrl": true
+      },
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Grant the second permission now required by Lambda Function URLs",
+          "must": [
+            "Exact distribution SourceArn",
+            "Invoke only through Function URL"
+          ],
+          "mutable": "change-with-constraints"
+        }
+      }
+    }
+  },
+  "Outputs": {
+    "AgentFunctionName": {
+      "Description": "Code-only deployment target",
+      "Value": {
+        "Ref": "AgentFunction"
+      }
+    },
+    "AgentFunctionArn": {
+      "Description": "Pass to the optional static stack AgentFunctionArn parameter",
+      "Value": {
+        "Fn::GetAtt": [
+          "AgentFunction",
+          "Arn"
+        ]
+      }
+    },
+    "AgentFunctionUrl": {
+      "Description": "IAM authenticated origin; unauthenticated direct access must return 403",
+      "Value": {
+        "Fn::GetAtt": [
+          "AgentFunctionUrl",
+          "FunctionUrl"
+        ]
+      }
+    },
+    "AgentOriginDomainName": {
+      "Description": "Pass to the optional static stack AgentOriginDomainName parameter",
+      "Value": {
+        "Fn::Select": [
+          2,
+          {
+            "Fn::Split": [
+              "/",
+              {
+                "Fn::GetAtt": [
+                  "AgentFunctionUrl",
+                  "FunctionUrl"
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "SessionTableName": {
+      "Condition": "SessionStoreEnabled",
+      "Description": "Optional private synthetic state and daily budget table",
+      "Value": {
+        "Ref": "SessionTable"
+      }
+    }
+  }
+}
