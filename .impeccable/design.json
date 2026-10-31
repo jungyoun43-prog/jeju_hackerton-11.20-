@@ -2,12 +2,12 @@
   "schemaVersion": 1,
   "name": "혼디 · 보호자 진료 준비",
   "mode": "operate",
-  "direction": "인물 없는 제주 배경 위 세 상태 요약·접힌 준비 내역·페이지 전체로 읽는 대화/답변·공통 텍스트/음성 입력·접힌 방문 상세와 선택적인 기록/전화/여정/넓게 읽기 창을 갖춘 보호자 작업 공간",
+  "direction": "인물 없는 제주 배경 위 네 작업칸(PC2×2·모바일전체1열)·○△×상태·문서전체스크롤·공통텍스트/음성입력·기존기록/전화/여정창을 갖춘 보호자 작업 공간",
   "seedReference": "seed:a25f97f1d883646c",
   "layoutAuthority": {
-    "contract": "docs/reading-flow-contract.md",
+    "contract": "docs/grid-flow-contract.md",
     "seed": "none (user-pinned)",
-    "scope": "사용자가 승인한 단일 페이지 읽기 흐름. 2×2·모바일 선택 창·본문 고정 높이·내부 세로 스크롤 지침을 대체한다. 기존 seedReference는 브랜드 이력으로 보존하며 새 브랜드 seed를 만들지 않음."
+    "scope": "사용자 정정: 2×2 유지·칸 내부 세로 스크롤만 제거. 단일 본문으로 그리드를 없앤 중간 변경을 바로잡는다. 브랜드 seed와 현재 의미 색을 유지한다."
   },
   "colors": {
     "background": "#F3F5F8",
@@ -94,7 +94,7 @@
     "음성은 인식 후 사용자가 확인·수정하고 보내며 실제 발신이 아님",
     "모바일 서랍의 포커스·Escape·복귀와 실제 작성 내용의 초기화 확인을 제공",
     "사용자 후속 요청에 따라 인물 사진·caption을 제거하고 바다·현무암 배경을 작업면에 은은하게 사용",
-    "PC·모바일 모두 자료 확인·병원 문의·이동/동행의 세 요약과 접힌 준비 내역·항상 보이는 답변을 단일 문서로 표시",
+    "PC2×2·모바일1열로 자료·병원·이동·답변 네 칸 전체 표시, 내용만큼 늘어나고 페이지 전체로 스크롤",
     "사용자가 준비 내역·출처를 읽는 중 새 답변이 오면 새 답변 안내를 제공하고 진행 갱신만으로 펼침·읽기 위치·포커스를 바꾸지 않음",
     "이번 방문 상세는 공통입력/고지 아래 접힌 details이며 내부 흰 면은 정적 위치·얇은 경계·그림자 없음",
     "사용자 요약 버튼은 해당 준비 내역을 펼쳐 준비 절로 포커스·문서 스크롤을 옮기는 읽기 동작이며 모델·전화·예약을 실행하지 않음",
@@ -137,7 +137,7 @@
     "preparationSectionPadding": "20px",
     "mobilePreparationSectionPadding": "18px 16px",
     "paneBodyPadding": "16px 0 0",
-    "answerPadding": "20px 24px 26px",
+    "answerPadding": "20px 20px 26px",
     "mobileAnswerPadding": "18px 16px 22px",
     "promptMarginTopPx": 18,
     "mobilePromptMarginTopPx": 16,
@@ -171,15 +171,19 @@
     "compactReadingMaxWidthPx": 900,
     "smallDialogAndComposerMaxWidthPx": 600,
     "readingFlow": {
-      "columns": 1,
-      "display": "block",
+      "columns": 2,
+      "display": "grid",
       "height": "auto",
       "maxHeight": "none",
-      "overflowY": "visible"
+      "overflowY": "visible",
+      "mobileColumns": 1,
+      "gapPx": 16,
+      "mobileGapPx": 14,
+      "alignItems": "start"
     },
-    "desktopSummary": "세 항목의 얇은 가로 요약, min-height:52px, 항목 간격24px, 자연스러운 줄바꿈",
-    "compactSummary": "같은 세 항목 유지, 항목 안 기호/문장은 세로 배치, min-height:48px, 간격12px",
-    "preparationDetails": "native details; 기본 접힘; 펼치면 문서 높이 증가",
+    "desktopSummary": "네 항목의 얇은 가로 탐색, min-height52px, 항목 간격24px",
+    "compactSummary": "같은 네 항목 유지, 항목 안 기호/문장 세로 배치, min-height48px, 간격12px",
+    "preparationDetails": "전역 접힌 wrapper 없음. 칸별 처리기록 native details만 문서 높이로 펼침.",
     "workspacePaddingAt1150": "22px 24px 28px",
     "workspacePaddingAt1050": "20px 24px 28px",
     "workspacePaddingAt900": "16px 16px 24px",
@@ -202,9 +206,9 @@
       "caregiver-case-and-optional-preferences-rail",
       "compact-case-heading",
       "pending-only-observed-progress-activity",
-      "three-semantic-preparation-status-summaries",
-      "collapsed-native-preparation-details-for-records-hospitals-and-support",
-      "always-visible-plan-and-full-conversation-answer-in-document-flow",
+      "four-semantic-status-reading-anchors",
+      "four-direct-stage-children-visible-in-two-by-two-natural-height-grid",
+      "plan-answer-in-fourth-cell-with-document-scroll-and-no-inner-y-scroll",
       "care-journey-current-and-next-action-hidden-before-first-response",
       "actual-observed-progress-separate-from-last-confirmed-case-facts",
       "confirmed-event-dom-preserved-with-separate-observed-progress-list",
@@ -219,7 +223,7 @@
       "conditional-call-failure-handoffs-and-collapsed-four-recovery-examples"
     ],
     "mobile": [
-      "same-three-status-summaries-and-collapsed-preparation-details",
+      "same-four-stage-cells-visible-in-one-column",
       "full-conversation-and-answer-readable-through-document-scroll",
       "manual-reading-preserved-with-new-answer-notice",
       "optional-preferences-drawer-and-single-common-composer",
@@ -261,19 +265,19 @@
   "evidence": {
     "checkedOn": "2026-10-31",
     "sources": [
-      "docs/reading-flow-contract.md",
+      "docs/grid-flow-contract.md",
       "app/conversation.css",
       "app/conversation.js",
       "app/preparation-board-view.js",
       "app/preparation-stages.js"
     ],
-    "captures": "/tmp/hondi-reading-ui/: initial/details/long/large/last at six viewports, preview and expanded desktop/mobile captures",
-    "geometryRecord": "/tmp/hondi-reading-ui/long-results.json",
-    "observations": "6개 화면 크기의 핵심 본문 overflow-y visible·height auto·max-height none, 내역 펼침 뒤 문서 높이 증가, 긴 답변 양 끝·입력·전송·고지 도달, 문서 가로 넘침 없음. keyless preview에 긴 답변 fixture와 CSS200% 글자 확대를 적용한 기록과 캡처 대조.",
-    "previousCaptures": ".impeccable/review/board/: 이전 배치의 보관 이력",
-    "limits": "이 문서 작업은 소스·캡처·기하 기록 대조. context CLI 기존 오류126을 직접 문맥 읽기로 보완했으며 자동 디자인 통과가 아님. 최종 root 통합 QA·새 버전 공개 실모델·DynamoDB 진행·배포·실제 브라우저 확대·실기기 키보드/마이크·전화·공단 연계를 검증하지 않음.",
-    "uiSourceRevision": "de4bd86",
-    "progressDomSource": "app/preparation-board-view.js의 확정/진행 목록 분리와 WeakMap 문자열 guard를 소스로 대조. 최종 root 브라우저 QA 결과와 구분."
+    "captures": ".impeccable/review/grid/board/: latest integrated six viewport grid captures",
+    "geometryRecord": "orchestration/runs/preparation-board-browser.json",
+    "observations": "동일 sourceHash의 최종 proof에서 PC2×2·모바일1열4칸의 실제 좌표, height auto/max-height none/overflow visible, 긴 답변·200% 글자·출처 focus를 확인한다.",
+    "previousCaptures": ".impeccable/review/reading/ 및 .impeccable/review/board/: 이전 배치 보관 이력",
+    "limits": "기존 context CLI126/manual context를 유지. 현재판 검증은 최종 fresh sourceHash와 proof 확인 후 확정. 실모델·DynamoDB는 검증 revision별로 구분하며 실전화·개인기록·실마이크/센터 실기기/의료법률은 미검증.",
+    "progressDomSource": "app/preparation-board-view.js의 확정/진행 목록 분리와 WeakMap 문자열 guard를 소스로 대조. 최종 root 브라우저 QA 결과와 구분.",
+    "uiSourceRevision": "57e9732"
   },
   "references": {
     "observedOn": "2026-10-31",
