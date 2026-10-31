@@ -492,6 +492,26 @@
         "scripts/package.mjs",
         "tests/package.test.mjs"
       ]
+    },
+    {
+      "id": "reading-ui",
+      "branch": "design/reading-ui",
+      "baseCommit": "c96cf90c7f423784513e173c93ed3e218784900c",
+      "allow": [
+        "app/conversation.js",
+        "app/conversation.css",
+        "app/preparation-board-view.js"
+      ]
+    },
+    {
+      "id": "reading-qa",
+      "branch": "test/reading-flow",
+      "baseCommit": "c96cf90c7f423784513e173c93ed3e218784900c",
+      "allow": [
+        "scripts/conversation-browser-check.mjs",
+        "scripts/journey-browser-check.mjs",
+        "scripts/preparation-board-browser-check.mjs"
+      ]
     }
   ],
   "rules": [

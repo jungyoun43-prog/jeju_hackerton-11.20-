@@ -351,6 +351,18 @@
         "d6c510b",
         "9fc80a2"
       ]
+    },
+    "reading-ui": {
+      "phase": "implementing",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-reading-ui",
+      "integrationCommits": [],
+      "note": "사용자지정: 2×2폐기·세부창내부세로스크롤제거·○△×/색/텍스트로핵심요약. docs/reading-flow-contract.md 기준"
+    },
+    "reading-qa": {
+      "phase": "implementing",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-reading-qa",
+      "integrationCommits": [],
+      "note": "사용자지정: 2×2폐기·세부창내부세로스크롤제거·○△×/색/텍스트로핵심요약. docs/reading-flow-contract.md 기준"
     }
   },
   "review": {
