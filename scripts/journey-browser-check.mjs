@@ -136,6 +136,11 @@ async function clickWithConfirm(page,locator,accept) {
   return dialogs;
 }
 
+async function readPlan(page) {
+  const navigation=page.locator('#stage-navigation');
+  if(await navigation.isVisible())await navigation.locator('[data-open-stage="plan"]').click();
+}
+
 async function runPreview(page,button,id,posts,prefix) {
   const [preview]=await Promise.all([
     page.waitForResponse(response=>new URL(response.url()).pathname==='/api/agent/preview' && response.request().method()==='POST'),
@@ -148,6 +153,9 @@ async function runPreview(page,button,id,posts,prefix) {
   const actual=preview.status()===200 && data.isPreview===true && data.capabilities?.llm===false && body.scenarioId===id && request.headers()['x-amz-content-sha256']===hash && posts.length===1 && posts[0].path==='/api/agent/preview';
   record(`${prefix} 실제 keyless preview API·정확한 scenarioId·요청 해시`,actual,`HTTP ${preview.status()} · 응답 fixture 없음`);
   if(!actual)throw new Error('실제 preview 응답 계약이 맞지 않습니다.');
+  await readPlan(page);
+  const answer=page.locator('[data-stage-id="plan"] #conversation-scroll .message.assistant:not(.greeting)').last();
+  record(`${prefix} 미리보기 답변은 네 번째 작업창에서 읽음`,await answer.isVisible() && includes(await answer.innerText(),data.reply));
   const summary=await page.evaluate(async state=>(await import('/care-journey.js')).getCareJourneySummary(state),data.caseState);
   return {preview,data,summary};
 }

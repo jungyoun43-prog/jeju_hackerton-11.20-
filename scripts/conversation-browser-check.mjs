@@ -78,11 +78,22 @@ async function open(width,height,{configured=false,voice,storageSeed,onPost}={})
   await page.evaluate(()=>document.fonts.ready);
   return {page,context,requests,networkRequests};
 }
+async function readPlan(page) {
+  const navigation=page.locator('#stage-navigation');
+  if(await navigation.isVisible())await navigation.locator('[data-open-stage="plan"]').click();
+}
+async function openVisitSummary(page) {
+  for(const id of ['visit-summary','case-summary']) {
+    const details=page.locator(`#${id}`);
+    if(await details.evaluate(node=>node instanceof HTMLDetailsElement && !node.open))await details.locator(':scope>summary').click();
+  }
+}
 async function send(page,text) {
   await page.locator('#request-input').fill(text);
   const response=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/agent' && r.request().method()==='POST');
   const [result]=await Promise.all([response,page.locator('#send-request').click()]);
   await page.waitForFunction(()=>document.querySelector('#conversation-form').getAttribute('aria-busy')==='false');
+  await readPlan(page);
   await page.evaluate(()=>new Promise(done=>requestAnimationFrame(done)));
   return result;
 }
@@ -235,8 +246,8 @@ try {
       proof[label].noOverflow=await overflow(page);
       proof[label].screenshot=await screenshot(page,`initial-${label}`);
       record(`${width}px 가로 넘침과 첫 화면 입력`,proof[label].noOverflow && await visibleInViewport(page.locator('#request-input')) && await visibleInViewport(page.locator('#send-request')));
-      const mobileSummary=await page.locator('#mobile-case-summary').textContent();
-      record(`${width}px 병원·자료·택시·동행 읽기 요약`,await page.locator('[data-case-status]').count()===4 && (width>900 || ['병원','자료','택시','동행'].every(term=>mobileSummary.includes(term))));
+      const stageNames=await page.locator('#stage-navigation').textContent();
+      record(`${width}px 네 작업창과 병원·자료·이동·동행 읽기 요약`,await page.locator('#preparation-board [data-stage-id]').count()===4 && await page.locator('[data-case-status]').count()===4 && ['자료','병원','이동'].every(term=>stageNames.includes(term)));
       record(`${width}px 로고·자가 호스팅 한국어 폰트·제주 배경, 인물사진 비노출`,await page.locator('.brand img').first().evaluate(e=>e.complete && e.naturalWidth>0) && await backgroundLoaded(page) && await page.locator('.welcome-photo').count()===0 && await page.evaluate(()=>['Pretendard','MaruBuri'].every(name=>[...document.fonts].some(font=>font.family.replaceAll('"','')===name && font.status==='loaded'))));
       record(`${width}px 설정은 선택이며 준비 대화에 필수 수동 폼 없음`,await page.locator('#conversation-form select,#conversation-form input[type=checkbox]').count()===0 && await page.locator('#preferences-form [required]').count()===0 && await page.locator('#preferences-form select').count()===1);
       record(`${width}px 입력 가까이 실제 연락·예약 한계 표시`,await disclosure(page));
@@ -274,9 +285,10 @@ try {
       await page.locator('#preview-button').click();
       const preview=await previewResponse,payload=await preview.json();
       await page.waitForFunction(()=>document.querySelectorAll('.tool-record').length===15);
+      await readPlan(page);
       const previewOk=preview.status()===200 && payload.isPreview===true && payload.events.length===15;
       proof.fixedPreview ||= previewOk;
-      record(`${width}px 고정 미리보기 실제 도구 15건`,previewOk && await page.locator('.example-label').count()===2 && /고정 시나리오/.test(await page.locator('#mode-notice').textContent()));
+      record(`${width}px 고정 미리보기 실제 도구 15건`,previewOk && await page.locator('.example-label').count()===2 && /작성된 예시|고정.*미리보기/.test(await page.locator('#mode-notice').textContent()) && /LLM.*없음/.test(await page.locator('#mode-notice').textContent()));
       record(`${width}px 처리 기록은 기본 접힘·설정은 preview에 미적용`,await page.locator('.tool-records').evaluateAll(nodes=>nodes.length>0 && nodes.every(node=>!node.open)) && /적용하지/.test(await page.locator('#preferences-status').textContent()) && !Object.hasOwn(json(requests.at(-1)),'preferences'));
       record(`${width}px 실제 공개 기관·애월콜·공식 동행 경로`,payload.caseState.selectedHospital?.source.datasetId==='859' && payload.caseState.visitSupport.taxi.provider.name==='애월콜' && payload.caseState.visitSupport.taxi.provider.source.datasetId==='327' && payload.caseState.visitSupport.companion.provider.id==='areum-escort');
       record(`${width}px 공단 미연결·진찰 미수행·동행 불통 유지`,payload.events.some(e=>e.tool==='request_records' && e.status==='not_connected') && payload.pendingActions.some(a=>a.kind==='physician-exam') && payload.caseState.visitSupport.companion.status==='unreachable_demo');
@@ -284,11 +296,12 @@ try {
       record(`${width}px 실제 preview 결과가 환자자료 상태·출처·본문에 반영`,await recordsMatch(panel,payload.caseState) && await highwayDisconnected(panel));await closePatientRecords(page);
       await page.locator('.tool-records>summary').click();
       record(`${width}px 펼친 처리 기록 source 링크는 HTTPS`,await page.locator('.tool-source a').evaluateAll(links=>links.length>0 && links.every(a=>a.href.startsWith('https://') && a.target==='_blank' && a.rel.includes('noopener'))));
-      if(!await page.locator('#case-summary').evaluate(node=>node.open))await page.locator('#case-summary>summary').click();
+      await openVisitSummary(page);
       record(`${width}px 동행 재문의와 합성 병원 절차 표시`,(await page.locator('#case-content').innerText()).includes('동행 재문의') && /합성|시연/.test(await page.locator('[data-case-status="병원 문의"]').innerText()));
       const mapLink=page.locator('#case-content a[href^="https://www.google.com/maps/"]');
       record(`${width}px 실제 공개 주소 지도 링크`,await mapLink.count()===1 && new URL(await mapLink.getAttribute('href')).searchParams.get('query').includes(payload.caseState.selectedHospital.address));
       await screenshot(page,`preview-${label}`);
+      await readPlan(page);
       await page.locator('#conversation-scroll').evaluate(e=>e.scrollTop=e.scrollHeight);await screenshot(page,`tools-${label}`);
       const downloadPromise=page.waitForEvent('download');await page.locator('#save-report').click();
       const download=await downloadPromise,report=await readFile(await download.path(),'utf8');
@@ -309,7 +322,7 @@ try {
       const actual=await response,payload=await actual.json();
       await page.waitForFunction(()=>document.querySelectorAll('.tool-record').length===15);
       record('연결 설정 fixture에서도 실제 preview 15건만 실행',actual.status()===200 && payload.isPreview===true && payload.capabilities.llm===false && payload.events.length===15 && requests.length===1 && new URL(requests[0].url()).pathname==='/api/agent/preview','GET 연결 설정만 fixture·preview는 실제 keyless API·모델 POST 없음');
-      record('고정 예시의 llm:false는 전역 연결 설정을 덮어쓰지 않음',await page.locator('#connection-state').textContent()==='대화 연결 설정됨' && /실제 응답은 요청을 보낼 때/.test(await page.locator('#connection-details').textContent()) && /고정.*미리보기/.test(await page.locator('#mode-notice').textContent()) && /LLM.*없음/.test(await page.locator('#mode-notice').textContent()));
+      record('고정 예시의 llm:false는 전역 연결 설정을 덮어쓰지 않음',await page.locator('#connection-state').textContent()==='대화 연결 설정됨' && /실제 응답은 요청을 보낼 때/.test(await page.locator('#connection-details').textContent()) && /작성된 예시|고정.*미리보기/.test(await page.locator('#mode-notice').textContent()) && /LLM.*없음/.test(await page.locator('#mode-notice').textContent()));
       panel=await openPatientRecords(page);
       record('일반 기록 연계 connected fixture는 특정 건강정보 고속도로 성공으로 표시하지 않음',highwayBefore && await highwayDisconnected(panel));await closePatientRecords(page);
     } finally {await context.close();}
@@ -328,6 +341,7 @@ try {
       return {body:fixtureResponse(request,state,count===1?markdown:'합성 준비 상태를 갱신했습니다.')};
     }});
     try {
+      await openVisitSummary(page);
       await page.locator('.connection-details>summary').click();
       record(`${width}px 모델 설정과 실제 접근 성공을 구분`,(await page.locator('#connection-details').innerText()).includes('실제 응답은 요청을 보낼 때') && await overflow(page),'capabilities/응답 fixture·실제 모델 API 호출 아님');
       const chosen={taxiProviderId:'taxi327-6',wheelchair:false,companionNeeded:false};
@@ -345,13 +359,14 @@ try {
       record(`${width}px 모델 HTML·javascript 링크는 실행하지 않음`,await answer.locator('img,script,iframe,a[href^="javascript:"]').count()===0 && await page.evaluate(()=>window.__qaXss===undefined));
       record(`${width}px 새 답변은 처음부터 읽고 도구 기록은 접어 둠`,await answer.locator('h3').evaluate(node=>{const a=node.getBoundingClientRect(),b=document.querySelector('#conversation-scroll').getBoundingClientRect();return a.top>=b.top && a.bottom<=b.bottom;}) && await page.locator('.tool-records').evaluateAll(nodes=>nodes.every(node=>!node.open)));
       const summary=getVisitSupportSummary(state);
-      if(!await page.locator('#case-summary').evaluate(node=>node.open))await page.locator('#case-summary>summary').click();
+      await openVisitSummary(page);
       record(`${width}px fixture caseState와 방문 요약의 실제 상태 일치`,(await page.locator('[data-case-status="택시 이동"]').innerText()).includes(summary.taxi.label) && (await page.locator('[data-case-status="택시 이동"]').innerText()).includes(summary.taxi.providerName) && (await page.locator('[data-case-status="병원 동행"]').innerText()).includes(summary.companion.label));
       const panel=await openPatientRecords(page);
       record(`${width}px 응답 fixture의 자료 갱신과 위험문자는 읽기 내용으로 표시`,await recordsMatch(panel,state) && await panel.locator('[data-record-source] b,[data-record-content] img,[data-record-content] script,[data-record-content] iframe').count()===0 && await page.evaluate(()=>window.__qaRecordXss===undefined));await closePatientRecords(page);
       await screenshot(page,`configured-${width}`);
       await send(page,'방문일은 11월 20일로 바꿔 주세요.');
       record(`${width}px 성공 뒤 applyPreferences false·대화 세션 유지`,json(requests[1]).applyPreferences===false && json(requests[1]).sessionId===fixtureSessionId && (await page.locator('#case-content').innerText()).includes('11월 20일') && (await page.locator('[data-case-status="택시 이동"]').innerText()).includes(getVisitSupportSummary(state).taxi.label));
+      record(`${width}px 다음 요청의 history는 성공한 이전 사용자·답변만 전달`,json(requests[1]).history.length===2 && json(requests[1]).history[0].role==='user' && json(requests[1]).history[0].text===first.message && json(requests[1]).history[1].role==='assistant' && markdown.startsWith(json(requests[1]).history[1].text) && json(requests[1]).history[1].text.length<=2000);
       await send(page,'실패 뒤 같은 요청을 확인합니다.');await page.locator('[data-retry]').waitFor();
       const failed=requests[2].postData();
       const changed={taxiProviderId:'taxi327-14',wheelchair:true,companionNeeded:true};
@@ -463,6 +478,7 @@ try {
     const {page,context,requests}=await open(width,500,{configured:true,onPost:request=>({body:fixtureResponse(request,createDemoCase(),reply)})});
     const controls=['#request-input','#send-request','#composer-disclosure','.privacy-note'];
     try {
+      await readPlan(page);
       const initial=await accessSet(page,controls),conversation=await page.locator('#conversation-scroll').evaluate(node=>({height:node.clientHeight,scrollable:/auto|scroll/.test(getComputedStyle(node).overflowY) || getComputedStyle(node).overflowY==='visible' && document.scrollingElement.scrollHeight>innerHeight}));
       record(`${width}x500 첫 화면은 아래 fold와 실제 clip을 구분해 입력·고지 접근`,await overflow(page) && Object.values(initial).every(value=>value.reachable) && conversation.height>=80 && conversation.scrollable,JSON.stringify(initial));
       const input=page.locator('#request-input'),multiline=Array.from({length:12},(_,index)=>`${index+1}번째 요청 내용: 진료 자료와 이동을 확인해 주세요.`).join('\n');
