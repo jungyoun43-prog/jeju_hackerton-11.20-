@@ -49,9 +49,14 @@ test('도구는 준비 역할로 분류하고 미등록·prototype 이름을 실
  assert.equal(getToolStage('analyze_public_data',{analysis:'travel_time'}),'support');
  assert.equal(getToolStage('analyze_public_data',{analysis:'facility_compare'}),'records');
  assert.equal(getToolStage('search_public_data',{purpose:'companion'}),'support');
+ assert.equal(getToolStage('update_call_retry_policy',{target:'mainland'}),'hospitals');
+ assert.equal(getToolStage('update_call_retry_policy',{target:'jeju'}),'hospitals');
+ assert.equal(getToolStage('update_call_retry_policy',{target:'taxi'}),'support');
  for(const name of ['constructor','__proto__','diagnose','arbitrary'])assert.equal(getToolStage(name),null);
  assert.equal(getToolStage('analyze_public_data',null),'records');
  assert.doesNotMatch(progressActivity({tool:'constructor',stage:'records'}),/function|Object|constructor/);
+ assert.match(progressActivity({tool:null,status:'failed',stage:'plan'}),/마치지 못/);
+ assert.doesNotMatch(progressActivity({tool:null,status:'failed',stage:'plan'}),/정리하고|확인하고/);
 });
 
 test('응답 전 관측된 도구 결과는 각 창에 표시하되 마지막 확인 사례의 사실을 덮지 않는다',()=>{

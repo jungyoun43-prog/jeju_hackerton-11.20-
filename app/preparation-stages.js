@@ -18,6 +18,7 @@ export function getToolStage(name,input={}) {
   input=input&&typeof input==='object'&&!Array.isArray(input)?input:{};
   if(name==='search_public_data')return ['taxi','companion','travel'].includes(input.purpose)?'support':'records';
   if(name==='analyze_public_data')return ['support_candidates','travel_time'].includes(input.analysis)?'support':'records';
+  if(name==='update_call_retry_policy')return ['mainland','jeju'].includes(input.target)?'hospitals':'support';
   if(name==='run_journey_demo')return ({missing_record:'records',jeju_unavailable:'hospitals',time_changed:'support'})[input.scenarioId]??'plan';
   if(name==='run_call_recovery_demo')return ['call_identity_required','call_documents_or_schedule'].includes(input.scenarioId)?'hospitals':'support';
   return Object.hasOwn(TOOL_STAGE,name)?TOOL_STAGE[name]:null;
@@ -32,7 +33,12 @@ const TOOL_LABELS=Object.freeze({
 });
 export function progressActivity(event) {
   const label=Object.hasOwn(TOOL_LABELS,event?.tool)?TOOL_LABELS[event.tool]:null;
-  if(!label)return event?.stage==='plan'?'혼디가 답변을 정리하고 있어요.':'혼디가 요청을 확인하고 있어요.';
+  if(!label){
+    if(event?.status==='failed')return '이번 요청을 마치지 못했어요. 응답을 확인해 주세요.';
+    if(event?.status==='needs_input')return '다음 준비에 필요한 확인이 있어요.';
+    if(event?.status==='completed')return '확인한 준비 결과를 받고 있어요.';
+    return event?.stage==='plan'?'혼디가 답변을 정리하고 있어요.':'혼디가 요청을 확인하고 있어요.';
+  }
   return `${label} · ${event.status==='started'?'확인 중':event.status==='failed'?'추가 확인 필요':event.status==='needs_input'?'확인할 내용 있음':'결과 도착'}`;
 }
 const ownKeys=(value,keys)=>value&&typeof value==='object'&&!Array.isArray(value)&&Object.keys(value).length===keys.length&&keys.every(key=>Object.hasOwn(value,key));
@@ -105,7 +111,7 @@ export function getPreparationBoard(state,{events=[],progress=null,pending=false
     const id=PREPARATION_STAGE_IDS.includes(event.stage)?event.stage:event.tool==='analyze_public_data'&&/이동|동행/.test(event.label)?'support':getToolStage(event.tool);
     if(id)stages.find(stage=>stage.id===id).events.push(safeEvent(event));
   }
-  for(const stage of stages){stage.events=stage.events.slice(-5);stage.gapCount=stage.gaps.length;stage.gaps=[...new Set(stage.gaps)].slice(0,3);}
+  for(const stage of stages){stage.events=stage.events.slice(-5);const gaps=[...new Set(stage.gaps)];stage.gapCount=gaps.length;stage.gaps=gaps.slice(0,3);}
   let activeStageId=responseCount?'plan':'records';
   const live=pending&&progress?.status==='running'&&PREPARATION_STAGE_IDS.includes(progress.currentStage);
   if(live)activeStageId=progress.currentStage;

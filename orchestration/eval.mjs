@@ -125,6 +125,17 @@ await check('journey-browser-evidence','verification',async()=>{
  for(const path of [proof.desktop.screenshot,proof.mobile.screenshot]) {const bytes=await readFile(resolve(root,path));requireThat(bytes.readUInt32BE(0)===0x89504e47,'유효한 여정 PNG 증거가 아닙니다.');}
  return `${proof.checks.length}개 실제 preview/여정 검사. 실제 의료진·전화·환자기록·효과 검증은 별도`;
 });
+await check('preparation-board-browser-evidence','verification',async()=>{
+ const proof=JSON.parse(await readFile(resolve(root,'orchestration/runs/preparation-board-browser.json'),'utf8'));
+ requireThat(proof.result==='pass' && proof.errors.length===0 && proof.checks.length>0 && proof.checks.every(item=>item.status==='pass'),'네 작업창 화면·진행 검사가 필요합니다.');
+ requireThat(proof.modelInvoked===false && proof.phoneInvoked===false && proof.healthRecordsQueried===false,'보드 fixture를 실제 모델/전화/기록 검증으로 표시하지 않습니다.');
+ requireThat(proof.sourceHash===await runtimeFingerprint(root) && proof.finalSourceHash===proof.sourceHash,'네 작업창 증거와 현재 실행 소스 지문이 다릅니다.');
+ requireThat(proof.apiLive===true && proof.apiProgress?.unregistered?.status===200 && proof.apiProgress.unregistered.available===false && proof.apiProgress?.invalid?.status===400,'실제 keyless 진행 조회의 미등록200·잘못된입력400 검사가 필요합니다.');
+ requireThat(proof.scope?.unmockedNormalPostAttempts===0 && proof.scope?.blockedPostAttempts===0,'보드 검증에서 실제 일반 모델 요청을 보내지 않습니다.');
+ requireThat(proof.viewports?.length>=6 && proof.viewports.every(view=>view.noOverflow) && proof.viewports.some(view=>view.width>=1280) && proof.viewports.some(view=>view.width===390&&view.height===500),'PC/모바일/짧은화면의 접근·넘침 검사가 필요합니다.');
+ for(const view of proof.viewports){const bytes=await readFile(resolve(root,view.screenshot));requireThat(bytes.readUInt32BE(0)===0x89504e47,'네 작업창 PNG 증거가 필요합니다.');}
+ return `${proof.checks.length}개 네 작업창·실제 keyless 진행 API·진행/취소 fixture 검사와6개viewport. 실제모델·DDB 진행은 별도공개증거.`;
+});
 await check('rollback-boundary','rollback',()=>{
  for(const task of rules.tasks) {
   const integrated=state.tasks[task.id].integrationCommits;
