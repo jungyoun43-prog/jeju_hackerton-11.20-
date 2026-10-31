@@ -109,6 +109,45 @@ test('읍면동 비교는 주소 미표기 행을 관할 추정이나 0개로 �
   assert.match(result.limitations.join(' '), /실제 시설 부재를 뜻하지/);
 });
 
+test('애월과 서귀포 혼합지역은 각 지역에 필요한 주소 해상도로 관측수·분모·미표기를 보존한다', () => {
+  const before = structuredClone(context);
+  const result = analyzePublicData({analysis: 'facility_compare', areas: ['애월', '서귀포']}, context);
+  assert.deepEqual(result.inputs.areas, ['제주시 애월읍', '서귀포시']);
+  assert.equal(result.metrics.length, 4);
+  assert.equal(result.rows.length, 4);
+  const aewol = result.rows.find(row => row.kind === 'companion' && row.area === '제주시 애월읍');
+  assert.equal(aewol.granularity, 'local');
+  assert.equal(aewol.observedCount, 0);
+  assert.equal(aewol.denominator, 7);
+  assert.equal(aewol.addressMissingRows, 0);
+  assert.equal(aewol.unlocatedRows, 12);
+  assert.match(aewol.addressBasis, /읍면동/);
+  const seogwipo = result.rows.find(row => row.kind === 'companion' && row.area === '서귀포시');
+  const expected = registry.providers.filter(row => row.source.datasetId === '254' && row.address.includes('서귀포시')).length;
+  assert.equal(seogwipo.granularity, 'city');
+  assert.equal(seogwipo.observedCount, expected);
+  assert.equal(seogwipo.observedCount, 9);
+  assert.equal(seogwipo.denominator, 19);
+  assert.equal(seogwipo.unlocatedRows, 0);
+  assert.equal(seogwipo.shareOfLocatedSnapshot, 47.37);
+  assert.match(seogwipo.addressBasis, /시/);
+  for (const row of result.rows) {
+    const metric = result.metrics.find(item => item.datasetId === row.datasetId && item.granularity === row.granularity);
+    assert.equal(row.denominator, metric.denominator);
+    assert.equal(row.unlocatedRows, metric.unlocatedRows);
+    assert.equal(row.asOf, metric.coverage.asOf);
+    assert.equal(metric.denominator + metric.unlocatedRows, metric.eligibleRows);
+  }
+  assert.match(result.limitations.join(' '), /행정수준.*시와 읍면동.*비율.*직접 비교할 수 없/);
+  assert.ok(result.preparationActions.length);
+  for (const action of result.preparationActions) assert.ok(getSupportCandidates(registry, {kind: action.kind, area: context.area, wheelchair: context.wheelchair}).some(row => row.id === action.tool.input.providerId));
+  const reversed = analyzePublicData({analysis: 'facility_compare', areas: ['서귀포', '애월']});
+  assert.equal(reversed.rows.find(row => row.kind === 'companion' && row.area === '서귀포시').observedCount, 9);
+  assert.equal(reversed.rows.find(row => row.kind === 'companion' && row.area === '제주시 애월읍').denominator, 7);
+  assert.deepEqual(context, before);
+  realFlagsFalse(result);
+});
+
 async function fixtureModule({hospitalData = hospitals, supportData = registry}) {
   // 공개 API에 테스트 전용 원자료/파일 인자를 추가하지 않고 동일 순수 계산에 합성 fixture를 연결한다.
   const source = await readFile(new URL('../app/public-data-skill.js', import.meta.url), 'utf8');
@@ -242,10 +281,11 @@ test('조회 CLI는 키·네트워크 없이 공개 API와 같은 계산을 재�
   const commands = [
     ['search', '--purpose', 'hospital', '--query', '병원', '--limit', '3'],
     ['analyze', '--analysis', 'facility_compare', '--areas', '제주시,서귀포시'],
+    ['analyze', '--analysis', 'facility_compare', '--areas', '애월,서귀포'],
     ['analyze', '--analysis', 'support_candidates', '--area', '제주시 애월읍', '--wheelchair', 'true'],
     ['analyze', '--analysis', 'travel_time', '--area', '제주시 애월읍'],
   ];
-  const expected = [searchPublicDataCatalog({purpose: 'hospital', query: '병원', limit: 3}), analyzePublicData({analysis: 'facility_compare', areas: ['제주시', '서귀포시']}), analyzePublicData({analysis: 'support_candidates', area: '제주시 애월읍', wheelchair: true}), analyzePublicData({analysis: 'travel_time', area: '제주시 애월읍'})];
+  const expected = [searchPublicDataCatalog({purpose: 'hospital', query: '병원', limit: 3}), analyzePublicData({analysis: 'facility_compare', areas: ['제주시', '서귀포시']}), analyzePublicData({analysis: 'facility_compare', areas: ['애월', '서귀포']}), analyzePublicData({analysis: 'support_candidates', area: '제주시 애월읍', wheelchair: true}), analyzePublicData({analysis: 'travel_time', area: '제주시 애월읍'})];
   for (let index = 0; index < commands.length; index++) {
     const {stdout} = await exec(process.execPath, ['scripts/public-data-query.mjs', ...commands[index]], {cwd: root, env: {PATH: process.env.PATH, OPENAI_API_KEY: '', HTTP_PROXY: 'http://127.0.0.1:1', HTTPS_PROXY: 'http://127.0.0.1:1'}});
     assert.deepEqual(JSON.parse(stdout), expected[index]);

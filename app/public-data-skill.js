@@ -154,7 +154,7 @@ function facilities(kind, granularity) {
   }
   const located = rows.filter(row => granularity === 'city' ? row.city : row.city && row.local);
   return {rows, located, metrics: {
-    datasetId: hospital ? 'hub:859' : 'hub:254', kind, kindLabel: hospital ? '의료기관 등록 표본' : '돌봄 등록 문의처',
+    datasetId: hospital ? 'hub:859' : 'hub:254', kind, kindLabel: hospital ? '의료기관 등록 표본' : '돌봄 등록 문의처', granularity,
     sourceRows: hospital ? hospitalSnapshot.totalPreviewRows : supportRegistry.datasets.find(record => record.id === '254').rowCount,
     loadedRows: input.length, eligibleRows: rows.length, duplicateRows,
     excludedClosedRows: (hospital ? hospitalSnapshot.excludedClosedRows || 0 : 0) + closedInLoadedRows,
@@ -214,25 +214,27 @@ export function analyzePublicData(input, context = {}) {
     ensure(Array.isArray(input.areas) && input.areas.length === 2, '비교할 제주 지역을 정확히 두 곳 지정해 주세요.');
     const areas = input.areas.map(value => areaOf(value));
     ensure(areas[0] !== areas[1], '서로 다른 두 지역을 지정해 주세요.');
-    const granularity = areas.some(area => area.includes(' ')) ? 'local' : 'city';
+    const granularities = [...new Set(areas.map(area => area.includes(' ') ? 'local' : 'city'))];
     const data = baseAnalysis(analysis, {areas}, '병원·돌봄 등록 주소의 관측 표본 비교', '의료와 돌봄을 별도 분모로 계산한 과거 공개 snapshot; 제주 전체 현황 아님');
     data.datasetRefs = ['hub:859', 'hub:254'].map(datasetRef);
     for (const kind of ['hospital', 'companion']) {
-      const snapshot = facilities(kind, granularity);
-      data.metrics.push(snapshot.metrics);
+      const snapshots = new Map(granularities.map(granularity => [granularity, facilities(kind, granularity)]));
+      data.metrics.push(...[...snapshots.values()].map(snapshot => snapshot.metrics));
       for (const area of areas) {
         const [city, local] = area.split(' ');
+        const granularity = local ? 'local' : 'city', snapshot = snapshots.get(granularity);
         const observed = snapshot.located.filter(row => row.city === city && (!local || row.local === local)).length;
         data.rows.push({
           area, kind, kindLabel: snapshot.metrics.kindLabel, datasetId: snapshot.metrics.datasetId, observedCount: snapshot.metrics.denominator ? observed : null,
-          denominator: snapshot.metrics.denominator, denominatorLabel: snapshot.metrics.denominatorLabel,
+          denominator: snapshot.metrics.denominator, denominatorLabel: snapshot.metrics.denominatorLabel, granularity, addressBasis: snapshot.metrics.addressBasis,
           shareOfLocatedSnapshot: snapshot.metrics.denominator ? Number((observed / snapshot.metrics.denominator * 100).toFixed(2)) : null,
-          shareUnit: 'percent', unlocatedRows: snapshot.metrics.unlocatedRows, asOf: snapshot.metrics.coverage.asOf,
+          shareUnit: 'percent', addressMissingRows: snapshot.metrics.addressMissingRows, unlocatedRows: snapshot.metrics.unlocatedRows, asOf: snapshot.metrics.coverage.asOf,
           coverageLabel: snapshot.metrics.coverage.label,
         });
       }
     }
-    data.limitations.push(`같은 이름·확인된 주소의 중복을 자료별로 제외합니다. 병원 공개 ${hospitalSnapshot.totalPreviewRows}행 표본 중 폐업 ${hospitalSnapshot.excludedClosedRows || 0}행은 정제 단계에서 제외되었고 현재 정제 ${hospitalSnapshot.records.length}행을 조회합니다.`, '비율의 분모는 각 snapshot에서 비교 수준의 주소를 확인한 행입니다. 의료·돌봄 분모를 합치지 않습니다.', '주소 미상·읍면동 미표기는 미관측이며 0개로 배정하지 않습니다. 관측 0행은 실제 시설 부재를 뜻하지 않습니다.', '관측 주소는 등록 위치이며 서비스 관할·현재 운영을 뜻하지 않습니다. 전체 밀도·인구당 수·지역 우열·임상 적합성을 추정할 수 없습니다.', '859의 공통 원자료 기준일은 없으며 행별 갱신범위·원자료 수집시점·snapshot 조회일을 구분합니다. 돌봄은 2020-04-17 기준의 과거 자료입니다.');
+    data.limitations.push(`같은 이름·확인된 주소의 중복을 자료별로 제외합니다. 병원 공개 ${hospitalSnapshot.totalPreviewRows}행 표본 중 폐업 ${hospitalSnapshot.excludedClosedRows || 0}행은 정제 단계에서 제외되었고 현재 정제 ${hospitalSnapshot.records.length}행을 조회합니다.`, '비율의 분모는 각 snapshot에서 해당 지역을 판별하는 데 필요한 시 또는 읍면동 주소를 확인한 행입니다. 의료·돌봄 분모를 합치지 않습니다.', '주소 미상·읍면동 미표기는 미관측이며 0개로 배정하지 않습니다. 관측 0행은 실제 시설 부재를 뜻하지 않습니다.', '관측 주소는 등록 위치이며 서비스 관할·현재 운영을 뜻하지 않습니다. 전체 밀도·인구당 수·지역 우열·임상 적합성을 추정할 수 없습니다.', '859의 공통 원자료 기준일은 없으며 행별 갱신범위·원자료 수집시점·snapshot 조회일을 구분합니다. 돌봄은 2020-04-17 기준의 과거 자료입니다.');
+    if (granularities.length > 1) data.limitations.push('비교 지역의 행정수준이 시와 읍면동으로 다릅니다. 각 행은 필요한 주소 해상도의 관측수·분모·미표기 행을 별도로 표시하므로 비율이나 지역 우열을 직접 비교할 수 없습니다.');
     if (areas.some((area, index) => area.startsWith(areas[1 - index] + ' '))) data.limitations.push('두 비교지역은 포함 관계로 겹칩니다. 행을 상호 배타적인 두 집단으로 해석하지 않습니다.');
     if (data.metrics.some(metric => metric.unlocatedRows)) data.missingData.push('주소 미상 또는 비교 수준의 행정지역이 주소에 없는 행은 지역에 배정하지 못했습니다.');
     data.preparationActions = preparationActions(ctx);
