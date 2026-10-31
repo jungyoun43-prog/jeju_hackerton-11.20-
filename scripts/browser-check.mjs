@@ -10,6 +10,7 @@ let chromium;
 try { ({chromium}=require(process.env.PLAYWRIGHT_MODULE || 'playwright')); }
 catch { throw new Error('브라우저 QA에는 선택 도구 Playwright가 필요합니다. README의 브라우저 검사 절차를 참고하세요. 일반 앱 실행에는 필요하지 않습니다.'); }
 const base=process.env.BASE_URL || 'http://127.0.0.1:4173';
+const workspace=new URL('/workspace.html',base).href;
 const shots='.impeccable/review';
 await mkdir(resolve(root,shots),{recursive:true});
 await mkdir(resolve(root,'orchestration/runs'),{recursive:true});
@@ -71,7 +72,7 @@ async function supportScenario(page, selectedName) {
 }
 try {
  const page=await browser.newPage({viewport:{width:1440,height:900},deviceScaleFactor:1});watch(page);
- await page.goto(base,{waitUntil:'networkidle'});
+ await page.goto(workspace,{waitUntil:'networkidle'});
  record('사례 제목과 다음 행동',((await page.locator('#service-role').textContent()).includes('김정희')) && await primaryInViewport(page));
  record('병원·자료·택시·동행 상태가 첫 화면에 표시',await page.locator('.readiness-item').count()===4 && await page.locator('.readiness-strip').evaluate(e=>e.getBoundingClientRect().bottom<=innerHeight));
  record('생성한 이미지 로고 로드',await page.locator('.brand img').evaluate(e=>e.complete && e.naturalWidth>0 && e.src.endsWith('/assets/jeju-mark-v1.png')));
@@ -144,7 +145,7 @@ try {
  await page.locator('.nav-item[data-nav=data]').click();
  record('리셋하면 공개 후보 13곳 복원',await page.locator('[data-select-hospital]').count()===13);
  const mobile=await browser.newPage({viewport:{width:390,height:844},deviceScaleFactor:1});watch(mobile);
- await mobile.goto(base,{waitUntil:'networkidle'});
+ await mobile.goto(workspace,{waitUntil:'networkidle'});
  const mobileTiles=await initialMap(mobile);proof.map.mobileLiveTiles=mobileTiles;
  proof.mobile.noOverflow=await overflow(mobile);record('모바일 가로 넘침 없음',proof.mobile.noOverflow);
  record('모바일 첫 화면 주 행동',await primaryInViewport(mobile));

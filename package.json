@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "description": "제주 진료 나침반 — 보호자를 위한 진료 연결 워크스페이스",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "node --env-file-if-exists=.env scripts/server.mjs",
     "start": "node --env-file-if-exists=.env scripts/server.mjs",
@@ -15,7 +17,15 @@
     "package": "node scripts/package.mjs",
     "observe": "node orchestration/observe.mjs",
     "eval": "node orchestration/eval.mjs",
-    "rollback": "node orchestration/rollback.mjs"
+    "rollback": "node orchestration/rollback.mjs",
+    "build:agent": "node scripts/build-agent.mjs",
+    "test:conversation": "node scripts/conversation-browser-check.mjs"
   },
-  "dependencies": { "leaflet": "1.9.4" }
+  "dependencies": {
+    "@aws-sdk/client-bedrock-runtime": "3.1161.0",
+    "leaflet": "1.9.4"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
 }

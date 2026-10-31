@@ -1,6 +1,6 @@
 {
   "baseCommit": "e1e7e44",
-  "updatedAt": "2026-10-31T12:01:49.234241+00:00",
+  "updatedAt": "2026-10-31T12:31:09.688586+00:00",
   "tasks": {
     "ui": {
       "phase": "verified",
@@ -84,32 +84,69 @@
       "note": "README·PRD v0.4·사용법·실제 공개 후보13개·데이터시점·폰트/로고 명세 동기화"
     },
     "visit-ui": {
-      "phase": "in_progress",
+      "phase": "verified",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-visit-ui",
-      "integrationCommits": [],
-      "note": "이번 방문·병원·자료·택시·동행 상태가 첫 화면에서 읽히도록 압축"
+      "integrationCommits": [
+        "f8b91a3"
+      ],
+      "note": "85개 단위·47개 브라우저 검사 통과. 수동 UI는 대화 첫 화면 전환 후 개발 검증용으로 보존"
     },
     "visit-workflow": {
-      "phase": "in_progress",
+      "phase": "verified",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-visit-workflow",
-      "integrationCommits": [],
-      "note": "문의 초안→합성 응답→조건 변경 재확인, 지역·휠체어·자격 미확인 게이트"
+      "integrationCommits": [
+        "979c0da",
+        "1115698"
+      ],
+      "note": "85개 단위·47개 브라우저 검사 통과. 수동 UI는 대화 첫 화면 전환 후 개발 검증용으로 보존"
     },
     "visit-docs": {
-      "phase": "in_progress",
+      "phase": "verified",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-visit-docs",
+      "integrationCommits": [
+        "a7adaac"
+      ],
+      "note": "85개 단위·47개 브라우저 검사 통과. 수동 UI는 대화 첫 화면 전환 후 개발 검증용으로 보존"
+    },
+    "conversation-agent": {
+      "phase": "verified",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-conversation-agent",
+      "integrationCommits": [
+        "35e4cfb"
+      ],
+      "note": "provider 주입·검증 도구 루프·고정 preview·일반 요청503. 실제 LLM 연결은 사용자 요청으로 보류"
+    },
+    "conversation-ui": {
+      "phase": "in_progress",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-conversation-ui",
+      "integrationCommits": [
+        "9c4f72e"
+      ],
+      "note": "대화/브라우저 음성 입력·읽기 요약·실제 API 통합과 화면 검증 중"
+    },
+    "agent-api": {
+      "phase": "verified",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-agent-api",
+      "integrationCommits": [
+        "0a6ebfe"
+      ],
+      "note": "Lambda IAM URL·CloudFront OAC·분리 ZIP CI, 모델/영속저장 기본 비활성. 실제 배포는 root 확인 중"
+    },
+    "conversation-docs": {
+      "phase": "in_progress",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-conversation-docs",
       "integrationCommits": [],
-      "note": "허브계보3종과 공식보완2건·진료1건 지원과 반복 예산의 차이를 명세"
+      "note": "대화 우선 PRDv0.6·모델 후속 연결·실제 데이터3종과 넓은 조사 범위 동기화"
     }
   },
   "review": {
     "phase": "pending",
-    "role": "방문 준비·이동·동행 통합과 메인 시각 검토",
+    "role": "대화 우선 제품 흐름·API 미연결·실제 preview·PC/모바일 독립 검토",
     "findings": [
-      "메인에서 준비 상태가 한눈에 보이지 않음",
-      "현재 한 종 병원 목록 조회의 데이터 활용이 얕음"
+      "사용자가 폼과 수동 클릭 대신 텍스트·음성 요청에서 시작하는 Agent를 요청함",
+      "LLM 실제 연결은 사용자 명시에 따라 후속으로 보류함"
     ],
-    "resolution": "새 기능·메인 첫 화면을 독립 검토하고 이전 UI ship을 재사용하지 않는다."
+    "resolution": "실제 고정 preview/503·공개 배포와 최신 화면을 검토하며 실제 모델·마이크·기관 발신 검증으로 확대하지 않는다."
   },
   "awsDeployment": {
     "phase": "verified",

@@ -30,7 +30,7 @@ await check('worktree-isolation','isolation',()=>{
 for(const task of rules.tasks) await check(`file-ownership-${task.id}`,'ownership',()=>{
  const files=git('diff','--name-only',task.baseCommit || state.baseCommit,task.branch).split('\n').filter(Boolean);
  requireThat(files.length>0,`${task.id}: 완료 커밋이 아직 없습니다.`);
- const violations=files.filter(file=>!task.allow.includes(file));
+ const violations=files.filter(file=>!task.allow.some(allowed=>allowed.endsWith('/**') ? file.startsWith(allowed.slice(0,-2)) : file===allowed));
  requireThat(violations.length===0,`파일 소유권 위반: ${violations.join(', ')}`);
  const dirty=execFileSync('git',['status','--porcelain'],{cwd:state.tasks[task.id].worktree,encoding:'utf8'}).trim();
  requireThat(!dirty,`${task.id}: 미커밋 변경이 있어 완료 평가를 보류합니다.`);
@@ -104,6 +104,16 @@ await check('browser-evidence','verification',async()=>{
  for(const p of [proof.desktop.screenshot,proof.mobile.screenshot]) {const bytes=await readFile(resolve(root,p));requireThat(bytes.readUInt32BE(0)===0x89504e47,'유효한 PNG 화면 증거가 아닙니다.');}
  return 'PC·모바일 넘침/기능 흐름/보완 루프 검사와 화면 캡처 존재. 타일 네트워크·임상 검증은 별도';
 });
+await check('conversation-browser-evidence','verification',async()=>{
+ const proof=JSON.parse(await readFile(resolve(root,'orchestration/runs/conversation-browser.json'),'utf8'));
+ requireThat(proof.result==='pass' && proof.errors.length===0 && proof.checks.every(c=>c.status==='pass'),'대화 UI 검사에 실패한 항목이 있습니다.');
+ requireThat(proof.apiLive && proof.fixedPreview && proof.normalInputDisconnected,'실제 API의 고정 예시와 일반 입력 미연결 경로가 필요합니다.');
+ requireThat(proof.modelInvoked===false && proof.phoneInvoked===false && proof.healthRecordsQueried===false,'연동 보류 범위를 실제 호출 검증으로 표시하면 안 됩니다.');
+ requireThat(proof.desktop.noOverflow && proof.mobile.noOverflow,'PC·모바일 대화 화면에 가로 넘침이 있습니다.');
+ requireThat(proof.sourceHash===await runtimeFingerprint(root),'대화 화면 증거 이후 실행 소스가 변경됐습니다. 다시 캡처하세요.');
+ for(const path of [proof.desktop.screenshot,proof.mobile.screenshot]) {const bytes=await readFile(resolve(root,path));requireThat(bytes.readUInt32BE(0)===0x89504e47,'유효한 PNG 대화 화면 증거가 아닙니다.');}
+ return `${proof.checks.length}개 실제 API/화면 검사·고정 예시·일반503·입력복원·출처 확인. 실제 모델·음성·발신 품질 검증은 아님`;
+});
 await check('rollback-boundary','rollback',()=>{
  for(const task of rules.tasks) {
   const integrated=state.tasks[task.id].integrationCommits;
@@ -114,7 +124,7 @@ await check('rollback-boundary','rollback',()=>{
 });
 const passed=checks.filter(c=>c.status==='pass').length;
 const result={evaluatedAt:new Date().toISOString(),commit:git('rev-parse','HEAD'),automated:{passed,total:checks.length,rate:Math.round(passed/checks.length*1000)/10},checks,
- manualUnverified:['전체 운영 데이터 API·최신성·전체 원자료 재배포 조건 (공개 미리보기 859는 실제 사용)','실제 전화·기관 접수·의료진 참여','런타임 AI 모델·Prompt/Tool 연동의 실작동','임상 유효성·실서비스 개인정보 처리·정책 검토','기획서 최종 PDF 15페이지 이내 및 센터 실기기 실행'],submissionReady:false};
+ manualUnverified:['전체 운영 데이터 API·최신성·전체 원자료 재배포 조건 (허브계보3종 최소 사실은 실제 사용)','실제 전화·기관 접수·공단 기록 연계·의료진 참여','사용자가 보류한 실제 LLM 연결·품질과 실제 마이크 인식 (provider 주입 검사는 별도)','임상 유효성·실서비스 개인정보 처리·정책 검토','기획서 최종 PDF 15페이지 이내 및 센터 실기기 실행'],submissionReady:false};
 await mkdir(resolve(root,'orchestration/runs'),{recursive:true});
 await writeFile(resolve(root,'orchestration/runs/latest-eval.json'),JSON.stringify(result,null,2)+'\n');
 for(const item of checks) console.log(`${item.status==='pass'?'PASS':'FAIL'} ${item.id} · ${item.evidence}`);

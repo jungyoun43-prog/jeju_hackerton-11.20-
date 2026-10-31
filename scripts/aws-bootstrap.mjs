@@ -104,6 +104,9 @@ export async function runBootstrap({env=process.env,args=process.argv.slice(2),r
   const oidcSubject=selectGitHubOidcSubject({repository:settings.repository,explicitSubject:settings.oidcSubject,stack,github:github||githubMetadataRunner(env,root)});
   run(['cloudformation','validate-template','--template-body',`file://${settings.templatePath}`]);
   const parameters=[{ParameterKey:'ProjectName',ParameterValue:settings.projectName},{ParameterKey:'GitHubRepository',ParameterValue:settings.repository},{ParameterKey:'ExistingGitHubOidcProviderArn',ParameterValue:existingProvider},{ParameterKey:'GitHubOidcSubject',ParameterValue:oidcSubject}];
+  for(const key of ['AgentOriginDomainName','AgentFunctionArn']) {
+    if(stack?.Parameters?.some(parameter=>parameter.ParameterKey===key)) parameters.push({ParameterKey:key,UsePreviousValue:true});
+  }
   const operation=stack?'update-stack':'create-stack';
   const command=['cloudformation',operation,'--stack-name',settings.stackName,'--template-body',`file://${settings.templatePath}`,'--parameters',JSON.stringify(parameters),'--capabilities','CAPABILITY_IAM','--tags',`Key=Application,Value=${application}`,`Key=Project,Value=${settings.projectName}`];
   log(`${settings.stackName}: 템플릿 검증 완료, ${operation} 제출`);

@@ -155,6 +155,62 @@
         "docs/implementation-results.md",
         "docs/submission-checklist.md"
       ]
+    },
+    {
+      "id": "conversation-agent",
+      "branch": "feature/conversation-agent",
+      "baseCommit": "8ab0db8",
+      "allow": [
+        "agent/**",
+        "prompts/**",
+        "tests/agent.test.mjs",
+        "tests/agent-provider.test.mjs",
+        "scripts/build-agent.mjs"
+      ]
+    },
+    {
+      "id": "conversation-ui",
+      "branch": "feature/conversation-ui",
+      "baseCommit": "8ab0db8",
+      "allow": [
+        "app/index.html",
+        "app/workspace.html",
+        "app/conversation.js",
+        "app/conversation.css",
+        "DESIGN.md",
+        ".impeccable/design.json"
+      ]
+    },
+    {
+      "id": "agent-api",
+      "branch": "deploy/agent-api",
+      "baseCommit": "8ab0db8",
+      "allow": [
+        "infra/aws-agent-api.yaml",
+        "infra/aws-static-site.yaml",
+        "scripts/aws-agent-bootstrap.mjs",
+        "scripts/aws-agent-publish.mjs",
+        "tests/agent-infra.test.mjs",
+        ".github/workflows/ci.yml",
+        ".github/workflows/deploy-aws.yml"
+      ]
+    },
+    {
+      "id": "conversation-docs",
+      "branch": "docs/conversation-release",
+      "baseCommit": "35e4cfb",
+      "allow": [
+        "README.md",
+        "AGENTS.md",
+        "PRODUCT.md",
+        "THIRD_PARTY.md",
+        "docs/prd.md",
+        "docs/agent-pipeline.md",
+        "docs/user-manual.md",
+        "docs/data-sources.md",
+        "docs/submission-checklist.md",
+        "docs/deployment.md"
+      ]
     }
   ],
   "rules": [

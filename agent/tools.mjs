@@ -132,7 +132,7 @@ export function createToolDispatcher({phoneAdapter = createPhoneSimulationAdapte
         if (input.source === 'nhis') {
           data = {status:'not_connected',provider:'NHIS',authenticationRequired:true,approvedAdapterConfigured:false};
           events.push(event(name,'건강보험공단 기록 연계 미설정','승인된 인증·동의 연계가 설정되지 않아 실제 기록을 가져오지 않았습니다.',{status:'not_connected',source:NHIS_SOURCE}));
-          pendingActions.push(pending('health-records','승인된 공단 기록 연계 설정','현재는 실제 본인 인증·의료기록 조회를 지원하지 않습니다.'));
+          pendingActions.push(pending('health-records','실제 진료기록 확인 필요','지금은 합성 자료를 사용합니다. 실제 기록은 본인인증·동의를 거친 연계가 필요합니다.'));
         } else {
           next = applyAction(next,{type:'ADD_DOCUMENT',id:'report',content:recordsTemplate.report,source:'서버 고정 합성 판독문 보유 예시 · 실제 진료기록 아님'});
           data = {isSimulation:true,documents:next.documents.map(({id,label,status,source}) => ({id,label,status,source})),physicianExamCreated:false};

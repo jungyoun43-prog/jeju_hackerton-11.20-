@@ -2,6 +2,7 @@ import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { resolve, extname, sep, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { handleAgentRequest } from '../agent/handler.mjs';
 
 const project = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const production = process.argv.includes('--dist');
@@ -15,10 +16,22 @@ const server = createServer(async (req, res) => {
   const json = (status, value) => { res.writeHead(status, {'Content-Type':'application/json; charset=utf-8', 'Cache-Control':'no-store'}); res.end(JSON.stringify(value)); };
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  if (!['GET','HEAD'].includes(req.method)) return json(405, {error:'지원하지 않는 요청입니다.'});
   try {
     const url = new URL(req.url, 'http://localhost');
     const path = decodeURIComponent(url.pathname);
+    if(path==='/api/agent' || path.startsWith('/api/agent/')) {
+      const chunks=[];let length=0;
+      for await(const chunk of req) {
+        length+=chunk.length;
+        if(length>32768) return json(413,{error:{code:'BODY_TOO_LARGE',message:'요청 내용이 너무 깁니다.'},requestId:''});
+        chunks.push(chunk);
+      }
+      const body=Buffer.concat(chunks).toString('utf8');
+      const result=await handleAgentRequest({method:req.method,path,body,headers:req.headers});
+      res.writeHead(result.statusCode,result.headers);
+      return res.end(result.body);
+    }
+    if (!['GET','HEAD'].includes(req.method)) return json(405, {error:'지원하지 않는 요청입니다.'});
     if (path === '/api/health') return json(200, {ok:true, mode:'simulation', runtime:'node', phoneConnected:false, medicalRecordTransfer:false});
     if (path === '/api/config') return json(200, {mode:'simulation', tileUrl:process.env.MAP_TILE_URL || 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'});
     let base = root;
@@ -41,6 +54,7 @@ const server = createServer(async (req, res) => {
     json(500, {error:'파일을 불러오지 못했습니다.'});
   }
 });
+server.requestTimeout=15000;
 server.listen(port, host, () => console.log(`제주 진료 나침반 · 시연 모드\nLocal: http://${host}:${server.address().port}\n${production ? '빌드 결과' : '개발 화면'} · 실제 전화·의료기관 전송 없음`));
 server.on('error', error => { console.error(error.code === 'EADDRINUSE' ? `${port}번 포트가 사용 중입니다. PORT 환경변수로 변경하세요.` : error.message); process.exitCode = 1; });
 for (const signal of ['SIGINT','SIGTERM']) process.on(signal, () => server.close(() => process.exit(0)));

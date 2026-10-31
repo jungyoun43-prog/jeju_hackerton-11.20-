@@ -127,7 +127,7 @@ test('legacy default는 호환하지만 커스텀 subject와 조회 실패는 �
 
 test('기존 stack subject override는 provider 조건을 보존하고 역할 갱신 요청에 정확히 전달된다',async()=>{
   const calls=[];const subject='repo:example@123/jeju-demo@456:environment:production';
-  const stack={Tags:[ownerTag],StackStatus:'CREATE_COMPLETE',Parameters:[{ParameterKey:'ExistingGitHubOidcProviderArn',ParameterValue:''}]};
+  const stack={Tags:[ownerTag],StackStatus:'CREATE_COMPLETE',Parameters:[{ParameterKey:'ExistingGitHubOidcProviderArn',ParameterValue:''},{ParameterKey:'AgentOriginDomainName',ParameterValue:'example.lambda-url.ap-northeast-2.on.aws'},{ParameterKey:'AgentFunctionArn',ParameterValue:'arn:aws:lambda:ap-northeast-2:111122223333:function:demo-api'}]};
   const run=args=>{
     calls.push(args);
     if(args[1]==='describe-stacks')return {Stacks:[stack]};
@@ -139,6 +139,7 @@ test('기존 stack subject override는 provider 조건을 보존하고 역할 �
   const update=calls.find(args=>args[1]==='update-stack');const parameters=JSON.parse(update[update.indexOf('--parameters')+1]);
   assert.equal(parameters.find(p=>p.ParameterKey==='GitHubOidcSubject').ParameterValue,subject);
   assert.equal(parameters.find(p=>p.ParameterKey==='ExistingGitHubOidcProviderArn').ParameterValue,'');
+  for(const key of ['AgentOriginDomainName','AgentFunctionArn']) assert.deepEqual(parameters.find(p=>p.ParameterKey===key),{ParameterKey:key,UsePreviousValue:true});
   assert.ok(calls.every(args=>args[0]!=='iam'));
 });
 

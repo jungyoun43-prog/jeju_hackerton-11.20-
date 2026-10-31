@@ -25,7 +25,7 @@ export async function scanProject(root) {
 }
 export async function runtimeFingerprint(root) {
   const hash=createHash('sha256');
-  const files=(await sourceFiles(root)).filter(p=>p.startsWith('app/') || p==='scripts/server.mjs' || p==='package.json' || p==='package-lock.json').sort();
+  const files=(await sourceFiles(root)).filter(p=>p.startsWith('app/') || p.startsWith('agent/') || p.startsWith('prompts/') || p==='scripts/server.mjs' || p==='package.json' || p==='package-lock.json').sort();
   for(const path of files) {hash.update(path+'\0');hash.update(await readFile(resolve(root,path)));}
   return hash.digest('hex');
 }
