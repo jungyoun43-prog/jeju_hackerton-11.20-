@@ -4,7 +4,7 @@ import { readFile, mkdtemp, mkdir, rm, symlink } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { agentBootstrapSettings, linkedSiteParameters, runAgentBootstrap } from '../scripts/aws-agent-bootstrap.mjs';
+import { agentBootstrapSettings, agentStackParameters, linkedSiteParameters, runAgentBootstrap } from '../scripts/aws-agent-bootstrap.mjs';
 import { createAgentPublishPlan, runAgentPublish } from '../scripts/aws-agent-publish.mjs';
 
 const template=JSON.parse(await readFile(new URL('../infra/aws-agent-api.yaml',import.meta.url),'utf8'));
@@ -240,4 +240,115 @@ test('CI는 같은 SHA의 별도 backend artifact를 보존하고 명시한 togg
   assert.match(deploy,/node scripts\/aws-agent-publish.mjs --apply/);
   assert.match(deploy,/runAgentPublish\(\{args:\['--verify'\]\}\)/);
   assert.ok(!deploy.includes('s3://'));
+});
+
+test('OpenAI는 전용 빈 Secret의 ARN만 전달하고 정확한 읽기 권한·보존을 설정한다',()=>{
+  assert.equal(template.Parameters.EnableOpenAI.Default,'false');
+  assert.equal(template.Parameters.OpenAIModelId.Default,'gpt-6.1-sol');
+  assert.deepEqual(template.Parameters.OpenAIModelId.AllowedValues,['gpt-6.1-sol','gpt-6.1-terra']);
+  const secret=template.Resources.OpenAISecret;
+  assert.equal(secret.Condition,'OpenAIEnabled');
+  assert.equal(secret.DeletionPolicy,'Retain');assert.equal(secret.UpdateReplacePolicy,'Retain');
+  assert.deepEqual(secret.Properties.Name,{'Fn::Sub':'${AWS::StackName}/openai-api-key'});
+  assert.equal(secret.Properties.SecretString,undefined);assert.equal(secret.Properties.GenerateSecretString,undefined);
+  assert.equal(secret.Properties.KmsKeyId,undefined);
+  assert.ok(secret.Properties.Tags.some(tag=>tag.Key==='Application'&&tag.Value==='jeju-care-compass'));
+  const policy=template.Resources.AgentOpenAISecretPolicy;
+  assert.equal(policy.Condition,'OpenAIEnabled');
+  assert.deepEqual(policy.Properties.PolicyDocument.Statement,[{Sid:'LoadOnlyOpenAIKeyAtRuntime',Effect:'Allow',Action:['secretsmanager:GetSecretValue'],Resource:{Ref:'OpenAISecret'}}]);
+  assert.deepEqual(template.Outputs.OpenAISecretArn.Value,{Ref:'OpenAISecret'});
+  const variables=template.Resources.AgentFunction.Properties.Environment.Variables;
+  assert.deepEqual(variables.OPENAI_SECRET_ARN,{'Fn::If':['OpenAIEnabled',{Ref:'OpenAISecret'},'']});
+  assert.deepEqual(variables.AWS_ACCOUNT_ID,{Ref:'AWS::AccountId'});
+  assert.deepEqual(variables.OPENAI_MODEL,{Ref:'OpenAIModelId'});
+  assert.equal(variables.OPENAI_API_KEY,undefined);
+});
+
+test('CloudFormation과 CLI 모두 OpenAI의 영속 budget 및 단일 공급자를 요구한다',()=>{
+  assert.deepEqual(template.Rules.OpenAIRequiresSessionStore.Assertions[0].Assert,{'Fn::Equals':[{Ref:'EnableSessionStore'},'true']});
+  assert.deepEqual(template.Rules.OneModelProviderAtATime.Assertions[0].Assert,{'Fn::Equals':[{Ref:'EnableModel'},'false']});
+  assert.throws(()=>agentBootstrapSettings({...env,AGENT_OPENAI_ENABLED:'true',AGENT_SESSION_STORE_ENABLED:'false'},[]),/영속 저장소/);
+  assert.throws(()=>agentBootstrapSettings({...env,AGENT_OPENAI_ENABLED:'yes'},[]),/flag/);
+  assert.throws(()=>agentBootstrapSettings({...env,OPENAI_MODEL:'unreviewed-model'},[]),/OPENAI_MODEL/);
+  assert.equal(agentBootstrapSettings({...env,OPENAI_MODEL:'gpt-6.1-terra'},[]).openAIModelId,'gpt-6.1-terra');
+});
+
+const enabledStack={...agentStack,Parameters:[
+  ...agentStack.Parameters,
+  {ParameterKey:'ProjectName',ParameterValue:'jeju-care-compass'},
+  {ParameterKey:'EnableOpenAI',ParameterValue:'true'},
+  {ParameterKey:'EnableSessionStore',ParameterValue:'true'},
+  {ParameterKey:'EnableModel',ParameterValue:'false'},
+  {ParameterKey:'OpenAIModelId',ParameterValue:'gpt-6.1-terra'},
+  {ParameterKey:'BedrockModelId',ParameterValue:'apac.amazon.nova-micro-v1:0'},
+  {ParameterKey:'DemoDailyTurnLimit',ParameterValue:'40'},
+]};
+
+test('정기 stack 갱신은 미지정 OpenAI·DDB·Bedrock·모델·예산을 이전 값으로 보존한다',()=>{
+  const settings=agentBootstrapSettings(env,[]);
+  const parameters=agentStackParameters(template,settings,env,enabledStack);
+  for(const key of ['ProjectName','EnableOpenAI','EnableSessionStore','EnableModel','OpenAIModelId','BedrockModelId','DemoDailyTurnLimit']) assert.deepEqual(parameters.find(item=>item.ParameterKey===key),{ParameterKey:key,UsePreviousValue:true});
+  const override={...env,OPENAI_MODEL:'gpt-6.1-sol',DEMO_DAILY_TURN_LIMIT:'20'};
+  const changed=agentStackParameters(template,agentBootstrapSettings(override,[]),override,enabledStack);
+  assert.deepEqual(changed.find(item=>item.ParameterKey==='OpenAIModelId'),{ParameterKey:'OpenAIModelId',ParameterValue:'gpt-6.1-sol'});
+  assert.deepEqual(changed.find(item=>item.ParameterKey==='DemoDailyTurnLimit'),{ParameterKey:'DemoDailyTurnLimit',ParameterValue:'20'});
+  assert.deepEqual(changed.find(item=>item.ParameterKey==='EnableSessionStore'),{ParameterKey:'EnableSessionStore',UsePreviousValue:true});
+});
+
+test('신규·기존 비활성 stack에서 OpenAI만 켜거나 활성 모델의 DB만 끄는 변경을 거부한다',()=>{
+  const openaiOnly={...env,AGENT_OPENAI_ENABLED:'true'};
+  assert.throws(()=>agentStackParameters(template,agentBootstrapSettings(openaiOnly,[]),openaiOnly,null),/영속 세션/);
+  const storeOff={...env,AGENT_SESSION_STORE_ENABLED:'false'};
+  assert.throws(()=>agentStackParameters(template,agentBootstrapSettings(storeOff,[]),storeOff,enabledStack),/영속 세션/);
+  const dual={...env,AGENT_MODEL_ENABLED:'true'};
+  assert.throws(()=>agentStackParameters(template,agentBootstrapSettings(dual,[]),dual,enabledStack),/Bedrock/);
+  const create={...env,AGENT_OPENAI_ENABLED:'true',AGENT_SESSION_STORE_ENABLED:'true',AGENT_MODEL_ENABLED:'false'};
+  const parameters=agentStackParameters(template,agentBootstrapSettings(create,[]),create,null);
+  assert.equal(parameters.find(item=>item.ParameterKey==='EnableOpenAI').ParameterValue,'true');
+  assert.equal(parameters.find(item=>item.ParameterKey==='EnableSessionStore').ParameterValue,'true');
+  const previous=agentStackParameters(template,agentBootstrapSettings(env,[]),env,agentStack);
+  assert.equal(previous.find(item=>item.ParameterKey==='EnableOpenAI').ParameterValue,'false');
+  assert.equal(previous.find(item=>item.ParameterKey==='OpenAIModelId').ParameterValue,'gpt-6.1-sol');
+});
+
+test('실제 update 명령도 이전 활성 설정을 보존하며 실패한 의존 조건은 변경 전에 중단한다',async()=>{
+  const calls=[];
+  const run=args=>{
+    calls.push(args);
+    if(args[0]==='sts')return {Account:'111122223333'};
+    if(args[1]==='describe-stacks')return {Stacks:[args.includes('jeju-care-compass-agent')?enabledStack:siteStack]};
+    return {StackId:'test-only'};
+  };
+  await runAgentBootstrap({env,args:['--apply'],run,log:()=>{}});
+  const update=calls.find(args=>args[1]==='update-stack');
+  const parameters=JSON.parse(update[update.indexOf('--parameters')+1]);
+  assert.deepEqual(parameters.find(item=>item.ParameterKey==='EnableOpenAI'),{ParameterKey:'EnableOpenAI',UsePreviousValue:true});
+  calls.length=0;
+  await assert.rejects(runAgentBootstrap({env:{...env,AGENT_SESSION_STORE_ENABLED:'false'},args:['--apply'],run,log:()=>{}}),/영속 세션/);
+  assert.ok(calls.every(args=>!['create-stack','update-stack','validate-template'].includes(args[1])));
+});
+
+test('모델 활성화 배포 검증은 llm true와 허용·선택 모델을 요구하며 실제 외부 연결 과장을 거부한다',async t=>{
+  const root=await artifact(t),plan=await createAgentPublishPlan({env,root});
+  const run=args=>args[1]==='get-function-configuration'?lambdaConfig(plan):{Tags:{Application:'jeju-care-compass',DataMode:'synthetic'}};
+  const verifyEnv={...env,AWS_SITE_URL:'https://example.cloudfront.net',AGENT_EXPECT_MODEL:'true'};
+  const check=async(capabilities,extra={})=>runAgentPublish({env:{...verifyEnv,...extra},root,args:['--verify'],run,fetchImpl:async()=>({ok:true,json:async()=>({revision,phone:'simulation',healthRecords:'demo',...capabilities})})});
+  for(const model of ['gpt-6.1-sol','gpt-6.1-terra']) {
+    const result=await check({llm:true,model});assert.equal(result.verified,true);assert.equal(result.modelConnected,true);assert.equal(result.model,model);
+  }
+  await assert.rejects(check({llm:false,model:'gpt-6.1-sol'}),/llm은 true/);
+  await assert.rejects(check({llm:true,model:'unreviewed-model'}),/모델 명칭/);
+  await assert.rejects(check({llm:true,model:'gpt-6.1-terra'},{OPENAI_MODEL:'gpt-6.1-sol'}),/OPENAI_MODEL과 다릅니다/);
+  await assert.rejects(check({llm:true,model:'gpt-6.1-sol',phone:'connected'}),/실제 전화/);
+  await assert.rejects(check({llm:true,model:'gpt-6.1-sol',healthRecords:'connected'}),/실제 전화/);
+  await assert.rejects(runAgentPublish({env:{...env,AGENT_EXPECT_MODEL:'true'},root,args:['--verify'],run:()=>{throw new Error('공개 주소 검사 전에 AWS를 호출하면 안 됨');}}),/AWS_SITE_URL/);
+});
+
+test('CI의 모델 확인 flag는 repository 변수이며 요약은 실제 확인한 설정을 사용한다',async()=>{
+  const deploy=await readFile(new URL('../.github/workflows/deploy-aws.yml',import.meta.url),'utf8');
+  assert.match(deploy,/AGENT_EXPECT_MODEL: \$\{\{ vars.AGENT_EXPECT_MODEL \|\| 'false' \}\}/);
+  assert.match(deploy,/OPENAI_MODEL: \$\{\{ vars.OPENAI_MODEL \|\| 'gpt-6.1-sol' \}\}/);
+  assert.match(deploy,/verified.modelConnected/);
+  assert.ok(!deploy.includes('모델 API는 미연결이며'));
+  assert.ok(!deploy.includes('OPENAI_API_KEY'));
 });

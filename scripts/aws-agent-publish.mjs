@@ -43,6 +43,9 @@ with zipfile.ZipFile(sys.argv[1]) as archive:
 export async function runAgentPublish({env=process.env,args=process.argv.slice(2),root=projectRoot,run,fetchImpl=fetch,log=console.log}={}) {
   if(args.some(arg=>!['--apply','--verify','--help'].includes(arg))||args.includes('--apply')&&args.includes('--verify')) fail('사용법: node scripts/aws-agent-publish.mjs [--apply | --verify]');
   if(args.includes('--help')) return {help:'기본은 ZIP 계획 검증만 합니다. --apply: 검증 ZIP을 Lambda에 직접 게시. --verify: 코드 hash·정상 상태·선택한 공개 capabilities revision을 읽기 확인. S3에는 업로드하지 않습니다.'};
+  if(env.AGENT_EXPECT_MODEL&&!['true','false'].includes(env.AGENT_EXPECT_MODEL)) fail('AGENT_EXPECT_MODEL은 true 또는 false여야 합니다.');
+  if(env.AGENT_EXPECT_MODEL==='true'&&env.OPENAI_MODEL&&!['gpt-6.1-sol','gpt-6.1-terra'].includes(env.OPENAI_MODEL)) fail('OPENAI_MODEL은 허용된 OpenAI 모델이어야 합니다.');
+  if(args.includes('--verify')&&env.AGENT_EXPECT_MODEL==='true'&&!env.AWS_SITE_URL) fail('모델 활성화 검증에는 공개 capabilities를 확인할 AWS_SITE_URL이 필요합니다.');
   const plan=await createAgentPublishPlan({env,root});
   if(!args.length) return {...plan,applied:false,note:'AWS 호출 없음. API ZIP은 정적 사이트 버킷에 게시하지 않습니다.'};
   run ||= awsRunner(env,plan.region,root);
@@ -51,6 +54,7 @@ export async function runAgentPublish({env=process.env,args=process.argv.slice(2
   if(tags.Application!=='jeju-care-compass'||tags.DataMode!=='synthetic') fail('합성 Agent 전용 함수 태그가 없어 게시를 중단했습니다.');
   if(config.Runtime!=='nodejs22.x'||config.Handler!=='index.handler'||!config.FunctionArn?.includes(`:lambda:${plan.region}:`)) fail('Lambda 실행환경·handler·리전이 계약과 다릅니다.');
   if(args.includes('--verify')) {
+    let modelStatus={};
     if(config.State!=='Active'||config.LastUpdateStatus!=='Successful') fail('Lambda 코드 갱신이 아직 정상 완료되지 않았습니다.');
     if(config.CodeSha256!==plan.codeSha256) fail('실제 Lambda 코드 hash가 검증 ZIP과 다릅니다.');
     if(env.AWS_SITE_URL) {
@@ -61,9 +65,14 @@ export async function runAgentPublish({env=process.env,args=process.argv.slice(2
       const capabilities=await response.json();
       if(capabilities.revision!==plan.revision) fail('공개 Agent 버전이 검증 ZIP과 다릅니다.');
       if(capabilities.phone==='connected'||capabilities.healthRecords==='connected') fail('실제 전화·개인 기록 연동을 활성화한 것으로 표시하면 안 됩니다.');
-      if(env.AGENT_EXPECT_MODEL!=='true'&&capabilities.llm!==false) fail('모델 미설정 배포의 capabilities.llm은 false여야 합니다.');
+      if(env.AGENT_EXPECT_MODEL==='true') {
+        if(capabilities.llm!==true) fail('모델 활성화 배포의 capabilities.llm은 true여야 합니다.');
+        if(!['gpt-6.1-sol','gpt-6.1-terra'].includes(capabilities.model)) fail('공개 Agent의 OpenAI 모델 명칭을 확인하세요.');
+        if(env.OPENAI_MODEL&&capabilities.model!==env.OPENAI_MODEL) fail('공개 Agent 모델이 검증하려는 OPENAI_MODEL과 다릅니다.');
+      } else if(capabilities.llm!==false) fail('모델 미설정 배포의 capabilities.llm은 false여야 합니다.');
+      modelStatus={modelConnected:capabilities.llm===true,model:capabilities.llm===true?capabilities.model:''};
     }
-    return {verified:true,revision:plan.revision,functionName:plan.functionName,codeSha256:plan.codeSha256,note:'코드·공개 상태 확인이며 실제 모델·마이크·발신 검증이 아닙니다.'};
+    return {verified:true,revision:plan.revision,functionName:plan.functionName,codeSha256:plan.codeSha256,...modelStatus,note:'코드·공개 설정 확인이며 실제 모델 계정 접근·품질·마이크·발신 검증이 아닙니다.'};
   }
   if(config.LastUpdateStatus==='InProgress') fail('함수 갱신이 진행 중입니다. 완료 후 다시 게시하세요.');
   if(!config.RevisionId) fail('동시 갱신 방지를 위한 Lambda RevisionId가 없습니다.');

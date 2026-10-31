@@ -1,6 +1,6 @@
 {
   "AWSTemplateFormatVersion": "2010-09-09",
-  "Description": "Jeju Care Compass synthetic conversation API. Model invocation and persisted session state are disabled by default.",
+  "Description": "Jeju Care Compass synthetic conversation API. Optional OpenAI key is loaded from a dedicated secret; public paid model access requires durable state and a daily budget.",
   "Metadata": {
     "CheckedAt": "2026-10-31",
     "AWSToolsMetrics": {
@@ -10,14 +10,19 @@
       "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-lambda.html",
       "https://docs.aws.amazon.com/lambda/latest/dg/urls-auth.html",
       "https://docs.aws.amazon.com/bedrock/latest/userguide/inference-profiles-prereq.html",
-      "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/TTL.html"
+      "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/TTL.html",
+      "https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-resource-secretsmanager-secret.html",
+      "https://docs.aws.amazon.com/service-authorization/latest/reference/list_secretsmanager.html",
+      "https://docs.aws.amazon.com/service-authorization/latest/reference/list_dynamodb.html"
     ],
     "com.aws.cloudformation.Context": {
       "why": "Add an optional backend to the existing private static demo",
       "must": [
         "No real patient records or calls",
         "Default disabled LLM is explicit, not simulated as a live model",
-        "Only root applies AWS changes"
+        "Only root applies AWS changes",
+        "OpenAI remains opt-in and requires durable quota enforcement",
+        "Secret values are never accepted as stack parameters or emitted as outputs"
       ],
       "mutable": "change-with-constraints"
     }
@@ -66,6 +71,72 @@
       "Default": 80,
       "MinValue": 1,
       "MaxValue": 80
+    },
+    "EnableOpenAI": {
+      "Type": "String",
+      "Default": "false",
+      "AllowedValues": [
+        "false",
+        "true"
+      ],
+      "Description": "Enable the OpenAI runtime with a dedicated Secrets Manager ARN and durable session/budget table"
+    },
+    "OpenAIModelId": {
+      "Type": "String",
+      "Default": "gpt-6.1-sol",
+      "AllowedValues": [
+        "gpt-6.1-sol",
+        "gpt-6.1-terra"
+      ],
+      "Description": "Selected OpenAI Responses API model; configuration is not proof of account access"
+    }
+  },
+  "Rules": {
+    "OpenAIRequiresSessionStore": {
+      "RuleCondition": {
+        "Fn::Equals": [
+          {
+            "Ref": "EnableOpenAI"
+          },
+          "true"
+        ]
+      },
+      "Assertions": [
+        {
+          "Assert": {
+            "Fn::Equals": [
+              {
+                "Ref": "EnableSessionStore"
+              },
+              "true"
+            ]
+          },
+          "AssertDescription": "OpenAI public access requires durable session and daily budget state; instance memory is insufficient."
+        }
+      ]
+    },
+    "OneModelProviderAtATime": {
+      "RuleCondition": {
+        "Fn::Equals": [
+          {
+            "Ref": "EnableOpenAI"
+          },
+          "true"
+        ]
+      },
+      "Assertions": [
+        {
+          "Assert": {
+            "Fn::Equals": [
+              {
+                "Ref": "EnableModel"
+              },
+              "false"
+            ]
+          },
+          "AssertDescription": "OpenAI is the selected provider. Keep the historical Bedrock EnableModel disabled."
+        }
+      ]
     }
   },
   "Conditions": {
@@ -81,6 +152,14 @@
       "Fn::Equals": [
         {
           "Ref": "EnableSessionStore"
+        },
+        "true"
+      ]
+    },
+    "OpenAIEnabled": {
+      "Fn::Equals": [
+        {
+          "Ref": "EnableOpenAI"
         },
         "true"
       ]
@@ -180,7 +259,7 @@
     "AgentExecutionRole": {
       "Type": "AWS::IAM::Role",
       "Properties": {
-        "Description": "Agent role: dedicated logs, optional one-table state and optional exact APAC model profile",
+        "Description": "Agent role: dedicated logs, optional one-table durable state, exact OpenAI secret read and historical disabled Bedrock profile",
         "AssumeRolePolicyDocument": {
           "Version": "2012-10-17",
           "Statement": [
@@ -232,7 +311,7 @@
       },
       "Metadata": {
         "com.aws.cloudformation.Context": {
-          "why": "Keep the default disabled backend free of model and data permissions",
+          "why": "Scope runtime operations to dedicated logs, the selected state table and selected model secret only",
           "must": [
             "No managed broad policy",
             "Optional permissions are separate conditional policies",
@@ -506,6 +585,21 @@
             },
             "DEMO_DAILY_TURN_LIMIT": {
               "Ref": "DemoDailyTurnLimit"
+            },
+            "OPENAI_MODEL": {
+              "Ref": "OpenAIModelId"
+            },
+            "OPENAI_SECRET_ARN": {
+              "Fn::If": [
+                "OpenAIEnabled",
+                {
+                  "Ref": "OpenAISecret"
+                },
+                ""
+              ]
+            },
+            "AWS_ACCOUNT_ID": {
+              "Ref": "AWS::AccountId"
             }
           }
         },
@@ -535,7 +629,9 @@
           "must": [
             "Code placeholder stays 503 until validated ZIP is uploaded directly",
             "One request deadline is bounded; reserved concurrency two",
-            "Model disabled and no DDB provisioned by default"
+            "Model disabled and no DDB provisioned by default",
+            "OpenAI credential value is never included in Lambda environment or template",
+            "OpenAI enabled requires durable session and daily budget store; no public paid memory-only mode"
           ],
           "mutable": "change-with-constraints"
         }
@@ -611,6 +707,88 @@
           "mutable": "change-with-constraints"
         }
       }
+    },
+    "OpenAISecret": {
+      "Type": "AWS::SecretsManager::Secret",
+      "Condition": "OpenAIEnabled",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}/openai-api-key"
+        },
+        "Description": "Server-only OpenAI credential for the synthetic Jeju guardian demo; value supplied outside CloudFormation",
+        "Tags": [
+          {
+            "Key": "Application",
+            "Value": "jeju-care-compass"
+          },
+          {
+            "Key": "Project",
+            "Value": {
+              "Ref": "ProjectName"
+            }
+          },
+          {
+            "Key": "DataMode",
+            "Value": "synthetic"
+          },
+          {
+            "Key": "Provider",
+            "Value": "openai"
+          }
+        ]
+      },
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Create an empty owned secret whose exact ARN is the only credential pointer exposed to Lambda",
+          "must": [
+            "Never set SecretString or GenerateSecretString in the template",
+            "Root uploads one OPENAI_API_KEY JSON field separately; no values in code, outputs, logs or CI",
+            "Retain on deletion or replacement; preserve the active key across routine stack updates",
+            "Use AWS managed secretsmanager encryption; do not grant broad KMS access"
+          ],
+          "mutable": "change-with-constraints"
+        }
+      }
+    },
+    "AgentOpenAISecretPolicy": {
+      "Type": "AWS::IAM::Policy",
+      "Condition": "OpenAIEnabled",
+      "Properties": {
+        "PolicyName": "ReadOnlyDedicatedOpenAISecret",
+        "Roles": [
+          {
+            "Ref": "AgentExecutionRole"
+          }
+        ],
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "LoadOnlyOpenAIKeyAtRuntime",
+              "Effect": "Allow",
+              "Action": [
+                "secretsmanager:GetSecretValue"
+              ],
+              "Resource": {
+                "Ref": "OpenAISecret"
+              }
+            }
+          ]
+        }
+      },
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Allow the runtime to load only the dedicated OpenAI secret value",
+          "must": [
+            "Exact secret ARN from Ref; no wildcard or ListSecrets",
+            "No PutSecretValue, mutation or rotation permission",
+            "No frontend credential and no plaintext key in Lambda environment"
+          ],
+          "mutable": "change-with-constraints"
+        }
+      }
     }
   },
   "Outputs": {
@@ -662,6 +840,13 @@
       "Description": "Optional private synthetic state and daily budget table",
       "Value": {
         "Ref": "SessionTable"
+      }
+    },
+    "OpenAISecretArn": {
+      "Condition": "OpenAIEnabled",
+      "Description": "Dedicated server credential ARN only; root supplies its value outside CloudFormation",
+      "Value": {
+        "Ref": "OpenAISecret"
       }
     }
   }

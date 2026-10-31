@@ -21,18 +21,46 @@ export function agentBootstrapSettings(env=process.env,args=[],root=projectRoot)
     distributionId:env.AWS_DISTRIBUTION_ID||'',projectName:env.PROJECT_NAME||application,
     enableModel:env.AGENT_MODEL_ENABLED||'false',enableStore:env.AGENT_SESSION_STORE_ENABLED||'false',
     modelId:env.BEDROCK_MODEL_ID||'apac.amazon.nova-lite-v1:0',dailyTurnLimit:String(env.DEMO_DAILY_TURN_LIMIT||80),
+    enableOpenAI:env.AGENT_OPENAI_ENABLED||'false',openAIModelId:env.OPENAI_MODEL||'gpt-6.1-sol',
     templatePath:resolve(root,'infra/aws-agent-api.yaml'),siteTemplatePath:resolve(root,'infra/aws-static-site.yaml'),
   };
   if(settings.region!=='ap-northeast-2') fail('이 템플릿은 서울 ap-northeast-2 기준입니다. 다른 리전은 모델·OAC 검증 후 수정하세요.');
   if(!/^[A-Za-z][A-Za-z0-9-]{0,54}$/.test(settings.stackName)) fail('AWS_AGENT_STACK_NAME은 함수 이름 여유를 포함해 55자 이내여야 합니다.');
   if(!/^[A-Za-z][A-Za-z0-9-]{0,127}$/.test(settings.siteStackName)) fail('AWS_STACK_NAME 형식을 확인하세요.');
   if(!/^[a-z][a-z0-9-]{2,29}$/.test(settings.projectName)) fail('PROJECT_NAME 형식을 확인하세요.');
-  if(!['true','false'].includes(settings.enableModel)||!['true','false'].includes(settings.enableStore)) fail('모델·상태 저장 flag는 true 또는 false여야 합니다.');
+  if(![settings.enableModel,settings.enableStore,settings.enableOpenAI].every(value=>['true','false'].includes(value))) fail('모델·상태 저장 flag는 true 또는 false여야 합니다.');
+  if(!['gpt-6.1-sol','gpt-6.1-terra'].includes(settings.openAIModelId)) fail('OPENAI_MODEL은 gpt-6.1-sol 또는 gpt-6.1-terra여야 합니다.');
+  if(settings.enableOpenAI==='true'&&env.AGENT_SESSION_STORE_ENABLED==='false') fail('OpenAI 활성화에는 AGENT_SESSION_STORE_ENABLED=true인 영속 저장소가 필요합니다.');
   if(!/^apac\.amazon\.nova-(?:lite|micro|pro)-v1:0$/.test(settings.modelId)) fail('확인한 APAC Nova profile만 허용합니다. 모델 변경은 IAM 지역 범위도 검토하세요.');
   if(!/^\d+$/.test(settings.dailyTurnLimit)||Number(settings.dailyTurnLimit)<1||Number(settings.dailyTurnLimit)>80) fail('DEMO_DAILY_TURN_LIMIT은 1~80입니다.');
   if(settings.distributionId&&!/^[A-Z0-9]{8,32}$/.test(settings.distributionId)) fail('AWS_DISTRIBUTION_ID 형식을 확인하세요.');
   if(settings.mode==='apply'&&!settings.distributionId) fail('기존 사이트의 AWS_DISTRIBUTION_ID를 지정하세요.');
   return settings;
+}
+
+// 미지정 값은 기존 stack을 보존한다. 새 설정이 추가됐다는 이유로 활성 모델·예산을 끄지 않는다.
+export function agentStackParameters(template,settings,env,stack) {
+  const overrides={
+    ProjectName:env.PROJECT_NAME,DistributionId:settings.distributionId,
+    EnableModel:env.AGENT_MODEL_ENABLED,EnableSessionStore:env.AGENT_SESSION_STORE_ENABLED,
+    BedrockModelId:env.BEDROCK_MODEL_ID,DemoDailyTurnLimit:env.DEMO_DAILY_TURN_LIMIT,
+    EnableOpenAI:env.AGENT_OPENAI_ENABLED,OpenAIModelId:env.OPENAI_MODEL,
+  };
+  const effective={};
+  const parameters=Object.entries(template.Parameters).map(([key,spec])=>{
+    const explicit=overrides[key]!==undefined&&overrides[key]!=='';
+    const previous=stack?.Parameters?.find(item=>item.ParameterKey===key);
+    const value=explicit?String(overrides[key]):previous?.ParameterValue!==undefined?String(previous.ParameterValue):'Default' in spec?String(spec.Default):undefined;
+    if(value===undefined) fail(`Agent 파라미터 ${key}를 확인할 수 없습니다.`);
+    if(spec.AllowedValues&&!spec.AllowedValues.map(String).includes(value)) fail(`Agent 파라미터 ${key}의 허용 값을 확인하세요.`);
+    if(spec.AllowedPattern&&!new RegExp(`^(?:${spec.AllowedPattern})$`).test(value)) fail(`Agent 파라미터 ${key}의 형식을 확인하세요.`);
+    if(spec.Type==='Number'&&(!/^\d+$/.test(value)||Number(value)<spec.MinValue||Number(value)>spec.MaxValue)) fail(`Agent 파라미터 ${key}의 허용 범위를 확인하세요.`);
+    effective[key]=value;
+    return previous&&!explicit?{ParameterKey:key,UsePreviousValue:true}:{ParameterKey:key,ParameterValue:value};
+  });
+  if(effective.EnableOpenAI==='true'&&effective.EnableSessionStore!=='true') fail('OpenAI 활성화에는 AGENT_SESSION_STORE_ENABLED=true인 영속 세션·일일 예산 저장소가 필요합니다.');
+  if(effective.EnableOpenAI==='true'&&effective.EnableModel!=='false') fail('OpenAI 활성화 시 기존 Bedrock AGENT_MODEL_ENABLED=false를 유지하세요.');
+  return parameters;
 }
 
 function findOwnedStack(run,name) {
@@ -66,10 +94,10 @@ export function linkedSiteParameters(template,siteStack,agentStack) {
 
 export async function runAgentBootstrap({env=process.env,args=process.argv.slice(2),root=projectRoot,run,log=console.log}={}) {
   const settings=agentBootstrapSettings(env,args,root);
-  if(settings.mode==='help') return {help:'기본은 AWS 호출 없는 계획입니다. --apply: 비활성 모델 API stack 생성. --status: 상태. --link-site --apply: 기존 사이트에 OAC origin 연결. AWS_PROFILE은 CLI 기본 인증 체인을 사용합니다.'};
+  if(settings.mode==='help') return {help:'기본은 AWS 호출 없는 계획입니다. --apply: API stack 생성/갱신. 새 stack은 모델·DB 비활성, 기존 stack의 미지정 설정은 보존. OpenAI는 AGENT_OPENAI_ENABLED=true·AGENT_SESSION_STORE_ENABLED=true로 준비하며 키는 root가 Secret에 별도 입력합니다. --status: 상태. --link-site --apply: 기존 OAC origin 연결.'};
   const template=JSON.parse(await readFile(settings.templatePath,'utf8'));
   if(!template.Description?.includes('synthetic')) fail('합성 시연 API 템플릿을 확인하세요.');
-  if(settings.mode==='plan') return {...settings,applied:false,changes:settings.linkSite?'기존 OIDC 소유·정확한 subject를 보존한 /api/agent* OAC 연결':'Node22 Lambda AWS_IAM URL; 모델·DDB는 기본 비활성; 실제 호출·계약 변경 없음',note:'AWS 모델 목록 조회는 호출 가능 증거가 아닙니다. 계정 모델 접근 실패를 자동 복구하거나 대체하지 않습니다.'};
+  if(settings.mode==='plan') return {...settings,applied:false,changes:settings.linkSite?'기존 OIDC 소유·정확한 subject를 보존한 /api/agent* OAC 연결':'Node22 IAM API; OpenAI는 전용 Secret ARN·영속 budget과 함께 선택 활성화',note:'새 stack 기본값은 비활성이며 기존 미지정 설정은 보존합니다. 계획은 AWS를 조회하지 않습니다. Secret 값·로컬 .env를 읽거나 업로드하지 않으며 설정과 실제 모델 접근 성공은 구분합니다.'};
   run ||= awsRunner(env,settings.region,root);
   const agentStack=findOwnedStack(run,settings.stackName);
   if(settings.mode==='status') {
@@ -92,8 +120,8 @@ export async function runAgentBootstrap({env=process.env,args=process.argv.slice
     // 기존 public site의 배포임을 읽기로 확인한 후에만 새 API의 권한 범위를 설정한다.
     const siteStack=findOwnedStack(run,settings.siteStackName);requireComplete(siteStack,'사이트');
     if(output(siteStack,'DistributionId')!==settings.distributionId) fail('기존 사이트와 CloudFront 배포가 일치하지 않습니다.');
-    parameters=Object.entries({ProjectName:settings.projectName,DistributionId:settings.distributionId,EnableModel:settings.enableModel,EnableSessionStore:settings.enableStore,BedrockModelId:settings.modelId,DemoDailyTurnLimit:settings.dailyTurnLimit}).map(([ParameterKey,ParameterValue])=>({ParameterKey,ParameterValue}));
-    tags=[{Key:'Application',Value:application},{Key:'Project',Value:settings.projectName},{Key:'DataMode',Value:'synthetic'}];
+    parameters=agentStackParameters(template,settings,env,agentStack);
+    tags=agentStack?.Tags||[{Key:'Application',Value:application},{Key:'Project',Value:settings.projectName},{Key:'DataMode',Value:'synthetic'}];
   }
   run(['cloudformation','validate-template','--template-body',`file://${templatePath}`]);
   const operation=stack?'update-stack':'create-stack';

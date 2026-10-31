@@ -51,6 +51,8 @@ jobs:
       AWS_SITE_URL: ${{ vars.AWS_SITE_URL }}
       AWS_AGENT_DEPLOY_ENABLED: ${{ vars.AWS_AGENT_DEPLOY_ENABLED }}
       AWS_AGENT_FUNCTION_NAME: ${{ vars.AWS_AGENT_FUNCTION_NAME }}
+      AGENT_EXPECT_MODEL: ${{ vars.AGENT_EXPECT_MODEL || 'false' }}
+      OPENAI_MODEL: ${{ vars.OPENAI_MODEL || 'gpt-6.1-sol' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -159,8 +161,9 @@ jobs:
           let last;
           for (let attempt = 0; attempt < 12; attempt++) {
             try {
-              await runAgentPublish({args:['--verify']});
-              await appendFile(process.env.GITHUB_STEP_SUMMARY, `\n동일 커밋 Lambda ZIP의 hash와 공개 capabilities를 확인했습니다. 모델 API는 미연결이며 실제 전화·개인 진료기록 조회도 미연동입니다.\n`);
+              const verified = await runAgentPublish({args:['--verify']});
+              const modelState = verified.modelConnected ? `${verified.model} 설정 활성(실제 계정 접근·품질 검증 별도)` : '모델 미연결';
+              await appendFile(process.env.GITHUB_STEP_SUMMARY, `\n동일 커밋 Lambda ZIP의 hash와 공개 capabilities를 확인했습니다. ${modelState}. 실제 전화·개인 진료기록 조회는 미연동입니다.\n`);
               last = undefined;
               break;
             } catch (error) {
