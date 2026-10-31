@@ -45,7 +45,7 @@ function findOwnedStack(run,name) {
 
 function requireComplete(stack,label) {
   if(!stack) fail(`${label} stack이 없습니다.`);
-  if(!['CREATE_COMPLETE','UPDATE_COMPLETE'].includes(stack.StackStatus)) fail(`${label} stack의 정상 완료를 확인하세요: ${stack.StackStatus}`);
+  if(!['CREATE_COMPLETE','UPDATE_COMPLETE','UPDATE_ROLLBACK_COMPLETE'].includes(stack.StackStatus)) fail(`${label} stack의 안정화 완료를 확인하세요: ${stack.StackStatus}`);
 }
 
 export function linkedSiteParameters(template,siteStack,agentStack) {

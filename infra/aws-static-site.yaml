@@ -694,15 +694,14 @@
           "Name": {
             "Fn::Sub": "${AWS::StackName}-agent-request"
           },
-          "Comment": "Forward JSON media type and client body hash for Lambda OAC; keep viewer Host private",
+          "Comment": "All viewer headers except Host preserves body SHA256; no cookies or query strings",
           "CookiesConfig": {
             "CookieBehavior": "none"
           },
           "HeadersConfig": {
-            "HeaderBehavior": "whitelist",
+            "HeaderBehavior": "allExcept",
             "Headers": [
-              "Content-Type",
-              "X-Amz-Content-Sha256"
+              "host"
             ]
           },
           "QueryStringsConfig": {
@@ -715,7 +714,8 @@
           "why": "Preserve the POST body hash required by Lambda OAC without forwarding viewer Host",
           "must": [
             "x-amz-content-sha256 forwarded for POST",
-            "No viewer Host, credentials or cookies forwarded"
+            "No viewer Host or cookies forwarded; OAC always replaces Authorization",
+            "CloudFront rejects explicitly allowlisting X-Amz-Content-Sha256"
           ],
           "mutable": "change-with-constraints"
         }

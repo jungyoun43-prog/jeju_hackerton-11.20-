@@ -91,8 +91,11 @@ test('API 경로만 uncached Lambda OAC로 보내고 정적 API와 OIDC trust는
   assert.ok(behavior.AllowedMethods.includes('POST'));
   const cache=siteTemplate.Resources.AgentCachePolicy.Properties.CachePolicyConfig;
   assert.ok(['MinTTL','MaxTTL','DefaultTTL'].every(key=>cache[key]===0));
-  const headers=siteTemplate.Resources.AgentOriginRequestPolicy.Properties.OriginRequestPolicyConfig.HeadersConfig.Headers;
-  assert.ok(headers.includes('X-Amz-Content-Sha256'));assert.ok(!headers.includes('Host'));
+  const requestPolicy=siteTemplate.Resources.AgentOriginRequestPolicy.Properties.OriginRequestPolicyConfig;
+  assert.equal(requestPolicy.HeadersConfig.HeaderBehavior,'allExcept');
+  assert.deepEqual(requestPolicy.HeadersConfig.Headers,['host']);
+  assert.equal(requestPolicy.CookiesConfig.CookieBehavior,'none');
+  assert.equal(requestPolicy.QueryStringsConfig.QueryStringBehavior,'none');
   assert.equal(siteTemplate.Resources.AgentOriginAccessControl.Properties.OriginAccessControlConfig.OriginAccessControlOriginType,'lambda');
   const code=siteTemplate.Resources.AgentCodeDeployPolicy;
   assert.equal(code.Condition,'HasAgentApi');
@@ -159,6 +162,26 @@ test('다른 소유 stack이나 불일치 배포는 변경하지 않는다',asyn
   }}),/일치하지/);
   assert.ok(calls.every(args=>!['create-stack','update-stack'].includes(args[1])));
   await assert.rejects(runAgentBootstrap({env,args:['--status'],run:()=>({Stacks:[{...agentStack,Tags:[]}]})}),/소유 태그/);
+});
+
+test('rollback 복원 완료만 재연결하고 cleanup·복원 실패 중에는 변경하지 않는다',async()=>{
+  for(const status of ['UPDATE_ROLLBACK_COMPLETE','UPDATE_ROLLBACK_COMPLETE_CLEANUP_IN_PROGRESS','UPDATE_ROLLBACK_FAILED']) {
+    const calls=[];
+    const run=args=>{
+      calls.push(args);
+      if(args[0]==='sts')return {Account:'111122223333'};
+      if(args[1]==='describe-stacks')return {Stacks:[args.includes('jeju-care-compass-agent')?agentStack:{...siteStack,StackStatus:status}]};
+      return {StackId:'test-only'};
+    };
+    const operation=runAgentBootstrap({env,args:['--link-site','--apply'],run,log:()=>{}});
+    if(status==='UPDATE_ROLLBACK_COMPLETE') {
+      assert.equal((await operation).operation,'update-stack');
+      assert.ok(calls.some(args=>args[1]==='update-stack'));
+    } else {
+      await assert.rejects(operation,/안정화/);
+      assert.ok(calls.every(args=>!['update-stack','create-stack'].includes(args[1])));
+    }
+  }
 });
 
 test('Lambda ZIP은 정적 dist 밖의 정해진 파일과 동일 커밋 메타데이터만 허용한다',async t=>{
