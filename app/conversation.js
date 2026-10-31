@@ -14,7 +14,6 @@ const MAX_HISTORY = 8;
 const MAX_HISTORY_TEXT = 2000;
 const PREFERENCES_STORAGE_KEY = 'jeju-care-preferences-v1';
 const mobileRail = window.matchMedia('(max-width:1050px)');
-const mobileBoard = window.matchMedia('(max-width:900px)');
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 const escape = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 const micIcon = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="13" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3m-4 0h8"/></svg>';
@@ -29,7 +28,6 @@ let pending = false;
 let activeRequest;
 let failedPreviewRequest;
 let conversationVersion = 0;
-let layoutFrame;
 let capabilityState = 'checking';
 let capabilities = {llm:null,model:'',phone:'not_connected',healthRecords:'not_connected',voiceInput:'browser',progress:'unavailable'};
 let latestActions = [];
@@ -62,6 +60,7 @@ function renderBoard() {
   const progress=activeRequest?.kind==='message'?activeRequest.progress:null;
   const board=getPreparationBoard(caseState,{events:latestEvents,progress,pending,responseCount,requestProblem});
   if(!manualStageSelection)selectedStageId=board.activeStageId;
+  document.getElementById('care-journey-summary').hidden=responseCount===0;
   renderPreparationBoard(board,{selectedStageId,unreadAnswer,progress});
 }
 
@@ -72,12 +71,17 @@ function openStage(id,{manual=true}={}) {
   if(id==='plan')unreadAnswer=false;
   renderBoard();
   if(id==='plan')scrollToMessage(document.querySelector('#message-list .message.assistant:last-child'));
-  updateConversationLayout();
+  else {
+    document.getElementById('preparation-details').open=true;
+    const section=document.getElementById(`stage-${id}`);
+    section.focus({preventScroll:true});
+    section.scrollIntoView({block:'start',behavior:'instant'});
+  }
 }
 
 function markAnswerReady() {
   if(!manualStageSelection)selectedStageId='plan';
-  unreadAnswer=mobileBoard.matches && selectedStageId!=='plan';
+  unreadAnswer=manualStageSelection && selectedStageId!=='plan';
 }
 
 function openAnswer() {
@@ -449,11 +453,10 @@ function appendMessage({role,text,id=makeId(),events=[],greeting=false,isExample
 }
 
 function scrollToLatest() {
-  const scroll = document.getElementById('conversation-scroll');
   const request=activeRequest;
   requestAnimationFrame(()=>{
     if(request && activeRequest!==request)return;
-    if(scroll.getBoundingClientRect().height)scroll.scrollTop=scroll.scrollHeight;
+    document.querySelector('#message-list .message:last-child')?.scrollIntoView({block:'start',behavior:'instant'});
   });
 }
 
@@ -461,9 +464,7 @@ function scrollToMessage(node) {
   if(!node)return;
   requestAnimationFrame(()=>{
     if(!node.isConnected)return;
-    const scroll=document.getElementById('conversation-scroll');
-    if(!scroll.getBoundingClientRect().height)return;
-    scroll.scrollTop+=node.getBoundingClientRect().top-scroll.getBoundingClientRect().top-14;
+    node.scrollIntoView({block:'start',behavior:'instant'});
   });
 }
 
@@ -474,22 +475,6 @@ function resizeInput() {
   document.getElementById('send-request').disabled = pending || Boolean(activeRecognition) || !input.value.trim();
   document.getElementById('character-count').textContent = `${input.value.length}/${MAX_MESSAGE}`;
   for(const button of document.querySelectorAll('[data-contact-draft],[data-journey-draft],[data-journey-scenario],[data-call-recovery-scenario]'))button.disabled=pending || Boolean(activeRecognition);
-  updateConversationLayout();
-}
-
-// 짧은 화면·긴 입력·확대 글꼴에서도 공유 입력과 고지로 스크롤할 수 있다.
-function updateConversationLayout() {
-  cancelAnimationFrame(layoutFrame);
-  layoutFrame=requestAnimationFrame(()=>{
-    const workspace=document.querySelector('.chat-workspace');
-    const board=document.getElementById('preparation-board');
-    if(!workspace || !board)return;
-    const viewportHeight=Math.min(window.innerHeight,window.visualViewport?.height ?? window.innerHeight);
-    const shortScreen=viewportHeight<=720;
-    const enlarged=parseFloat(getComputedStyle(document.getElementById('request-input')).fontSize)>=24 || [...board.querySelectorAll('.stage-pane-header h2')].some(node=>node.getBoundingClientRect().height && parseFloat(getComputedStyle(node).fontSize)>=24);
-    workspace.classList.toggle('expanded-reading',enlarged);
-    workspace.classList.toggle('flow-layout',shortScreen || enlarged);
-  });
 }
 
 function fillRequestDraft(text,{source='요청 예시',focus=true}={}) {
@@ -517,7 +502,6 @@ function setPending(value) {
   for (const button of document.querySelectorAll('[data-example]')) button.disabled=value;
   for (const button of document.querySelectorAll('[data-contact-draft],[data-journey-draft],[data-journey-scenario],[data-call-recovery-scenario]')) button.disabled=value || Boolean(activeRecognition);
   renderBoard();
-  updateConversationLayout();
   if (value) scrollToLatest();
 }
 
@@ -822,6 +806,7 @@ function resetConversation({focus=true,force=false}={}) {
   caseState=createDemoCase();sessionId=undefined;history=[];latestActions=[];latestEvents=[];responseCount=0;previewMode=false;failedRequests.clear();
   preferencesNeedApply=true;
   document.getElementById('message-list').replaceChildren();
+  document.getElementById('preparation-details').open=false;
   welcomeMessage();document.getElementById('starter-prompts').hidden=false;
   document.getElementById('request-input').value='';resizeInput();renderSnapshot();updateCapabilities();
   document.getElementById('conversation-status').textContent='새 가상 사례로 대화를 시작합니다.';
@@ -842,7 +827,7 @@ function welcomeMessage() {
 
 function mount() {
   const brand=`<img src="/assets/hondi-logo-v1.png" alt="" width="480" height="168"/>`;
-  const planContent=`<div class="conversation-scroll stage-pane-body" id="conversation-scroll" tabindex="0" aria-label="방문 계획과 준비 대화"><section class="care-journey-summary" id="care-journey-summary" aria-label="현재 진료 연결과 다음 행동"><div class="journey-summary-state"><h3>현재</h3><strong id="care-journey-current">미확인</strong></div><button type="button" id="open-care-journey" aria-haspopup="dialog" aria-controls="care-journey-dialog">여정·할 일 보기${icon('chevron')}</button><p class="journey-summary-next"><span>다음</span><strong id="care-journey-next"></strong></p></section><div class="message-list" id="message-list" role="log" aria-label="진료 준비 대화" aria-live="polite" aria-relevant="additions"></div><details class="stage-log" data-stage-log hidden><summary><span data-stage-log-label>처리 기록</span>${icon('chevron')}</summary><div data-stage-events></div></details></div>`;
+  const planContent=`<div class="conversation-scroll stage-pane-body" id="conversation-scroll" aria-label="방문 계획과 준비 대화"><section class="care-journey-summary" id="care-journey-summary" aria-label="현재 진료 연결과 다음 행동"><div class="journey-summary-state"><h3>현재</h3><strong id="care-journey-current">미확인</strong></div><button type="button" id="open-care-journey" aria-haspopup="dialog" aria-controls="care-journey-dialog">여정·할 일 보기${icon('chevron')}</button><p class="journey-summary-next"><span>다음</span><strong id="care-journey-next"></strong></p></section><div class="message-list" id="message-list" role="log" aria-label="진료 준비 대화" aria-live="polite" aria-relevant="additions"></div><details class="stage-log" data-stage-log hidden><summary><span data-stage-log-label>처리 기록</span>${icon('chevron')}</summary><div data-stage-events></div></details></div>`;
   const menuIcon='<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>';
   document.getElementById('app').innerHTML=`
     <div class="app-shell">
@@ -889,7 +874,7 @@ function mount() {
           <div class="mobile-case-summary" id="mobile-case-summary" aria-label="이번 방문 요약" hidden></div>
           <div class="conversation-layout">
             <section class="chat-workspace" aria-labelledby="conversation-title">
-              <div class="chat-toolbar"><h2 id="conversation-title">진료 준비 작업</h2><button type="button" id="preview-button" class="preview-button">대화 흐름 미리보기${icon('chevron')}</button></div>
+              <div class="chat-toolbar"><h2 id="conversation-title">진료 준비</h2><button type="button" id="preview-button" class="preview-button">대화 흐름 미리보기${icon('chevron')}</button></div>
               <p class="mode-notice" id="mode-notice">연결 범위를 확인하고 있어요.</p>
               <p class="board-activity" id="board-activity" role="status" aria-live="polite"></p>
               ${preparationBoardMarkup(planContent)}
@@ -955,6 +940,7 @@ function mount() {
   document.getElementById('preview-button').addEventListener('click',()=>showPreview());
   document.getElementById('save-report').addEventListener('click',saveReport);
   document.getElementById('stage-navigation').addEventListener('click',event=>{const button=event.target.closest('[data-open-stage]');if(button)openStage(button.dataset.openStage);});
+  document.getElementById('preparation-details').addEventListener('toggle',renderBoard);
   document.getElementById('answer-ready-notice').addEventListener('click',()=>openStage('plan'));
   document.getElementById('expand-answer').addEventListener('click',openAnswer);
   const answerDialog=document.getElementById('answer-dialog');
@@ -1027,18 +1013,12 @@ function mount() {
     }
   });
   mobileRail.addEventListener('change',()=>{const focusedRail=document.getElementById('care-rail').contains(document.activeElement);closeCareMenu({restoreFocus:false});if(mobileRail.matches && focusedRail)document.getElementById('open-care-menu').focus();});
-  mobileBoard.addEventListener('change',()=>{renderBoard();updateConversationLayout();});
   closeCareMenu({restoreFocus:false});
   window.addEventListener('beforeunload',event=>{if(hasConversationWork()){event.preventDefault();event.returnValue='';}});
   document.addEventListener('click',event=>{
     const example=event.target.closest('[data-example]');if(example && !pending)fillRequestDraft(example.dataset.example);
     const retry=event.target.closest('[data-retry]');if(retry && failedRequests.has(retry.dataset.retry))sendRequest(failedRequests.get(retry.dataset.retry).text,retry.dataset.retry);
   });
-  const layoutObserver=new ResizeObserver(updateConversationLayout);
-  for(const node of document.querySelectorAll('.chat-toolbar,.mode-notice,.starter-prompts,.conversation-form,.composer-notes,.pending-message'))layoutObserver.observe(node);
-  window.addEventListener('resize',updateConversationLayout);
-  window.visualViewport?.addEventListener('resize',updateConversationLayout);
-  document.fonts.ready.then(updateConversationLayout);
   resizeInput();
   fetch(API+'/capabilities',{cache:'no-store'}).then(response=>{if(!response.ok)throw new Error('unavailable');return response.json();}).then(data=>updateCapabilities(data.capabilities || data)).catch(()=>updateCapabilities({llm:false}));
 }
