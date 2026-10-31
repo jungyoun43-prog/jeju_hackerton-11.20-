@@ -239,3 +239,24 @@ test('허브 공개 미리보기 후보도 사례와 문의 단계에 연결하�
   assert.throws(() => action(next, 'SUBMIT_PACKET'), /두 기관/);
   assert.throws(() => action(next, 'SELECT_LOCAL_HOSPITAL', { hospital: { ...hospital, source: { ...hospital.source, url: 'https://example.invalid/' } } }), /기관 자료/);
 });
+
+test('이동 문의는 의료진 회신을 보존하고 제주 기관 변경은 이동 답변만 재확인한다', () => {
+  const provider = {
+    id: 'synthetic-taxi-domain', kind: 'taxi', name: '합성 애월 문의처', region: '애월읍', address: '', phone: '064-000-0000',
+    serviceType: 'call_taxi', description: '검사 전용 합성 기관',
+    source: { datasetId: '327', url: 'https://www.data.go.kr/data/15056321/fileData.do', hubUrl: 'https://jejudatahub.net/data/view/data/327', scope: 'linked-public-file', asOf: '2026-03-19', retrievedAt: '2026-10-31' },
+  };
+  let state = reviewedState();
+  const clinical = structuredClone(state.review);
+  state = action(state, 'SUPPORT_SELECT_PROVIDER', { kind: 'taxi', provider });
+  state = action(state, 'SUPPORT_PREPARE_INQUIRY', { kind: 'taxi' });
+  state = action(state, 'SUPPORT_RECORD_RESPONSE', { kind: 'taxi', outcome: 'available' });
+  assert.deepEqual(state.review, clinical);
+  assert.equal(getTasks(state)[0].action, 'plan');
+  const changed = action(state, 'SELECT_LOCAL_HOSPITAL', { hospital: importedHospital('새 합성 제주 기관') });
+  assert.equal(changed.visitSupport.taxi.status, 'needs_recheck');
+  assert.equal(changed.visitSupport.taxi.response, '');
+  assert.match(changed.visitSupport.taxi.inquiry, /새 합성 제주 기관/);
+  assert.deepEqual(changed.documents, state.documents);
+  assert.equal(changed.review.status, 'not_requested');
+});
