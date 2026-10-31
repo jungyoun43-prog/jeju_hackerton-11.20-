@@ -10,7 +10,7 @@ const { buildSite } = await import('./build.mjs');
 await buildSite();
 await mkdir(resolve(root,'output'),{recursive:true});
 const zipPath = resolve(root,'output/jeju-care-compass-mvp.zip');
-const selected = ['README.md','AGENTS.md','PRODUCT.md','DESIGN.md','THIRD_PARTY.md','.env.example','package.json','package-lock.json','app','scripts','tests','docs','research','orchestration','infra','.github','dist','.impeccable/review/desktop.png','.impeccable/review/mobile.png'];
+const selected = ['README.md','AGENTS.md','PRODUCT.md','DESIGN.md','THIRD_PARTY.md','.env.example','package.json','package-lock.json','app','scripts','tests','docs','research','orchestration','infra','.github','dist','.impeccable/design.json','.impeccable/review/desktop.png','.impeccable/review/mobile.png','.impeccable/review/data-desktop.png','.impeccable/review/data-mobile.png'];
 const code = `import json,sys,zipfile,pathlib
 root=pathlib.Path(sys.argv[1]); dest=pathlib.Path(sys.argv[2]); selected=json.loads(sys.argv[3])
 safe_evidence={'orchestration/runs/browser.json','orchestration/runs/latest-eval.json','orchestration/runs/release.json','orchestration/runs/rollback.json'}
