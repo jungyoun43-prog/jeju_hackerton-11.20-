@@ -1,6 +1,6 @@
 {
   "baseCommit": "e1e7e44",
-  "updatedAt": "2026-10-31T12:37:56.908862+00:00",
+  "updatedAt": "2026-10-31T12:40:38.058609+00:00",
   "tasks": {
     "ui": {
       "phase": "verified",
@@ -32,7 +32,7 @@
     "aws-infra": {
       "phase": "verified",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-aws-infra",
-      "note": "정확한 immutable OIDC subject로 신뢰 정책 수정, 실제 CF UPDATE_COMPLETE; 최종 CI 실행 검증 중",
+      "note": "정확한 immutable production OIDC subject·기존 provider 보존, 실제 CloudFormation 완료. 최신 배포는 aws-deployment 증거를 따른다.",
       "integrationCommits": [
         "4e8393e7e5557a9e7cce5f713272f82846be2c94",
         "43b4d4d314602cdec50a773f09cb786b0975bb1b",
@@ -42,7 +42,7 @@
     "aws-ci": {
       "phase": "verified",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-aws-ci",
-      "note": "로컬42개 검사·템플릿 검증 완료; 실제 CI 상태는 aws-deployment 증거와 Actions 조회",
+      "note": "같은 SHA의 정적/서버 artifact·OIDC 게시·공개 revision 검증을 실제 Actions에서 확인",
       "integrationCommits": [
         "ba9743b414e45396603f899e4768b808c3144fcc"
       ]
@@ -155,25 +155,25 @@
     "resolution": "최신 캡처·실제 viewport·소스 delta를 읽기 전용 독립 검토하여 SHIP. 실제 임상/모델/마이크 검증은 별도"
   },
   "awsDeployment": {
-    "phase": "api_verified",
+    "phase": "verified",
     "region": "ap-northeast-2",
     "profile": "jeju-deploy",
     "githubAuthenticated": true,
     "liveUrl": "https://d1mfksxrj025bx.cloudfront.net",
     "authenticated": true,
     "stackStatus": "UPDATE_COMPLETE",
-    "ciWorkflow": "new_revision_pending",
+    "ciWorkflow": "passed",
     "evidence": "orchestration/runs/aws-deployment.json",
-    "ciRun": "https://github.com/jungyoun43-prog/jeju_hackerton-11.20-/actions/runs/41198341223",
-    "verifiedRevision": "60ad28fb0ad6a160d73a4690e51b3111746cde49",
+    "ciRun": "https://github.com/jungyoun43-prog/jeju_hackerton-11.20-/actions/runs/41202034743",
+    "verifiedRevision": "32d0694ef91b8e7d8b0de01a275ae0f374db7277",
     "apiStack": "CREATE_COMPLETE",
-    "apiRevision": "183962a",
+    "apiRevision": "32d0694ef91b8e7d8b0de01a275ae0f374db7277",
     "apiChecks": {
       "capabilities": 200,
       "fixedPreview": 200,
       "normalInput": 503,
       "directOrigin": 403
     },
-    "note": "API와 OAC는 실제 확인. 새 main 정적 UI+API 동일revision의 자동 배포 최종 확인은 진행 중"
+    "note": "실제 Actions에서 같은 커밋 정적/서버 artifact 게시·공개 revision·Lambda 코드 hash 확인. 실제 LLM·전화·공단 연결은 비활성"
   }
 }

@@ -45,7 +45,11 @@
 
 AWS 첫 site 연결은 CloudFront가 SHA256 헤더의 명시 allowlist를 거부해 rollback됐다. 실제 관리형 정책·공식 API 정의를 확인하고 `allExcept`로 host만 제외하며 cookie/query는 전달하지 않는 방식으로 수정했다. 안정화된 UPDATE_ROLLBACK_COMPLETE에서 다시 적용해 UPDATE_COMPLETE를 확인했다. cfn-lint·ValidateTemplate 통과와 실제 서비스 생성 성공은 다르다. 수정 후 API POST와 원점 차단을 실제 대조했다.
 
-이 버전의 제출 ZIP·자동규칙·새 main 동일 revision 자동 배포 최종 기록은 통합 담당자가 갱신한다. 센터 실기기 검증은 별도다.
+자동규칙 eval은 **28/28(100%)** 통과했다. 전용 worktree16개와 파일 소유권·출처·대표 비밀값 패턴·실행 소스 지문·롤백 경계를 검사한다. 임상·법률·실기관 연동·최종 제출 준비 점수는 아니다.
+
+제출 스냅샷을 새 디렉터리에 풀어 CRC·비밀파일 제외·Agent/Prompt/출처/인프라 포함, `npm ci --ignore-scripts`·검사122개·정적 빌드·Lambda 번들 빌드를 확인했다. HTTP7경로에서 화면/스크립트/개발화면/health/capabilities/preview200과 일반입력503을 대조했다. 원본과 압축해제 소스의 실행 지문은 `1d4c3051fa5aad661f8ad7d9c090c44918c8f0ff0480907e70cd6a828d7045cb`로 일치한다. `orchestration/runs/release.json`에 기록한다. 센터 실기기 검증은 별도다.
+
+실제 [Actions41202034743](https://github.com/jungyoun43-prog/jeju_hackerton-11.20-/actions/runs/41202034743)에서 `32d0694` 동일 커밋의 검사·정적/서버 ZIP 빌드·분리 artifact·OIDC 인증·웹/API 게시·공개 revision·Lambda 코드 hash 확인이 모두 성공했다. API와 정적 앱의 배포 버전이 일치하며 모델은 미연결이다. 공개 CloudFront 주소에서도 대화40/40·개발용 수동47/47 브라우저 검사가 통과했다. PC·모바일 캡처·API·보고서·실행 지문을 보존한다.
 
 ## 4. 보존한 이전 검증 이력
 

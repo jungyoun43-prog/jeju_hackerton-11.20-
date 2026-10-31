@@ -1,6 +1,6 @@
 # AWS 데모 배포와 CI/CD
 
-2026-10-31. 기존 정적 공개 데모와 이번 대화 API 준비를 구분한다. **새 대화 UI·API의 사이트 연결·공개 revision 검증은 진행 중**이다. 실제 성공·실패·수정 이력은 [구현 결과](implementation-results.md)와 GitHub Actions를 따르며 템플릿·코드 작성만으로 배포 완료를 기록하지 않는다.
+2026-10-31. 대화 UI·API의 사이트 연결과 `32d0694` 동일 revision 배포를 [실제 Actions](https://github.com/jungyoun43-prog/jeju_hackerton-11.20-/actions/runs/41202034743)에서 확인했다. 공개 API는 capabilities200·고정preview200·일반입력503, 직접 Lambda 원점은403이다. 모델/영속저장은 비활성이다. 실패·정책 수정·복구와 검증 범위는 [구현 결과](implementation-results.md)를 따른다.
 
 실제 LLM 연결은 후속 보류했다. 기본 API는 capabilities의 `llm:false`, 일반 요청의 `MODEL_NOT_CONNECTED`/503, 별도 고정 preview를 제공한다. 실제 전화·공단 기록·예약·배차·병원 전송을 활성화하지 않는다.
 

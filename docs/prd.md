@@ -8,7 +8,7 @@
 
 현재 구현은 대화 UI, `createAgentService({provider})` 공급자 인터페이스, 도구 호출 루프·인자 검증과 고정 예시다. **실제 LLM 연결은 사용자 요청으로 보류**했다. 일반 `POST /api/agent`는 `MODEL_NOT_CONNECTED`/503을 반환하며 입력을 복원한다. 별도 `POST /api/agent/preview`는 사전 작성 사례에서 공공 snapshot·상태 전이·합성 문의를 실행한다. 자유 입력에 고정 답변을 붙여 실제 모델 응답으로 표시하지 않는다.
 
-허브 계보 3종인 859 공개20행·13개 후보, 327 연결 원출처 최신택시34업체, 254 공개돌봄19개와 별도 공식안내2건을 사용한다. 기존 수동 화면은 `/workspace.html`의 개발 도구다. 개인 기록·통화·의료진 회신은 합성이며 실제 공단 연계·전화·배차·동행 배정·결제·병원 전송·예약과 임상 검증은 미완료다. 새 PC·모바일 UI·AWS revision·제출 ZIP의 최종 확인은 진행 중이며 [결과 기록](implementation-results.md)에 증거를 남긴다. 상세 API·한도는 [연결 문서](../agent/README.md), 제출 요건은 [체크리스트](submission-checklist.md)를 따른다.
+허브 계보 3종인 859 공개20행·13개 후보, 327 연결 원출처 최신택시34업체, 254 공개돌봄19개와 별도 공식안내2건을 사용한다. 기존 수동 화면은 `/workspace.html`의 개발 도구다. 개인 기록·통화·의료진 회신은 합성이며 실제 공단 연계·전화·배차·동행 배정·결제·병원 전송·예약과 임상 검증은 미완료다. PC·모바일 대화 API40개·수동 흐름47개와 제출 ZIP 독립 실행을 확인했으며, 최신 AWS revision은 [결과 기록](implementation-results.md)을 따른다. 상세 API·한도는 [연결 문서](../agent/README.md), 제출 요건은 [체크리스트](submission-checklist.md)를 따른다.
 
 ## 1. 구현목표와 분석 주제
 
@@ -160,7 +160,7 @@ MVP 밖의 항목은 실제 병원·EMR 연동, 전화망 발신, 결제·예약
 | GPU·모델 | 기본은 모델 미연결·고정 예시로 GPU 불필요. 실제 모델 연결은 후속이며 센터 실기기 검증과 별개 |
 | 실행·빌드 | `npm ci --ignore-scripts` → `npm run dev`, 검사 `npm test`, 정적 `npm run build`, 별도 `npm run build:agent`·Python3 ZIP |
 | 모델·빌드 라이브러리 | Bedrock SDK3.1161.0·esbuild0.28.2. SDK 설치만으로 실제 모델 연결을 의미하지 않음 |
-| AWS API | Node22 Lambda·AWS_IAM Function URL·CloudFront OAC, `/api/agent*` uncached. 모델/DDB 기본 비활성, 새 revision 검증 진행 중 |
+| AWS API | Node22 Lambda·AWS_IAM Function URL·CloudFront OAC, `/api/agent*` uncached. 모델/DDB 기본 비활성, 동일 revision 웹/API 자동 배포 검증 완료 |
 | 외부 의존성 | 설치 시 npm, 지도 사용 시 타일 서버·외부 지도, 배포 시 AWS·GitHub. 출처별 병원·택시·돌봄 snapshot과 로고는 포함 자산 |
 | 환경변수 | 로컬 `HOST`·`PORT`·`MAP_TILE_URL`. Lambda 후보 설정은 배포 매뉴얼, 연결은 `createAgentService({provider})`. 실제 키는 제출·브라우저 제외 |
 | 오프라인 한계 | 로컬 고정 예시는 외부 모델·DB 없이 실행. 타일·외부 지도·브라우저 음성 서비스·AWS에는 네트워크 필요 |

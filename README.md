@@ -74,7 +74,7 @@ node scripts/datahub-profile.mjs --fetch
 
 **[공개 데모](https://d1mfksxrj025bx.cloudfront.net)** · [GitHub Actions](https://github.com/jungyoun43-prog/jeju_hackerton-11.20-/actions/workflows/deploy-aws.yml)
 
-비공개 S3·CloudFront의 기존 공개 데모가 있습니다. **이번 대화 UI·API의 새 revision 배포와 PC·모바일 최종 검증은 진행 중**이며, 확인한 결과만 [검증 기록](docs/implementation-results.md)에 갱신합니다. 이전 `ad6fc2c`의 [자동 배포 성공](https://github.com/jungyoun43-prog/jeju_hackerton-11.20-/actions/runs/41198504055)을 이번 버전의 성공 증거로 사용하지 않습니다.
+대화 UI와 API를 비공개 S3·CloudFront·Lambda로 배포했습니다. `32d0694`의 [자동 배포](https://github.com/jungyoun43-prog/jeju_hackerton-11.20-/actions/runs/41202034743)에서 검사·분리 artifact·OIDC 인증·웹/API 게시와 동일 revision·Lambda 코드 hash 검증이 성공했습니다. 단위122개·대화 브라우저40개·수동 흐름47개·자동규칙28개 및 ZIP 독립 설치를 확인했으며 상세 범위와 공개 화면 기록은 [검증 기록](docs/implementation-results.md)을 따릅니다.
 
 CI는 같은 커밋의 `dist/`와 별도 `output/agent-lambda.zip`을 검사·보존합니다. backend는 명시한 배포 toggle에서만 Lambda에 직접 게시하며 사이트 S3에 ZIP을 올리지 않습니다. Lambda URL은 AWS_IAM과 CloudFront OAC를 사용하고 모델·DynamoDB는 기본 비활성입니다. AWS 장기 키를 GitHub Secrets에 넣지 않습니다. [배포 매뉴얼](docs/deployment.md)에 변수·게시·검증·롤백을 기록했습니다.
 
@@ -89,6 +89,15 @@ npm run rollback -- <통합-커밋-SHA>
 ```
 
 이 명령은 브랜치·worktree가 있는 개발 저장소용입니다. 자동 eval은 기계 검증한 규칙만 평가하며 임상·법률·데이터 권리·제출 준비 전체를 보장하지 않습니다. 선택 브라우저 검사는 Playwright와 Chromium이 필요합니다. 기존 `npm run test:browser`는 수동 화면을, `npm run test:conversation`은 대화 화면을 확인합니다. 모의 음성 결과를 실제 마이크 검증으로 표시하지 않습니다.
+
+개발 서버를 실행한 상태에서 별도 터미널로 선택 QA 도구를 설치·실행합니다. 기존 설치는 `PLAYWRIGHT_MODULE`, `CHROMIUM_PATH`, 서버 주소는 `BASE_URL`로 지정할 수 있습니다.
+
+```bash
+npm install --no-save --package-lock=false playwright@1.64.1
+npx playwright install chromium
+npm run test:conversation
+npm run test:browser
+```
 
 ```bash
 APP_REVISION=local-preview npm run build:agent
