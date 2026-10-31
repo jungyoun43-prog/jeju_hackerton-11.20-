@@ -25,6 +25,7 @@ test('애월 출발은 애월콜을 먼저 찾고 지역 근거를 표시한다'
   assert.equal(candidates[0].matchLevel, 'local');
   assert.match(candidates[0].matchLabel, /확인 필요/);
   assert.ok(!candidates.some(provider => provider.region === '서귀포시'));
+  assert.equal(getSupportCandidates(registry, {kind: 'taxi', area: '애월'})[0].name, '애월콜');
 });
 
 test('서귀포 출발에 애월 업체를 일치 후보로 표시하지 않는다', () => {
@@ -51,6 +52,7 @@ test('병원동행 공식 소개와 일반 돌봄 등록 문의처를 구분한�
   assert.ok(care);
   assert.match(care.description, /병원 동행 제공.*확인되지/);
   assert.equal(care.matchLevel, 'city');
+  assert.ok(!candidates.some(provider => provider.region === '조천읍'));
 });
 
 test('지역이 없으면 근접 거리나 일치 지역을 생성하지 않는다', () => {

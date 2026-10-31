@@ -6,8 +6,8 @@ const NORTH = ['애월읍', '한림읍', '한경면', '조천읍', '구좌읍', 
 const SOUTH = ['대정읍', '남원읍', '성산읍', '안덕면', '표선면', '중문'];
 
 function cityOf(value) {
-  if (value.includes('서귀포시') || SOUTH.some(place => value.includes(place))) return '서귀포시';
-  if (value.includes('제주시') || NORTH.some(place => value.includes(place))) return '제주시';
+  if (value.includes('서귀포시') || SOUTH.some(place => value.includes(place.replace(/[읍면]$/, '')))) return '서귀포시';
+  if (value.includes('제주시') || NORTH.some(place => value.includes(place.replace(/[읍면]$/, '')))) return '제주시';
   return '';
 }
 
@@ -110,11 +110,11 @@ export function getSupportCandidates(registry, {kind, area = '', wheelchair = fa
   const query = area.trim(), city = cityOf(query);
   return registry.providers.filter(provider => provider.kind === kind).map(provider => {
     const providerCity = cityOf(`${provider.region} ${provider.address}`);
-    const local = provider.region !== city && provider.region !== '제주특별자치도' && query.includes(provider.region);
+    const local = provider.region !== city && provider.region !== '제주특별자치도' && query.includes(provider.region.replace(/[읍면동]$/, ''));
     const sameCity = city && providerCity === city;
     const official = ['hospital_escort', 'accessible_transport'].includes(provider.serviceType);
     if (city && providerCity && providerCity !== city && !official) return null;
-    if (kind === 'taxi' && !local && provider.region !== city && !official && city) return null;
+    if (!local && provider.region !== city && !official && city) return null;
     if (!local && !sameCity && !official && city) return null;
     const matchLevel = local ? 'local' : sameCity ? 'city' : official ? 'island' : 'unverified';
     const matchLabel = local ? '등록 지역 일치 · 서비스 확인 필요' : sameCity ? '같은 시의 문의처 · 담당지역 확인' : official ? '공식 서비스 안내 · 지원지역 확인' : '출발 지역 확인 필요';
