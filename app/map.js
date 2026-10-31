@@ -1,5 +1,6 @@
 let map;
 let fallbackTimer;
+let mapLoaded = false;
 
 export const DEMO_LOCATIONS = {
   home: [33.461, 126.31],
@@ -17,6 +18,14 @@ export function googleMapUrl(directions = false) {
 export function destroyMap() {
   clearTimeout(fallbackTimer);
   if (map) { map.remove(); map = undefined; }
+  mapLoaded = false;
+}
+
+export function refreshMap() {
+  if (!map) return;
+  const hint = map.getContainer().parentElement?.querySelector('.map-load-state');
+  if (hint && mapLoaded) hint.hidden = true;
+  requestAnimationFrame(() => map?.invalidateSize({ pan: false }));
 }
 
 export async function mountMap(id = 'care-map') {
@@ -35,9 +44,9 @@ export async function mountMap(id = 'care-map') {
     maxZoom: 18,
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors',
   });
-  const hint = container.parentElement.querySelector('.map-load-state');
-  tile.on('load', () => { if (hint) hint.hidden = true; clearTimeout(fallbackTimer); });
-  tile.on('tileerror', () => { if (hint) { hint.hidden = false; hint.textContent = '지도 배경 연결을 확인해 주세요 · 외부 지도에서 열 수 있어요'; } });
+  const currentHint = () => container.parentElement?.querySelector('.map-load-state');
+  tile.on('load', () => { mapLoaded = true; const hint = currentHint(); if (hint) hint.hidden = true; clearTimeout(fallbackTimer); });
+  tile.on('tileerror', () => { const hint = currentHint(); if (hint) { hint.hidden = false; hint.textContent = '지도 배경 연결을 확인해 주세요 · 외부 지도에서 열 수 있어요'; } });
   tile.addTo(map);
   const marker = (position, type, label) => {
     const artwork = type === 'home'
@@ -50,5 +59,5 @@ export async function mountMap(id = 'care-map') {
   marker(DEMO_LOCATIONS.home, 'home', '부모님 댁 · 가상 위치');
   marker(DEMO_LOCATIONS.hospital, 'hospital', '제주 협진 병원 · 가상 위치');
   map.fitBounds([DEMO_LOCATIONS.home, DEMO_LOCATIONS.hospital], { padding: [45, 45], maxZoom: 10 });
-  fallbackTimer = setTimeout(() => { if (hint) { hint.hidden = false; hint.textContent = '지도 연결이 지연되고 있어요 · Google 지도에서 위치 보기'; } }, 6500);
+  fallbackTimer = setTimeout(() => { const hint = currentHint(); if (hint) { hint.hidden = false; hint.textContent = '지도 연결이 지연되고 있어요 · Google 지도에서 위치 보기'; } }, 6500);
 }

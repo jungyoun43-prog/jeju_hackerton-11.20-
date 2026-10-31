@@ -7,7 +7,7 @@
   text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased;
 }
 * { box-sizing: border-box; }
-body { margin: 0; }
+body { margin: 0; word-break: keep-all; overflow-wrap: break-word; }
 button, input, textarea, select { font: inherit; }
 button, a, input, textarea, select, summary { -webkit-tap-highlight-color: transparent; }
 button, a, summary { touch-action: manipulation; }
@@ -91,9 +91,9 @@ button { border: 0; background: transparent; color: inherit; }
 .panel-top h3 { font-size: 15px; font-weight: 700; }
 .panel-meta { color: var(--muted); font-size: 11px; }
 .steps { display: flex; padding: 0; margin: 0; list-style: none; }
-.step { display: flex; align-items: center; gap: 9px; flex: 1; font-size: 12px; position: relative; color: #6d7d74; }
+.step { display: flex; align-items: center; gap: 9px; flex: 1; font-size: 12px; position: relative; color: #617069; }
 .step:not(:last-child)::after { content: ''; height: 1px; flex: 1; margin: 0 16px; background: #e0e7e0; }
-.step-dot { width: 25px; height: 25px; border-radius: 50%; display: grid; place-items: center; font-size: 10px; background: #f0f3ed; color: #6d7d74; flex-shrink: 0; }
+.step-dot { width: 25px; height: 25px; border-radius: 50%; display: grid; place-items: center; font-size: 10px; background: #f0f3ed; color: #617069; flex-shrink: 0; }
 .step-dot .icon { width: 13px; height: 13px; }
 .step.done { color: var(--teal); }
 .step.done .step-dot { background: #e1eee5; color: var(--teal); }

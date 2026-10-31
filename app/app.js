@@ -1,6 +1,6 @@
 import { createDemoCase, applyAction, getTasks, getProgress, getSummary, calculateBurden, buildReport, DOCUMENT_DEFINITIONS } from './domain.js';
 import { icon } from './icons.js';
-import { mountMap, destroyMap, googleMapUrl } from './map.js';
+import { mountMap, destroyMap, refreshMap, googleMapUrl } from './map.js';
 
 let state = createDemoCase();
 let currentView = 'overview';
@@ -117,11 +117,16 @@ function plan() {
 
 function render() {
   const focused = document.activeElement?.id;
-  destroyMap();
+  const retainedMap = ['overview', 'plan'].includes(currentView) ? document.getElementById('care-map') : null;
+  if (retainedMap) retainedMap.remove();
+  else destroyMap();
   const content = { overview, documents, calls, plan }[currentView]();
   document.getElementById('app').innerHTML = `<div class="app-layout"><aside class="sidebar" aria-label="주 탐색"><a class="brand" href="#overview" data-nav="overview" aria-label="제주 진료 나침반, 진료 준비로"><span class="brand-mark">${icon('compass')}</span><span class="brand-name">제주<br><span>진료 나침반</span></span></a><p class="sidebar-caption">우리 가족 워크스페이스</p><nav class="nav-list">${Object.entries(views).map(([key, [label, symbol]]) => `<button class="nav-item ${key === currentView ? 'active' : ''}" data-nav="${key}" ${key === currentView ? 'aria-current="page"' : ''} title="${label}">${icon(symbol)}<span class="nav-label">${label}</span>${key === 'documents' ? `<span class="nav-count">${getProgress(state).total - getProgress(state).prepared}</span>` : ''}</button>`).join('')}</nav><div class="sidebar-spacer"></div><div class="sidebar-note">${icon('leaf')}<strong>제주에서, 함께</strong>진료 준비의 작은 빈틈까지<br>가족과 나침반이 함께 챙겨요.</div><div class="profile"><div class="avatar">${escape((state.patient.caregiver || '보호자').slice(-2))}</div><div><strong>${escape(state.patient.caregiver)} 님</strong><small>보호자 · 시연 계정</small></div></div></aside><div class="workspace"><header class="topbar"><div class="breadcrumb"><span>가족 진료 워크스페이스</span>${icon('chevron')}<strong>${views[currentView][0]}</strong></div><div class="topbar-actions"><span class="demo-pill">합성 사례 · 시연 모드</span><button class="icon-button" data-report title="진행 보고서 내려받기" aria-label="진행 보고서 내려받기">${icon('download')}</button><button class="icon-button" data-reset title="시연 처음으로" aria-label="시연 처음으로">${icon('refresh')}</button></div></header><main class="main" id="main" tabindex="-1">${content}<footer class="footnote"><span>${icon('shield')}전화·자료 전송·의료진 회신은 시뮬레이션입니다. 실제 예약·협진은 확정되지 않았어요.</span><button class="text-button" data-report>진행 보고서 저장${icon('download')}</button></footer></main></div></div><div class="toast" id="toast" role="status" aria-live="polite" hidden></div>`;
   if (focused && document.getElementById(focused)) document.getElementById(focused).focus({ preventScroll: true });
-  if (document.getElementById('care-map')) mountMap();
+  if (retainedMap && document.getElementById('care-map')) {
+    document.getElementById('care-map').replaceWith(retainedMap);
+    refreshMap();
+  } else if (document.getElementById('care-map')) mountMap();
 }
 
 function notify(message, error = false) {
