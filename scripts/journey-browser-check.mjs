@@ -220,11 +220,22 @@ async function verifySummary(page,panel,summary,prefix) {
 function verifyScenario(summary,state,text,prefix,id) {
   const all=summaryText(summary);
   if(id==='missing_record') {
-    const missing=state.documents?.find(document=>document.id==='report')?.status!=='ready';
-    const issuance=summary.tasks.some(task=>/판독문/.test(`${task.title} ${task.detail}`) && /발급/.test(`${task.title} ${task.detail}`));
-    const dependent=summary.tasks.some(task=>task.status==='blocked' && /제출/.test(`${task.title} ${task.detail}`) && /발급|누락|미준비|필요|먼저|후/.test(task.detail));
-    const inquiry=summary.findings.some(item=>/발급/.test(`${item.label} ${item.detail}`)) && summary.findings.some(item=>/제출/.test(`${item.label} ${item.detail}`));
-    record(`${prefix} 누락 자료의 발급→제주 제출 의존 할 일·문의 반영`,missing && issuance && dependent && inquiry && /판독문/.test(text));
+    const tasks=new Map(summary.tasks.map(task=>[task.id,task]));
+    const issuance=tasks.get('report-issuance'),obtain=tasks.get('report-obtain'),submission=tasks.get('report-submission'),delivery=tasks.get('report-delivery');
+    const issuanceFinding=summary.findings.find(item=>item.target==='mainland' && /판독문.*발급.*절차/.test(item.label));
+    const submissionFinding=summary.findings.find(item=>item.target==='jeju' && /제출.*방식/.test(item.label));
+    // 방법은 원본 확보 전에 물을 수 있다. 문의 완료를 실제 자료 발급·전달로 읽지 않는다.
+    const inquiriesReady=issuance?.status==='ready' && submission?.status==='ready' && issuanceFinding?.isSimulation===true && submissionFinding?.isSimulation===true
+      && Date.parse(issuanceFinding.at)<=Date.parse(submissionFinding.at) && /발급.*절차/.test(issuance.detail) && /파일 형식|제출 경로/.test(submission.detail);
+    const originalPending=state.documents?.find(document=>document.id==='report')?.status==='missing' && obtain?.status==='todo'
+      && /원본/.test(obtain.title) && /작성일/.test(obtain.title) && /절차.*(?:먼저|뒤)/.test(obtain.detail) && /실제 발급.*아니/.test(obtain.detail)
+      && summary.nextActions.some(action=>action.id===obtain.id) && includes(text,obtain.detail);
+    record(`${prefix} 발급·제출 방법의 합성 문의 완료와 원본·작성일 확보 할 일을 구분`,inquiriesReady && originalPending);
+    const deliveryBlocked=delivery?.status==='blocked' && /원본/.test(delivery.detail) && /제출 방식/.test(delivery.detail) && /선행|먼저|필요/.test(delivery.detail)
+      && /본인|대리/.test(delivery.detail) && /공유 범위/.test(delivery.detail) && /수신 확인/.test(delivery.detail)
+      && summary.nextActions.some(action=>action.id===delivery.id) && includes(text,delivery.detail);
+    const unsent=state.packet?.status==='draft' && state.packet.submittedAt===null && boundarySafe(summary) && /실제.*(?:전송|수신).*미실행/.test(submission?.detail??'');
+    record(`${prefix} 원본·공유 권한 선행 조건으로 실제 전달은 차단·미전송`,deliveryBlocked && unsent,'절차 문의 ready · 원본 확보 todo · 실제 전달 blocked · packet draft/submittedAt null');
   } else if(id==='jeju_unavailable') {
     const rejection=summary.findings.some(item=>item.target==='jeju' && /거절|미참여|참여하지|접수.*불가/.test(`${item.label} ${item.detail}`));
     const followup=summary.nextActions.some(item=>/다른|다음|대안|후보/.test(`${item.title} ${item.detail}`) && /문의|접수|절차/.test(`${item.title} ${item.detail}`));
