@@ -1,0 +1,1024 @@
+{
+  "schemaVersion": 1,
+  "retrievedAt": "2026-10-31",
+  "datasets": [
+    {
+      "id": "327",
+      "name": "제주특별자치도_콜택시업체현황",
+      "hubUrl": "https://jejudatahub.net/data/view/data/327",
+      "sourceUrl": "https://www.data.go.kr/data/15056321/fileData.do",
+      "scope": "linked-public-file",
+      "asOf": "2026-03-19",
+      "rowCount": 34,
+      "fileName": "제주특별자치도_콜택시업체현황_20260319.csv",
+      "fileSha256": "a5aacd355425c55d98bd08d965423f206c589a7aeab722b13d7d99d0a8d88d2b",
+      "hubPreview": {
+        "asOf": "2020-04-30",
+        "rowCount": 45
+      },
+      "note": "허브의 과거 미리보기 대신 연결 원출처 공개 CSV를 사용. 가입대수·실시간 빈차·운임 정보는 없음."
+    },
+    {
+      "id": "254",
+      "name": "제주특별자치도_노인돌봄서비스시설현황",
+      "hubUrl": "https://jejudatahub.net/data/view/data/254",
+      "sourceUrl": "https://jejudatahub.net/data/view/data/254",
+      "scope": "public-preview",
+      "asOf": "2020-04-17",
+      "rowCount": 19,
+      "note": "과거 등록 문의처이며 현재 병원동행 제공 여부 미확인."
+    }
+  ],
+  "providers": [
+    {
+      "id": "taxi327-1",
+      "kind": "taxi",
+      "name": "평화로콜",
+      "region": "제주시",
+      "address": "",
+      "phone": "064-747-1011",
+      "serviceType": "call_taxi",
+      "description": "지역별 호출택시 문의처입니다. 현재 차량·배차·운임·휠체어 탑승 가능 여부는 문의가 필요합니다.",
+      "source": {
+        "datasetId": "327",
+        "url": "https://www.data.go.kr/data/15056321/fileData.do",
+        "hubUrl": "https://jejudatahub.net/data/view/data/327",
+        "scope": "linked-public-file",
+        "asOf": "2026-03-19",
+        "retrievedAt": "2026-10-31"
+      }
+    },
+    {
+      "id": "taxi327-2",
+      "kind": "taxi",
+      "name": "제주개인브랜드콜",
+      "region": "제주시",
+      "address": "",
+      "phone": "064-727-1111",
+      "serviceType": "call_taxi",
+      "description": "지역별 호출택시 문의처입니다. 현재 차량·배차·운임·휠체어 탑승 가능 여부는 문의가 필요합니다.",
+      "source": {
+        "datasetId": "327",
+        "url": "https://www.data.go.kr/data/15056321/fileData.do",
+        "hubUrl": "https://jejudatahub.net/data/view/data/327",
+        "scope": "linked-public-file",
+        "asOf": "2026-03-19",
+        "retrievedAt": "2026-10-31"
+      }
+    },
+    {
+      "id": "taxi327-3",
+      "kind": "taxi",
+      "name": "VIP호출택시",
+      "region": "제주시",
+      "address": "",
+      "phone": "064-711-6666",
+      "serviceType": "call_taxi",
+      "description": "지역별 호출택시 문의처입니다. 현재 차량·배차·운임·휠체어 탑승 가능 여부는 문의가 필요합니다.",
+      "source": {
+        "datasetId": "327",
+        "url": "https://www.data.go.kr/data/15056321/fileData.do",
+        "hubUrl": "https://jejudatahub.net/data/view/data/327",
+        "scope": "linked-public-file",
+        "asOf": "2026-03-19",
+        "retrievedAt": "2026-10-31"
+      }
+    },
+    {
+      "id": "taxi327-4",
+      "kind": "taxi",
+      "name": "삼화외도콜",
+      "region": "제주시",
+      "address": "",
+      "phone": "064-743-0404",
+      "serviceType": "call_taxi",
+      "description": "지역별 호출택시 문의처입니다. 현재 차량·배차·운임·휠체어 탑승 가능 여부는 문의가 필요합니다.",
+      "source": {
+        "datasetId": "327",
+        "url": "https://www.data.go.kr/data/15056321/fileData.do",
+        "hubUrl": "https://jejudatahub.net/data/view/data/327",
+        "scope": "linked-public-file",
+        "asOf": "2026-03-19",
+        "retrievedAt": "2026-10-31"
+      }
+    },
+    {
+      "id": "taxi327-5",
+      "kind": "taxi",
+      "name": "한라산호출",
+      "region": "제주시",
+      "address": "",
+      "phone": "064-755-1950",
+      "serviceType": "call_taxi",
+      "description": "지역별 호출택시 문의처입니다. 현재 차량·배차·운임·휠체어 탑승 가능 여부는 문의가 필요합니다.",
+      "source": {
+        "datasetId": "327",
+        "url": "https://www.data.go.kr/data/15056321/fileData.do",
+        "hubUrl": "https://jejudatahub.net/data/view/data/327",
+        "scope": "linked-public-file",
+        "asOf": "2026-03-19",
+        "retrievedAt": "2026-10-31"
+      }
+    },
+    {
+      "id": "taxi327-6",
+      "kind": "taxi",
+      "name": "5.16콜",
+      "region": "제주시",
+      "address": "",
+      "phone": "064-751-6516",
+      "serviceType": "call_taxi",
+      "description": "지역별 호출택시 문의처입니다. 현재 차량·배차·운임·휠체어 탑승 가능 여부는 문의가 필요합니다.",
+      "source": {
+        "datasetId": "327",
+        "url": "https://www.data.go.kr/data/15056321/fileData.do",
+        "hubUrl": "https://jejudatahub.net/data/view/data/327",
+        "scope": "linked-public-file",
+        "asOf": "2026-03-19",
+        "retrievedAt": "2026-10-31"
+      }
+    },
+    {
+      "id": "taxi327-7",
+      "kind": "taxi",
+      "name": "부두콜",
+      "region": "제주시",
+      "address": "",
+      "phone": "064-751-4321",
+      "serviceType": "call_taxi",
+      "description": "지역별 호출택시 문의처입니다. 현재 차량·배차·운임·휠체어 탑승 가능 여부는 문의가 필요합니다.",
+      "source": {
+        "datasetId": "327",
+        "url": "https://www.data.go.kr/data/15056321/fileData.do",
+        "hubUrl": "https://jejudatahub.net/data/view/data/327",
+        "scope": "linked-public-file",
+        "asOf": "2026-03-19",
+        "retrievedAt": "2026-10-31"
+      }
+    },
+    {
+      "id": "taxi327-8",
+      "kind": "taxi",
+      "name": "봉개콜택시",
+      "region": "제주시",
+      "address": "",
+      "phone": "064-723-3999",
+      "serviceType": "call_taxi",
+      "description": "지역별 호출택시 문의처입니다. 현재 차량·배차·운임·휠체어 탑승 가능 여부는 문의가 필요합니다.",
+      "source": {
+        "datasetId": "327",
+        "url": "https://www.data.go.kr/data/15056321/fileData.do",
+        "hubUrl": "https://jejudatahub.net/data/view/data/327",
+        "scope": "linked-public-file",
+        "asOf": "2026-03-19",
+        "retrievedAt": "2026-10-31"
+      }
+    },
+    {
+      "id": "taxi327-9",
+      "kind": "taxi",
+      "name": "골프연합",
+      "region": "제주시",
+      "address": "",
+      "phone": "064-723-7900",
+      "serviceType": "call_taxi",
+      "description": "지역별 호출택시 문의처입니다. 현재 차량·배차·운임·휠체어 탑승 가능 여부는 문의가 필요합니다.",
+      "source": {
+        "datasetId": "327",
+        "url": "https://www.data.go.kr/data/15056321/fileData.do",
+        "hubUrl": "https://jejudatahub.net/data/view/data/327",
+        "scope": "linked-public-file",
+        "asOf": "2026-03-19",
+        "retrievedAt": "2026-10-31"
+      }
+    },
+    {
+      "id": "taxi327-10",
+      "kind": "taxi",
+      "name": "대형점보택시",
+      "region": "제주시",
+      "address": "",
+      "phone": "064-722-0030",
+      "serviceType": "call_taxi",
+      "description": "지역별 호출택시 문의처입니다. 현재 차량·배차·운임·휠체어 탑승 가능 여부는 문의가 필요합니다.",
+      "source": {
+        "datasetId": "327",
+        "url": "https://www.data.go.kr/data/15056321/fileData.do",
+        "hubUrl": "https://jejudatahub.net/data/view/data/327",
+        "scope": "linked-public-file",
+        "asOf": "2026-03-19",
+        "retrievedAt": "2026-10-31"
+      }
+    },
+    {
+      "id": "taxi327-11",
+      "kind": "taxi",
+      "name": "삼삼콜",
+      "region": "제주시",
+      "address": "",
+      "phone": "064-713-3332",
+      "serviceType": "call_taxi",
+      "description": "지역별 호출택시 문의처입니다. 현재 차량·배차·운임·휠체어 탑승 가능 여부는 문의가 필요합니다.",
+      "source": {
+        "datasetId": "327",
+        "url": "https://www.data.go.kr/data/15056321/fileData.do",
+        "hubUrl": "https://jejudatahub.net/data/view/data/327",
+        "scope": "linked-public-file",
+        "asOf": "2026-03-19",
+        "retrievedAt": "2026-10-31"
+      }
+    },
+    {
+      "id": "taxi327-12",
+      "kind": "taxi",
+      "name": "교래번영콜",
+      "region": "조천읍",
+      "address": "",
+      "phone": "064-727-0082",
+      "serviceType": "call_taxi",
+      "description": "지역별 호출택시 문의처입니다. 현재 차량·배차·운임·휠체어 탑승 가능 여부는 문의가 필요합니다.",
+      "source": {
+        "datasetId": "327",
+        "url": "https://www.data.go.kr/data/15056321/fileData.do",
+        "hubUrl": "https://jejudatahub.net/data/view/data/327",
+        "scope": "linked-public-file",
+        "asOf": "2026-03-19",
+        "retrievedAt": "2026-10-31"
+      }
+    },
+    {
+      "id": "taxi327-13",
+      "kind": "taxi",
+      "name": "조천/함덕콜",
+      "region": "조천읍",
+      "address": "",
+      "phone": "064-784-8288",
+      "serviceType": "call_taxi",
+      "description": "지역별 호출택시 문의처입니다. 현재 차량·배차·운임·휠체어 탑승 가능 여부는 문의가 필요합니다.",
+      "source": {
+        "datasetId": "327",
+        "url": "https://www.data.go.kr/data/15056321/fileData.do",
+        "hubUrl": "https://jejudatahub.net/data/view/data/327",
+        "scope": "linked-public-file",
+        "asOf": "2026-03-19",
+        "retrievedAt": "2026-10-31"
+      }
+    },
+    {
+      "id": "taxi327-14",
+      "kind": "taxi",
+      "name": "애월콜",
+      "region": "애월읍",
+      "address": "",
+      "phone": "064-799-9007",
+      "serviceType": "call_taxi",
+      "description": "지역별 호출택시 문의처입니다. 현재 차량·배차·운임·휠체어 탑승 가능 여부는 문의가 필요합니다.",
+      "source": {
+        "datasetId": "327",
+        "url": "https://www.data.go.kr/data/15056321/fileData.do",
+        "hubUrl": "https://jejudatahub.net/data/view/data/327",
+        "scope": "linked-public-file",
+        "asOf": "2026-03-19",
+        "retrievedAt": "2026-10-31"
+      }
+    },
+    {
+      "id": "taxi327-15",
+      "kind": "taxi",
+      "name": "구좌연합콜",
+      "region": "구좌읍",
+      "address": "",
+      "phone": "064-783-4994",
+      "serviceType": "call_taxi",
+      "description": "지역별 호출택시 문의처입니다. 현재 차량·배차·운임·휠체어 탑승 가능 여부는 문의가 필요합니다.",
+      "source": {
+        "datasetId": "327",
+        "url": "https://www.data.go.kr/data/15056321/fileData.do",
+        "hubUrl": "https://jejudatahub.net/data/view/data/327",
+        "scope": "linked-public-file",
+        "asOf": "2026-03-19",
+        "retrievedAt": "2026-10-31"
+      }
+    },
+    {
+      "id": "taxi327-16",
+      "kind": "taxi",
+      "name": "김녕콜",
+      "region": "구좌읍",
+      "address": "",
+      "phone": "064-782-2777",
+      "serviceType": "call_taxi",
+      "description": "지역별 호출택시 문의처입니다. 현재 차량·배차·운임·휠체어 탑승 가능 여부는 문의가 필요합니다.",
+      "source": {
+        "datasetId": "327",
+        "url": "https://www.data.go.kr/data/15056321/fileData.do",
+        "hubUrl": "https://jejudatahub.net/data/view/data/327",
+        "scope": "linked-public-file",
+        "asOf": "2026-03-19",
+        "retrievedAt": "2026-10-31"
+      }
+    },
+    {
+      "id": "taxi327-17",
+      "kind": "taxi",
+      "name": "한림서부콜",
+      "region": "한림읍",
+      "address": "",
+      "phone": "064-796-9595",
+      "serviceType": "call_taxi",
+      "description": "지역별 호출택시 문의처입니다. 현재 차량·배차·운임·휠체어 탑승 가능 여부는 문의가 필요합니다.",
+      "source": {
+        "datasetId": "327",
+        "url": "https://www.data.go.kr/data/15056321/fileData.do",
+        "hubUrl": "https://jejudatahub.net/data/view/data/327",
+        "scope": "linked-public-file",
+        "asOf": "2026-03-19",
+        "retrievedAt": "2026-10-31"
+      }
+    },
+    {
+      "id": "taxi327-18",
+      "kind": "taxi",
+      "name": "한림한수풀콜",
+      "region": "한림읍",
+      "address": "",
+      "phone": "064-796-9191",
+      "serviceType": "call_taxi",
+      "description": "지역별 호출택시 문의처입니다. 현재 차량·배차·운임·휠체어 탑승 가능 여부는 문의가 필요합니다.",
+      "source": {
+        "datasetId": "327",
+        "url": "https://www.data.go.kr/data/15056321/fileData.do",
+        "hubUrl": "https://jejudatahub.net/data/view/data/327",
+        "scope": "linked-public-file",
+        "asOf": "2026-03-19",
+        "retrievedAt": "2026-10-31"
+      }
+    },
+    {
+      "id": "taxi327-19",
+      "kind": "taxi",
+      "name": "한경개인콜",
+      "region": "한경면",
+      "address": "",
+      "phone": "064-772-1818",
+      "serviceType": "call_taxi",
+      "description": "지역별 호출택시 문의처입니다. 현재 차량·배차·운임·휠체어 탑승 가능 여부는 문의가 필요합니다.",
+      "source": {
+        "datasetId": "327",
+        "url": "https://www.data.go.kr/data/15056321/fileData.do",
+        "hubUrl": "https://jejudatahub.net/data/view/data/327",
+        "scope": "linked-public-file",
+        "asOf": "2026-03-19",
+        "retrievedAt": "2026-10-31"
+      }
+    },
+    {
+      "id": "taxi327-20",
+      "kind": "taxi",
+      "name": "서귀포개인브랜드콜",
+      "region": "서귀포시",
+      "address": "",
+      "phone": "064-762-4244",
+      "serviceType": "call_taxi",
+      "description": "지역별 호출택시 문의처입니다. 현재 차량·배차·운임·휠체어 탑승 가능 여부는 문의가 필요합니다.",
+      "source": {
+        "datasetId": "327",
+        "url": "https://www.data.go.kr/data/15056321/fileData.do",
+        "hubUrl": "https://jejudatahub.net/data/view/data/327",
+        "scope": "linked-public-file",
+        "asOf": "2026-03-19",
+        "retrievedAt": "2026-10-31"
+      }
+    },
+    {
+      "id": "taxi327-21",
+      "kind": "taxi",
+      "name": "OK콜",
+      "region": "서귀포시",
+      "address": "",
+      "phone": "064-732-0082",
+      "serviceType": "call_taxi",
+      "description": "지역별 호출택시 문의처입니다. 현재 차량·배차·운임·휠체어 탑승 가능 여부는 문의가 필요합니다.",
+      "source": {
+        "datasetId": "327",
+        "url": "https://www.data.go.kr/data/15056321/fileData.do",
+        "hubUrl": "https://jejudatahub.net/data/view/data/327",
+        "scope": "linked-public-file",
+        "asOf": "2026-03-19",
+        "retrievedAt": "2026-10-31"
+      }
+    },
+    {
+      "id": "taxi327-22",
+      "kind": "taxi",
+      "name": "올레호출",
+      "region": "서귀포시",
+      "address": "",
+      "phone": "064-762-0100",
+      "serviceType": "call_taxi",
+      "description": "지역별 호출택시 문의처입니다. 현재 차량·배차·운임·휠체어 탑승 가능 여부는 문의가 필요합니다.",
+      "source": {
+        "datasetId": "327",
+        "url": "https://www.data.go.kr/data/15056321/fileData.do",
+        "hubUrl": "https://jejudatahub.net/data/view/data/327",
+        "scope": "linked-public-file",
+        "asOf": "2026-03-19",
+        "retrievedAt": "2026-10-31"
+      }
+    },
+    {
+      "id": "taxi327-23",
+      "kind": "taxi",
+      "name": "사랑콜",
+      "region": "서귀포시",
+      "address": "",
+      "phone": "064-733-0008",
+      "serviceType": "call_taxi",
+      "description": "지역별 호출택시 문의처입니다. 현재 차량·배차·운임·휠체어 탑승 가능 여부는 문의가 필요합니다.",
+      "source": {
+        "datasetId": "327",
+        "url": "https://www.data.go.kr/data/15056321/fileData.do",
+        "hubUrl": "https://jejudatahub.net/data/view/data/327",
+        "scope": "linked-public-file",
+        "asOf": "2026-03-19",
+        "retrievedAt": "2026-10-31"
+      }
+    },
+    {
+      "id": "taxi327-24",
+      "kind": "taxi",
+      "name": "남원콜택시",
+      "region": "남원읍",
+      "address": "",
+      "phone": "064-764-9191",
+      "serviceType": "call_taxi",
+      "description": "지역별 호출택시 문의처입니다. 현재 차량·배차·운임·휠체어 탑승 가능 여부는 문의가 필요합니다.",
+      "source": {
+        "datasetId": "327",
+        "url": "https://www.data.go.kr/data/15056321/fileData.do",
+        "hubUrl": "https://jejudatahub.net/data/view/data/327",
+        "scope": "linked-public-file",
+        "asOf": "2026-03-19",
+        "retrievedAt": "2026-10-31"
+      }
+    },
+    {
+      "id": "taxi327-25",
+      "kind": "taxi",
+      "name": "표선콜",
+      "region": "표선면",
+      "address": "",
+      "phone": "064-787-4000",
+      "serviceType": "call_taxi",
+      "description": "지역별 호출택시 문의처입니다. 현재 차량·배차·운임·휠체어 탑승 가능 여부는 문의가 필요합니다.",
+      "source": {
+        "datasetId": "327",
+        "url": "https://www.data.go.kr/data/15056321/fileData.do",
+        "hubUrl": "https://jejudatahub.net/data/view/data/327",
+        "scope": "linked-public-file",
+        "asOf": "2026-03-19",
+        "retrievedAt": "2026-10-31"
+      }
+    },
+    {
+      "id": "taxi327-26",
+      "kind": "taxi",
+      "name": "성산콜",
+      "region": "성산읍",
+      "address": "",
+      "phone": "064-784-3030",
+      "serviceType": "call_taxi",
+      "description": "지역별 호출택시 문의처입니다. 현재 차량·배차·운임·휠체어 탑승 가능 여부는 문의가 필요합니다.",
+      "source": {
+        "datasetId": "327",
+        "url": "https://www.data.go.kr/data/15056321/fileData.do",
+        "hubUrl": "https://jejudatahub.net/data/view/data/327",
+        "scope": "linked-public-file",
+        "asOf": "2026-03-19",
+        "retrievedAt": "2026-10-31"
+      }
+    },
+    {
+      "id": "taxi327-27",
+      "kind": "taxi",
+      "name": "동성콜",
+      "region": "성산읍",
+      "address": "",
+      "phone": "064-782-8200",
+      "serviceType": "call_taxi",
+      "description": "지역별 호출택시 문의처입니다. 현재 차량·배차·운임·휠체어 탑승 가능 여부는 문의가 필요합니다.",
+      "source": {
+        "datasetId": "327",
+        "url": "https://www.data.go.kr/data/15056321/fileData.do",
+        "hubUrl": "https://jejudatahub.net/data/view/data/327",
+        "scope": "linked-public-file",
+        "asOf": "2026-03-19",
+        "retrievedAt": "2026-10-31"
+      }
+    },
+    {
+      "id": "taxi327-28",
+      "kind": "taxi",
+      "name": "중문콜",
+      "region": "중문",
+      "address": "",
+      "phone": "064-738-1700",
+      "serviceType": "call_taxi",
+      "description": "지역별 호출택시 문의처입니다. 현재 차량·배차·운임·휠체어 탑승 가능 여부는 문의가 필요합니다.",
+      "source": {
+        "datasetId": "327",
+        "url": "https://www.data.go.kr/data/15056321/fileData.do",
+        "hubUrl": "https://jejudatahub.net/data/view/data/327",
+        "scope": "linked-public-file",
+        "asOf": "2026-03-19",
+        "retrievedAt": "2026-10-31"
+      }
+    },
+    {
+      "id": "taxi327-29",
+      "kind": "taxi",
+      "name": "모슬포호출",
+      "region": "안덕면",
+      "address": "",
+      "phone": "064-794-0707",
+      "serviceType": "call_taxi",
+      "description": "지역별 호출택시 문의처입니다. 현재 차량·배차·운임·휠체어 탑승 가능 여부는 문의가 필요합니다.",
+      "source": {
+        "datasetId": "327",
+        "url": "https://www.data.go.kr/data/15056321/fileData.do",
+        "hubUrl": "https://jejudatahub.net/data/view/data/327",
+        "scope": "linked-public-file",
+        "asOf": "2026-03-19",
+        "retrievedAt": "2026-10-31"
+      }
+    },
+    {
+      "id": "taxi327-30",
+      "kind": "taxi",
+      "name": "이어도콜",
+      "region": "안덕면",
+      "address": "",
+      "phone": "064-748-0067",
+      "serviceType": "call_taxi",
+      "description": "지역별 호출택시 문의처입니다. 현재 차량·배차·운임·휠체어 탑승 가능 여부는 문의가 필요합니다.",
+      "source": {
+        "datasetId": "327",
+        "url": "https://www.data.go.kr/data/15056321/fileData.do",
+        "hubUrl": "https://jejudatahub.net/data/view/data/327",
+        "scope": "linked-public-file",
+        "asOf": "2026-03-19",
+        "retrievedAt": "2026-10-31"
+      }
+    },
+    {
+      "id": "taxi327-31",
+      "kind": "taxi",
+      "name": "안덕개인콜",
+      "region": "안덕면",
+      "address": "",
+      "phone": "064-794-1400",
+      "serviceType": "call_taxi",
+      "description": "지역별 호출택시 문의처입니다. 현재 차량·배차·운임·휠체어 탑승 가능 여부는 문의가 필요합니다.",
+      "source": {
+        "datasetId": "327",
+        "url": "https://www.data.go.kr/data/15056321/fileData.do",
+        "hubUrl": "https://jejudatahub.net/data/view/data/327",
+        "scope": "linked-public-file",
+        "asOf": "2026-03-19",
+        "retrievedAt": "2026-10-31"
+      }
+    },
+    {
+      "id": "taxi327-32",
+      "kind": "taxi",
+      "name": "안덕공항콜",
+      "region": "안덕면",
+      "address": "",
+      "phone": "064-755-4885",
+      "serviceType": "call_taxi",
+      "description": "지역별 호출택시 문의처입니다. 현재 차량·배차·운임·휠체어 탑승 가능 여부는 문의가 필요합니다.",
+      "source": {
+        "datasetId": "327",
+        "url": "https://www.data.go.kr/data/15056321/fileData.do",
+        "hubUrl": "https://jejudatahub.net/data/view/data/327",
+        "scope": "linked-public-file",
+        "asOf": "2026-03-19",
+        "retrievedAt": "2026-10-31"
+      }
+    },
+    {
+      "id": "taxi327-33",
+      "kind": "taxi",
+      "name": "대정안덕콜",
+      "region": "대정읍",
+      "address": "",
+      "phone": "064-792-0082",
+      "serviceType": "call_taxi",
+      "description": "지역별 호출택시 문의처입니다. 현재 차량·배차·운임·휠체어 탑승 가능 여부는 문의가 필요합니다.",
+      "source": {
+        "datasetId": "327",
+        "url": "https://www.data.go.kr/data/15056321/fileData.do",
+        "hubUrl": "https://jejudatahub.net/data/view/data/327",
+        "scope": "linked-public-file",
+        "asOf": "2026-03-19",
+        "retrievedAt": "2026-10-31"
+      }
+    },
+    {
+      "id": "taxi327-34",
+      "kind": "taxi",
+      "name": "모슬포대안",
+      "region": "대정읍",
+      "address": "",
+      "phone": "064-794-8401",
+      "serviceType": "call_taxi",
+      "description": "지역별 호출택시 문의처입니다. 현재 차량·배차·운임·휠체어 탑승 가능 여부는 문의가 필요합니다.",
+      "source": {
+        "datasetId": "327",
+        "url": "https://www.data.go.kr/data/15056321/fileData.do",
+        "hubUrl": "https://jejudatahub.net/data/view/data/327",
+        "scope": "linked-public-file",
+        "asOf": "2026-03-19",
+        "retrievedAt": "2026-10-31"
+      }
+    },
+    {
+      "id": "care254-1",
+      "kind": "companion",
+      "name": "제주시 홀로 사는노인 지원센터",
+      "region": "제주시",
+      "address": "제주특별자치도 제주시 동문로 80",
+      "phone": "064-759-9261",
+      "serviceType": "care_contact",
+      "description": "노인돌봄기본서비스 등록 문의처입니다. 병원 동행 제공·이용대상·담당지역은 확인되지 않았습니다.",
+      "source": {
+        "datasetId": "254",
+        "url": "https://jejudatahub.net/data/view/data/254",
+        "hubUrl": "https://jejudatahub.net/data/view/data/254",
+        "scope": "public-preview",
+        "asOf": "2020-04-17",
+        "retrievedAt": "2026-10-31"
+      }
+    },
+    {
+      "id": "care254-2",
+      "kind": "companion",
+      "name": "서귀포시 홀로 사는노인 지원센터",
+      "region": "서귀포시",
+      "address": "제주특별자치도 서귀포시 일주동로8642",
+      "phone": "064-738-7080",
+      "serviceType": "care_contact",
+      "description": "노인돌봄기본서비스 등록 문의처입니다. 병원 동행 제공·이용대상·담당지역은 확인되지 않았습니다.",
+      "source": {
+        "datasetId": "254",
+        "url": "https://jejudatahub.net/data/view/data/254",
+        "hubUrl": "https://jejudatahub.net/data/view/data/254",
+        "scope": "public-preview",
+        "asOf": "2020-04-17",
+        "retrievedAt": "2026-10-31"
+      }
+    },
+    {
+      "id": "care254-3",
+      "kind": "companion",
+      "name": "세모바퀴재가장기요양기관",
+      "region": "조천읍",
+      "address": "제주특별자치도 제주시 조천읍 신북로 262",
+      "phone": "064-783-3393",
+      "serviceType": "care_contact",
+      "description": "노인돌봄종합서비스 등록 문의처입니다. 병원 동행 제공·이용대상·담당지역은 확인되지 않았습니다.",
+      "source": {
+        "datasetId": "254",
+        "url": "https://jejudatahub.net/data/view/data/254",
+        "hubUrl": "https://jejudatahub.net/data/view/data/254",
+        "scope": "public-preview",
+        "asOf": "2020-04-17",
+        "retrievedAt": "2026-10-31"
+      }
+    },
+    {
+      "id": "care254-4",
+      "kind": "companion",
+      "name": "제주한경노인복지센터",
+      "region": "한경면",
+      "address": "제주특별자치도 제주시 한경면 칠전로 38",
+      "phone": "064-772-3351",
+      "serviceType": "care_contact",
+      "description": "노인돌봄종합서비스 등록 문의처입니다. 병원 동행 제공·이용대상·담당지역은 확인되지 않았습니다.",
+      "source": {
+        "datasetId": "254",
+        "url": "https://jejudatahub.net/data/view/data/254",
+        "hubUrl": "https://jejudatahub.net/data/view/data/254",
+        "scope": "public-preview",
+        "asOf": "2020-04-17",
+        "retrievedAt": "2026-10-31"
+      }
+    },
+    {
+      "id": "care254-5",
+      "kind": "companion",
+      "name": "서부한경노인복지센터",
+      "region": "한경면",
+      "address": "제주특별자치도 제주시 한경면 한경해안로 586",
+      "phone": "064-772-0949",
+      "serviceType": "care_contact",
+      "description": "노인돌봄종합서비스 등록 문의처입니다. 병원 동행 제공·이용대상·담당지역은 확인되지 않았습니다.",
+      "source": {
+        "datasetId": "254",
+        "url": "https://jejudatahub.net/data/view/data/254",
+        "hubUrl": "https://jejudatahub.net/data/view/data/254",
+        "scope": "public-preview",
+        "asOf": "2020-04-17",
+        "retrievedAt": "2026-10-31"
+      }
+    },
+    {
+      "id": "care254-6",
+      "kind": "companion",
+      "name": "㈜제주이어도돌봄센터",
+      "region": "용담1동",
+      "address": "제주특별자치도 제주시 서광로 157",
+      "phone": "064-721-1297",
+      "serviceType": "care_contact",
+      "description": "노인돌봄종합서비스 등록 문의처입니다. 병원 동행 제공·이용대상·담당지역은 확인되지 않았습니다.",
+      "source": {
+        "datasetId": "254",
+        "url": "https://jejudatahub.net/data/view/data/254",
+        "hubUrl": "https://jejudatahub.net/data/view/data/254",
+        "scope": "public-preview",
+        "asOf": "2020-04-17",
+        "retrievedAt": "2026-10-31"
+      }
+    },
+    {
+      "id": "care254-7",
+      "kind": "companion",
+      "name": "한라재가복지센터",
+      "region": "용담2동",
+      "address": "제주특별자치도 제주시 용문로 17길 35",
+      "phone": "064-712-6100",
+      "serviceType": "care_contact",
+      "description": "노인돌봄종합서비스 등록 문의처입니다. 병원 동행 제공·이용대상·담당지역은 확인되지 않았습니다.",
+      "source": {
+        "datasetId": "254",
+        "url": "https://jejudatahub.net/data/view/data/254",
+        "hubUrl": "https://jejudatahub.net/data/view/data/254",
+        "scope": "public-preview",
+        "asOf": "2020-04-17",
+        "retrievedAt": "2026-10-31"
+      }
+    },
+    {
+      "id": "care254-8",
+      "kind": "companion",
+      "name": "다온복지센터",
+      "region": "노형동",
+      "address": "제주특별자치도 제주시 월랑로8길 26",
+      "phone": "064-746-2205",
+      "serviceType": "care_contact",
+      "description": "노인돌봄종합서비스 등록 문의처입니다. 병원 동행 제공·이용대상·담당지역은 확인되지 않았습니다.",
+      "source": {
+        "datasetId": "254",
+        "url": "https://jejudatahub.net/data/view/data/254",
+        "hubUrl": "https://jejudatahub.net/data/view/data/254",
+        "scope": "public-preview",
+        "asOf": "2020-04-17",
+        "retrievedAt": "2026-10-31"
+      }
+    },
+    {
+      "id": "care254-9",
+      "kind": "companion",
+      "name": "수눌음재가장기요양기관",
+      "region": "삼도1동",
+      "address": "제주특별자치도 제주시 서광로 241-1",
+      "phone": "064-752-1919",
+      "serviceType": "care_contact",
+      "description": "노인돌봄종합서비스 등록 문의처입니다. 병원 동행 제공·이용대상·담당지역은 확인되지 않았습니다.",
+      "source": {
+        "datasetId": "254",
+        "url": "https://jejudatahub.net/data/view/data/254",
+        "hubUrl": "https://jejudatahub.net/data/view/data/254",
+        "scope": "public-preview",
+        "asOf": "2020-04-17",
+        "retrievedAt": "2026-10-31"
+      }
+    },
+    {
+      "id": "care254-10",
+      "kind": "companion",
+      "name": "주식회사시터피아",
+      "region": "삼도1동",
+      "address": "제주특별자치도 제주시 서사로 28",
+      "phone": "064-723-1324",
+      "serviceType": "care_contact",
+      "description": "노인돌봄종합서비스 등록 문의처입니다. 병원 동행 제공·이용대상·담당지역은 확인되지 않았습니다.",
+      "source": {
+        "datasetId": "254",
+        "url": "https://jejudatahub.net/data/view/data/254",
+        "hubUrl": "https://jejudatahub.net/data/view/data/254",
+        "scope": "public-preview",
+        "asOf": "2020-04-17",
+        "retrievedAt": "2026-10-31"
+      }
+    },
+    {
+      "id": "care254-11",
+      "kind": "companion",
+      "name": "한마음복지센터",
+      "region": "아라동",
+      "address": "제주특별자치도 제주시 아라일동 1",
+      "phone": "064-724-9963",
+      "serviceType": "care_contact",
+      "description": "노인돌봄종합서비스 등록 문의처입니다. 병원 동행 제공·이용대상·담당지역은 확인되지 않았습니다.",
+      "source": {
+        "datasetId": "254",
+        "url": "https://jejudatahub.net/data/view/data/254",
+        "hubUrl": "https://jejudatahub.net/data/view/data/254",
+        "scope": "public-preview",
+        "asOf": "2020-04-17",
+        "retrievedAt": "2026-10-31"
+      }
+    },
+    {
+      "id": "care254-12",
+      "kind": "companion",
+      "name": "가족노인복지타운",
+      "region": "대정읍",
+      "address": "제주특별자치도 서귀포시 대정읍 인안성로 52-7",
+      "phone": "064-792-7662",
+      "serviceType": "care_contact",
+      "description": "노인돌봄종합서비스 등록 문의처입니다. 병원 동행 제공·이용대상·담당지역은 확인되지 않았습니다.",
+      "source": {
+        "datasetId": "254",
+        "url": "https://jejudatahub.net/data/view/data/254",
+        "hubUrl": "https://jejudatahub.net/data/view/data/254",
+        "scope": "public-preview",
+        "asOf": "2020-04-17",
+        "retrievedAt": "2026-10-31"
+      }
+    },
+    {
+      "id": "care254-13",
+      "kind": "companion",
+      "name": "성산원광소규모요양시설",
+      "region": "성산읍",
+      "address": "제주특별자치도 서귀포시 성산읍 일주동로 4254",
+      "phone": "064-784-2999",
+      "serviceType": "care_contact",
+      "description": "노인돌봄종합서비스 등록 문의처입니다. 병원 동행 제공·이용대상·담당지역은 확인되지 않았습니다.",
+      "source": {
+        "datasetId": "254",
+        "url": "https://jejudatahub.net/data/view/data/254",
+        "hubUrl": "https://jejudatahub.net/data/view/data/254",
+        "scope": "public-preview",
+        "asOf": "2020-04-17",
+        "retrievedAt": "2026-10-31"
+      }
+    },
+    {
+      "id": "care254-14",
+      "kind": "companion",
+      "name": "아름재가장기요양기관",
+      "region": "안덕면",
+      "address": "제주특별자치도 서귀포시 안덕면 일주서로 2048번길 237-1",
+      "phone": "070-8820-5083",
+      "serviceType": "care_contact",
+      "description": "노인돌봄종합서비스 등록 문의처입니다. 병원 동행 제공·이용대상·담당지역은 확인되지 않았습니다.",
+      "source": {
+        "datasetId": "254",
+        "url": "https://jejudatahub.net/data/view/data/254",
+        "hubUrl": "https://jejudatahub.net/data/view/data/254",
+        "scope": "public-preview",
+        "asOf": "2020-04-17",
+        "retrievedAt": "2026-10-31"
+      }
+    },
+    {
+      "id": "care254-15",
+      "kind": "companion",
+      "name": "예담노인복지센터",
+      "region": "동홍동",
+      "address": "제주특별자치도 서귀포시 동홍로 89",
+      "phone": "064-733-9492",
+      "serviceType": "care_contact",
+      "description": "노인돌봄종합서비스 등록 문의처입니다. 병원 동행 제공·이용대상·담당지역은 확인되지 않았습니다.",
+      "source": {
+        "datasetId": "254",
+        "url": "https://jejudatahub.net/data/view/data/254",
+        "hubUrl": "https://jejudatahub.net/data/view/data/254",
+        "scope": "public-preview",
+        "asOf": "2020-04-17",
+        "retrievedAt": "2026-10-31"
+      }
+    },
+    {
+      "id": "care254-16",
+      "kind": "companion",
+      "name": "다함께노인복지센터",
+      "region": "서홍동",
+      "address": "제주특별자치도 서귀포시 중앙로 111",
+      "phone": "064-732-1223",
+      "serviceType": "care_contact",
+      "description": "노인돌봄종합서비스 등록 문의처입니다. 병원 동행 제공·이용대상·담당지역은 확인되지 않았습니다.",
+      "source": {
+        "datasetId": "254",
+        "url": "https://jejudatahub.net/data/view/data/254",
+        "hubUrl": "https://jejudatahub.net/data/view/data/254",
+        "scope": "public-preview",
+        "asOf": "2020-04-17",
+        "retrievedAt": "2026-10-31"
+      }
+    },
+    {
+      "id": "care254-17",
+      "kind": "companion",
+      "name": "서귀원광노인복지센터",
+      "region": "서홍동",
+      "address": "제주특별자치도 서귀포시 서홍로 69번길 129-2",
+      "phone": "064-763-2456",
+      "serviceType": "care_contact",
+      "description": "노인돌봄종합서비스 등록 문의처입니다. 병원 동행 제공·이용대상·담당지역은 확인되지 않았습니다.",
+      "source": {
+        "datasetId": "254",
+        "url": "https://jejudatahub.net/data/view/data/254",
+        "hubUrl": "https://jejudatahub.net/data/view/data/254",
+        "scope": "public-preview",
+        "asOf": "2020-04-17",
+        "retrievedAt": "2026-10-31"
+      }
+    },
+    {
+      "id": "care254-18",
+      "kind": "companion",
+      "name": "더사람사회서비스센터",
+      "region": "천지동",
+      "address": "제주특별자치도 서귀포시 서문로 33-1",
+      "phone": "064-739-0044",
+      "serviceType": "care_contact",
+      "description": "노인돌봄종합서비스 등록 문의처입니다. 병원 동행 제공·이용대상·담당지역은 확인되지 않았습니다.",
+      "source": {
+        "datasetId": "254",
+        "url": "https://jejudatahub.net/data/view/data/254",
+        "hubUrl": "https://jejudatahub.net/data/view/data/254",
+        "scope": "public-preview",
+        "asOf": "2020-04-17",
+        "retrievedAt": "2026-10-31"
+      }
+    },
+    {
+      "id": "care254-19",
+      "kind": "companion",
+      "name": "효원재가장기요양기관",
+      "region": "효돈동",
+      "address": "제주특별자치도 서귀포시 효돈로 199",
+      "phone": "064-767-3373",
+      "serviceType": "care_contact",
+      "description": "노인돌봄종합서비스 등록 문의처입니다. 병원 동행 제공·이용대상·담당지역은 확인되지 않았습니다.",
+      "source": {
+        "datasetId": "254",
+        "url": "https://jejudatahub.net/data/view/data/254",
+        "hubUrl": "https://jejudatahub.net/data/view/data/254",
+        "scope": "public-preview",
+        "asOf": "2020-04-17",
+        "retrievedAt": "2026-10-31"
+      }
+    },
+    {
+      "id": "areum-escort",
+      "kind": "companion",
+      "name": "제주시니어클럽 아름동행",
+      "region": "제주시",
+      "address": "",
+      "phone": "064-745-3999",
+      "serviceType": "hospital_escort",
+      "description": "공식 사업 소개에서 병원동행·이동지원 확인. 기관 대표문의이며 지원지역·자격·날짜·비용은 별도 확인합니다.",
+      "source": {
+        "datasetId": "",
+        "url": "https://www.jjcsc.co.kr/Business/Market",
+        "hubUrl": "",
+        "scope": "official-service-page",
+        "asOf": "",
+        "retrievedAt": "2026-10-31"
+      }
+    },
+    {
+      "id": "jeju-accessible-transport",
+      "kind": "taxi",
+      "name": "제주 교통약자 이동지원센터",
+      "region": "제주특별자치도",
+      "address": "",
+      "phone": "1899-6884",
+      "serviceType": "accessible_transport",
+      "description": "특별교통수단·임차택시 안내. 이용대상·사전 회원등록·차량을 확인해야 합니다. 병원 동행인 제공 서비스가 아닙니다.",
+      "source": {
+        "datasetId": "",
+        "url": "https://www.jejuhappycall.com/?mcode=guide01",
+        "hubUrl": "",
+        "scope": "official-service-page",
+        "asOf": "",
+        "retrievedAt": "2026-10-31"
+      }
+    }
+  ]
+}
