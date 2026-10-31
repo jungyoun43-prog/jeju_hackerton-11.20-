@@ -5,13 +5,17 @@ import { DEFAULT_CARE_PREFERENCES, normalizeCarePreferences, getTaxiPreferenceOp
 import { formatMessage } from './message-format.js';
 import { buildCallPlan, CALL_TARGETS } from './call-policy.js';
 import { getCareJourneySummary, JOURNEY_SCENARIOS, CALL_RECOVERY_SCENARIOS } from './care-journey.js';
+import { PREPARATION_STAGE_IDS, getPreparationBoard } from './preparation-stages.js';
+import { preparationBoardMarkup, renderPreparationBoard } from './preparation-board-view.js';
 
 const API = '/api/agent';
 const MAX_MESSAGE = 1600;
 const MAX_HISTORY = 8;
 const MAX_HISTORY_TEXT = 2000;
+const PROGRESS_TOOLS=new Set(['apply_care_preferences','get_case','update_visit','request_records','search_hospital_contacts','select_hospital_contact','request_hospital_contact','find_support','prepare_inquiries','request_support_contact','update_call_retry_policy','prepare_review','get_care_journey','build_report','summarize_preparation','search_public_data','analyze_public_data','run_journey_demo','run_call_recovery_demo']);
 const PREFERENCES_STORAGE_KEY = 'jeju-care-preferences-v1';
 const mobileRail = window.matchMedia('(max-width:1050px)');
+const mobileBoard = window.matchMedia('(max-width:900px)');
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 const escape = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 const micIcon = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="13" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3m-4 0h8"/></svg>';
@@ -28,7 +32,7 @@ let failedPreviewRequest;
 let conversationVersion = 0;
 let layoutFrame;
 let capabilityState = 'checking';
-let capabilities = {llm:null,model:'',phone:'not_connected',healthRecords:'not_connected',voiceInput:'browser'};
+let capabilities = {llm:null,model:'',phone:'not_connected',healthRecords:'not_connected',voiceInput:'browser',progress:'unavailable'};
 let latestActions = [];
 let latestEvents = [];
 let responseCount = 0;
@@ -48,7 +52,50 @@ let drawerReturnFocus;
 let patientRecordsReturnFocus;
 let contactPlanReturnFocus;
 let careJourneyReturnFocus;
+let selectedStageId='records';
+let manualStageSelection=false;
+let unreadAnswer=false;
+let requestProblem='';
+let answerReturnFocus;
 const failedRequests = new Map();
+
+function renderBoard() {
+  const progress=activeRequest?.kind==='message'?activeRequest.progress:null;
+  const board=getPreparationBoard(caseState,{events:latestEvents,progress,pending,responseCount,requestProblem});
+  if(!manualStageSelection)selectedStageId=board.activeStageId;
+  renderPreparationBoard(board,{selectedStageId,unreadAnswer,progress});
+}
+
+function openStage(id,{manual=true}={}) {
+  if(!PREPARATION_STAGE_IDS.includes(id))return;
+  selectedStageId=id;
+  if(manual)manualStageSelection=true;
+  if(id==='plan')unreadAnswer=false;
+  renderBoard();
+  if(id==='plan')scrollToMessage(document.querySelector('#message-list .message.assistant:last-child'));
+  updateConversationLayout();
+}
+
+function markAnswerReady() {
+  if(!manualStageSelection)selectedStageId='plan';
+  unreadAnswer=mobileBoard.matches && selectedStageId!=='plan';
+}
+
+function openAnswer() {
+  if(!responseCount)return;
+  const dialog=document.getElementById('answer-dialog');
+  if(dialog.open)return;
+  selectedStageId='plan';manualStageSelection=true;unreadAnswer=false;renderBoard();
+  answerReturnFocus=document.activeElement;
+  const view=document.getElementById('answer-read-view');
+  view.innerHTML=document.getElementById('message-list').innerHTML;
+  for(const button of view.querySelectorAll('button'))button.remove();
+  view.querySelectorAll('[id]').forEach(node=>node.removeAttribute('id'));
+  view.querySelectorAll('[data-message-id]').forEach(node=>node.removeAttribute('data-message-id'));
+  dialog.showModal();document.body.classList.add('records-dialog-open');
+  document.getElementById('answer-title').focus({preventScroll:true});
+  view.scrollTop=0;
+}
 
 function loadCarePreferences() {
   try {
@@ -330,6 +377,7 @@ function updateCapabilities(next) {
       model: typeof next.model === 'string' ? next.model.slice(0,160) : capabilities.model,
       phone: ['simulation','not_connected','connected'].includes(next.phone) ? next.phone : capabilities.phone,
       healthRecords: ['demo','not_connected','connected'].includes(next.healthRecords) ? next.healthRecords : capabilities.healthRecords,
+      progress: next.progress==='poll'?'poll':'unavailable',
       voiceInput:'browser',
     };
   }
@@ -343,7 +391,7 @@ function updateCapabilities(next) {
   const notice = document.getElementById('mode-notice');
   notice.hidden = !previewMode && capabilities.llm === true;
   notice.classList.toggle('is-preview',previewMode);
-  notice.textContent = previewMode ? '고정 시나리오 미리보기 · 환자·회신은 합성, LLM·실제 발신 없음' : capabilityState === 'checking' ? '연결 범위를 확인하고 있어요.' : '자유 대화는 AI 모델 연결 후 작동합니다. 지금은 고정 예시를 미리 볼 수 있어요.';
+  notice.textContent = previewMode ? '작성된 예시 · 환자·회신은 합성, LLM·실제 발신 없음' : capabilityState === 'checking' ? '연결 범위를 확인하고 있어요.' : 'AI 모델 미연결 · ‘대화 흐름 미리보기’로 준비 과정을 볼 수 있어요.';
 }
 
 function renderSnapshot() {
@@ -382,6 +430,7 @@ function renderSnapshot() {
   }
   document.getElementById('case-sources').innerHTML = sourceItems.length ? sourceItems.map(item=>`<div><strong>${escape(item.label)}</strong>${safeSource(item.source)}</div>`).join('') : '<p>Agent가 자료를 조회하면 사용한 출처를 처리 기록과 함께 보여드립니다.</p>';
   document.getElementById('save-report').disabled = responseCount === 0;
+  renderBoard();
 }
 
 function eventsMarkup(events) {
@@ -405,8 +454,7 @@ function scrollToLatest() {
   const request=activeRequest;
   requestAnimationFrame(()=>{
     if(request && activeRequest!==request)return;
-    if(document.querySelector('.chat-workspace').classList.contains('flow-layout'))document.getElementById('pending-message').scrollIntoView({block:'nearest',behavior:'instant'});
-    else scroll.scrollTop=scroll.scrollHeight;
+    if(scroll.getBoundingClientRect().height)scroll.scrollTop=scroll.scrollHeight;
   });
 }
 
@@ -415,8 +463,8 @@ function scrollToMessage(node) {
   requestAnimationFrame(()=>{
     if(!node.isConnected)return;
     const scroll=document.getElementById('conversation-scroll');
-    if(document.querySelector('.chat-workspace').classList.contains('flow-layout'))node.scrollIntoView({block:'start',behavior:'instant'});
-    else scroll.scrollTop+=node.getBoundingClientRect().top-scroll.getBoundingClientRect().top-22;
+    if(!scroll.getBoundingClientRect().height)return;
+    scroll.scrollTop+=node.getBoundingClientRect().top-scroll.getBoundingClientRect().top-14;
   });
 }
 
@@ -430,19 +478,18 @@ function resizeInput() {
   updateConversationLayout();
 }
 
-// 작은 높이·확대 글꼴에서는 대화/입력/고지를 문서 흐름으로 함께 읽는다.
+// 짧은 화면·긴 입력·확대 글꼴에서도 공유 입력과 고지로 스크롤할 수 있다.
 function updateConversationLayout() {
   cancelAnimationFrame(layoutFrame);
   layoutFrame=requestAnimationFrame(()=>{
     const workspace=document.querySelector('.chat-workspace');
-    const scroll=document.getElementById('conversation-scroll');
-    if(!workspace || !scroll)return;
+    const board=document.getElementById('preparation-board');
+    if(!workspace || !board)return;
     const viewportHeight=Math.min(window.innerHeight,window.visualViewport?.height ?? window.innerHeight);
     const shortScreen=viewportHeight<=720;
-    workspace.classList.remove('flow-layout');
-    const style=getComputedStyle(scroll);
-    const readingHeight=scroll.clientHeight-parseFloat(style.paddingTop)-parseFloat(style.paddingBottom);
-    workspace.classList.toggle('flow-layout',shortScreen || readingHeight<112 || workspace.scrollHeight>workspace.clientHeight+1);
+    const enlarged=parseFloat(getComputedStyle(document.getElementById('request-input')).fontSize)>=24 || [...board.querySelectorAll('.stage-pane-header h2')].some(node=>node.getBoundingClientRect().height && parseFloat(getComputedStyle(node).fontSize)>=24);
+    workspace.classList.toggle('expanded-reading',enlarged);
+    workspace.classList.toggle('flow-layout',shortScreen || enlarged);
   });
 }
 
@@ -470,6 +517,7 @@ function setPending(value) {
   document.getElementById('send-request').setAttribute('aria-label',value?'요청 응답을 기다리는 중':'요청 보내기');
   for (const button of document.querySelectorAll('[data-example]')) button.disabled=value;
   for (const button of document.querySelectorAll('[data-contact-draft],[data-journey-draft],[data-journey-scenario],[data-call-recovery-scenario]')) button.disabled=value || Boolean(activeRecognition);
+  renderBoard();
   updateConversationLayout();
   if (value) scrollToLatest();
 }
@@ -481,6 +529,7 @@ function requestIsCurrent(request) {
 function beginRequest(kind,values,timeout) {
   const request={...values,kind,version:conversationVersion,controller:new AbortController()};
   activeRequest=request;
+  requestProblem='';
   request.timer=setTimeout(()=>{if(requestIsCurrent(request))cancelRequest({timedOut:true});},timeout);
   setPending(true);
   return request;
@@ -488,6 +537,7 @@ function beginRequest(kind,values,timeout) {
 
 function finishRequest(request) {
   clearTimeout(request.timer);
+  stopProgress(request);
   if(!requestIsCurrent(request))return false;
   activeRequest=undefined;setPending(false);
   if(request.kind==='preview')document.getElementById('preview-button').textContent='대화 흐름 미리보기';
@@ -495,6 +545,7 @@ function finishRequest(request) {
 }
 
 function showRequestProblem(request,copy,{uncertain=false}={}) {
+  requestProblem=copy;
   failedRequests.set(request.requestId,{text:request.text,body:request.body});
   const firstRequestWarning=uncertain && !request.body.sessionId ? '첫 응답을 받기 전이라 재시도하면 서버에서 같은 일을 한 번 더 처리하고 시연 이용 횟수가 추가될 수 있어요.' : '';
   const node=request.messageNode;
@@ -506,6 +557,7 @@ function showRequestProblem(request,copy,{uncertain=false}={}) {
   }
   const input=document.getElementById('request-input');
   input.value=request.text;resizeInput();
+  renderBoard();
 }
 
 function cancelRequest({timedOut=false}={}) {
@@ -558,6 +610,68 @@ async function payloadHash(payload) {
   return [...new Uint8Array(bytes)].map(byte=>byte.toString(16).padStart(2,'0')).join('');
 }
 
+function makeProgressToken() {
+  const bytes=crypto.getRandomValues(new Uint8Array(32));
+  return btoa(String.fromCharCode(...bytes)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+
+function normalizeProgress(value) {
+  const stageStatuses=['waiting','running','observed','needs_input','failed'];
+  const eventStatuses=['started','completed','needs_input','failed'];
+  const toolAllowed=tool=>tool===null || PROGRESS_TOOLS.has(tool);
+  const keys=(item,names)=>item && typeof item==='object' && !Array.isArray(item) && Object.keys(item).length===names.length && names.every(name=>Object.hasOwn(item,name));
+  if(!keys(value,['version','status','sequence','updatedAt','currentStage','stages','events']) || value.version!==1 || !['running','completed','failed'].includes(value.status) || !Number.isSafeInteger(value.sequence) || value.sequence<0 || value.sequence>128 || typeof value.updatedAt!=='string' || value.updatedAt.length>40 || !Number.isFinite(Date.parse(value.updatedAt)) || ![null,...PREPARATION_STAGE_IDS].includes(value.currentStage) || !Array.isArray(value.stages) || value.stages.length!==4 || new Set(value.stages.map(stage=>stage?.id)).size!==4 || !Array.isArray(value.events) || value.events.length>32)return null;
+  if(value.stages.some(stage=>!keys(stage,['id','status','lastTool']) || !PREPARATION_STAGE_IDS.includes(stage.id) || !stageStatuses.includes(stage.status) || !toolAllowed(stage.lastTool)))return null;
+  let sequence=-1;
+  for(const event of value.events) {
+    if(!keys(event,['sequence','stage','tool','status']) || !Number.isSafeInteger(event.sequence) || event.sequence<=sequence || event.sequence>value.sequence || !PREPARATION_STAGE_IDS.includes(event.stage) || !eventStatuses.includes(event.status) || !toolAllowed(event.tool))return null;
+    sequence=event.sequence;
+  }
+  return {version:1,status:value.status,sequence:value.sequence,updatedAt:value.updatedAt,currentStage:value.currentStage,stages:value.stages.map(stage=>({id:stage.id,status:stage.status,lastTool:stage.lastTool})),events:value.events.map(event=>({sequence:event.sequence,stage:event.stage,tool:event.tool,status:event.status}))};
+}
+
+function stopProgress(request) {
+  if(!request)return;
+  request.progressStopped=true;clearTimeout(request.progressTimer);
+  request.progressController?.abort();
+}
+
+function startProgress(request) {
+  if(request.kind!=='message' || !request.body.progressToken || capabilities.progress!=='poll')return;
+  const token=request.body.progressToken;
+  const current=()=>requestIsCurrent(request) && !request.progressStopped && request.body.progressToken===token;
+  request.progressPolls=0;
+  const poll=async()=>{
+    if(!current() || request.progressPolls>=26)return;
+    request.progressPolls++;
+    const controller=new AbortController();request.progressController=controller;
+    const timer=setTimeout(()=>controller.abort(),2250);
+    try {
+      const payload=JSON.stringify({progressToken:token});
+      const hash=await payloadHash(payload);
+      if(!current())return;
+      const response=await fetch(API+'/progress',{method:'POST',headers:{'Content-Type':'application/json','x-amz-content-sha256':hash},body:payload,signal:controller.signal,cache:'no-store'});
+      if(!current())return;
+      if(!response.ok)throw new Error('PROGRESS_UNAVAILABLE');
+      const raw=await response.json();
+      if(!current())return;
+      if(raw?.available===true) {
+        const progress=normalizeProgress(raw.progress);
+        if(!progress)throw new Error('PROGRESS_UNAVAILABLE');
+        if(!request.progress || progress.sequence>request.progress.sequence) {
+          request.progress=progress;renderBoard();
+        }
+        if(request.progress?.status!=='running')return;
+      } else if(raw?.available!==false)throw new Error('PROGRESS_UNAVAILABLE');
+    } catch {
+      // 진행 조회가 실패해도 원래 응답을 기다리며 준비 상태를 바꾸지 않는다.
+      return;
+    } finally {clearTimeout(timer);}
+    if(current() && request.progressPolls<26)request.progressTimer=setTimeout(poll,2500);
+  };
+  request.progressTimer=setTimeout(poll,2500);
+}
+
 // 모델 연결을 바꿔도 화면·음성 입력은 이 API 경로를 그대로 사용한다.
 async function callAgent(path,body,signal) {
   const payload=JSON.stringify(body);
@@ -592,6 +706,7 @@ async function showPreview(scenarioId='aewol-parent-visit') {
     previewMode=true;sessionId=undefined;history=[];failedRequests.clear();
     failedPreviewRequest=undefined;
     caseState=data.caseState;latestActions=data.pendingActions;latestEvents=data.events;responseCount=1;
+    markAnswerReady();
     document.getElementById('request-input').value='';resizeInput();
     document.getElementById('message-list').replaceChildren();
     document.getElementById('starter-prompts').hidden=true;
@@ -599,7 +714,7 @@ async function showPreview(scenarioId='aewol-parent-visit') {
     // 미리보기의 LLM 미사용은 전역 모델 연결 설정과 별개다.
     updateCapabilities();renderSnapshot();
     document.getElementById('conversation-status').textContent='고정된 합성 대화 예시를 불러왔습니다. 실제 모델 응답과 전화는 아닙니다.';
-    requestAnimationFrame(()=>{document.getElementById('conversation-scroll').scrollTop=0;});
+    scrollToMessage(document.querySelector('#message-list .message.assistant:last-child'));
   } catch {
     if(!requestIsCurrent(request))return;
     failedPreviewRequest=request.body;
@@ -620,7 +735,9 @@ async function sendRequest(text,retryId) {
   if(retryId && input.value.trim() && input.value.trim()!==text && !window.confirm('같은 요청을 다시 확인하면 작성 중인 새 초안을 원래 요청으로 바꿉니다. 계속할까요?'))return;
   if(previewMode)resetConversation({focus:false,force:true});
   const requestId=retryId || makeId();
-  const requestBody=failed ? failed.body : {message:text,...(sessionId?{sessionId}:{}),history:normalizeHistory(history),requestId,preferences:{...carePreferences},applyPreferences:preferencesNeedApply};
+  const coreBody=failed ? {...failed.body} : {message:text,...(sessionId?{sessionId}:{}),history:normalizeHistory(history),requestId,preferences:{...carePreferences},applyPreferences:preferencesNeedApply};
+  delete coreBody.progressToken;
+  const requestBody={...coreBody,...(capabilities.progress==='poll' && capabilities.llm===true?{progressToken:makeProgressToken()}: {})};
   let messageNode,replyNode;
   if (retryId) {
     messageNode=document.querySelector(`[data-message-id="${requestId}"]`);
@@ -630,10 +747,12 @@ async function sendRequest(text,retryId) {
   document.getElementById('starter-prompts').hidden=true;
   input.value='';resizeInput();
   const request=beginRequest('message',{text,requestId,body:requestBody,messageNode},65000);
+  startProgress(request);
   try {
     const data=await callAgent(API,requestBody,request.controller.signal);
     if(!requestIsCurrent(request))return;
     caseState=data.caseState;sessionId=data.sessionId;latestActions=data.pendingActions;latestEvents=data.events;responseCount++;
+    markAnswerReady();
     history=normalizeHistory([...history,{role:'user',text},{role:'assistant',text:data.reply}]);
     failedRequests.delete(requestId);
     if(preferencesEqual(requestBody.preferences,carePreferences))preferencesNeedApply=false;
@@ -711,7 +830,8 @@ function resetConversation({focus=true,force=false}={}) {
   if(pending)return false;
   if(!force && hasConversationWork() && !window.confirm('현재 대화와 작성 중인 요청이 사라집니다. 새 가상 사례를 시작할까요?'))return false;
   if(activeRecognition){recognitionCancelled=true;activeRecognition.abort();activeRecognition=undefined;resetVoiceButton();}
-  conversationVersion++;failedPreviewRequest=undefined;
+  stopProgress(activeRequest);conversationVersion++;failedPreviewRequest=undefined;
+  requestProblem='';selectedStageId='records';manualStageSelection=false;unreadAnswer=false;
   caseState=createDemoCase();sessionId=undefined;history=[];latestActions=[];latestEvents=[];responseCount=0;previewMode=false;failedRequests.clear();
   preferencesNeedApply=true;
   document.getElementById('message-list').replaceChildren();
@@ -735,6 +855,7 @@ function welcomeMessage() {
 
 function mount() {
   const brand=`<img src="/assets/hondi-logo-v1.png" alt="" width="480" height="168"/>`;
+  const planContent=`<div class="conversation-scroll stage-pane-body" id="conversation-scroll" tabindex="0" aria-label="방문 계획과 준비 대화"><section class="care-journey-summary" id="care-journey-summary" aria-label="현재 진료 연결과 다음 행동"><div class="journey-summary-state"><h3>현재</h3><strong id="care-journey-current">미확인</strong></div><button type="button" id="open-care-journey" aria-haspopup="dialog" aria-controls="care-journey-dialog">여정·할 일 보기${icon('chevron')}</button><p class="journey-summary-next"><span>다음</span><strong id="care-journey-next"></strong></p></section><div class="message-list" id="message-list" role="log" aria-label="진료 준비 대화" aria-live="polite" aria-relevant="additions"></div><details class="stage-log" data-stage-log hidden><summary><span data-stage-log-label>처리 기록</span>${icon('chevron')}</summary><div data-stage-events></div></details></div>`;
   const menuIcon='<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>';
   document.getElementById('app').innerHTML=`
     <div class="app-shell">
@@ -778,15 +899,13 @@ function mount() {
             <div class="case-header"><h1 id="case-heading"></h1><p id="case-caption"></p></div>
             <div class="header-actions"><span class="connection-state checking" id="connection-state">연결 확인 중</span><button type="button" class="header-button" id="new-conversation">${icon('plus')}<span>새 대화</span></button></div>
           </header>
-          <div class="mobile-case-summary" id="mobile-case-summary" aria-label="이번 방문 요약"></div>
+          <div class="mobile-case-summary" id="mobile-case-summary" aria-label="이번 방문 요약" hidden></div>
           <div class="conversation-layout">
             <section class="chat-workspace" aria-labelledby="conversation-title">
-              <div class="chat-toolbar"><h2 id="conversation-title">혼디와 준비하기</h2><button type="button" id="preview-button" class="preview-button">대화 흐름 미리보기${icon('chevron')}</button></div>
+              <div class="chat-toolbar"><h2 id="conversation-title">진료 준비 작업</h2><button type="button" id="preview-button" class="preview-button">대화 흐름 미리보기${icon('chevron')}</button></div>
               <p class="mode-notice" id="mode-notice">연결 범위를 확인하고 있어요.</p>
-              <div class="conversation-scroll" id="conversation-scroll">
-                <section class="care-journey-summary" id="care-journey-summary" aria-label="현재 진료 연결과 다음 행동"><div class="journey-summary-state"><h3>현재</h3><strong id="care-journey-current">미확인</strong></div><button type="button" id="open-care-journey" aria-haspopup="dialog" aria-controls="care-journey-dialog">여정·할 일 보기${icon('chevron')}</button><p class="journey-summary-next"><span>다음</span><strong id="care-journey-next"></strong></p><p class="journey-summary-flow">자료 → 병원 문의 → 이동·동행 후속 확인</p></section>
-                <div class="message-list" id="message-list" role="log" aria-label="진료 준비 대화" aria-live="polite" aria-relevant="additions"></div>
-              </div>
+              <p class="board-activity" id="board-activity" role="status" aria-live="polite"></p>
+              ${preparationBoardMarkup(planContent)}
               <div class="pending-message" id="pending-message" hidden><div class="pending-summary"><span class="working-mark"></span><p role="status">요청 응답을 기다리고 있어요.</p></div><button type="button" id="cancel-request" class="cancel-request">응답 대기 중지</button><p class="pending-note">이 화면의 대기만 중지해요. 서버 처리는 계속될 수 있습니다.</p></div>
               <div class="starter-prompts" id="starter-prompts"><p>이렇게 요청해 보세요</p>
                   <button type="button" data-example="저는 동행이 어려워요. 자료와 이동도 준비해 주세요."><span>저는 동행이 어려워요.<br> 자료와 이동도 준비해 주세요.</span>${icon('arrow')}</button>
@@ -800,17 +919,19 @@ function mount() {
               </form>
               <div class="composer-notes"><p class="composer-disclosure" id="composer-disclosure">${icon('info')}가상 사례 · 실제 연락·예약 없음</p><p class="privacy-note" id="privacy-note">주민번호·인증정보·실제 의료기록 입력 금지 · 대화는 새로고침하면 사라져요.</p></div>
             </section>
+            <details class="visit-summary" id="visit-summary"><summary><span>${icon('calendar')}이번 방문 상세</span><span>일정·준비 상태·출처</span>${icon('chevron')}</summary>
             <aside class="case-sidebar" aria-label="대화에서 준비한 내용">
-              <details class="case-summary" id="case-summary" ${window.matchMedia('(min-width:901px)').matches?'open':''}><summary><span>${icon('calendar')}이번 방문 준비</span>${icon('chevron')}</summary><div id="case-content"></div></details>
+              <details class="case-summary" id="case-summary" open><summary><span>${icon('calendar')}이번 방문 준비</span>${icon('chevron')}</summary><div id="case-content"></div></details>
               <button type="button" class="report-button" id="save-report" title="대화 응답 후 준비 내역을 저장할 수 있어요." disabled>${icon('download')}준비 내역 저장</button>
               <details class="connection-details"><summary>지금 연결된 범위${icon('chevron')}</summary><div id="connection-details"></div></details>
               <details class="source-details"><summary>준비에 사용한 출처${icon('chevron')}</summary><div id="case-sources"></div></details>
               <span class="mode-label" id="mode-label">가상 사례 · 실제 발신 없음</span><p class="service-note">진찰과 진료 계획은 의료진이 결정합니다. 등록된 문의처와 실제 예약·배정은 다릅니다.</p>
-            </aside>
+            </aside></details>
           </div>
           <p id="conversation-status" class="visually-hidden" role="status" aria-live="polite"></p>
         </main>
       </div>
+      <dialog class="patient-records-dialog answer-dialog" id="answer-dialog" aria-labelledby="answer-title" aria-describedby="answer-description"><header class="patient-records-header"><div><h2 id="answer-title" tabindex="-1">혼디의 정리 · 넓게 읽기</h2><p id="answer-description">열 때의 대화 · 읽기 전용 · 실제 연락·예약 없음</p></div><button type="button" id="close-answer" class="close-records" aria-label="넓게 읽기 닫기">${icon('close')}</button></header><div class="answer-read-view message-list" id="answer-read-view"></div></dialog>
       <dialog class="patient-records-dialog" id="patient-records-dialog" aria-labelledby="patient-records-title" aria-describedby="patient-records-description">
         <header class="patient-records-header"><div><h2 id="patient-records-title" tabindex="-1">환자 정보·건강 기록</h2><p id="patient-records-description">가상 사례 · 합성 정보 · 읽기 전용</p></div><button type="button" id="close-patient-records" class="close-records" aria-label="환자 정보·건강 기록 닫기">${icon('close')}</button></header>
         <div class="patient-records-body" id="patient-records-body">
@@ -846,6 +967,13 @@ function mount() {
   document.getElementById('new-conversation').addEventListener('click',()=>resetConversation());
   document.getElementById('preview-button').addEventListener('click',()=>showPreview());
   document.getElementById('save-report').addEventListener('click',saveReport);
+  document.getElementById('stage-navigation').addEventListener('click',event=>{const button=event.target.closest('[data-open-stage]');if(button)openStage(button.dataset.openStage);});
+  document.getElementById('answer-ready-notice').addEventListener('click',()=>openStage('plan'));
+  document.getElementById('expand-answer').addEventListener('click',openAnswer);
+  const answerDialog=document.getElementById('answer-dialog');
+  document.getElementById('close-answer').addEventListener('click',()=>answerDialog.close());
+  answerDialog.addEventListener('keydown',event=>trapDialogFocus(event,answerDialog));
+  answerDialog.addEventListener('close',()=>{document.body.classList.remove('records-dialog-open');document.getElementById('answer-read-view').replaceChildren();if(answerReturnFocus?.isConnected)answerReturnFocus.focus({preventScroll:true});});
   document.getElementById('nav-patient-records').addEventListener('click',event=>{event.preventDefault();openPatientRecords();});
   document.getElementById('nav-contact-plan').addEventListener('click',event=>{event.preventDefault();openContactPlan();});
   document.getElementById('nav-care-journey').addEventListener('click',event=>{event.preventDefault();openCareJourney();});
@@ -912,6 +1040,7 @@ function mount() {
     }
   });
   mobileRail.addEventListener('change',()=>{const focusedRail=document.getElementById('care-rail').contains(document.activeElement);closeCareMenu({restoreFocus:false});if(mobileRail.matches && focusedRail)document.getElementById('open-care-menu').focus();});
+  mobileBoard.addEventListener('change',()=>{renderBoard();updateConversationLayout();});
   closeCareMenu({restoreFocus:false});
   window.addEventListener('beforeunload',event=>{if(hasConversationWork()){event.preventDefault();event.returnValue='';}});
   document.addEventListener('click',event=>{
