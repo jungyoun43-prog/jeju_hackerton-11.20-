@@ -2,6 +2,8 @@ import { createDemoCase, applyAction, getTasks, getProgress, getSummary, calcula
 import { icon } from './icons.js';
 import { mountMap, destroyMap, refreshMap, googleMapUrl, hospitalMapUrl } from './map.js';
 import { filterHospitals } from './hospitals.js';
+import { getVisitSupportSummary, buildSupportInquiry } from './visit-support.js';
+import { loadSupportRegistry, getSupportCandidates } from './support-data.js';
 
 let state = createDemoCase();
 let currentView = 'overview';
@@ -16,6 +18,9 @@ let candidateSnapshot;
 let candidateOrigin = 'public-preview';
 let importProfile;
 let hospitalFilters = { department: '', area: '' };
+let supportRegistry;
+let supportLoadError = '';
+const supportNames = { taxi: '택시 이동', companion: '병원 동행' };
 const busyTargets = new Set();
 const views = { overview: ['진료 준비', 'home'], documents: ['진료 자료', 'folder'], calls: ['병원 문의', 'phone'], plan: ['일정·동행', 'calendar'], data: ['기관·데이터', 'database'] };
 const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -84,14 +89,54 @@ function missionPanel() {
 }
 function familyTasks() {
   const tasks=getTasks(state).filter(task=>task.action !== 'call').slice(0,2);
-  return `<section class="family-tasks"><div class="panel-top"><h2>가족과 의료진의 준비</h2></div>${tasks.length ? tasks.map(task=>`<div class="family-task"><div><small>${escape(task.owner)}</small><strong>${escape(task.title.replace(/해 주세요[.]?$/, ''))}</strong>${actionButton(task,true)}</div></div>`).join('') : `<p class="help-text">접수와 회신 상태를 확인하세요.</p>`}<p class="family-boundary">진찰과 진료 계획은 의료진이 결정합니다.</p></section>`;
+  return `<section class="family-tasks"><div class="panel-top"><h2>가족과 의료진의 준비</h2></div>${tasks.length ? tasks.map(task=>`<div class="family-task"><div><small>${escape(task.owner)}</small><strong>${escape(task.title.replace(/(?:을|를) 준비해 주세요[.]?$/, ' 준비').replace(/해 주세요[.]?$/, ''))}</strong>${actionButton(task,true)}</div></div>`).join('') : `<p class="help-text">접수와 회신 상태를 확인하세요.</p>`}<p class="family-boundary">진찰과 진료 계획은 의료진이 결정합니다.</p></section>`;
 }
 function connectionPanel() {
   const progress=getProgress(state), answered=Object.values(state.inquiries).filter(item=>item.status==='confirmed').length;
   return `<section class="connection-panel" aria-labelledby="connection-title"><div class="panel-top"><h2 id="connection-title">두 병원 사이, 준비 기록</h2><span class="panel-meta">절차 ${answered}/2곳 확인</span></div><div class="care-connection"><article class="care-place"><div class="place-route"><span>제주</span><i></i></div><div class="place-record"><div class="place-title"><h3>현지 대면 진찰</h3>${badge(inquiryStatus[state.inquiries.jeju.status][0],state.inquiries.jeju.status==='confirmed'?'green':'neutral')}</div><p>${escape(state.patient.localHospital)}</p><span class="place-purpose">진찰 소견 · 검사 자료 · 의뢰서</span><div class="place-actions"><button class="text-button" data-nav="calls" data-focus="inquiry-jeju">문의 기록${icon('chevron')}</button><button class="text-button" data-nav="data">기관 찾기${icon('chevron')}</button></div></div></article><div class="connection-bridge">${icon('folder')}<strong>검토할 자료</strong><span>${progress.prepared}/${progress.total} 준비</span><button class="text-button" data-nav="documents">자료 보기${icon('chevron')}</button></div><article class="care-place"><div class="place-route"><span>도외</span></div><div class="place-record"><div class="place-title"><h3>기존 주치의·전문의 검토</h3>${badge(state.review.status==='completed'?'합성 회신 확인':state.review.status==='pending'?'회신 대기':inquiryStatus[state.inquiries.mainland.status][0],state.review.status==='completed'?'green':'neutral')}</div><p>${escape(state.patient.existingHospital)}</p><span class="place-purpose">기록 검토 · 추가 요청 · 후속 계획</span><button class="text-button" data-nav="calls" data-focus="inquiry-mainland">문의 기록${icon('chevron')}</button></div></article></div></section>`;
 }
+function visitDateLabel() {
+  const value = state.patient.nextVisit;
+  const date = new Date(`${value}T12:00:00Z`);
+  return !value || Number.isNaN(date.valueOf()) ? '방문일 미정' : new Intl.DateTimeFormat('ko-KR', { month: 'long', day: 'numeric', weekday: 'short', timeZone: 'UTC' }).format(date);
+}
+function supportTone(status) {
+  return status === 'available_demo' ? 'green' : ['needs_recheck', 'unavailable_demo', 'unreachable_demo'].includes(status) ? 'orange' : 'neutral';
+}
+function supportCandidates(kind) {
+  return supportRegistry ? getSupportCandidates(supportRegistry, { kind, area: state.patient.area, wheelchair: state.visitSupport.requirements.wheelchair }) : [];
+}
+function readinessStrip() {
+  const progress = getProgress(state), support = getVisitSupportSummary(state);
+  const confirmed = Object.values(state.inquiries).filter(item => item.status === 'confirmed').length;
+  const items = [
+    { label: '병원 연결', value: `${confirmed}/2곳 절차 확인`, detail: confirmed === 2 ? '자료 검토 준비' : '접수 창구 확인 필요', nav: 'calls', tone: confirmed === 2 ? 'ready' : '' },
+    { label: '진료 자료', value: `${progress.prepared}/${progress.total}개 준비`, detail: progress.prepared === progress.total ? '필요 자료 준비됨' : '빠진 자료 확인', nav: 'documents', tone: progress.prepared === progress.total ? 'ready' : '' },
+    { label: '택시 이동', value: support.taxi.label, detail: state.visitSupport.requirements.transportNeeded ? support.taxi.providerName || '지역 문의처 찾기' : '별도 지원 없음', nav: 'plan', focus: 'visit-support-taxi', tone: support.taxi.status === 'available_demo' && !support.nextActions.some(task=>task.kind==='taxi') ? 'ready' : '' },
+    { label: '병원 동행', value: support.companion.label, detail: state.visitSupport.requirements.companionNeeded ? support.companion.providerName || '보호자 대신 함께 갈 사람' : '별도 지원 없음', nav: 'plan', focus: 'visit-support-companion', tone: support.companion.status === 'available_demo' && !support.nextActions.some(task=>task.kind==='companion') ? 'ready' : '' },
+  ];
+  return `<section class="readiness-strip" aria-label="이번 방문의 준비 상태">${items.map(item => `<button class="readiness-item ${item.tone}" data-nav="${item.nav}" ${item.focus ? `data-focus="${item.focus}"` : ''}><span>${escape(item.label)}${icon('chevron')}</span><strong>${escape(item.value)}</strong><small>${escape(item.detail)}</small></button>`).join('')}</section>`;
+}
+function visitRoutePanel() {
+  const progress = getProgress(state), support = getVisitSupportSummary(state);
+  const localName = state.selectedHospital?.companyName || '제주 기관을 선택해 주세요';
+  return `<section class="visit-route-panel" aria-labelledby="visit-route-title"><div class="panel-top"><h2 id="visit-route-title">이번 진료가 이어지는 길</h2><span class="panel-meta">방문 1건의 준비</span></div><div class="physical-route"><div class="route-home">${icon('home')}<div><small>출발</small><strong>${escape(state.patient.area)}</strong></div></div><div class="route-transport">${icon('car')}<span>${escape(state.visitSupport.requirements.transportNeeded ? support.taxi.providerName || '이동 수단 준비' : '추가 이동지원 없음')}</span><small>이동시간 미확인</small></div><div class="route-clinic">${icon('hospital')}<div><small>제주 대면 진찰</small><strong>${escape(localName)}</strong><button class="text-button" data-nav="data">${state.selectedHospital ? '선택 기관 확인' : '기관 찾기'}${icon('chevron')}</button></div></div></div><div class="records-route"><div>${icon('folder')}<span>진찰·검사 자료 <strong>${progress.prepared}/${progress.total} 준비</strong></span></div>${icon('arrow')}<div>${icon('hospital')}<span>기존 주치의 검토<small>${escape(state.patient.existingHospital)}</small></span></div></div><p class="route-note">이동은 제주 방문 준비입니다. 도외 병원과는 자료 검토 절차를 확인합니다.</p></section>`;
+}
+function supportOverviewPanel() {
+  const support = getVisitSupportSummary(state);
+  return `<section class="support-overview" aria-labelledby="support-overview-title"><div class="panel-top"><h2 id="support-overview-title">이동과 동행도 함께</h2><button class="text-button" data-nav="plan" data-focus="visit-support">준비하기${icon('chevron')}</button></div>${['taxi','companion'].map(kind => {
+    const item = support[kind], candidate = supportCandidates(kind)[0];
+    const required = state.visitSupport.requirements[kind === 'taxi' ? 'transportNeeded' : 'companionNeeded'];
+    return `<div class="support-overview-row">${icon(kind === 'taxi' ? 'car' : 'users')}<div><span>${escape(supportNames[kind])}</span><strong>${escape(required ? item.providerName || candidate?.name || '문의처 확인 중' : '별도 지원 없음')}</strong><small>${escape(required && item.providerName ? item.label : required ? candidate ? `${candidate.matchLabel} · 이용 가능 여부 문의` : supportLoadError || '지역에 맞는 문의처를 불러옵니다.' : '추가 지원이 필요하지 않은 설정')}</small></div><button class="text-button" data-nav="plan" data-focus="visit-support-${kind}">${item.providerName ? '상태 보기' : '문의 준비'}${icon('chevron')}</button></div>`;
+  }).join('')}<p class="support-boundary">현재 차량·동행인이 배정된 상태는 아닙니다.</p></section>`;
+}
+function nextTasksPanel() {
+  const support = getVisitSupportSummary(state), tasks = getTasks(state).slice(1,3);
+  return `<section class="next-tasks"><div class="panel-top"><h2>이어서 준비할 일</h2><span class="panel-meta">담당자와 다음 행동</span></div>${tasks.map(task => `<div class="next-task-row"><span class="task-check">${icon(task.owner.includes('의료진') ? 'hospital' : 'file')}</span><div><strong>${escape(task.title.replace(/(?:을|를) 준비해 주세요[.]?$/, ' 준비').replace(/해 주세요[.]?$/, ''))}</strong><small>${escape(task.owner)}</small></div>${actionButton(task,true)}</div>`).join('')}${support.nextActions.slice(0,1).map(task => `<div class="next-task-row"><span class="task-check">${icon(task.kind === 'taxi' ? 'car' : 'users')}</span><div><strong>${escape(task.title)}</strong><small>${escape(task.reason)}</small></div><button class="text-button" data-nav="plan" data-focus="visit-support-${escape(task.kind)}">준비하기${icon('chevron')}</button></div>`).join('')}</section>`;
+}
 function overview() {
-  return `<header class="case-intro"><div class="intro-copy"><h1 id="service-role">${escape(state.patient.name)} 님의 <br>진료 준비</h1><p>제주 현지 진찰과 기존 주치의 검토가 이어지도록.</p><div class="case-context"><span>${escape(state.patient.area)} · ${escape(state.patient.age)}세</span><span>보호자 ${escape(state.patient.caregiver)}</span><span class="synthetic-label">합성 사례</span></div><button class="text-button case-settings" data-nav="plan" data-focus="patient-settings">다음 방문 ${escape(state.patient.nextVisit || '미정')} · 가족·일정 수정${icon('chevron')}</button></div></header><div class="case-workspace"><div class="case-main">${missionPanel()}${connectionPanel()}${activitiesPanel()}</div><aside class="case-aside" aria-label="필요 자료와 가족 준비">${documentsPanel()}${familyTasks()}${assistantPanel()}${sourceSummary()}</aside></div><div class="context-grid">${mapPanel()}<div class="location-note"><h2>이동도 함께 준비합니다.</h2><p>방문 횟수와 가족의 동행 가능일을 바꾸면<br>미배정 일정과 비용 가정을 다시 계산합니다.</p><button class="text-button" data-nav="plan">일정과 동행 확인${icon('arrow')}</button></div></div>`;
+  const time = state.visitSupport.requirements.appointmentTime;
+  return `<header class="visit-heading"><div><h1 id="service-role">${escape(state.patient.name)} 님의 진료 준비</h1><p><span>${escape(state.patient.area)} · ${escape(state.patient.age)}세</span><span>보호자 ${escape(state.patient.caregiver)}</span><span class="synthetic-label">합성 사례</span></p></div><button class="visit-date" data-nav="plan" data-focus="patient-settings">${icon('calendar')}<span><small>다음 방문 · 시연 일정</small><strong>${escape(visitDateLabel())}</strong><small>${time ? `${escape(time)} 진료 시각 가정` : '진료 시각 미정'} · 일정 수정</small></span>${icon('chevron')}</button></header>${readinessStrip()}<div class="visit-workboard"><div class="visit-main">${missionPanel()}${visitRoutePanel()}${nextTasksPanel()}</div><aside class="visit-sidebar" aria-label="이동·동행과 자료 준비">${supportOverviewPanel()}${documentsPanel()}</aside></div><div class="visit-followups">${activitiesPanel()}${assistantPanel()}</div><div class="visit-bottom">${mapPanel()}${sourceSummary()}</div>`;
 }
 function profilePanel(profile=dataProfile) {
   if(!profile) return `<section class="panel data-profile"><h2>자료의 범위를 먼저 확인해요</h2><p class="help-text">${escape(dataProfileError || '공개 자료의 출처 정보를 불러오고 있어요.')}</p><a class="text-button" href="https://jejudatahub.net/data/view/data/859" target="_blank" rel="noopener noreferrer">허브 원문 확인${icon('external')}</a></section>`;
@@ -111,7 +156,7 @@ function hospitalCandidates() {
   return `<section class="panel hospital-import"><div class="panel-top"><h2>문의할 제주 기관 찾기</h2>${badge(imported?'내 자료':'공개 데이터')}</div><p class="help-text">${escape(sourceDescription)}</p>${hospitalRecords.length ? `<form id="hospital-filter" class="hospital-filter"><div class="field"><label for="hospital-department">등록 진료과</label><select id="hospital-department" name="department"><option value="">전체 진료과</option>${departments.map(value=>`<option ${value===hospitalFilters.department?'selected':''}>${escape(value)}</option>`).join('')}</select></div><div class="field"><label for="hospital-area">주소에서 지역 찾기</label><input id="hospital-area" name="area" value="${escape(hospitalFilters.area)}" placeholder="예: 애월, 제주시" maxlength="100"/></div><button class="button secondary" type="submit">후보 조회${icon('search')}</button></form><p class="candidate-count">등록 조건에 맞는 ${records.length}곳 · 임상 적합성 순위가 아닙니다.</p><div class="candidate-list">${records.map(record=>`<article class="hospital-candidate"><div><h3>${escape(record.companyName)}</h3>${badge('현재 진료·협진 미확인','orange')}</div><p>${escape(record.address || '주소 미확인')}</p><span>${escape(record.departments.join(' · ') || '등록 진료과 미확인')}</span><small>자료상 ${escape(record.openStatus)} · 갱신 ${escape(record.updatedAt || '미확인')}<br>출처: ${escape(sourceLabel)}</small><div class="candidate-actions"><button class="button outline small" data-select-hospital="${escape(record.id)}" ${!/^(영업\s*\/\s*정상|정상|영업중)$/.test(record.openStatus)?'disabled':''}>문의할 기관으로 선택${icon('arrow')}</button><a class="text-button hospital-map-link" href="${escape(hospitalMapUrl(record))}" target="_blank" rel="noopener noreferrer">지도에서 주소 보기${icon('external')}</a></div></article>`).join('') || '<p class="empty-note">조건에 맞는 등록 행이 없어요. 지역이나 진료과를 바꿔보세요.</p>'}</div>` : `<div class="import-empty"><h3>기관 등록 정보를 불러오고 있어요</h3><p>${escape(dataProfileError || '공개 미리보기의 출처와 등록 정보를 확인하고 있습니다.')}</p></div>`}<details class="hospital-import-more"><summary>보유한 기관 자료로 조회하기</summary><p class="help-text">이용 가능한 병·의원 JSON/CSV를 가져오면 현재 후보 목록을 바꿉니다. 원본은 서버에 보내지 않아요.</p><label class="file-drop" for="hospital-file">${icon('folder')}<strong>병·의원 자료 가져오기</strong><span>JSON 또는 CSV · 2MB 이하</span><input type="file" id="hospital-file" accept=".json,.csv,application/json,text/csv" ${!dataTools?'disabled':''}/></label></details></section>`;
 }
 function data() {
-  return `${pageTitle('제주 기관·데이터', '출처와 시점을 확인하고, 기관 등록 정보를 문의 준비에 연결해요.')}<div class="data-banner">${icon('info')}등록된 진료과·행정 상태는 현재 진료 가능 여부나 협진 수락을 뜻하지 않습니다.</div><div class="subpage-grid data-grid"><div class="column">${hospitalCandidates()}</div><div class="column">${profilePanel(importProfile || dataProfile)}</div></div>`;
+  return `${pageTitle('제주 기관·데이터', '출처와 시점을 확인하고, 기관 등록 정보를 문의 준비에 연결해요.')}<div class="data-banner">${icon('info')}등록된 진료과·행정 상태는 현재 진료 가능 여부나 협진 수락을 뜻하지 않습니다.</div><div class="subpage-grid data-grid"><div class="column">${hospitalCandidates()}</div><div class="column">${profilePanel(importProfile || dataProfile)}${supportSourcesPanel()}</div></div>`;
 }
 
 function fullDocuments() {
@@ -160,10 +205,40 @@ function costsPanel() {
   return `<section class="panel"><div class="panel-top"><h2>일정이 바뀌면 부담은?</h2>${badge('사용자 입력 가정', 'orange')}</div><p class="help-text" style="margin-bottom:19px">실제 견적이 아닌 예산 시나리오입니다. 확인하지 않은 금액은 비워두고, 필요 없는 항목만 0으로 입력해 주세요.</p><form id="cost-form"><div class="cost-grid">${costFields.map(([key, label, unit]) => `<div class="field"><label for="plan-${key}">${label} (${unit})</label><input id="plan-${key}" type="number" inputmode="numeric" min="0" ${key === 'visits' ? 'max="100"' : ''} name="${key}" value="${state.plan[key] ?? ''}" placeholder="미확인" step="1" ${['visits', 'caregiverAvailable'].includes(key) ? 'required' : ''}/></div>`).join('')}</div><div class="form-actions" style="margin-top:20px"><button type="submit" class="button primary">부담 다시 계산${icon('refresh')}</button></div></form><div class="cost-result" aria-live="polite"><div class="cost-result-top"><p>입력한 금액의 예상 소계</p><strong>${money(burden.estimatedSubtotal)}<small>원</small></strong></div><p class="unknown-costs">${burden.unknownItems.length ? `미확인 항목 · ${burden.unknownItems.map(escape).join(', ')}<br>전체 비용이 확정된 것은 아니에요.` : '모든 비용 항목을 입력했어요. 실제 금액은 예약·기관 견적으로 확인해 주세요.'}</p><p class="inline-message ${burden.careGap ? 'warning' : ''}">${burden.careGap ? `동행자가 정해지지 않은 방문이 ${burden.careGap}회 있어요. 가족 분담이나 동행 지원을 확인해 주세요.` : '입력한 방문 횟수에 필요한 보호자 동행을 확보한 가정이에요.'}</p></div></section>`;
 }
 function patientPanel() {
-  return `<section class="panel" id="patient-settings"><div class="panel-top"><h2>가족·일정 정보</h2>${badge('시연용 입력')}</div><form id="patient-form" class="patient-form"><div class="field"><label for="patient-name">가상 환자 이름</label><input id="patient-name" name="name" value="${escape(state.patient.name)}" maxlength="60" required/></div><div class="field"><label for="patient-caregiver">보호자 이름</label><input id="patient-caregiver" name="caregiver" value="${escape(state.patient.caregiver)}" maxlength="60" required/></div><div class="field"><label for="patient-area">거주 지역</label><input id="patient-area" name="area" value="${escape(state.patient.area)}" maxlength="120" required/></div><div class="field"><label for="patient-date">기존 다음 외래 일정</label><input id="patient-date" name="nextVisit" type="date" value="${escape(state.patient.nextVisit)}" required/></div><div class="form-actions"><button class="button outline small" type="submit">가족 정보 반영${icon('check')}</button></div></form><p class="help-text" style="margin-top:12px">이 정보는 외부 지도나 병원으로 전송하지 않습니다.</p></section>`;
+  return `<section class="panel" id="patient-settings"><div class="panel-top"><h2>가족·일정 정보</h2>${badge('시연용 입력')}</div><form id="patient-form" class="patient-form"><div class="field"><label for="patient-name">가상 환자 이름</label><input id="patient-name" name="name" value="${escape(state.patient.name)}" maxlength="60" required/></div><div class="field"><label for="patient-caregiver">보호자 이름</label><input id="patient-caregiver" name="caregiver" value="${escape(state.patient.caregiver)}" maxlength="60" required/></div><div class="field"><label for="patient-area">거주 지역</label><input id="patient-area" name="area" value="${escape(state.patient.area)}" maxlength="120" required/></div><div class="field"><label for="patient-date">이번 방문 예정일 · 시연</label><input id="patient-date" name="nextVisit" type="date" value="${escape(state.patient.nextVisit)}" required/></div><div class="form-actions"><button class="button outline small" type="submit">가족 정보 반영${icon('check')}</button></div></form><p class="help-text" style="margin-top:12px">이 정보는 외부 지도나 병원으로 전송하지 않습니다.</p></section>`;
+}
+function supportSourcesPanel() {
+  if (!supportRegistry) return `<section class="panel"><h2>이동·돌봄 자료</h2><p class="help-text">${escape(supportLoadError || '지원 문의처의 출처를 불러오고 있습니다.')}</p></section>`;
+  return `<section class="panel support-sources"><div class="panel-top"><h2>이동·돌봄 문의처의 근거</h2>${icon('database')}</div>${supportRegistry.datasets.map(dataset => `<div><h3>${escape(dataset.name)}</h3><p>${escape(dataset.rowCount)}행 · 기준 ${escape(dataset.asOf || '미확인')}</p><a class="text-button" href="${escape(dataset.sourceUrl)}" target="_blank" rel="noopener noreferrer">원출처 확인${icon('external')}</a></div>`).join('')}<p class="help-text">택시는 허브 연결 원출처의 2026년 자료를 사용합니다. 2020년 돌봄 등록 정보와 현재 동행 서비스 소개를 구분하며, 이용 가능일·요금은 문의가 필요합니다.</p></section>`;
+}
+function supportRequirementsPanel() {
+  const requirements = state.visitSupport.requirements, summary = getVisitSupportSummary(state);
+  return `<section class="support-requirements" id="visit-support"><div class="panel-top"><div><h2>이번 방문의 이동·동행 준비</h2><p>${escape(visitDateLabel())} · ${escape(state.patient.area)} 출발</p></div>${badge('예약·배차 시연', 'orange')}</div><form id="support-requirements-form"><div class="support-needs"><label class="checkbox"><input id="support-transport-needed" name="transportNeeded" type="checkbox" ${requirements.transportNeeded ? 'checked' : ''}/><span>택시 이동이 필요해요</span></label><label class="checkbox"><input id="support-companion-needed" name="companionNeeded" type="checkbox" ${requirements.companionNeeded ? 'checked' : ''}/><span>병원 동행이 필요해요</span></label><label class="checkbox"><input id="support-wheelchair" name="wheelchair" type="checkbox" ${requirements.wheelchair ? 'checked' : ''}/><span>휠체어 이용 조건을 확인해요</span></label></div><div class="support-time-row"><div class="field"><label for="support-appointment-time">진료 시각 · 미확인이라면 비워두세요</label><input id="support-appointment-time" name="appointmentTime" type="time" value="${escape(requirements.appointmentTime)}"/></div><button class="button outline" type="submit">필요 조건 반영${icon('check')}</button></div></form><div class="support-open-items"><strong>먼저 확인할 조건</strong>${summary.unresolved.length ? `<ul>${summary.unresolved.slice(0,4).map(item => `<li>${escape(item)}</li>`).join('')}</ul>` : '<p>입력한 시연 조건의 준비를 확인했습니다. 실제 예약과 배정은 제공기관 확인이 필요합니다.</p>'}</div></section>`;
+}
+function providerTypeLabel(provider) {
+  return { call_taxi: '호출택시 등록 정보', care_contact: '지역 돌봄 문의처', hospital_escort: '공식 병원동행 소개 확인', accessible_transport: '교통약자 이동 문의처' }[provider.serviceType] || '지원 문의처';
+}
+function providerContact(provider) {
+  const match = String(provider.phone || '').match(/0\d{1,2}[-\s]?\d{3,4}[-\s]?\d{4}|1\d{3}[-\s]?\d{4}/);
+  return match ? `<a class="provider-phone" href="tel:${match[0].replace(/[^\d+]/g,'')}">${icon('phone')}${escape(provider.phone)}</a>` : `<span class="provider-phone">${escape(provider.phone || '번호는 공식 창구에서 확인')}</span>`;
+}
+function providerRow(provider, kind) {
+  const selected = state.visitSupport[kind].provider?.id === provider.id;
+  return `<article class="support-provider ${selected ? 'selected' : ''}"><div class="provider-heading"><strong>${escape(provider.name)}</strong><span>${escape(provider.matchLabel)}</span></div><p>${escape(providerTypeLabel(provider))} · ${escape(provider.region || '지역 확인 필요')}</p>${providerContact(provider)}<p class="provider-evidence">${provider.serviceType === 'care_contact' ? '병원동행 제공 여부부터 확인해야 합니다. ' : ''}${escape(provider.description || '')}</p><div class="provider-actions"><button class="button outline small" data-support-select="${escape(provider.id)}" data-support-kind="${kind}" ${selected ? 'disabled' : ''}>${selected ? '선택한 문의처' : '문의처 선택'}${icon(selected ? 'check' : 'arrow')}</button><a class="text-button" href="${escape(provider.source.url)}" target="_blank" rel="noopener noreferrer">${provider.source.asOf ? `기준 ${escape(provider.source.asOf)}` : `공식 안내 · ${escape(provider.source.retrievedAt?.slice(0,10) || '확인일 미상')} 확인`}${icon('external')}</a></div></article>`;
+}
+function inquiryDraft(kind) {
+  try { return buildSupportInquiry(state, kind); } catch (error) { return error.message; }
+}
+function supportKindPanel(kind) {
+  const selected = state.visitSupport[kind], summary = getVisitSupportSummary(state)[kind];
+  const needed = state.visitSupport.requirements[kind === 'taxi' ? 'transportNeeded' : 'companionNeeded'];
+  const candidates = supportCandidates(kind), provider = selected.provider;
+  const prepared = ['prepared','available_demo','unavailable_demo','unreachable_demo'].includes(selected.status);
+  const canRespond = selected.status === 'prepared';
+  return `<section class="panel support-kind" id="visit-support-${kind}" data-support-panel="${kind}"><div class="panel-top"><h2>${icon(kind === 'taxi' ? 'car' : 'users')}${escape(supportNames[kind])}</h2><span class="badge ${supportTone(summary.status)}" id="support-status-${kind}" data-support-state="${escape(summary.status)}">${escape(summary.label)}</span></div>${!needed ? '<p class="help-text">추가 지원이 필요하지 않은 설정입니다. 필요 조건을 바꾸면 다시 문의처를 찾을 수 있습니다.</p>' : `<p class="support-kind-intro">${kind === 'taxi' ? '출발 지역과 차량 조건에 맞는 문의처를 찾고, 방문일의 이용 가능 여부를 확인하세요.' : '함께 갈 가족이 없다면 동행 서비스와 지역 돌봄 문의처에 지원 범위·날짜·자격을 확인하세요.'}</p><details class="support-options" ${!provider ? 'open' : ''}><summary>${provider ? '다른 문의처 살펴보기' : `지역에 맞는 문의처 ${candidates.length}곳`}</summary>${candidates.length ? candidates.slice(0,3).map(candidate => providerRow(candidate,kind)).join('') : `<p class="empty-note">${escape(supportLoadError || (supportRegistry ? '현재 자료에서 조건에 맞는 문의처를 찾지 못했습니다. 출발 지역을 확인하거나 공식 창구에 문의하세요.' : '공개 지원 정보를 불러오고 있습니다.'))}</p>`}${candidates.length > 3 ? `<details class="more-providers"><summary>나머지 ${candidates.length-3}곳 보기</summary>${candidates.slice(3).map(candidate => providerRow(candidate,kind)).join('')}</details>` : ''}</details>${provider ? `<div class="selected-support"><div class="selected-provider"><small>선택한 문의처</small><h3>${escape(provider.name)}</h3><p>${escape(providerTypeLabel(provider))}</p>${providerContact(provider)}</div>${selected.status === 'needs_recheck' ? '<p class="inline-message warning">방문 조건이 바뀌었습니다. 새 조건으로 다시 문의할 준비가 필요합니다.</p>' : ''}<button class="button secondary" data-support-prepare="${kind}">${prepared ? '문의 초안 다시 만들기' : '문의 초안 만들기'}${icon('file')}</button>${prepared ? `<div class="support-inquiry-draft"><label for="support-inquiry-${kind}">제공기관에 확인할 문의 초안</label><textarea id="support-inquiry-${kind}" readonly rows="9">${escape(inquiryDraft(kind))}</textarea><div class="draft-actions"><button class="text-button" data-support-copy="${kind}">초안 복사${icon('copy')}</button><button class="text-button" data-support-download="${kind}">텍스트 저장${icon('download')}</button></div></div>` : ''}<form class="support-response-form" data-support-response-form="${kind}"><h3>문의 응답 시연</h3><p>실제 제공기관에 연락하지 않습니다. 아래 응답을 선택해 다음 준비가 어떻게 바뀌는지 확인하세요.</p><div class="field"><label for="support-outcome-${kind}">이번에 재현할 응답</label><select id="support-outcome-${kind}" name="outcome" ${!canRespond ? 'disabled' : ''}><option value="available">해당 조건 가능 응답</option><option value="unavailable">해당 조건 이용 불가</option><option value="unreachable">연결되지 않음</option></select></div>${kind === 'taxi' && state.visitSupport.requirements.wheelchair ? `<label class="checkbox"><input id="support-wheelchair-confirmed" name="wheelchairConfirmed" type="checkbox" ${selected.wheelchairConfirmed ? 'checked' : ''} ${!canRespond ? 'disabled' : ''}/><span>휠체어 탑승 조건을 확인한 응답 재현</span></label>` : ''}${kind === 'taxi' && provider.serviceType === 'accessible_transport' ? `<label class="checkbox"><input id="support-eligibility-confirmed" name="eligibilityConfirmed" type="checkbox" ${selected.eligibilityConfirmed ? 'checked' : ''} ${!canRespond ? 'disabled' : ''}/><span>이용대상·회원등록을 확인한 응답 재현</span></label>` : ''}<button class="button primary" type="submit" ${!canRespond ? 'disabled' : ''}>합성 응답 반영${icon('phone')}</button></form>${selected.response ? `<p class="support-response ${supportTone(selected.status)}" role="status">${escape(selected.response)}<small>출처 · 합성 문의 응답</small></p>` : ''}</div>` : ''}` }<p class="support-boundary">실제 예약·배차·동행인 배정은 제공기관 확인이 필요합니다.</p></section>`;
 }
 function plan() {
-  return `${pageTitle('일정·이동', '진료 계획을 가족의 일상에 맞춰 준비해요.')}<p class="page-description">의료진 회신을 바탕으로 할 일을 확인하고, 방문 횟수나 동행 조건이 바뀔 때 생활 부담을 계산해 보세요. 이동시간과 예약은 실제 확인 전까지 확정하지 않아요.</p><div class="subpage-grid"><div class="column">${planPanel()}${costsPanel()}${patientPanel()}</div><div class="column">${mapPanel()}<section class="panel"><div class="panel-top"><h2>이동 경로 확인</h2>${icon('map')}</div><p class="help-text">아래 링크는 시연용 두 지점으로 Google 지도를 엽니다. 실제 경로·이동시간·교통편은 외부 지도에서 확인해 주세요.</p><a class="button outline" href="${googleMapUrl(true)}" target="_blank" rel="noopener noreferrer" style="margin-top:16px">Google 지도에서 경로 확인${icon('external')}</a></section>${assistantPanel()}</div></div>`;
+  return `${pageTitle('이동·동행', '병원에 가는 날, 이동과 함께 갈 사람까지 준비해요.')}<p class="page-description">아래는 다음 방문 1건의 지원 준비입니다. 필요한 조건에 따라 지역 문의처와 질문이 바뀌며, 실제 예약·배차는 확정하지 않습니다.</p>${supportRequirementsPanel()}<div class="support-planning-grid">${supportKindPanel('taxi')}${supportKindPanel('companion')}</div><div class="subpage-grid plan-details"><div class="column">${patientPanel()}${costsPanel()}</div><div class="column">${planPanel()}${mapPanel()}<section class="panel"><div class="panel-top"><h2>이동 경로 확인</h2>${icon('map')}</div><p class="help-text">시연용 두 지점으로 외부 지도를 엽니다. 선택 기관의 실제 경로·이동시간은 따로 확인하세요.</p><a class="button outline" href="${googleMapUrl(true)}" target="_blank" rel="noopener noreferrer">Google 지도에서 경로 확인${icon('external')}</a></section></div></div>`;
 }
 
 function render() {
@@ -172,7 +247,7 @@ function render() {
   if (retainedMap) retainedMap.remove();
   else destroyMap();
   const content = { overview, documents, calls, plan, data }[currentView]();
-  document.getElementById('app').innerHTML = `<div class="app-layout"><aside class="sidebar" aria-label="주 탐색"><a class="brand" href="#overview" data-nav="overview" aria-label="제주 진료 나침반, 진료 준비로"><img class="brand-image" src="/assets/jeju-mark-v1.png" alt="" width="46" height="46"/><span class="brand-name">제주<br>진료 나침반</span></a><p class="sidebar-caption">가족 진료 수첩</p><nav class="nav-list">${Object.entries(views).map(([key, [label, symbol]]) => `<button class="nav-item ${key === currentView ? 'active' : ''}" data-nav="${key}" ${key === currentView ? 'aria-current="page"' : ''} title="${label}">${icon(symbol)}<span class="nav-label">${label}</span>${key === 'documents' ? `<span class="nav-count">${getProgress(state).total - getProgress(state).prepared}</span>` : ''}</button>`).join('')}</nav><div class="sidebar-spacer"></div><div class="sidebar-note"><span>제주데이터허브</span><button class="text-button" data-nav="data">병·의원 등록 정보${icon('chevron')}</button></div><div class="profile"><div class="avatar">${escape((state.patient.caregiver || '보호자').slice(-2))}</div><div><strong>${escape(state.patient.caregiver)} 님</strong><small>보호자 · 시연 계정</small></div></div></aside><div class="workspace"><header class="topbar"><a class="mobile-brand" href="#overview" data-nav="overview" aria-label="제주 진료 나침반"><img src="/assets/jeju-mark-v1.png" alt="" width="30" height="30"/><span>제주 진료 나침반</span></a><div class="breadcrumb"><span>${escape(state.patient.name)} 님의 진료 연결</span>${icon('chevron')}<strong>${views[currentView][0]}</strong></div><div class="topbar-actions"><span class="demo-pill">시연 모드 · 실제 발신 없음</span><button class="icon-button" data-report title="진행 보고서 내려받기" aria-label="진행 보고서 내려받기">${icon('download')}</button><button class="icon-button" data-reset title="시연 처음으로" aria-label="시연 처음으로">${icon('refresh')}</button></div></header><main class="main" id="main" tabindex="-1">${content}<footer class="footnote"><span>${icon('shield')}전화·자료 전송·의료진 회신은 시뮬레이션입니다. 실제 예약·협진은 확정되지 않았어요.</span><button class="text-button" data-report>진행 보고서 저장${icon('download')}</button></footer></main></div></div><div class="toast" id="toast" role="status" aria-live="polite" hidden></div>`;
+  document.getElementById('app').innerHTML = `<div class="app-layout"><aside class="sidebar" aria-label="주 탐색"><a class="brand" href="#overview" data-nav="overview" aria-label="제주 진료 나침반, 진료 준비로"><img class="brand-image" src="/assets/jeju-mark-v1.png" alt="" width="46" height="46"/><span class="brand-name">제주<br>진료 나침반</span></a><p class="sidebar-caption">가족 진료 수첩</p><nav class="nav-list">${Object.entries(views).map(([key, [label, symbol]]) => `<button class="nav-item ${key === currentView ? 'active' : ''}" data-nav="${key}" ${key === currentView ? 'aria-current="page"' : ''} title="${label}">${icon(symbol)}<span class="nav-label">${label}</span>${key === 'documents' ? `<span class="nav-count">${getProgress(state).total - getProgress(state).prepared}</span>` : ''}</button>`).join('')}</nav><div class="sidebar-spacer"></div><div class="sidebar-note"><span>제주데이터허브</span><button class="text-button" data-nav="data">기관·이동·돌봄 자료${icon('chevron')}</button></div><div class="profile"><div class="avatar">${escape((state.patient.caregiver || '보호자').slice(-2))}</div><div><strong>${escape(state.patient.caregiver)} 님</strong><small>보호자 · 시연 계정</small></div></div></aside><div class="workspace"><header class="topbar"><a class="mobile-brand" href="#overview" data-nav="overview" aria-label="제주 진료 나침반"><img src="/assets/jeju-mark-v1.png" alt="" width="30" height="30"/><span>제주 진료 나침반</span></a><div class="breadcrumb"><span>${escape(state.patient.name)} 님의 진료 연결</span>${icon('chevron')}<strong>${views[currentView][0]}</strong></div><div class="topbar-actions"><span class="demo-pill">시연 모드 · 실제 발신 없음</span><button class="icon-button" data-report title="진행 보고서 내려받기" aria-label="진행 보고서 내려받기">${icon('download')}</button><button class="icon-button" data-reset title="시연 처음으로" aria-label="시연 처음으로">${icon('refresh')}</button></div></header><main class="main" id="main" tabindex="-1">${content}<footer class="footnote"><span>${icon('shield')}전화·배차·동행 배정·의료진 회신은 시뮬레이션입니다. 실제 예약·협진은 확정되지 않았어요.</span><button class="text-button" data-report>진행 보고서 저장${icon('download')}</button></footer></main></div></div><div class="toast" id="toast" role="status" aria-live="polite" hidden></div>`;
   if (focused && document.getElementById(focused)) document.getElementById(focused).focus({ preventScroll: true });
   if (retainedMap && document.getElementById('care-map')) {
     document.getElementById('care-map').replaceWith(retainedMap);
@@ -195,7 +270,7 @@ function dispatch(action, message) {
 function navigate(view, target) {
   if (!views[view]) return;
   currentView = view; render();
-  if (target) document.getElementById(target)?.scrollIntoView({ behavior: 'auto', block: 'center' });
+  if (target) document.getElementById(target)?.scrollIntoView({ behavior: 'auto', block: target.startsWith('visit-support') ? 'start' : 'center' });
   else { window.scrollTo({ top: 0, behavior: 'auto' }); document.getElementById('main').focus({ preventScroll: true }); }
 }
 function answerQuestion(question) {
@@ -225,6 +300,26 @@ document.addEventListener('click', event => {
     const action = task.dataset.task;
     navigate(action === 'call' ? 'calls' : action === 'plan' ? 'plan' : 'documents', action === 'call' ? `inquiry-${task.dataset.target}` : action === 'document' ? `document-${task.dataset.target}` : undefined);
     return;
+  }
+  const supportProvider = event.target.closest('[data-support-select]');
+  if (supportProvider) {
+    const provider = supportRegistry?.providers.find(item => item.id === supportProvider.dataset.supportSelect);
+    if (provider && dispatch({type:'SUPPORT_SELECT_PROVIDER',kind:supportProvider.dataset.supportKind,provider},'문의할 지원기관을 선택했습니다. 실제 이용 가능 여부는 아직 확인 전입니다.')) document.getElementById(`visit-support-${supportProvider.dataset.supportKind}`)?.scrollIntoView({behavior:'auto',block:'start'});
+    return;
+  }
+  const prepareSupport = event.target.closest('[data-support-prepare]');
+  if (prepareSupport) { dispatch({type:'SUPPORT_PREPARE_INQUIRY',kind:prepareSupport.dataset.supportPrepare},'현재 조건으로 문의 초안을 만들었습니다. 실제 발신은 하지 않았습니다.'); return; }
+  const copySupport = event.target.closest('[data-support-copy]');
+  if (copySupport) {
+    const draft=document.getElementById(`support-inquiry-${copySupport.dataset.supportCopy}`);
+    if(draft) { const fallback=()=>{draft.focus();draft.select();notify('브라우저에서 복사하지 못했습니다. 선택된 초안을 직접 복사해 주세요.',true);}; if(navigator.clipboard?.writeText) navigator.clipboard.writeText(draft.value).then(()=>notify('문의 초안을 복사했습니다.')).catch(fallback); else fallback(); }
+    return;
+  }
+  const saveSupport=event.target.closest('[data-support-download]');
+  if(saveSupport) {
+    const kind=saveSupport.dataset.supportDownload;
+    const url=URL.createObjectURL(new Blob([inquiryDraft(kind)],{type:'text/plain;charset=utf-8'}));
+    const link=document.createElement('a');link.href=url;link.download=`제주-방문-${kind==='taxi'?'택시':'동행'}-문의초안.txt`;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);notify('지원 문의 초안을 저장했습니다.');return;
   }
   const selected = event.target.closest('[data-select-hospital]');
   if (selected) { const hospital=hospitalRecords.find(record=>record.id===selected.dataset.selectHospital); if(hospital && dispatch({type:'SELECT_LOCAL_HOSPITAL',hospital},'선택한 기관의 접수 절차를 새로 확인할 수 있어요.')) navigate('calls','inquiry-jeju'); return; }
@@ -256,6 +351,12 @@ document.addEventListener('submit', async event => {
   event.preventDefault();
   const form = event.target;
   const data = new FormData(form);
+  if(form.id==='support-requirements-form') {
+    dispatch({type:'SUPPORT_UPDATE_REQUIREMENTS',values:{transportNeeded:data.has('transportNeeded'),companionNeeded:data.has('companionNeeded'),wheelchair:data.has('wheelchair'),appointmentTime:String(data.get('appointmentTime')||'')}},'지원 조건을 반영하고 다시 확인할 항목을 갱신했습니다.');return;
+  }
+  if(form.dataset.supportResponseForm) {
+    dispatch({type:'SUPPORT_RECORD_RESPONSE',kind:form.dataset.supportResponseForm,outcome:String(data.get('outcome')),wheelchairConfirmed:data.has('wheelchairConfirmed'),eligibilityConfirmed:data.has('eligibilityConfirmed')},'합성 응답을 반영했습니다. 실제 예약·배차·동행 배정은 확정하지 않았습니다.');return;
+  }
   if (form.id === 'hospital-filter') {hospitalFilters={department:String(data.get('department')||''),area:String(data.get('area')||'')};render();return;}
   if (form.id === 'assistant-form') { answerQuestion(String(data.get('question') || '')); return; }
   if (form.dataset.documentForm) {
@@ -281,6 +382,7 @@ document.addEventListener('submit', async event => {
 });
 
 render();
+loadSupportRegistry().then(registry=>{supportRegistry=registry;if(['overview','plan','data'].includes(currentView))render();}).catch(error=>{supportLoadError=error.message || '지원 문의처를 불러오지 못했습니다.';if(['overview','plan','data'].includes(currentView))render();});
 import('./datahub.js').then(async tools => {
   dataTools=tools;
   const results=await Promise.allSettled([tools.loadDataProfile(),tools.loadHospitalCandidates()]);
