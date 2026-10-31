@@ -32,10 +32,11 @@
     "aws-infra": {
       "phase": "verified",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-aws-infra",
-      "note": "로컬42개 검사·템플릿 검증 완료; 실제 CI 상태는 aws-deployment 증거와 Actions 조회",
+      "note": "정확한 immutable OIDC subject로 신뢰 정책 수정, 실제 CF UPDATE_COMPLETE; 최종 CI 실행 검증 중",
       "integrationCommits": [
         "4e8393e7e5557a9e7cce5f713272f82846be2c94",
-        "43b4d4d314602cdec50a773f09cb786b0975bb1b"
+        "43b4d4d314602cdec50a773f09cb786b0975bb1b",
+        "5b4f2fc"
       ]
     },
     "aws-ci": {
@@ -45,27 +46,55 @@
       "integrationCommits": [
         "ba9743b414e45396603f899e4768b808c3144fcc"
       ]
+    },
+    "data-profile": {
+      "phase": "verified",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-data-profile",
+      "integrationCommits": [
+        "5a83a64",
+        "764725b"
+      ],
+      "note": "실제 허브859 공개미리보기20행 집계와13개 등록후보 연결; 전체 API·현재 수용 연동과 구분"
+    },
+    "ui-refresh": {
+      "phase": "superseded",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-ui-refresh",
+      "integrationCommits": [
+        "7529d1b",
+        "87ea731",
+        "c35db23"
+      ],
+      "note": "데이터 기능 통합; 사용자가 시각 결과를 거부해 editorial-ui에서 대체"
+    },
+    "editorial-ui": {
+      "phase": "in_progress",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-editorial-ui",
+      "integrationCommits": [],
+      "note": "이미지 로고·사례 중심 구조로 사용자 시각 피드백 반영 중"
+    },
+    "docs-sync": {
+      "phase": "in_progress",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-docs-sync",
+      "integrationCommits": [],
+      "note": "실제 공개 자료 활용과 현재 구현·제약을 문서 동기화 중"
     }
   },
   "review": {
-    "phase": "ship",
-    "role": "읽기 전용 독립 통합·디자인 검토",
+    "phase": "pending",
+    "role": "새 시각 결과의 독립 검토",
     "findings": [
-      "중복 의료진 회신 버튼",
-      "미구현 Google Embed 안내",
-      "비밀값 스캔 확장자 범위",
-      "작업별 롤백 커밋 검증"
+      "사용자가 기존 UI가 AI slop처럼 보인다고 지적"
     ],
-    "resolution": "독립 검토가 코드·캡처·소스 지문과 22개 브라우저 결과를 대조하고 주요 발견 수정 확인. 합성 MVP 검토 범위에서 ship."
+    "resolution": "이전 ship은 과거 MVP 검증 이력이며 현재 재설계 승인으로 사용하지 않는다."
   },
   "awsDeployment": {
-    "phase": "infrastructure_ready",
+    "phase": "trust_updated_ci_pending",
     "region": "ap-northeast-2",
     "profile": "jeju-deploy",
     "githubAuthenticated": true,
     "liveUrl": "https://d1mfksxrj025bx.cloudfront.net",
     "authenticated": true,
-    "stackStatus": "CREATE_COMPLETE",
+    "stackStatus": "UPDATE_COMPLETE",
     "ciWorkflow": "configured",
     "evidence": "orchestration/runs/aws-deployment.json"
   }

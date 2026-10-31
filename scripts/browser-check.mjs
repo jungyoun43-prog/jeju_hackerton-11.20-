@@ -1,5 +1,5 @@
 import { createRequire } from 'node:module';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile, readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runtimeFingerprint } from '../orchestration/checks.mjs';
@@ -16,18 +16,21 @@ await mkdir(resolve(root,'orchestration/runs'),{recursive:true});
 const browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH || undefined,args:['--no-sandbox','--disable-dev-shm-usage']});
 const errors=[],checks=[];
 const record=(name,ok,detail='')=>checks.push({name,status:ok?'pass':'fail',detail});
-const proof={result:'fail',checkedAt:new Date().toISOString(),url:base,sourceHash:await runtimeFingerprint(root),errors,checks,flowCompleted:false,supplementLoop:false,desktop:{width:1440,noOverflow:false,screenshot:shots+'/desktop.png'},mobile:{width:390,noOverflow:false,screenshot:shots+'/mobile.png'},map:{liveTiles:false,automatedPanZoom:false}};
+const proof={result:'fail',checkedAt:new Date().toISOString(),url:base,sourceHash:await runtimeFingerprint(root),errors,checks,flowCompleted:false,supplementLoop:false,desktop:{width:1440,noOverflow:false,screenshot:shots+'/desktop.png'},mobile:{width:390,noOverflow:false,screenshot:shots+'/mobile.png'},map:{liveTiles:false,automatedPanZoom:false},data:{datasetId:'859',scope:'public-preview',candidateCount:13}};
 const watch=page=>page.on('pageerror',error=>errors.push(error.message));
 const overflow=page=>page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth);
+const primaryInViewport=page=>page.locator('#mission-primary').evaluate(e=>{const r=e.getBoundingClientRect();return r.top>=0 && r.bottom<=innerHeight && r.left>=0 && r.right<=innerWidth;});
 async function initialMap(page) {
  await page.waitForSelector('.leaflet-container');
  try {await page.waitForFunction(()=>document.querySelectorAll('.leaflet-tile-loaded').length>0,{},{timeout:5000});return true;}
  catch {await page.waitForTimeout(1800);return false;}
 }
 try {
- const page=await browser.newPage({viewport:{width:1440,height:1100},deviceScaleFactor:1});watch(page);
+ const page=await browser.newPage({viewport:{width:1440,height:900},deviceScaleFactor:1});watch(page);
  await page.goto(base,{waitUntil:'networkidle'});
- record('초기 다음 할 일',await page.locator('#task-title').textContent()==='지금 할 일');
+ record('사례 제목과 다음 행동',((await page.locator('#service-role').textContent()).includes('김정희')) && await primaryInViewport(page));
+ record('생성한 이미지 로고 로드',await page.locator('.brand img').evaluate(e=>e.complete && e.naturalWidth>0 && e.src.endsWith('/assets/jeju-mark-v1.png')));
+ record('제목용 한국어 폰트 로드',await page.evaluate(async()=>{await document.fonts.ready;return [...document.fonts].some(font=>font.family.replaceAll('"','')==='MaruBuri' && font.status==='loaded');}));
  proof.desktop.noOverflow=await overflow(page);record('PC 가로 넘침 없음',proof.desktop.noOverflow);
  record('배너 이미지 로드',await page.evaluate(async()=>{const image=new Image();image.src=getComputedStyle(document.querySelector('.hero')).backgroundImage.match(/url\(["']?(.*?)["']?\)/)[1];await image.decode();return image.naturalWidth>0;}));
  proof.map.liveTiles=await initialMap(page);
@@ -35,6 +38,18 @@ try {
  await page.screenshot({path:resolve(root,proof.desktop.screenshot),fullPage:true});
  // 최초 보이는 영역만 타일을 조회한다. 반복 기능 검사에서 타일을 재수집하지 않는다.
  await page.route('https://tile.openstreetmap.org/**',route=>route.abort());
+ await page.locator('.nav-item[data-nav=data]').click();
+ await page.waitForFunction(()=>document.querySelectorAll('[data-select-hospital]').length===13);
+ record('허브859 공개 등록 후보 13곳',await page.locator('.hospital-candidate').count()===13 && (await page.locator('.data-profile').textContent()).includes('20행'));
+ await page.locator('#hospital-department').selectOption('내과');await page.locator('#hospital-area').fill('제주시');await page.locator('#hospital-filter button').click();
+ record('내과 등록 진료과 정확한 6곳 조회',await page.locator('.hospital-candidate').count()===6);
+ const firstCandidate=page.locator('.hospital-candidate').first();
+ const selectedName=await firstCandidate.locator('h3').textContent();
+ const mapUrl=new URL(await firstCandidate.locator('a.hospital-map-link').getAttribute('href'));
+ record('실제 등록 기관의 주소 지도 링크',mapUrl.hostname==='www.google.com' && mapUrl.searchParams.get('query')?.includes(selectedName) && mapUrl.searchParams.get('query')?.includes('제주'));
+ await page.screenshot({path:resolve(root,shots+'/data-desktop.png'),fullPage:true});
+ await firstCandidate.locator('[data-select-hospital]').click();
+ record('선택 기관을 제주 문의로 연결',(await page.locator('#inquiry-jeju').textContent()).includes(selectedName));
  await page.locator('.nav-item[data-nav=documents]').click();
  record('준비 전 접수 차단',await page.locator('[data-submit-packet]').isDisabled());
  await page.locator('.nav-item[data-nav=calls]').click();
@@ -69,14 +84,30 @@ try {
  record('미확인 비용 유지',(await page.locator('.unknown-costs').textContent()).includes('미확인'));
  record('모든 텍스트 입력에 레이블',await page.evaluate(()=>[...document.querySelectorAll('input:not([type=checkbox]),textarea,select')].every(e=>e.labels?.length)));
  const download=page.waitForEvent('download');await page.locator('.topbar [data-report]').click();
- record('출처 보고서 내려받기',(await download).suggestedFilename().includes('보고서'));
+ const reportDownload=await download;
+ const report=await readFile(await reportDownload.path(),'utf8');
+ record('출처 보고서 내려받기',reportDownload.suggestedFilename().includes('보고서') && report.includes(selectedName) && report.includes('859') && report.includes('시연'));
+ await page.locator('.nav-item[data-nav=data]').click();
+ await page.locator('.hospital-import-more summary').click();
+ const importCsv='사업장명,도로명주소,진료과목,영업상태명,데이터갱신일시,데이터수집일시\n가상 가져오기 의원,제주특별자치도 제주시 가상로 1,가정의학과,정상,2026-01-01,2026-01-02';
+ await page.locator('#hospital-file').setInputFiles({name:'synthetic-hospitals.csv',mimeType:'text/csv',buffer:Buffer.from(importCsv)});
+ await page.waitForFunction(()=>document.querySelectorAll('[data-select-hospital]').length===1);
+ record('사용자 CSV를 공개 미리보기와 구분',(await page.locator('.hospital-candidate h3').textContent())==='가상 가져오기 의원' && (await page.locator('.data-profile').textContent()).includes('사용자 제공'));
+ await page.locator('.topbar [data-reset]').click();
+ await page.locator('.nav-item[data-nav=data]').click();
+ record('리셋하면 공개 후보 13곳 복원',await page.locator('[data-select-hospital]').count()===13);
  const mobile=await browser.newPage({viewport:{width:390,height:844},deviceScaleFactor:1});watch(mobile);
  await mobile.goto(base,{waitUntil:'networkidle'});
  const mobileTiles=await initialMap(mobile);proof.map.mobileLiveTiles=mobileTiles;
  proof.mobile.noOverflow=await overflow(mobile);record('모바일 가로 넘침 없음',proof.mobile.noOverflow);
+ record('모바일 첫 화면 주 행동',await primaryInViewport(mobile));
  await mobile.screenshot({path:resolve(root,proof.mobile.screenshot),fullPage:true});
  await mobile.route('https://tile.openstreetmap.org/**',route=>route.abort());
- for(const view of ['documents','calls','plan']) {await mobile.locator(`.nav-item[data-nav=${view}]`).click();record(`모바일 ${view} 넘침 없음`,await overflow(mobile));}
+ for(const view of ['documents','calls','plan','data']) {await mobile.locator(`.nav-item[data-nav=${view}]`).click();record(`모바일 ${view} 넘침 없음`,await overflow(mobile));}
+ await mobile.screenshot({path:resolve(root,shots+'/data-mobile.png'),fullPage:true});
+ await mobile.locator('[data-select-hospital]').first().click();
+ record('긴 실제 기관명 모바일 문의 넘침 없음',await overflow(mobile));
+ await mobile.screenshot({path:resolve(root,shots+'/calls-mobile.png'),fullPage:true});
  record('실행 JS 오류 없음',errors.length===0,errors.join('; '));
  if(checks.every(check=>check.status==='pass') && errors.length===0) proof.result='pass';
 } catch(error) {errors.push(error.message);record('브라우저 시나리오 완료',false,error.message);}

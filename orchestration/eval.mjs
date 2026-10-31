@@ -58,7 +58,16 @@ await check('asset-provenance','provenance',async()=>{
  const manifest=JSON.parse(await readFile(resolve(root,'app/assets/manifest.json'),'utf8'));
  requireThat(manifest.assets.length>0,'자산 명세가 비어 있습니다.');
  for(const asset of manifest.assets) {await access(resolve(root,'app/assets',asset.file));requireThat(asset.prompt && asset.tool && asset.createdAt,'생성 자산의 프롬프트/도구/날짜가 없습니다.');}
- return '배너 파일 및 정확한 생성 프롬프트·도구·날짜 기록';
+ return '이미지·로고 파일 및 정확한 생성 프롬프트·도구·날짜 기록';
+});
+await check('public-data-boundary','provenance',async()=>{
+ const candidates=JSON.parse(await readFile(resolve(root,'app/data/hospital-candidates.json'),'utf8'));
+ const profile=JSON.parse(await readFile(resolve(root,'app/data/datahub-profile.json'),'utf8'));
+ requireThat(candidates.datasetId==='859' && candidates.scope==='public-preview','지정된 허브859 공개 미리보기 출처가 필요합니다.');
+ requireThat(candidates.totalPreviewRows===20 && candidates.records.length===13 && candidates.excludedClosedRows===7,'공개 미리보기20행·폐업7·등록후보13 범위가 다릅니다.');
+ requireThat(profile.totalRows===20 && profile.activeRegistrationRows===13,'전체 공개 집계와 후보 범위를 구분해야 합니다.');
+ requireThat(candidates.records.every(row=>row.source?.isSynthetic===false && row.source?.scope==='public-preview' && row.inquiryStatus==='unverified'),'실제 등록 사실과 미확인 수용 상태를 보존해야 합니다.');
+ return '실제 공개 미리보기20행 집계·등록후보13곳·출처·현재 수용 미확인 범위 확인';
 });
 await check('secret-pattern-scan','privacy',async()=>{
  const findings=await scanProject(root);
@@ -94,7 +103,7 @@ await check('rollback-boundary','rollback',()=>{
 });
 const passed=checks.filter(c=>c.status==='pass').length;
 const result={evaluatedAt:new Date().toISOString(),commit:git('rev-parse','HEAD'),automated:{passed,total:checks.length,rate:Math.round(passed/checks.length*1000)/10},checks,
- manualUnverified:['필수 공공데이터의 실제 사용·접근·재배포 권한','실제 전화·기관 접수·의료진 참여','런타임 AI 모델·Prompt/Tool 연동의 실작동','임상 유효성·실서비스 개인정보 처리·정책 검토','기획서 최종 PDF 15페이지 이내 및 센터 실기기 실행'],submissionReady:false};
+ manualUnverified:['전체 운영 데이터 API·최신성·전체 원자료 재배포 조건 (공개 미리보기 859는 실제 사용)','실제 전화·기관 접수·의료진 참여','런타임 AI 모델·Prompt/Tool 연동의 실작동','임상 유효성·실서비스 개인정보 처리·정책 검토','기획서 최종 PDF 15페이지 이내 및 센터 실기기 실행'],submissionReady:false};
 await mkdir(resolve(root,'orchestration/runs'),{recursive:true});
 await writeFile(resolve(root,'orchestration/runs/latest-eval.json'),JSON.stringify(result,null,2)+'\n');
 for(const item of checks) console.log(`${item.status==='pass'?'PASS':'FAIL'} ${item.id} · ${item.evidence}`);

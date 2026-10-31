@@ -55,6 +55,64 @@
         "scripts/build.mjs",
         "tests/static-hosting.test.mjs"
       ]
+    },
+    {
+      "id": "data-profile",
+      "branch": "data/datahub-profile",
+      "baseCommit": "4397c63",
+      "allow": [
+        "app/datahub.js",
+        "app/data/datahub-profile.json",
+        "app/data/hospital-candidates.json",
+        "scripts/datahub-profile.mjs",
+        "tests/datahub-profile.test.mjs",
+        "app/domain.js",
+        "tests/domain.test.mjs",
+        "docs/data-sources.md"
+      ]
+    },
+    {
+      "id": "ui-refresh",
+      "branch": "design/ui-refresh",
+      "baseCommit": "4397c63",
+      "allow": [
+        "app/index.html",
+        "app/styles.css",
+        "app/app.js",
+        "app/icons.js",
+        "app/map.js",
+        "DESIGN.md"
+      ]
+    },
+    {
+      "id": "editorial-ui",
+      "branch": "design/editorial-ui",
+      "baseCommit": "00a7000",
+      "allow": [
+        "app/index.html",
+        "app/styles.css",
+        "app/app.js",
+        "app/icons.js",
+        "app/map.js",
+        "DESIGN.md",
+        ".impeccable/design.json"
+      ]
+    },
+    {
+      "id": "docs-sync",
+      "branch": "docs/public-data-sync",
+      "baseCommit": "00a7000",
+      "allow": [
+        "README.md",
+        "AGENTS.md",
+        "PRODUCT.md",
+        "THIRD_PARTY.md",
+        "docs/prd.md",
+        "docs/user-manual.md",
+        "docs/submission-checklist.md",
+        "docs/implementation-results.md",
+        "docs/data-sources.md"
+      ]
     }
   ],
   "rules": [
