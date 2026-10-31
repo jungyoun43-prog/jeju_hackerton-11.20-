@@ -39,8 +39,20 @@ test('진행 DTO는 고정 키·도구·순서·단계·크기를 검사하고 �
  const constructor=progress();constructor.events[0].tool='constructor';bad.push(constructor);
  const duplicate=progress();duplicate.stages[1].id='records';bad.push(duplicate);
  const reverse=progress();reverse.events.reverse();bad.push(reverse);
+ const zero=progress();zero.sequence=0;zero.events=[];bad.push(zero);
+ const reversedStages=progress();reversedStages.stages.reverse();bad.push(reversedStages);
+ const dateOnly=progress();dateOnly.updatedAt='2026-10-31';bad.push(dateOnly);
+ const invalidDate=progress();invalidDate.updatedAt='2026-02-30T12:00:00.000Z';bad.push(invalidDate);
+ const prototype=progress();Object.setPrototypeOf(prototype,{});bad.push(prototype);
  const tooMany=progress();tooMany.events=Array.from({length:33},(_,i)=>({sequence:i,stage:'records',tool:null,status:'started'}));tooMany.sequence=33;bad.push(tooMany);
  for(const value of bad){assert.equal(normalizePreparationProgress(value),null);assert.ok(getPreparationBoard(createDemoCase(),{pending:true,progress:value}).stages.every(stage=>!stage.live));}
+});
+
+test('유효한 빈 진행은 순번1부터 받고 도구 실행이나 마지막 확인 사실을 만들지 않는다',()=>{
+ const empty={...progress(),sequence:1,currentStage:null,events:[],stages:PREPARATION_STAGE_IDS.map(id=>({id,status:'waiting',lastTool:null}))};
+ assert.deepEqual(normalizePreparationProgress(empty),empty);
+ const state=createDemoCase(),before=structuredClone(state),board=getPreparationBoard(state,{pending:true,progress:empty});
+ assert.equal(board.progressAvailable,true);assert.ok(board.stages.every(stage=>!stage.live&&!stage.liveActivity));assert.deepEqual(state,before);
 });
 
 test('도구는 준비 역할로 분류하고 미등록·prototype 이름을 실행 정보로 사용하지 않는다',()=>{

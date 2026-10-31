@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { getToolStage, PREPARATION_STAGE_IDS } from '../app/preparation-stages.js';
+import { getToolStage, PREPARATION_STAGE_IDS, PROGRESS_TOOLS, normalizePreparationProgress } from '../app/preparation-stages.js';
+export { PROGRESS_TOOLS } from '../app/preparation-stages.js';
 
 export const PROGRESS_TTL_SECONDS = 120;
 export const PROGRESS_IO_TIMEOUT_MS = 150;
@@ -9,21 +10,10 @@ const FLUSH_TIMEOUT_MS = PROGRESS_IO_TIMEOUT_MS * 2 + 25;
 const TOKEN = /^[A-Za-z0-9_-]{43}$/;
 const KEY = /^progress#[a-f0-9]{64}$/;
 const WRITER = /^[a-f0-9]{32}$/;
-// 모델이 돌려준 임의의 문자열을 DTO에 복사하지 않는다. 새 도구는 명시적으로 검토한다.
-export const PROGRESS_TOOLS = Object.freeze([
-  'get_case','update_visit','search_hospital_contacts','select_hospital_contact','request_records',
-  'request_hospital_contact','find_support','prepare_inquiries','request_support_contact','prepare_review',
-  'build_report','get_care_journey','run_journey_demo','update_call_retry_policy','run_call_recovery_demo',
-  'search_public_data','analyze_public_data','apply_care_preferences','summarize_preparation',
-]);
-const stageStatuses = ['waiting','running','observed','needs_input','failed'];
 const eventStatuses = ['started','completed','needs_input','failed'];
-const plain = value => value !== null && typeof value === 'object' && [Object.prototype,null].includes(Object.getPrototypeOf(value));
 const requireValue = value => {if(!value)throw new TypeError('진행 상태 형식을 확인해 주세요.');};
-const keys = (value,expected) => requireValue(plain(value) && Object.keys(value).length === expected.length && expected.every(key => Object.hasOwn(value,key)));
 const tool = value => value === null || PROGRESS_TOOLS.includes(value);
 const stage = value => PREPARATION_STAGE_IDS.includes(value);
-const integer = (value,min,max) => Number.isSafeInteger(value) && value >= min && value <= max;
 
 export const isProgressToken = value => typeof value === 'string' && value.length === 43 && TOKEN.test(value);
 export const isProgressKey = value => typeof value === 'string' && value.length === 73 && KEY.test(value);
@@ -35,25 +25,9 @@ export function progressKey(token) {
 
 /** 고정 enum과 시간·순번만 허용한다. 중첩 추가 필드도 제거 대신 거절한다. */
 export function normalizeProgressSnapshot(value) {
-  keys(value,['version','status','sequence','updatedAt','currentStage','stages','events']);
-  requireValue(value.version === 1 && ['running','completed','failed'].includes(value.status) && integer(value.sequence,1,128));
-  requireValue(typeof value.updatedAt === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value.updatedAt)
-    && Number.isFinite(Date.parse(value.updatedAt)) && new Date(value.updatedAt).toISOString() === value.updatedAt);
-  requireValue(value.currentStage === null || stage(value.currentStage));
-  requireValue(Array.isArray(value.stages) && value.stages.length === PREPARATION_STAGE_IDS.length);
-  for(const [index,item] of value.stages.entries()) {
-    keys(item,['id','status','lastTool']);
-    requireValue(item.id === PREPARATION_STAGE_IDS[index] && stageStatuses.includes(item.status) && tool(item.lastTool));
-  }
-  requireValue(Array.isArray(value.events) && value.events.length <= 32);
-  let previous = 0;
-  for(const item of value.events) {
-    keys(item,['sequence','stage','tool','status']);
-    requireValue(integer(item.sequence,1,value.sequence) && item.sequence > previous && stage(item.stage) && tool(item.tool) && eventStatuses.includes(item.status));
-    previous = item.sequence;
-  }
-  requireValue(Buffer.byteLength(JSON.stringify(value),'utf8') <= 8192);
-  return structuredClone(value);
+  const snapshot=normalizePreparationProgress(value);
+  requireValue(snapshot);
+  return snapshot;
 }
 
 export function supportsProgress(store) {

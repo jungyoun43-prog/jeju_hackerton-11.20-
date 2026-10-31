@@ -326,7 +326,7 @@ try {
     try {
       const facts=await confirmedFacts(page),call=await begin(page,'실제 시작한 작업만 표시해 주세요.');
       const first=await advancePoll(page,0);
-      const empty={available:true,progress:{version:1,status:'running',sequence:0,updatedAt:'2026-10-31T12:00:00.000Z',currentStage:null,stages:ids.map(id=>({id,status:'waiting',lastTool:null})),events:[]}};
+      const empty={available:true,progress:{version:1,status:'running',sequence:1,updatedAt:'2026-10-31T12:00:00.000Z',currentStage:null,stages:ids.map(id=>({id,status:'waiting',lastTool:null})),events:[]}};
       await release(page,first,empty);
       record('currentStage:null·events:[]는 단계 실행 강조·가짜 답변 없음',await page.locator('#preparation-board [data-live="true"]').count()===0 && await page.locator('#preparation-board [data-stage-live]:visible').count()===0 && await page.locator('.message.assistant:not(.greeting)').count()===0 && await page.locator('#conversation-form').getAttribute('aria-busy')==='true');
       record('빈 진행에서도 마지막 확인 환자·자료·문의 facts 보존',JSON.stringify(await confirmedFacts(page))===JSON.stringify(facts));
@@ -353,7 +353,7 @@ try {
     } finally {await context.close();}
   });
 
-  for(const mode of ['http-failure','failed-dto','cap'])await scenario(mode+' 진행 오류·상한',async()=>{
+  for(const mode of ['http-failure','failed-dto','zero-sequence','cap'])await scenario(mode+' 진행 오류·상한',async()=>{
     const {page,context}=await open(1280,800,{fixture:true});
     try {
       const call=await begin(page,'진행 연결이 안 되어도 최종 답변을 기다려 주세요.'),baseline=await allStatus(page);
@@ -370,6 +370,7 @@ try {
       } else {
         const poll=await advancePoll(page,0);
         if(mode==='http-failure')await release(page,poll,{error:{code:'PROGRESS_UNAVAILABLE',message:'진행 fixture 오류'}},{status:503});
+        else if(mode==='zero-sequence')await release(page,poll,progress('hospitals',0));
         else await release(page,poll,progress('hospitals',2,{status:'failed',eventStatus:'failed'}));
         count++;await page.clock.runFor(2600);
       }

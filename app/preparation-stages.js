@@ -31,6 +31,8 @@ const TOOL_LABELS=Object.freeze({
   summarize_preparation:'이번 요청의 준비 결과',search_public_data:'관련 공공데이터 목록',analyze_public_data:'공개 자료 조회·코드 계산',
   run_journey_demo:'합성 진료 여정',run_call_recovery_demo:'합성 전화 인계 상황',
 });
+// 모델의 임의 문자열을 복사하지 않는다. 새 도구는 고정 표시 목록에서 명시적으로 검토한다.
+export const PROGRESS_TOOLS=Object.freeze(Object.keys(TOOL_LABELS));
 export function progressActivity(event) {
   const label=Object.hasOwn(TOOL_LABELS,event?.tool)?TOOL_LABELS[event.tool]:null;
   if(!label){
@@ -41,27 +43,28 @@ export function progressActivity(event) {
   }
   return `${label} · ${event.status==='started'?'확인 중':event.status==='failed'?'추가 확인 필요':event.status==='needs_input'?'확인할 내용 있음':'결과 도착'}`;
 }
-const ownKeys=(value,keys)=>value&&typeof value==='object'&&!Array.isArray(value)&&Object.keys(value).length===keys.length&&keys.every(key=>Object.hasOwn(value,key));
-const isTool=value=>value===null||typeof value==='string'&&Object.hasOwn(TOOL_LABELS,value);
+const ownKeys=(value,keys)=>value!==null&&typeof value==='object'&&[Object.prototype,null].includes(Object.getPrototypeOf(value))&&Object.keys(value).length===keys.length&&keys.every(key=>Object.hasOwn(value,key));
+const isTool=value=>value===null||PROGRESS_TOOLS.includes(value);
 /** 고정 진행 메타데이터만 받는다. 입력·결과·자유문을 진행 정보에 섞지 않는다. */
 export function normalizePreparationProgress(value) {
   if(!ownKeys(value,['version','status','sequence','updatedAt','currentStage','stages','events'])||value.version!==1
-    ||!['running','completed','failed'].includes(value.status)||!Number.isSafeInteger(value.sequence)||value.sequence<0||value.sequence>128
-    ||typeof value.updatedAt!=='string'||value.updatedAt.length>40||!Number.isFinite(Date.parse(value.updatedAt))
-    ||value.currentStage!==null&&!PREPARATION_STAGE_IDS.includes(value.currentStage)||!Array.isArray(value.stages)||value.stages.length!==4
+    ||!['running','completed','failed'].includes(value.status)||!Number.isSafeInteger(value.sequence)||value.sequence<1||value.sequence>128
+    ||typeof value.updatedAt!=='string'||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value.updatedAt)
+    ||!Number.isFinite(Date.parse(value.updatedAt))||new Date(value.updatedAt).toISOString()!==value.updatedAt
+    ||value.currentStage!==null&&!PREPARATION_STAGE_IDS.includes(value.currentStage)||!Array.isArray(value.stages)||value.stages.length!==PREPARATION_STAGE_IDS.length
     ||!Array.isArray(value.events)||value.events.length>32)return null;
-  const ids=new Set();
-  for(const stage of value.stages){
-    if(!ownKeys(stage,['id','status','lastTool'])||!PREPARATION_STAGE_IDS.includes(stage.id)||ids.has(stage.id)
+  for(const [index,stage] of value.stages.entries()){
+    if(!ownKeys(stage,['id','status','lastTool'])||stage.id!==PREPARATION_STAGE_IDS[index]
       ||!['waiting','running','observed','needs_input','failed'].includes(stage.status)||!isTool(stage.lastTool))return null;
-    ids.add(stage.id);
   }
-  let previous=-1;
+  let previous=0;
   for(const event of value.events){
     if(!ownKeys(event,['sequence','stage','tool','status'])||!Number.isSafeInteger(event.sequence)||event.sequence<=previous||event.sequence>value.sequence
       ||!PREPARATION_STAGE_IDS.includes(event.stage)||!isTool(event.tool)||!['started','completed','needs_input','failed'].includes(event.status))return null;
     previous=event.sequence;
   }
+  const serialized=JSON.stringify(value);
+  if(typeof serialized!=='string'||new TextEncoder().encode(serialized).byteLength>8192)return null;
   return structuredClone(value);
 }
 const source=value=>value&&typeof value.url==='string'?{url:value.url,label:value.datasetId?`제주데이터허브 ${value.datasetId}`:'공식 서비스 안내'}:null;

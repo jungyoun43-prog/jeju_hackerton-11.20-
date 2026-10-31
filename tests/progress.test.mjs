@@ -6,6 +6,7 @@ import { createMemorySessionStore } from '../agent/store.mjs';
 import { AGENT_TOOLS, createToolDispatcher } from '../agent/tools.mjs';
 import { createProgressReporter, normalizeProgressSnapshot, progressKey, readProgress, PROGRESS_TOOLS, isProgressKey } from '../agent/progress.mjs';
 import { validateMessageRequest, validateProgressRequest } from '../agent/validation.mjs';
+import { normalizePreparationProgress, PROGRESS_TOOLS as SHARED_PROGRESS_TOOLS } from '../app/preparation-stages.js';
 
 const token=()=>randomBytes(32).toString('base64url');
 const deferred=()=>{let resolve;const promise=new Promise(done=>{resolve=done;});return {promise,resolve};};
@@ -53,6 +54,7 @@ test('토큰·해시 키 뒤의 줄바꿈은 일반 요청·진행 조회·저�
 
 test('고정 도구 allowlist는 현재 모델 도구와 서버 내부 준비 두 종류만 포함한다',()=>{
   assert.deepEqual([...PROGRESS_TOOLS].sort(),[...AGENT_TOOLS.map(item=>item.name),'apply_care_preferences','summarize_preparation'].sort());
+  assert.equal(PROGRESS_TOOLS,SHARED_PROGRESS_TOOLS);assert.ok(Object.isFrozen(PROGRESS_TOOLS));
 });
 
 test('실제 provider 대기→도구 시작→도구 결과→응답 저장 전이를 중간 조회한다',async()=>{
@@ -137,16 +139,28 @@ test('메모리 진행은 해시 키·120초 TTL·별도 DTO이며 원문과 사
   now+=1000;assert.deepEqual(await readProgress(store,progressToken),{available:false,progress:null});
 });
 
-test('진행 DTO의 추가 필드·임의 도구·단계·시점·역순 sequence를 거절한다',async()=>{
+test('서버와 화면은 진행 DTO의 추가 필드·임의 도구·단계·시점·역순 sequence를 함께 거절한다',async()=>{
   const store=createMemorySessionStore(),progressToken=token(),reporter=createProgressReporter({store,token:progressToken});
   reporter.started('get_case');reporter.completed();await reporter.flush();
   const base=await store.readProgress(progressKey(progressToken));
+  assert.deepEqual(normalizeProgressSnapshot(base),normalizePreparationProgress(base));
+  const nullPrototype=Object.assign(Object.create(null),base);
+  assert.deepEqual(normalizeProgressSnapshot(nullPrototype),base);assert.deepEqual(normalizePreparationProgress(nullPrototype),base);
+  const maximum={...base,sequence:128,events:Array.from({length:32},(_,index)=>({...base.events[0],sequence:97+index}))};
+  assert.deepEqual(normalizeProgressSnapshot(maximum),maximum);assert.deepEqual(normalizePreparationProgress(maximum),maximum);
   for(const mutate of [
     value=>{value.patient='PRIVATE';},value=>{value.stages[0].arguments={};},value=>{value.events[0].result='PRIVATE';},
     value=>{value.events[0].tool='PRIVATE_PROVIDER_TOOL';},value=>{value.stages[0].lastTool='PRIVATE';},value=>{value.currentStage='clinical_acceptance';},
     value=>{value.status='reserved';},value=>{value.updatedAt='PRIVATE';},value=>{value.events.reverse();},
     value=>{value.sequence=129;},value=>{value.stages.pop();},value=>{value.events[0].sequence=0;},
-  ]){const value=structuredClone(base);mutate(value);assert.throws(()=>normalizeProgressSnapshot(value));}
+    value=>{value.sequence=0;value.events=[];},value=>{value.stages.reverse();},
+    value=>{value.updatedAt='2026-10-31';},value=>{value.updatedAt='2026-02-30T12:00:00.000Z';},
+    value=>{value.updatedAt='2026-10-31T12:00:00.000+00:00';},value=>{value.events[0].sequence=-1;},
+    value=>{Object.setPrototypeOf(value,{});},value=>{Object.setPrototypeOf(value.stages[0],{});},value=>{Object.setPrototypeOf(value.events[0],{});},
+    // 숨은 직렬화 함수도 UTF-8 상한을 우회하지 못한다. 한글 3,000자는 8KiB를 넘는다.
+    value=>{Object.defineProperty(value,'toJSON',{value:()=>'가'.repeat(3000)});},
+    value=>{Object.defineProperty(value,'toJSON',{value:()=>undefined});},
+  ]){const value=structuredClone(base);mutate(value);assert.equal(normalizePreparationProgress(value),null);assert.throws(()=>normalizeProgressSnapshot(value),{name:'TypeError',message:'진행 상태 형식을 확인해 주세요.'});}
 });
 
 test('이벤트32개·순번128개를 넘지 않고 마지막 실패를 기록할 공간을 보존한다',async()=>{
