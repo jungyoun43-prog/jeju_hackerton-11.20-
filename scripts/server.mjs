@@ -55,6 +55,6 @@ const server = createServer(async (req, res) => {
   }
 });
 server.requestTimeout=15000;
-server.listen(port, host, () => console.log(`제주 진료 나침반 · 시연 모드\nLocal: http://${host}:${server.address().port}\n${production ? '빌드 결과' : '개발 화면'} · 실제 전화·의료기관 전송 없음`));
+server.listen(port, host, () => console.log(`혼디 · 시연 모드\nLocal: http://${host}:${server.address().port}\n${production ? '빌드 결과' : '개발 화면'} · 실제 전화·의료기관 전송 없음`));
 server.on('error', error => { console.error(error.code === 'EADDRINUSE' ? `${port}번 포트가 사용 중입니다. PORT 환경변수로 변경하세요.` : error.message); process.exitCode = 1; });
 for (const signal of ['SIGINT','SIGTERM']) process.on(signal, () => server.close(() => process.exit(0)));

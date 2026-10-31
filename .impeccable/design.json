@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "name": "제주 진료 나침반 · 보호자 진료 준비",
+  "name": "혼디 · 보호자 진료 준비",
   "mode": "operate",
   "direction": "제주 배경 위의 대화·확인 후 전송할 입력 예시·단일 방문 요약과 읽기 전용 환자 기록/전화 준비를 갖춘 보호자 작업 공간",
   "seedReference": "seed:a25f97f1d883646c",
@@ -32,9 +32,10 @@
     "composerRadiusPx": 12
   },
   "assets": {
-    "logo": "/assets/jeju-mark-v1.png",
+    "logo": "/assets/hondi-logo-v1.png",
     "bodyFont": "/assets/PretendardVariable.woff2",
-    "workspaceBackground": "/assets/jeju-workspace-background-v1.webp"
+    "workspaceBackground": "/assets/jeju-workspace-background-v1.webp",
+    "agentMark": "/assets/hondi-mark-v1.png"
   },
   "viewports": [
     "1440x900",

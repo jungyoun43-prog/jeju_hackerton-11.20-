@@ -163,7 +163,7 @@ export function buildCallPlan(state, target) {
   return {
     version:1,target,recipient,purpose,questions:questionsFor(target,recipient,requirements),minimumDisclosure:disclosureFor(state,target),
     excludedInformation:['환자 실명·나이','진단명·병력·검사 결과·의료기록 본문','주민등록번호 등 고유식별정보','실제 환자·보호자 연락처','환자의 상세 주소','API 키·인증정보'],
-    openingScript:`[실발신 전 위임·수신처·기록처리 확인 후 사용할 예정 문구 · 현재 발신 없음] 안녕하세요. 제주 진료 나침반의 AI 전화 도우미입니다. 오늘 문의 목적은 ${purpose}입니다. AI를 통한 행정 문의에 응대하실 수 있는지 먼저 확인해 주시겠습니까? [실제 확인한 위임 범위와 녹음·전사 여부, 목적·보관기간·외부 전송·거절 방법을 여기서 안내한 뒤 기관이 수락한 범위로 진행합니다. 현재 해당 정책은 미설정입니다.]`,
+    openingScript:`[실발신 전 위임·수신처·기록처리 확인 후 사용할 예정 문구 · 현재 발신 없음] 안녕하세요. 혼디의 AI 전화 도우미입니다. 오늘 문의 목적은 ${purpose}입니다. AI를 통한 행정 문의에 응대하실 수 있는지 먼저 확인해 주시겠습니까? [실제 확인한 위임 범위와 녹음·전사 여부, 목적·보관기간·외부 전송·거절 방법을 여기서 안내한 뒤 기관이 수락한 범위로 진행합니다. 현재 해당 정책은 미설정입니다.]`,
     recordHandling,preCallChecks,simulation:{inquiryDelegated,status,label,detail},nextActions,
     requestDraft:`현재 방문 조건을 기준으로 ${subject}에 관한 AI 전화 시연을 준비해 줘. 실제 발신 없이 위임·최소 전달정보·AI 고지·기록 처리 확인사항과 다음 준비를 정리해 줘.`,
     realDelegationVerified:false,realAdapterConfigured:false,actualCallPlaced:false,reservationConfirmed:false,clinicalAcceptanceConfirmed:false,

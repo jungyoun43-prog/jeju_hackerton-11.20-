@@ -1,4 +1,4 @@
-# 제주 진료 나침반 데이터와 출처 명세
+# 혼디 데이터와 출처 명세
 
 확인일: 2026-10-31 · 연결 문서: [PRD](prd.md)
 
@@ -247,7 +247,7 @@ insane-search의 `weak_ok`는 본문 검토의 출발점으로 취급했다. 제
 | 초기 지도 마커 | 애월 인근·제주 시내의 합성 지점 | 실제 환자 주소·협진 참여 병원·공공데이터 좌표가 아님. 지도에 합성 표시 |
 | 환자·문서·통화·회신 | 자체 시연용 합성 fixture | 실제 개인정보·의료행위 수행 증거가 아님. 합성 출처를 결과물까지 유지 |
 | 이전 진료 연결 배너 v2 | 내장 Imagegen으로 만든 부모·의사·자녀 연결 일러스트 `app/assets/jeju-care-v2.png`. 사용자 후속 피드백으로 현재 화면에서 제거하고 이력 자산으로 보존 | 현재 대화 화면의 적용 자산이 아님. 도구의 상세 모델 ID는 공개되지 않아 추정 기재하지 않음. 정확 프롬프트·사용 도구·최종 파일은 `app/assets/manifest.json` 기준. 적용 계정의 생성 서비스 이용조건은 최종 제출 때 확인 |
-| 이미지 로고 | 내장 Imagegen으로 만든 현무암·연결 모티브의 투명 PNG `app/assets/jeju-mark-v1.png` | 원본·정확 프롬프트·사용 도구·생성일은 같은 manifest에 기록. 상표 등록·유사상표 조사는 수행하지 않음. 현재 대화·수동 화면 로고로 사용, 새 PC·모바일·ZIP 검증은 결과 기록 기준 |
+| 이미지 로고 | 내장 Imagegen으로 만든 현무암·연결 모티브의 투명 PNG `app/assets/hondi-logo-v1.png` | 원본·정확 프롬프트·사용 도구·생성일은 같은 manifest에 기록. 상표 등록·유사상표 조사는 수행하지 않음. 현재 대화·수동 화면 로고로 사용, 새 PC·모바일·ZIP 검증은 결과 기록 기준 |
 | Impeccable | [원본](https://github.com/pbakaus/impeccable), revision `b7a89176e4e87422b40f98adabceb051dbb5448b` | 개발 시 디자인 지침으로 사용. 자동 context 로더 권한 실패 후 프로젝트 문맥·Operate/craft 지침을 직접 적용. 사용자 화면의 런타임 AI 모델이 아님 |
 | Awesome Design Skills · Refined | [원본 스킬](https://github.com/bergside/awesome-design-skills/blob/f631a09b4fcc0166f2e2c1a8c81906ef680c57e8/skills/refined/SKILL.md) | MIT 표기 확인. 토큰·간격·상태·접근성 지침 참고. 예시 팔레트·영문 글꼴을 그대로 복제하지 않음 |
 | Sites·Imagegen·Codex | 로컬 웹 구현·생성 이미지·코드/문서 작성 보조 | 개발 도구 사용과 제품 런타임 기능을 구분. 숨겨진 모델 버전·사용량을 추정하지 않음 |

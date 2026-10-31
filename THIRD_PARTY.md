@@ -27,6 +27,8 @@
 | Amazon Bedrock 접근 확인 | 2026-10-31, 서울 리전·APAC Nova profile 목록 조회와 합성 Converse 요청 | 실제 요청은 계정 Error 002로 실패. 사용 가능·한국어 tool-use 검증 완료로 기록하지 않고 추가 시도 중단. 후보 APAC profile은 6개 리전 범위를 갖지만 기본 handler에서 미활성 |
 | Agent prompt | `prompts/caregiver-system.mjs` | 허용 도구·의료진 역할·합성 경계·출처 조건을 담은 자체 프롬프트. 실제 모델 품질 검증과 구분 |
 | 전화·배차·동행 배정·결제·EMR·의료진 회신 | 미연동 | 문의 초안과 합성 응답으로 준비·변경 흐름 재현. 실제 발신·예약·결제·전송 없음 |
+| 공통 전화·협진·휠체어 계획 | 자체 `app/call-policy.js`·Agent Prompt·도구·UI | 사용자 원칙을 수신처·질문·최소 전달·AI 고지 예정문·기록 처리 미설정·실발신 전 확인·합성 결과로 구현. 전화 사업자/API·발신번호 신규 계약 없음, 새로운 실제 녹음·전사·개인정보 저장 없음 |
+| 전화 대행 참고 자료 | 피클 공식 도움말·약관 제4조와 국가법령정보센터 일부 조문, 확인2026-10-31 | [조사 기록](research/ai_phone_policy_2026-10-31.md)의 읽은 원문·초기 HTML·404·렌더 범위를 구분. 타 서비스의 존재를 우리 구현의 법적 적합성으로 해석하지 않음 |
 | insane-search | 로컬 설치 도구 | 공개 원문·공식 개발 문서 조사. 출처·확인 범위 기록 |
 | REA / reverse-engineer-anything | morluto/rea commit23de10bb2849cdce8ddbe70504aa7cc57de75a98, CLI rea-agents6.8.0 · MIT | 개발용 의료 웹사이트 브라우저 Evidence 조사. 앱 실행·Lambda 의존성에 포함하지 않음. 도구의 Node22.23.4는 프로젝트 밖 전용 도구 환경에 설치. 정상/실패 관측은 docs/medical-reference-design.md |
 | Impeccable | revision `b7a89176e4e87422b40f98adabceb051dbb5448b` · Apache-2.0 | 디자인 지침 참고. 자동 context는 실행 권한 오류로 미실행; 문서 직접 확인 |
@@ -51,3 +53,7 @@
 디자인 지침: [Impeccable 원본](https://github.com/pbakaus/impeccable), [Awesome Design Skills의 Refined](https://github.com/bergside/awesome-design-skills/blob/f631a09b4fcc0166f2e2c1a8c81906ef680c57e8/skills/refined/SKILL.md). 타일 정책을 충족하지 못하는 운영 규모에서는 이용조건이 맞는 공급자 또는 자체 타일로 교체해야 한다.
 
 공개 디자인 참고: [Linear Projects](https://linear.app/docs/projects)의 작업·상태·담당 배치, [Wellthy Care Concierge](https://wellthy.com/care-concierge)의 가족 돌봄 실무 설명, [Maven](https://www.mavenclinic.com/)의 관계 이미지·행동 배치를 실제 공개 화면에서 확인했다. 로그인 뒤 제품 화면을 확인하거나 해당 로고·사진·문구를 복제한 것은 아니다. 확인일 2026-10-31.
+
+## 혼디 로고 교체 (2026-10-31)
+
+사용자가 지정한 에이전트 대화에서 생성·선택한 귤 심볼 + 소문자 `hondi` PNG를 재사용했습니다. 새 생성 호출은 하지 않았습니다. 원본은 `app/assets/hondi-logo-source-v1.png`, 웹용 투명 PNG와 심볼은 `hondi-logo-v1.png`·`hondi-mark-v1.png`입니다. 원본 해시·정확 프롬프트·부모 시안·생성 도구·여백/축소 범위는 `app/assets/manifest.json`에 기록합니다. 이전 로고는 이력으로 보존하며 상표 등록·중복 검토를 완료했다고 주장하지 않습니다.

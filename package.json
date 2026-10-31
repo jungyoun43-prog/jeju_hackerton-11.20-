@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "제주 진료 나침반 — 보호자를 위한 진료 연결 워크스페이스",
+  "description": "혼디(hondi) — 보호자를 위한 진료 연결 워크스페이스",
   "engines": {
     "node": ">=22"
   },

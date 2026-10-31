@@ -34,6 +34,16 @@ AWS는 UTC 하루80개 대화 요청을 모델 호출 전에 조건부 원자 �
 
 모델 호출은 최대8회 중 마지막1회를 tool_choice:none 요약에 남깁니다. 함수 정의와 요청별 reasoning context는 유지합니다. 독립 도구는 묶어 실행할 수 있고 실제 도구16개/작업45초 제한은 유지합니다. 호출 횟수·도구 예산에 다가가면 완료한 준비와 아직 실행하지 않은 일을 구분해 요약하고 저장합니다. 정상적인 여러 단계가 마지막 답변 기회를 잃어 전부 롤백되던 경로를 수정한 것이며, 모든 요청이 한 번에 끝남을 보장하지 않습니다. 작업 deadline에 lease 해제 최대2.5초가 별도로 더해질 수 있습니다.
 
+## 전화·협진·휠체어 이동 계획
+
+`app/call-policy.js`의 `buildCallPlan(state,target)`을 화면·도구·시연 어댑터가 함께 사용합니다. 대상은 mainland/jeju/taxi/companion이며 수신처·문의 목적·질문·최소 전달·제외 항목·AI 시작 예정문·녹음/전사/보관/국외 이전 미설정·실발신 전 확인·합성 결과·다음 행동을 구분합니다. get_case.callPlans는 작은 요약이고 전화/문의 준비 도구 data.callPlan은 전체 계획입니다. 계획이나 실환자 동의 필드를 DB에 새로 저장하지 않습니다.
+
+양기관 협진 문의는 행정 접수·의뢰/회송·자료 전달 절차와 의료진 작성 기록을 준비하며, 의료적 적합성·진료 수락·예약은 확인하지 않습니다. 휠체어 이동은 자격·회원등록·탑승/승하차 지원·동행인·시각·차량 가능 질문을 포함합니다. available_demo와 실제 자격/휠체어 탑승/배차 확인을 구분합니다.
+
+사용자는 전화 사업자 계정이 없어 준비·시연을 먼저 선택했습니다. 실제 발신 어댑터를 거부하는 guard와 realDelegationVerified/realAdapterConfigured/actualCallPlaced/reservationConfirmed/clinicalAcceptanceConfirmed:false를 유지합니다. 합성 문의 허용은 실제 환자의 위임·민감정보 제공 동의가 아닙니다. 실제 녹음·전사·보관 정책 없이 ‘기록합니다’라고 말하지 않으며 구체 운영 전 처리 근거·수수료/국외 이전 검토가 필요합니다. [공통 계약](../docs/call-workflow-contract.md)을 따릅니다.
+
+클라이언트의 응답 대기 중지는 AbortController로 해당 화면의 기다림만 끝냅니다. 서버 실행·발신 중단 API가 아니며 완료된 중단으로 표시하지 않습니다. 원래 requestId/본문·설정 스냅샷을 재사용하되 최초 응답 전 중지는 sessionId가 없어 추가 실행·차감이 생길 수 있는 기존 한계를 유지합니다.
+
 ## AWS 키와 배포
 
 Lambda는 전용 `OPENAI_SECRET_ARN`·`SESSION_TABLE_NAME`을 함께 요구하며 평문 키만으로 메모리 경로를 사용할 수 없습니다. exact ARN·계정·서울 리전과 한 필드 JSON을 확인하고 성공한 runtime을 warm cache에 둡니다. Secret·SDK 오류 원문은 공개하지 않습니다.

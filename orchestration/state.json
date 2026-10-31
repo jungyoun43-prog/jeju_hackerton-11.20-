@@ -1,6 +1,6 @@
 {
   "baseCommit": "e1e7e44",
-  "updatedAt": "2026-10-31T14:32:07.222577+00:00",
+  "updatedAt": "2026-10-31T15:30:09.737588+00:00",
   "tasks": {
     "ui": {
       "phase": "verified",
@@ -217,6 +217,31 @@
         "36b2e84"
       ],
       "note": "root 실제 keyless503/preview+fixture115/115, 오류0, 최종 지문과 캡처 일치. 특정 고속도로 미연결/외부조회 없는 열기/상태갱신/escape/포커스 검사."
+    },
+    "call-protocol": {
+      "phase": "verified",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-call-protocol",
+      "integrationCommits": [
+        "034cdb6",
+        "b3111b3"
+      ],
+      "note": "통합·단위233·대화171·수동47·규칙40 통과. 실행 지문 cfbcb480893bdab26debe0281d2c9453ce5131b1632185b7d74913b1f96e3cc4. 실제 전화/개인기록·임상·법률은 미검증."
+    },
+    "ui-hardening": {
+      "phase": "verified",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-ui-hardening",
+      "integrationCommits": [
+        "6e3076a"
+      ],
+      "note": "통합·단위233·대화171·수동47·규칙40 통과. 실행 지문 cfbcb480893bdab26debe0281d2c9453ce5131b1632185b7d74913b1f96e3cc4. 실제 전화/개인기록·임상·법률은 미검증."
+    },
+    "ui-call-qa": {
+      "phase": "verified",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-ui-call-qa",
+      "integrationCommits": [
+        "9ce664f"
+      ],
+      "note": "통합·단위233·대화171·수동47·규칙40 통과. 실행 지문 cfbcb480893bdab26debe0281d2c9453ce5131b1632185b7d74913b1f96e3cc4. 실제 전화/개인기록·임상·법률은 미검증."
     }
   },
   "review": {

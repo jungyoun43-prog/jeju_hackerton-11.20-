@@ -30,7 +30,7 @@
       "createdAt": "2026-10-31",
       "tool": "ChatGPT built-in Imagegen / GPT Image family",
       "modelId": "not exposed by tool",
-      "usage": "주 탐색의 이미지 로고와 favicon",
+      "usage": "이전 제주 진료 나침반 로고. 혼디 로고 교체 후 화면에서 사용하지 않으며 생성 이력으로 보존.",
       "referenceImages": [],
       "prompt": "Use case: logo-brand. Asset type: original square brand symbol image for a Korean family medical-coordination service named '제주 진료 나침반', used at 40–56 px beside a separate live Korean wordmark. Create ONE exceptionally refined, ownable, flat graphic logo mark on a genuinely transparent background. Idea: two softly irregular dark basalt stone forms from Jeju, one forming a confident open protective arc, the other a small upward guiding wedge; the clean negative space between them describes a clear continuing path and quiet sense of connection across distance. One small restrained burnt-tangerine orange junction is integral to the shape. The mark feels designed by a sophisticated Korean identity studio: compact, asymmetrical but optically balanced, warm human character through precise organic curves, memorable solid silhouette, crisp vector-like edges, very simple geometry, thick enough to read at 32 px. Palette only deep basalt ink #243631 and burnt orange #C6653E. Center the mark with generous transparent padding, symbol fills roughly 75% of square. No text, no letters, no words, no medical cross, no heart, no hands, no leaf, no location pin, no circle badge, no generic compass rose, no gradient, no glow, no 3D, no shadows, no texture, no mockup, no watermark. Produce a final professional logo symbol, not a sheet of concepts.",
       "notes": "투명 PNG 원본을 그대로 복사했다. 현무암 형태 사이의 길과 귤색 연결점을 표현한 독창적 생성 시안이며, 상표 등록·유사상표 조사를 수행한 것은 아니다."
@@ -64,6 +64,65 @@
       "bytes": 228456,
       "sha256": "dbb82304a614873cc1bd3b92f26010b2bef11c131bbf96446beb1ef8c1d966c1",
       "notes": "실제 특정 해안·기관·환자 위치의 증거가 아닌 독자 생성 배경. 인물·문구 없음. PNG 원본 보존, Chromium canvas로 같은 픽셀 크기에서 WebP 형식만 변환."
+    },
+    {
+      "file": "hondi-logo-v1.png",
+      "type": "generated_logo_export",
+      "createdAt": "2026-10-31",
+      "tool": "ChatGPT built-in imagegen; existing approved output reused without regeneration",
+      "modelId": "not exposed by tool",
+      "usage": "혼디(hondi) 브랜드의 PC·모바일 주 탐색 로고",
+      "sourceAgentId": "25dd8a21-7bd0-4eae-b573-e255a9c21a82",
+      "sourceGenerationId": "exec-5b75ee49-8e23-4eae-98aa-7e97e9499f46",
+      "originalFile": "hondi-logo-source-v1.png",
+      "referenceImages": [
+        "prior Korean 혼디 logo from generation exec-d483994b-3c60-4eee-8bf6-b0e3792c3d2f"
+      ],
+      "prompt": "Use case: text-localization / logo-brand edit.\nEdit target: the supplied transparent Korean 혼디 logo. This is the existing brand identity to preserve.\nPrimary request: replace ONLY the Korean wordmark on the right with the exact lowercase Latin word \"hondi\". The five letters must be h-o-n-d-i, all lowercase. Remove the Korean lettering completely.\nKeep the existing left symbol: two rounded warm tangerine-orange segments nestled together with a clean curving seam and the single deep forest-green leaf above. Preserve its recognizable silhouette, colors, proportions, and positioning relative to the wordmark. Do not reinvent the mark or introduce additional motifs.\nNew typography: carefully drawn contemporary rounded geometric sans-serif, substantial medium-bold strokes, optically balanced letter spacing, beautiful clean lowercase forms. The curves in h, n, and d should harmonize with the soft symbol. Use a round dot on the i. Set the entire wordmark in the same deep forest green as the original Korean lettering. Match the wordmark's optical weight to the symbol and align it cleanly beside the mark. Allow a comfortable, deliberate gap between symbol and wordmark.\nDeliver ONE finished horizontal logo lockup, balanced proportions, crisp precise vector-like edges as a high-quality raster image. The full name \"hondi\" must be prominent and immediately readable, with ample transparent clearance around the complete lockup.\nPreserve a genuinely transparent background with native alpha, including open areas inside the symbol and letters. No background color, no painted checkerboard, no canvas texture. No additional Korean or English text, no subtitle, no tagline, no variant sheet, no mockup, no watermark, no shadow, no 3D or decorative effects.",
+      "referencePrompt": "Use case: logo-brand.\nAsset type: an original finished logo image for a Korean family-care AI assistant called 혼디, a Jeju-inspired name meaning together.\nPrimary request: Create ONE polished horizontal logo lockup with an original compact symbol on the left and the exact Korean wordmark 혼디 on the right. The product helps adult children coordinate their parents' clinic visits, calls, paperwork and transport. Convey warm, capable companionship and Jeju character.\nSymbol concept: two simple, softly rounded tangerine segments nestling side by side into one distinctive, optically balanced silhouette, separated by a deliberate clean negative-space seam. The two pieces remain individually legible while supporting one another, expressing togetherness. A single small deep-green citrus leaf is integrated into the top silhouette, a subtle Jeju reference. Keep the mark extremely simple and recognizable at 32 pixels; adult and thoughtfully designed, not a cartoon fruit mascot.\nTypography: render ONLY the two Korean syllables \"혼디\" exactly, with excellent Hangul legibility, confident contemporary softly rounded sans-serif lettering, substantial strokes and carefully balanced spacing. Give the wordmark a little custom character without distorting the syllables. Large dark forest-green lettering, centered vertically next to the symbol. No English, no subtitle, no tagline, no additional text.\nColor palette: warm tangerine orange #EE873E and deep forest green #24483D, flat solid colors only.\nComposition: a spacious, closely balanced horizontal logo, symbol and wordmark at comparable visual weight, plenty of clean transparent clearance around the complete lockup. Show one final logo only, no concept sheet, no alternate layouts, no surrounding objects.\nBackground: genuinely transparent with native alpha, including the clear spaces between and inside forms.\nStyle: exceptional professional brand identity, precise vector-like edges rendered as a high-quality PNG. Very simple flat graphic construction. No gradient, shadows, glow, texture, paper, embossing, 3D, photographic elements, badge frame, speech bubble, generic heart, hands, medical cross, stethoscope, compass, mountain, landscape, mockup, watermark, or checkerboard painted into the image.",
+      "exports": [
+        {
+          "file": "hondi-logo-v1.png",
+          "dimensions": [
+            480,
+            168
+          ],
+          "usage": "horizontal lockup"
+        },
+        {
+          "file": "hondi-mark-v1.png",
+          "dimensions": [
+            128,
+            128
+          ],
+          "usage": "same tangerine symbol for agent avatar and favicon"
+        }
+      ],
+      "exportBounds": {
+        "size": [
+          1774,
+          887
+        ],
+        "all": {
+          "left": 107,
+          "top": 199,
+          "right": 1696,
+          "bottom": 707,
+          "width": 1589,
+          "height": 508
+        },
+        "symbol": {
+          "left": 107,
+          "top": 199,
+          "right": 666,
+          "bottom": 707,
+          "width": 559,
+          "height": 508
+        }
+      },
+      "sourceSha256": "9664959a2ad7e24cbf33d9b8a1fb6ac19cbdd2c21ca0ae893e6430a1ab5efe21",
+      "sha256": "cadbc2e5ffce3c52e20bb3087d39890c8dda8f2da2be60272606b10274a3b4d2",
+      "notes": "원본은 바이트 그대로 보존. 브라우저 canvas에서 alpha>16의 범위로 빈 여백을 정리하고 기존 심볼을 분리·축소 내보냄. 새 형태·색상·배경을 생성하거나 기존 그림을 다시 그리지 않음. 상표 중복·등록 가능성은 미검증."
     }
   ]
 }

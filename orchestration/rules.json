@@ -310,6 +310,39 @@
       "allow": [
         "scripts/conversation-browser-check.mjs"
       ]
+    },
+    {
+      "id": "call-protocol",
+      "branch": "feature/call-protocol",
+      "baseCommit": "0f956cd687c8ab937a7a11f0c85d22d548ed681f",
+      "allow": [
+        "app/call-policy.js",
+        "app/domain.js",
+        "agent/tools.mjs",
+        "prompts/caregiver-system.mjs",
+        "tests/call-policy.test.mjs",
+        "tests/agent.test.mjs",
+        "tests/domain.test.mjs"
+      ]
+    },
+    {
+      "id": "ui-hardening",
+      "branch": "fix/caregiver-ui-hardening",
+      "baseCommit": "0f956cd687c8ab937a7a11f0c85d22d548ed681f",
+      "allow": [
+        "app/conversation.js",
+        "app/conversation.css",
+        "DESIGN.md",
+        ".impeccable/design.json"
+      ]
+    },
+    {
+      "id": "ui-call-qa",
+      "branch": "test/ui-call-hardening",
+      "baseCommit": "0f956cd687c8ab937a7a11f0c85d22d548ed681f",
+      "allow": [
+        "scripts/conversation-browser-check.mjs"
+      ]
     }
   ],
   "rules": [

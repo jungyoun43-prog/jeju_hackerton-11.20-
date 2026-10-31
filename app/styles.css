@@ -139,8 +139,9 @@ input,textarea {
   color:var(--ink)
 }
 .brand-image {
-  width:48px;
-  height:48px;
+  display:block;
+  width:144px;
+  height:auto;
   object-fit:contain
 }
 .brand-name {
@@ -1675,8 +1676,8 @@ textarea {
     padding:31px 14px 20px
   }
   .brand-image {
-    width:42px;
-    height:42px
+    width:134px;
+    height:auto
   }
   .brand-name {
     font-size:14px
@@ -1931,8 +1932,8 @@ textarea {
     color:var(--ink)
   }
   .mobile-brand img {
-    width:30px;
-    height:30px;
+    width:112px;
+    height:auto;
     object-fit:contain
   }
   .mobile-brand span {

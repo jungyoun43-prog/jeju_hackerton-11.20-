@@ -75,7 +75,7 @@ try {
  await page.goto(workspace,{waitUntil:'networkidle'});
  record('사례 제목과 다음 행동',((await page.locator('#service-role').textContent()).includes('김정희')) && await primaryInViewport(page));
  record('병원·자료·택시·동행 상태가 첫 화면에 표시',await page.locator('.readiness-item').count()===4 && await page.locator('.readiness-strip').evaluate(e=>e.getBoundingClientRect().bottom<=innerHeight));
- record('생성한 이미지 로고 로드',await page.locator('.brand img').evaluate(e=>e.complete && e.naturalWidth>0 && e.src.endsWith('/assets/jeju-mark-v1.png')));
+ record('생성한 이미지 로고 로드',await page.locator('.brand img').evaluate(e=>e.complete && e.naturalWidth>0 && e.src.endsWith('/assets/hondi-logo-v1.png')));
  record('제목용 한국어 폰트 로드',await page.evaluate(async()=>{await document.fonts.ready;return [...document.fonts].some(font=>font.family.replaceAll('"','')==='MaruBuri' && font.status==='loaded');}));
  proof.desktop.noOverflow=await overflow(page);record('PC 가로 넘침 없음',proof.desktop.noOverflow);
  record('의사·가족 일러스트 제거',await page.locator('.hero,.care-scene,.case-visual').count()===0);

@@ -304,7 +304,7 @@ function appendMessage({role,text,id=makeId(),events=[],greeting=false,isExample
   node.className = `message ${role} ${greeting?'greeting':''}`;
   node.dataset.messageId = id;
   const body=greeting?`<div class="welcome-content"><h2>이번 진료에 필요한 일,<br>편하게 말씀해 주세요.</h2><div class="welcome-copy">${formatMessage(text)}</div></div>`:formatMessage(text);
-  node.innerHTML = `<div class="message-meta">${role==='assistant'?'<img src="/assets/jeju-mark-v1.png" alt="" width="23" height="23"/>':''}<strong>${role==='user'?'보호자':'나침반'}</strong>${isExample?'<span class="example-label">작성된 예시</span>':greeting?'':`<time>${escape(timeLabel(new Date()))}</time>`}</div><div class="message-body">${body}</div>${eventsMarkup(events)}`;
+  node.innerHTML = `<div class="message-meta">${role==='assistant'?'<img src="/assets/hondi-mark-v1.png" alt="" width="23" height="23"/>':''}<strong>${role==='user'?'보호자':'혼디'}</strong>${isExample?'<span class="example-label">작성된 예시</span>':greeting?'':`<time>${escape(timeLabel(new Date()))}</time>`}</div><div class="message-body">${body}</div>${eventsMarkup(events)}`;
   document.getElementById('message-list').append(node);
   return node;
 }
@@ -638,17 +638,17 @@ function welcomeMessage() {
 }
 
 function mount() {
-  const brand=`<img src="/assets/jeju-mark-v1.png" alt="" width="42" height="42"/><span>제주 진료 나침반</span>`;
+  const brand=`<img src="/assets/hondi-logo-v1.png" alt="" width="480" height="168"/>`;
   const menuIcon='<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>';
   document.getElementById('app').innerHTML=`
     <div class="app-shell">
       <header class="mobile-app-header" id="mobile-app-header">
-        <a class="brand" href="/" aria-label="제주 진료 나침반 홈">${brand}</a>
+        <a class="brand" href="/" aria-label="혼디 홈">${brand}</a>
         <button type="button" id="open-care-menu" class="menu-button" aria-controls="care-rail" aria-expanded="false">${menuIcon}<span>설정</span></button>
       </header>
       <button type="button" id="drawer-backdrop" class="drawer-backdrop" aria-label="설정 닫기" tabindex="-1" hidden></button>
       <aside class="care-rail" id="care-rail" aria-label="가상 가족 사례와 기본 설정" tabindex="-1">
-        <div class="rail-brand-row"><a class="brand" href="/" aria-label="제주 진료 나침반 홈">${brand}</a><button type="button" id="close-care-menu" class="close-menu" aria-label="설정 닫기">${icon('close')}</button></div>
+        <div class="rail-brand-row"><a class="brand" href="/" aria-label="혼디 홈">${brand}</a><button type="button" id="close-care-menu" class="close-menu" aria-label="설정 닫기">${icon('close')}</button></div>
         <section class="rail-case" aria-labelledby="rail-patient">
           <span class="case-person">${icon('user')}</span><h2 id="rail-patient"></h2>
           <p id="rail-area"></p><p id="rail-caregiver"></p>
@@ -684,7 +684,7 @@ function mount() {
           <div class="mobile-case-summary" id="mobile-case-summary" aria-label="이번 방문 요약"></div>
           <div class="conversation-layout">
             <section class="chat-workspace" aria-labelledby="conversation-title">
-              <div class="chat-toolbar"><h2 id="conversation-title">나침반과 준비하기</h2><button type="button" id="preview-button" class="preview-button">대화 흐름 미리보기${icon('chevron')}</button></div>
+              <div class="chat-toolbar"><h2 id="conversation-title">혼디와 준비하기</h2><button type="button" id="preview-button" class="preview-button">대화 흐름 미리보기${icon('chevron')}</button></div>
               <p class="mode-notice" id="mode-notice">연결 범위를 확인하고 있어요.</p>
               <div class="conversation-scroll" id="conversation-scroll">
                 <div class="message-list" id="message-list" role="log" aria-label="진료 준비 대화" aria-live="polite" aria-relevant="additions"></div>
