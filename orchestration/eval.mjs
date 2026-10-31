@@ -25,10 +25,10 @@ await check('worktree-isolation','isolation',()=>{
   const entry=output.split('\n\n').find(e=>e.includes(`worktree ${state.tasks[task.id].worktree}\n`));
   requireThat(entry?.includes(`branch refs/heads/${task.branch}`),`${task.id}: 등록된 브랜치/워크트리가 다릅니다.`);
  }
- return '서로 다른 3개 worktree와 전용 브랜치 등록 확인';
+ return `서로 다른 ${rules.tasks.length}개 worktree와 전용 브랜치 등록 확인`;
 });
 for(const task of rules.tasks) await check(`file-ownership-${task.id}`,'ownership',()=>{
- const files=git('diff','--name-only',state.baseCommit,task.branch).split('\n').filter(Boolean);
+ const files=git('diff','--name-only',task.baseCommit || state.baseCommit,task.branch).split('\n').filter(Boolean);
  requireThat(files.length>0,`${task.id}: 완료 커밋이 아직 없습니다.`);
  const violations=files.filter(file=>!task.allow.includes(file));
  requireThat(violations.length===0,`파일 소유권 위반: ${violations.join(', ')}`);

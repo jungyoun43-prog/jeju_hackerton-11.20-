@@ -1,12 +1,12 @@
 # AWS 배포·CI/CD 공통 계약
 
-요청일: 2026-10-31. 사용자는 AWS에서 볼 수 있는 배포와 자동 CI/CD를 요청했다. GitHub 저장소는 `jungyoun43-prog/jeju_hackerton-11.20-`이며 현재 비어 있는 private 저장소다. GitHub 읽기·쓰기 인증은 확인했다. AWS 계정 인증은 사용자가 서버에서 `aws login --remote --profile jeju-deploy --region ap-northeast-2`로 연결 중이다. 로그인 성공·계정 권한은 아직 검증하지 않았다.
+요청일: 2026-10-31. 사용자는 AWS에서 볼 수 있는 배포와 자동 CI/CD를 요청했다. GitHub 저장소는 `jungyoun43-prog/jeju_hackerton-11.20-`이며 초기 연결 당시 비어 있던 private 저장소다. GitHub 읽기·쓰기 인증은 확인했다. 사용자가 서버에서 `aws login --remote --profile jeju-deploy --region ap-northeast-2`로 연결했고 STS 인증과 전용 stack 생성 권한을 확인했다.
 
 ## 구조
 
 정적 MVP를 **비공개 S3 origin + CloudFront HTTPS**로 공개한다. 실제 환자 기록이나 서버의 인증정보를 업로드하지 않는다. CloudFront 링크를 아는 사람이 합성 시연을 볼 수 있는 공개 데모다. 실제 LLM·전화·병원 전송은 여전히 미연동이다.
 
-GitHub Actions는 PR/push에서 설치·단위 검사·정적 빌드를 수행한다. `main`의 승인된 배포 job만 OIDC로 AWS 역할을 받아 전용 버킷에 배포하고 CloudFront 캐시를 무효화한다. 장기 AWS access key를 GitHub Secrets에 저장하지 않는다. AWS 설정 전에는 배포 job을 명시적으로 skip하고 테스트는 실행한다.
+GitHub Actions의 재사용 CI는 PR과 main push에서 설치·단위 검사·정적 빌드를 수행한다. 배포 workflow가 재사용 validate job을 호출해 main push에서 중복 검사하지 않는다. `main`의 승인된 배포 job만 OIDC로 AWS 역할을 받아 전용 버킷에 배포하고 CloudFront 캐시를 무효화한다. 장기 AWS access key를 GitHub Secrets에 저장하지 않는다. AWS 설정 전에는 배포 job을 명시적으로 skip하고 테스트는 실행한다.
 
 ## 소유 파일과 인터페이스
 

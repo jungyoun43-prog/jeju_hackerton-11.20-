@@ -17,6 +17,11 @@
 | Impeccable | revision `b7a89176e4e87422b40f98adabceb051dbb5448b` · Apache-2.0 | 디자인 지침 참고. 자동 context는 실행 권한 오류로 미실행; 문서 직접 확인 |
 | Awesome Design Skills / Refined | revision `f631a09b4fcc0166f2e2c1a8c81906ef680c57e8`, 스킬 표기 MIT | 토큰·간격·가독성·상태·접근성 기준 참고. 화면/템플릿 복사 아님 |
 | Playwright | 이 개발 환경에서 1.64.1 확인 · Apache-2.0 | 브라우저 QA 도구. 서비스 실행 의존성에 포함하지 않음. 선택 설치 후 재현 가능 |
+| AWS CLI | 2.39.3 확인 | 로컬 콘솔 임시 인증·CloudFormation·S3·CloudFront 배포. 설치·인증 캐시는 제출 소스 밖에 유지 |
+| Amazon S3·CloudFront·IAM OIDC·CloudFormation | AWS 외부 서비스 | 공개 합성 데모 호스팅·최소 권한 임시 CI 배포. 실제 의료기관 연결을 제공하지 않음. 사용량별 비용·인터넷 의존 |
+| GitHub Actions | checkout7.0.1, setup-node7.1.0, upload-artifact7.0.2, download-artifact8.0.2, aws-credentials6.3.0 | 공식 태그 refs를 insane-search로 확인한 40자리 SHA로 고정. 정확한 값은 `.github/workflows/`에 기록 |
+| cfn-lint·cfn-guard | 1.59.0 / 3.2.1 | 격리된 개발 도구. 템플릿 schema와 프로젝트 다섯 규칙 검사. 서비스 실행 의존성이나 전면 규정 준수 인증이 아님 |
+| AWS CloudFormation·IAM 스킬 | 로컬 AWS Agent Toolkit 지침 | 리소스 의도·제약·검증·OIDC 역할 범위 참고. 템플릿에 `aws-cloudformation@3` marker 기록 |
 
 화면의 아이콘은 일관된 SVG로 작성한다. 기본 글꼴은 운영체제 글꼴이며 외부 폰트 호출은 없다. 합성 사례와 가상 기관 좌표를 쓰며 제주데이터허브 원자료를 배포 가능한 것으로 간주하지 않는다.
 

@@ -2,17 +2,89 @@
   "version": 1,
   "baseBranch": "main",
   "tasks": [
-    {"id":"ui","branch":"mvp/ui","allow":["app/index.html","app/styles.css","app/app.js","app/icons.js","app/map.js"]},
-    {"id":"workflow","branch":"mvp/workflow","allow":["app/domain.js","app/hospitals.js","tests/domain.test.mjs","tests/hospitals.test.mjs"]},
-    {"id":"docs","branch":"mvp/docs","allow":["docs/prd.md","docs/user-manual.md","docs/submission-checklist.md","docs/implementation-results.md","docs/data-sources.md"]}
+    {
+      "id": "ui",
+      "branch": "mvp/ui",
+      "allow": [
+        "app/index.html",
+        "app/styles.css",
+        "app/app.js",
+        "app/icons.js",
+        "app/map.js"
+      ]
+    },
+    {
+      "id": "workflow",
+      "branch": "mvp/workflow",
+      "allow": [
+        "app/domain.js",
+        "app/hospitals.js",
+        "tests/domain.test.mjs",
+        "tests/hospitals.test.mjs"
+      ]
+    },
+    {
+      "id": "docs",
+      "branch": "mvp/docs",
+      "allow": [
+        "docs/prd.md",
+        "docs/user-manual.md",
+        "docs/submission-checklist.md",
+        "docs/implementation-results.md",
+        "docs/data-sources.md"
+      ]
+    },
+    {
+      "id": "aws-infra",
+      "branch": "deploy/aws-infra",
+      "baseCommit": "cfb45ca",
+      "allow": [
+        "infra/aws-static-site.yaml",
+        "scripts/aws-bootstrap.mjs",
+        "scripts/aws-publish.mjs",
+        "tests/aws-infra.test.mjs"
+      ]
+    },
+    {
+      "id": "aws-ci",
+      "branch": "deploy/aws-ci",
+      "baseCommit": "cfb45ca",
+      "allow": [
+        ".github/workflows/ci.yml",
+        ".github/workflows/deploy-aws.yml",
+        "scripts/build.mjs",
+        "tests/static-hosting.test.mjs"
+      ]
+    }
   ],
   "rules": [
-    {"id":"isolation","description":"작업별 워크트리·브랜치 분리"},
-    {"id":"ownership","description":"허용된 파일만 수정"},
-    {"id":"contract","description":"공유 인터페이스·동작 수락 기준 준수"},
-    {"id":"provenance","description":"시연·실제 연동·출처 구분"},
-    {"id":"privacy","description":"제출 파일에 비밀값·실제 환자 기록 제외"},
-    {"id":"verification","description":"결과에 맞는 자동 검사와 화면 검증 증거"},
-    {"id":"rollback","description":"작업별 커밋·가역적 통합"}
+    {
+      "id": "isolation",
+      "description": "작업별 워크트리·브랜치 분리"
+    },
+    {
+      "id": "ownership",
+      "description": "허용된 파일만 수정"
+    },
+    {
+      "id": "contract",
+      "description": "공유 인터페이스·동작 수락 기준 준수"
+    },
+    {
+      "id": "provenance",
+      "description": "시연·실제 연동·출처 구분"
+    },
+    {
+      "id": "privacy",
+      "description": "제출 파일에 비밀값·실제 환자 기록 제외"
+    },
+    {
+      "id": "verification",
+      "description": "결과에 맞는 자동 검사와 화면 검증 증거"
+    },
+    {
+      "id": "rollback",
+      "description": "작업별 커밋·가역적 통합"
+    }
   ]
 }

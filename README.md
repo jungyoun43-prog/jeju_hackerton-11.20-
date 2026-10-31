@@ -3,6 +3,14 @@
 「제주 AI·빅데이터 활용 AI Agent 개발 챌린지」 참가를 위한 저장소입니다.
 제주데이터허브 데이터를 활용해 비전문가도 데이터 탐색과 분석 결과를 이용할 수 있는 AI Agent 서비스를 개발합니다.
 
+## AWS 데모와 자동 배포
+
+**[제주 진료 나침반 데모](https://d1mfksxrj025bx.cloudfront.net)** · [GitHub 배포 실행 기록](https://github.com/jungyoun43-prog/jeju_hackerton-11.20-/actions/workflows/deploy-aws.yml)
+
+서울 리전의 비공개 S3와 CloudFront HTTPS로 합성 사례를 공개합니다. `main` push → 재사용 CI의 검사·빌드 → 같은 artifact → GitHub production OIDC 역할 → 게시·캐시 무효화 → 공개 revision 확인으로 연결합니다. AWS 장기 키를 GitHub Secrets에 저장하지 않습니다. 최초 실제 실행 결과는 Actions 기록을 확인합니다.
+
+배포 구조·변수·수동 재게시·롤백은 [AWS 배포 매뉴얼](docs/deployment.md)을 따릅니다. 인프라 코드는 [CloudFormation 템플릿](infra/aws-static-site.yaml)에 있습니다. 서비스의 실제 전화·LLM·의료기관 연동 상태는 아래 MVP 설명과 같습니다.
+
 ## MVP 실행
 
 현재 버전은 보호자의 **병원 문의 → 자료 보완 → 공유 허용 → 의료진 검토 접수 → 합성 회신 → 일정·동행 부담 갱신**을 직접 눌러볼 수 있는 웹 MVP입니다. 런타임 LLM·실제 전화·의료기관 전송은 아직 연결하지 않았습니다.

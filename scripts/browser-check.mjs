@@ -16,7 +16,7 @@ await mkdir(resolve(root,'orchestration/runs'),{recursive:true});
 const browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH || undefined,args:['--no-sandbox','--disable-dev-shm-usage']});
 const errors=[],checks=[];
 const record=(name,ok,detail='')=>checks.push({name,status:ok?'pass':'fail',detail});
-const proof={result:'fail',checkedAt:new Date().toISOString(),sourceHash:await runtimeFingerprint(root),errors,checks,flowCompleted:false,supplementLoop:false,desktop:{width:1440,noOverflow:false,screenshot:shots+'/desktop.png'},mobile:{width:390,noOverflow:false,screenshot:shots+'/mobile.png'},map:{liveTiles:false,automatedPanZoom:false}};
+const proof={result:'fail',checkedAt:new Date().toISOString(),url:base,sourceHash:await runtimeFingerprint(root),errors,checks,flowCompleted:false,supplementLoop:false,desktop:{width:1440,noOverflow:false,screenshot:shots+'/desktop.png'},mobile:{width:390,noOverflow:false,screenshot:shots+'/mobile.png'},map:{liveTiles:false,automatedPanZoom:false}};
 const watch=page=>page.on('pageerror',error=>errors.push(error.message));
 const overflow=page=>page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth);
 async function initialMap(page) {

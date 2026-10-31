@@ -1,0 +1,28 @@
+let buckets = Resources.*[ Type == 'AWS::S3::Bucket' ]
+let distributions = Resources.*[ Type == 'AWS::CloudFront::Distribution' ]
+
+rule s3_public_access_blocked when %buckets !empty {
+  %buckets.Properties.PublicAccessBlockConfiguration {
+    BlockPublicAcls == true
+    BlockPublicPolicy == true
+    IgnorePublicAcls == true
+    RestrictPublicBuckets == true
+  }
+}
+
+rule s3_encryption_exists when %buckets !empty {
+  %buckets.Properties.BucketEncryption.ServerSideEncryptionConfiguration !empty
+}
+
+rule s3_versioning_enabled when %buckets !empty {
+  %buckets.Properties.VersioningConfiguration.Status == 'Enabled'
+}
+
+rule s3_retention_protects_objects when %buckets !empty {
+  %buckets.DeletionPolicy == 'Retain'
+  %buckets.UpdateReplacePolicy == 'Retain'
+}
+
+rule cloudfront_redirects_https when %distributions !empty {
+  %distributions.Properties.DistributionConfig.DefaultCacheBehavior.ViewerProtocolPolicy == 'redirect-to-https'
+}

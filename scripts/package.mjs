@@ -6,10 +6,11 @@ import { scanProject } from '../orchestration/checks.mjs';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const sensitive = await scanProject(root);
 if (sensitive.length) throw new Error(`민감정보 패턴을 발견해 패키징을 중단했습니다. 파일: ${sensitive.join(', ')}`);
-await import('./build.mjs');
+const { buildSite } = await import('./build.mjs');
+await buildSite();
 await mkdir(resolve(root,'output'),{recursive:true});
 const zipPath = resolve(root,'output/jeju-care-compass-mvp.zip');
-const selected = ['README.md','AGENTS.md','PRODUCT.md','DESIGN.md','THIRD_PARTY.md','.env.example','package.json','package-lock.json','app','scripts','tests','docs','research','orchestration','dist','.impeccable/review/desktop.png','.impeccable/review/mobile.png'];
+const selected = ['README.md','AGENTS.md','PRODUCT.md','DESIGN.md','THIRD_PARTY.md','.env.example','package.json','package-lock.json','app','scripts','tests','docs','research','orchestration','infra','.github','dist','.impeccable/review/desktop.png','.impeccable/review/mobile.png'];
 const code = `import json,sys,zipfile,pathlib
 root=pathlib.Path(sys.argv[1]); dest=pathlib.Path(sys.argv[2]); selected=json.loads(sys.argv[3])
 safe_evidence={'orchestration/runs/browser.json','orchestration/runs/latest-eval.json','orchestration/runs/release.json','orchestration/runs/rollback.json'}

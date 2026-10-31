@@ -11,9 +11,10 @@ test('확장자가 다른 제출 텍스트도 검사하고 실제 비밀 .env는
  const fake='sk-proj-'+'x'.repeat(40);
  await writeFile(join(root,'integration.yaml'),`test_only: ${fake}`);
  await writeFile(join(root,'tool.sh'),`TEST_ONLY=${fake}`);
+ await writeFile(join(root,'deploy.ini'),'test_only='+'ASIA'+'A'.repeat(16));
  await writeFile(join(root,'.env'),`EXAMPLE=${fake}`);
  await writeFile(join(root,'record.png'),Buffer.from([137,80,78,71,0,1,2,3]));
- assert.deepEqual((await scanProject(root)).sort(),['integration.yaml','tool.sh']);
+ assert.deepEqual((await scanProject(root)).sort(),['deploy.ini','integration.yaml','tool.sh']);
 });
 
 test('미커밋 실행 소스 변경도 브라우저 증거의 지문을 바꾼다',async t=>{

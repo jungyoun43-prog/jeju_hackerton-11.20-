@@ -1,6 +1,6 @@
 {
   "baseCommit": "e1e7e44",
-  "updatedAt": "2026-10-31T11:02:12.234400+00:00",
+  "updatedAt": "2026-10-31T11:24:30.268748+00:00",
   "tasks": {
     "ui": {
       "phase": "verified",
@@ -28,6 +28,23 @@
         "c311ef5e75ba9de81e13363d2a80f794d6f5255f",
         "683062cebb1ff4c62a5429eed57f7b933fb922e4"
       ]
+    },
+    "aws-infra": {
+      "phase": "verified",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-aws-infra",
+      "note": "로컬42개 검사·템플릿 검증 완료; 실제 CI 상태는 aws-deployment 증거와 Actions 조회",
+      "integrationCommits": [
+        "4e8393e7e5557a9e7cce5f713272f82846be2c94",
+        "43b4d4d314602cdec50a773f09cb786b0975bb1b"
+      ]
+    },
+    "aws-ci": {
+      "phase": "verified",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-aws-ci",
+      "note": "로컬42개 검사·템플릿 검증 완료; 실제 CI 상태는 aws-deployment 증거와 Actions 조회",
+      "integrationCommits": [
+        "ba9743b414e45396603f899e4768b808c3144fcc"
+      ]
     }
   },
   "review": {
@@ -40,5 +57,16 @@
       "작업별 롤백 커밋 검증"
     ],
     "resolution": "독립 검토가 코드·캡처·소스 지문과 22개 브라우저 결과를 대조하고 주요 발견 수정 확인. 합성 MVP 검토 범위에서 ship."
+  },
+  "awsDeployment": {
+    "phase": "infrastructure_ready",
+    "region": "ap-northeast-2",
+    "profile": "jeju-deploy",
+    "githubAuthenticated": true,
+    "liveUrl": "https://d1mfksxrj025bx.cloudfront.net",
+    "authenticated": true,
+    "stackStatus": "CREATE_COMPLETE",
+    "ciWorkflow": "configured",
+    "evidence": "orchestration/runs/aws-deployment.json"
   }
 }

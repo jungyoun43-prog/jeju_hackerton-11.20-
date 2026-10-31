@@ -14,7 +14,7 @@ export async function sourceFiles(root, prefix='') {
 }
 export async function scanProject(root) {
   const findings=[];
-  const patterns=[/sk-proj-[A-Za-z0-9_-]{20,}/,/sk-[A-Za-z0-9]{32,}/,/AIza[0-9A-Za-z_-]{30,}/,/-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/];
+  const patterns=[/\b(?:AKIA|ASIA)[A-Z0-9]{16}\b/,/sk-proj-[A-Za-z0-9_-]{20,}/,/sk-[A-Za-z0-9]{32,}/,/AIza[0-9A-Za-z_-]{30,}/,/-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/];
   for(const path of await sourceFiles(root)) {
     const bytes=await readFile(resolve(root,path));
     if(bytes.subarray(0,8192).includes(0)) continue;
