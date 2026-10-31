@@ -302,7 +302,7 @@
     "board-ui": {
       "phase": "verified",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-board-ui",
-      "note": "root통합347/347·대화173/173·여정/인계222/222(실preview14,모델POST0)·수동47/47·네창104/104(6viewport,API200/400+fixture)·규칙51/51. 지문15a7315076aa969ee8866d32d982b8c94ba3076fd78af68f4b43a111c5acdf30. 독립UI/source검토차단0·DESIGN/sidecar1건수정resolved. 실제공개DDB/model·임상/법률은별도.",
+      "note": "진행지연복구후root352/352·대화173/173·여정/인계222/222(실preview14,모델POST0)·수동47/47·네창104/104 규칙51/51·동일지문c4c6dfbd481f1128b3b61bacbe174926157b81afbe82e7b267cbea589cf21e1d통과. UI/source독립ship및writer소유/ACK유실회귀검토ship. 공개Sol/DDB진행은수정배포후별도live/deployed증거를따르며실전화/개인기록·임상/법률은미검증.",
       "integrationCommits": [
         "17e4c6c"
       ]
@@ -310,16 +310,17 @@
     "board-progress": {
       "phase": "verified",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-board-progress",
-      "note": "root통합347/347·대화173/173·여정/인계222/222(실preview14,모델POST0)·수동47/47·네창104/104(6viewport,API200/400+fixture)·규칙51/51. 지문15a7315076aa969ee8866d32d982b8c94ba3076fd78af68f4b43a111c5acdf30. 독립UI/source검토차단0·DESIGN/sidecar1건수정resolved. 실제공개DDB/model·임상/법률은별도.",
+      "note": "진행지연복구후root352/352·대화173/173·여정/인계222/222(실preview14,모델POST0)·수동47/47·네창104/104 규칙51/51·동일지문c4c6dfbd481f1128b3b61bacbe174926157b81afbe82e7b267cbea589cf21e1d통과. UI/source독립ship및writer소유/ACK유실회귀검토ship. 공개Sol/DDB진행은수정배포후별도live/deployed증거를따르며실전화/개인기록·임상/법률은미검증.",
       "integrationCommits": [
         "32f4436",
-        "a067827"
+        "a067827",
+        "a64ef2c"
       ]
     },
     "board-qa": {
       "phase": "verified",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-board-qa",
-      "note": "root통합347/347·대화173/173·여정/인계222/222(실preview14,모델POST0)·수동47/47·네창104/104(6viewport,API200/400+fixture)·규칙51/51. 지문15a7315076aa969ee8866d32d982b8c94ba3076fd78af68f4b43a111c5acdf30. 독립UI/source검토차단0·DESIGN/sidecar1건수정resolved. 실제공개DDB/model·임상/법률은별도.",
+      "note": "진행지연복구후root352/352·대화173/173·여정/인계222/222(실preview14,모델POST0)·수동47/47·네창104/104 규칙51/51·동일지문c4c6dfbd481f1128b3b61bacbe174926157b81afbe82e7b267cbea589cf21e1d통과. UI/source독립ship및writer소유/ACK유실회귀검토ship. 공개Sol/DDB진행은수정배포후별도live/deployed증거를따르며실전화/개인기록·임상/법률은미검증.",
       "integrationCommits": [
         "9baabe0",
         "bfbd1d2"

@@ -39,7 +39,7 @@ capabilities에 `progress:'poll'|'unavailable'`을 추가한다. UI는 poll인 �
 
 진행 DTO: `{version:1,status:'running'|'completed'|'failed',sequence,updatedAt,currentStage:'records'|'hospitals'|'support'|'plan'|null,stages:[{id,status:'waiting'|'running'|'observed'|'needs_input'|'failed',lastTool:string|null}],events:[{sequence,stage,tool:string|null,status:'started'|'completed'|'needs_input'|'failed'}]}`. events최대32·sequence상한128. tool은고정allowlist만 허용하고 실제tool시작/끝/안전한상태만 기록한다. 환자이름·query/원문·인자·결과·reasoning·연락처·출처URL·시연수신기관명·예약/위임 필드는 없다. UI문구는고정사전에서 만들며 실제/시연은기존경계와함께읽는다. 응답 전의caseState는마지막확인상태로유지한다.
 
-로컬은메모리, AWS는기존DynamoDB의별도 `progress#sha256(token)` 키와120초TTL을 쓴다. 기존 session version1/lease/budget/엄격상태검증은 변경하지 않는다. 추가 테이블/권한/외부API를 만들지 않는다. 읽기는만료를앱에서도검사하고토큰원문은저장하지않는다. 잘못된일반요청/키없음/preview는progress저장을하지않는다. 진행 기록은best-effort·짧은별도timeout으로 제한하며 기록/읽기 실패가 모델/세션 저장·응답을 막지 않는다. 생성/기록은실제런타임전이에서만하며최대도구16/모델8/45초·일80요청 한도는 그대로다.
+로컬은메모리, AWS는기존DynamoDB의별도 `progress#sha256(token)` 키와120초TTL을 쓴다. 기존 session version1/lease/budget/엄격상태검증은 변경하지 않는다. 추가 테이블/권한/외부API를 만들지 않는다. 읽기는만료를앱에서도검사하고토큰원문은저장하지않는다. 행에는서버가임의생성한128bit writer소유표식을추가하며같은토큰을재사용한다른writer가덮거나TTL을연장할수없도록조건부기록한다. 소유표식은외부DTO/모델/세션/로그에보내지않는다. 잘못된일반요청/키없음/preview는progress저장을하지않는다. 진행 기록은best-effort·짧은별도timeout으로 제한하며 기록/읽기 실패가 모델/세션 저장·응답을 막지 않는다. 일시적인저장실패는같은제한예산안에서다음실제전이의최신snapshot부터이어가고, 소유권충돌은해당writer의기록을멈춘다. 응답을받지못한최초기록이이미저장됐어도동일소유자만재개할수있다. 생성/기록은실제런타임전이에서만하며최대도구16/모델8/45초·일80요청 한도는 그대로다.
 
 ## UI 상태와 검증
 

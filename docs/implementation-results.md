@@ -211,7 +211,7 @@ QA 서버가 종료된 첫 실행의 마지막 모바일 단계 실패는 전체
 
 선택progressToken과POST진행조회 경로를 추가했다. 고정단계/도구명/상태/순번/시간만 토큰SHA256별 기존DynamoDB·로컬메모리에120초TTL로 보관한다. 원문/query/환자정보/인자/결과/연락처/URL/토큰원문/추론은 추가 저장하지 않는다. 조회는 모델/Secret준비/세션/lease/budget을 실행하지 않고 유효한미등록/만료는200unavailable·잘못된입력400이다. 쓰기는직렬coalescing·개별150ms·총1s·flush200ms 내의best-effort로 제한해 원래45초응답/저장을 막지 않는다. 기존session v1·65초lease·UTC80요청/모델8회·도구16개 한도는 유지한다. 노출 토큰의43자와해시키73자 길이·끝줄바꿈/유니코드줄구분자도검증한다.
 
-| 확인 | 이번 통합본 결과·범위 |
+| 확인 | 첫 네 작업창 통합본 결과·범위 |
 | --- | --- |
 | 전체 단위·서버 | 347/347. 실제HTTP 중간진행, 토큰검증/해시·TTL·DDBfake왕복·cloudpoll Secret/provider/session/budget0·원문미저장·느린/실패진행비차단 포함 |
 | 기존 대화 | 173/173. 171개 기존기능과 history2개, 새읽기동선·접힌상세·입력/고지·모달·취소/재시도 유지 |
@@ -225,6 +225,16 @@ QA 서버가 종료된 첫 실행의 마지막 모바일 단계 실패는 전체
 실제HTML/JS/CSS bytes와source지문을대조한후 PC1440×900·1280×800, 모바일390×844·360×780·390×500·가로768×512를캡처했다. 보충11캡처는자료누락·시각변경/AI거절의실제keylesspreview4건과 확대답변UI fixture2건을구분한다. `.impeccable/review/board/review-captures.json`은같은지문/pass/errors[]이다. 실제스마트폰/마이크·의료진/기관/전화는검증하지 않았다. Impeccable detect는실제실행권한오류126이며자동디자인통과로표시하지않는다.
 
 진행fixture·DDBfake·keylessAPI의통과를실모델/공개DDB성공으로확대하지 않는다. 공개배포뒤 `orchestration/runs/preparation-board-deployed.json`·`preparation-board-live-check.json`·`aws-deployment.json`의같은revision/결과를따르고순서대로검증한다(공개동시처리상한2). ZIP은기존release와최종archive검사의소스지문·포함파일·독립설치결과를따른다. 최종15페이지PDF/센터실기기/실제환자운영과의료·법률검토는별도다.
+
+
+### 3.9.1 공개 진행 정지의 재현과 복구 보완
+
+첫 공개 검사(`8e19143`)는 실제 Sol 요청1건이 HTTP200·25,999ms에 끝났고 도구 이벤트10개를 반환했다. 그러나 유효한 진행조회8개가 모두 sequence1·자료 단계에 머물러 공개 진행 검사는 실패했다. 이 결과를 네 창 진행 성공으로 보고하지 않았다.
+
+저장은 성공했지만 응답이150ms를 넘는 fixture에서 기존 reporter의 영구 중지를 재현했다. 실제 실패 요청의 AWS 지연 원인은 telemetry로 확정하지 않았다. 보완한 writer는 일시 오류 뒤 다음 실제 전이의 최신 snapshot부터 재개한다. 서버 생성128bit writerId·원래TTL·증가sequence의 조건부 기록으로 응답 유실 뒤 동일 실행만 이어 쓰고, 같은토큰·같은TTL을 쓴 다른 실행도 덮어쓰지 못하게 했다. 표식은 내부 행에만 있고 진행DTO·모델·세션·로그에 노출하지 않는다.
+
+동일 실행지문 `c4c6dfbd481f1128b3b61bacbe174926157b81afbe82e7b267cbea589cf21e1d`에서 통합 단위·서버352/352, 대화173/173, 여정·인계222/222, 수동47/47, 네창104/104를 다시 통과했다. 자동규칙51/51와 focused45/45도 통과했고, [독립 정적 검토](reviews/2026-10-31-progress-delivery.md)에서 수정 차단 항목이 없었다. 진행 쓰기가 남은 상태에서 최종 전이를 받는 회귀도 추가했다. 개별I/O150ms·총쓰기1초 예산은 유지하며 flush는 두 쓰기를 기다릴 수 있는325ms로 제한한다. 부모45초 신호·일80요청·도구/모델 한도와 세션 스키마는 바꾸지 않았다. 새로운 실제 모델·DynamoDB 진행 결과는 배포한 revision과 일치하는 `preparation-board-live-check.json`, 공개 preview·화면은 `preparation-board-deployed.json`을 따른다. UI polling은 최종응답에서 멈추고, 검증의 별도 최종조회1회로 짧아 합쳐진 전이와 저장 완료를 확인한다.
+
 
 ## 4. 보존한 이전 검증 이력
 
