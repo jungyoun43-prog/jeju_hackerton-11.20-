@@ -55,6 +55,10 @@ export function validateSchema(value, schema, path = 'arguments') {
     if ((schema.required ?? []).some(key => !Object.hasOwn(value, key))) reject();
     if (schema.minProperties !== undefined && Object.keys(value).length < schema.minProperties) reject();
     for (const [key, item] of Object.entries(value)) if (schema.properties?.[key]) validateSchema(item, schema.properties[key], `${path}.${key}`);
+  } else if (schema.type === 'array') {
+    if (!Array.isArray(value) || value.length < (schema.minItems ?? 0) || value.length > (schema.maxItems ?? 100) || !schema.items) reject();
+    for (let index=0; index<value.length; index++) validateSchema(value[index],schema.items,`${path}[${index}]`);
+    if (schema.uniqueItems && new Set(value.map(item=>JSON.stringify(item))).size!==value.length) reject();
   } else if (schema.type === 'string') {
     if (typeof value !== 'string' || !noControl(value) || value.length > (schema.maxLength ?? 1000) || value.length < (schema.minLength ?? 0)) reject();
     if (schema.pattern && !new RegExp(schema.pattern).test(value)) reject();

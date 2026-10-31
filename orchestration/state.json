@@ -1,6 +1,6 @@
 {
   "baseCommit": "e1e7e44",
-  "updatedAt": "2026-10-31T16:05:37.002057+00:00",
+  "updatedAt": "2026-10-31T16:28:21.334241+00:00",
   "tasks": {
     "ui": {
       "phase": "verified",
@@ -246,11 +246,12 @@
     "journey-backend": {
       "phase": "verified",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-journey-backend",
-      "note": "root통합 단위261/261·대화171/171·수동47/47·여정208/208(실preview14)·규칙44/44, 독립ship/blocker0. 지문 d1881920a45699aa00f683830bb347bed880af15fca2c8ac8efb73184c991185; 실제전화/개인기록·임상/법률은미검증.",
+      "note": "자연형시연요청liveness보완통합. backend264tests,새공공데이터와통합후rootfresh검증예정.",
       "integrationCommits": [
         "04b864d",
         "39d63ac",
-        "7647dda"
+        "7647dda",
+        "e39fe94"
       ]
     },
     "journey-ui": {
@@ -272,6 +273,21 @@
         "585769f",
         "0479e62"
       ]
+    },
+    "public-data-store": {
+      "phase": "assigned",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-public-data-store",
+      "note": "진료준비내부공공데이터계약에따라분리구현예정. 공개데이터/원자료미확보/표본경계보존."
+    },
+    "public-data-adapter": {
+      "phase": "assigned",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-public-data-adapter",
+      "note": "진료준비내부공공데이터계약에따라분리구현예정. 공개데이터/원자료미확보/표본경계보존."
+    },
+    "public-data-tables": {
+      "phase": "assigned",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-public-data-tables",
+      "note": "진료준비내부공공데이터계약에따라분리구현예정. 공개데이터/원자료미확보/표본경계보존."
     }
   },
   "review": {

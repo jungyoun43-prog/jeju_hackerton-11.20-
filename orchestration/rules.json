@@ -389,6 +389,37 @@
       "allow": [
         "scripts/journey-browser-check.mjs"
       ]
+    },
+    {
+      "id": "public-data-store",
+      "branch": "feature/public-data-store",
+      "baseCommit": "e39fe94",
+      "allow": [
+        "app/public-data-skill.js",
+        "app/data/public-data-catalog.json",
+        "scripts/public-data-catalog.mjs",
+        "scripts/public-data-query.mjs",
+        "tests/public-data-skill.test.mjs"
+      ]
+    },
+    {
+      "id": "public-data-adapter",
+      "branch": "feature/public-data-adapter",
+      "baseCommit": "e39fe94",
+      "allow": [
+        "agent/public-data-tools.mjs",
+        "tests/public-data-tools.test.mjs"
+      ]
+    },
+    {
+      "id": "public-data-tables",
+      "branch": "feature/public-data-tables",
+      "baseCommit": "e39fe94",
+      "allow": [
+        "app/message-format.js",
+        "app/conversation.css",
+        "tests/message-format.test.mjs"
+      ]
     }
   ],
   "rules": [
