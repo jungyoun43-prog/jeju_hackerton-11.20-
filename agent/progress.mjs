@@ -23,8 +23,8 @@ const tool = value => value === null || PROGRESS_TOOLS.includes(value);
 const stage = value => PREPARATION_STAGE_IDS.includes(value);
 const integer = (value,min,max) => Number.isSafeInteger(value) && value >= min && value <= max;
 
-export const isProgressToken = value => typeof value === 'string' && TOKEN.test(value);
-export const isProgressKey = value => typeof value === 'string' && KEY.test(value);
+export const isProgressToken = value => typeof value === 'string' && value.length === 43 && TOKEN.test(value);
+export const isProgressKey = value => typeof value === 'string' && value.length === 73 && KEY.test(value);
 export function progressKey(token) {
   requireValue(isProgressToken(token));
   return `progress#${createHash('sha256').update(token,'utf8').digest('hex')}`;

@@ -4,7 +4,7 @@ import { randomBytes } from 'node:crypto';
 import { createAgentService } from '../agent/service.mjs';
 import { createMemorySessionStore } from '../agent/store.mjs';
 import { AGENT_TOOLS, createToolDispatcher } from '../agent/tools.mjs';
-import { createProgressReporter, normalizeProgressSnapshot, progressKey, readProgress, PROGRESS_TOOLS } from '../agent/progress.mjs';
+import { createProgressReporter, normalizeProgressSnapshot, progressKey, readProgress, PROGRESS_TOOLS, isProgressKey } from '../agent/progress.mjs';
 import { validateMessageRequest, validateProgressRequest } from '../agent/validation.mjs';
 
 const token=()=>randomBytes(32).toString('base64url');
@@ -29,6 +29,26 @@ test('선택 progressToken과 조회 DTO를 엄격히 검증하고 preview에는
   const service=createAgentService();
   assert.equal((await post(service,{scenarioId:'aewol-parent-visit',requestId:'progress-preview-fixture',progressToken},'/api/agent/preview')).statusCode,400);
   assert.equal((await service.handleAgentRequest({method:'GET',path:'/api/agent/progress'})).statusCode,405);
+});
+
+test('토큰·해시 키 뒤의 줄바꿈은 일반 요청·진행 조회·저장 키에서 거절한다',async()=>{
+  const progressToken=token(),key=progressKey(progressToken);
+  let reads=0,writes=0,models=0;
+  const store={async readProgress(){reads++;return null;},async writeProgress(){writes++;return true;}};
+  const service=createAgentService({store,provider:{connected:true,model:'fixture',async respond(){models++;throw new Error('실행 금지');}}});
+  assert.equal(isProgressKey(key),true);
+  for(const suffix of ['\n','\r','\r\n','\u2028','\u2029']) {
+    const invalidToken=progressToken+suffix;
+    assert.throws(()=>validateMessageRequest(request({progressToken:invalidToken})),error=>error.code==='INVALID_PROGRESS_TOKEN');
+    assert.throws(()=>validateProgressRequest({progressToken:invalidToken}),error=>error.code==='INVALID_PROGRESS_TOKEN');
+    assert.throws(()=>progressKey(invalidToken));
+    assert.equal(isProgressKey(key+suffix),false);
+    for(const [path,body] of [['/api/agent',request({progressToken:invalidToken})],['/api/agent/progress',{progressToken:invalidToken}]]) {
+      const response=await post(service,body,path);
+      assert.equal(response.statusCode,400);assert.equal(JSON.parse(response.body).error.code,'INVALID_PROGRESS_TOKEN');
+    }
+  }
+  assert.equal(reads,0);assert.equal(writes,0);assert.equal(models,0);
 });
 
 test('고정 도구 allowlist는 현재 모델 도구와 서버 내부 준비 두 종류만 포함한다',()=>{
