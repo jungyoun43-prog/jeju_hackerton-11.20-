@@ -44,7 +44,7 @@ async function defaultStoreFactory(options) {
 }
 
 /**
- * ARN이 없으면 기존 동기 local factory를 그대로 사용한다.
+ * ARN이 없는 로컬 Node에서만 기존 동기 local factory를 사용한다.
  * cloud에서는 store 구성과 exact ARN/account/region 검증 후에만 키를 가져온다.
  * SDK client는 warm 재사용하고 secret/provider promise는 성공 시 캐시·실패 시 제거한다.
  * 비밀값·SDK 오류·환경 전체를 출력하지 않고 process.env를 변경하지 않는다.
@@ -73,6 +73,8 @@ export function createCloudRuntimeGetter({env = process.env,secretsClient,docume
   return async function getRuntime({accountId} = {}) {
     try {
       if (!hasSecretSetting(env)) {
+        // Lambda에서는 plaintext env key + memory store로 cloud gate를 우회하지 않는다.
+        if (accountId !== undefined || env.AWS_LAMBDA_FUNCTION_NAME !== undefined) throw unavailable();
         if (cacheMode !== 'local') {runtimePromise=undefined;cacheKey=undefined;cacheMode='local';}
         if (!runtimePromise) runtimePromise = Promise.resolve().then(() => runtimeFactory({env,fetchImpl,config})).catch(() => {runtimePromise=undefined;throw unavailable();});
         return await runtimePromise;

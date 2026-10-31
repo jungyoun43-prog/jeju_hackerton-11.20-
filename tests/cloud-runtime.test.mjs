@@ -37,7 +37,7 @@ test('ARN이 없으면 기존 local factory를 사용하고 키 없는 API는503
 
 test('local key 구성은 여전히 sync factory 경로와 선택 모델을 유지한다',async()=>{
   let called=0;
-  const getRuntime=createCloudRuntimeGetter({env:{OPENAI_API_KEY:KEY,OPENAI_MODEL:'gpt-6.1-terra'},fetchImpl:async(_url,options)=>{called++;assert.equal(JSON.parse(options.body).model,'gpt-6.1-terra');return Response.json({status:'completed',output:[{type:'message',role:'assistant',content:[{type:'output_text',text:'local fixture'}]}]});}});
+  const getRuntime=createCloudRuntimeGetter({env:{OPENAI_API_KEY:KEY,OPENAI_MODEL:'gpt-6.1-terra',AWS_PROFILE:'fixture-profile',AWS_REGION:'ap-northeast-2'},fetchImpl:async(_url,options)=>{called++;assert.equal(JSON.parse(options.body).model,'gpt-6.1-terra');return Response.json({status:'completed',output:[{type:'message',role:'assistant',content:[{type:'output_text',text:'local fixture'}]}]});}});
   const service=await getRuntime();assert.equal(service.getCapabilities().llm,true);assert.equal(called,0);
   assert.equal((await service.handleAgentRequest(post())).statusCode,200);assert.equal(called,1);
 });
@@ -194,4 +194,37 @@ test('Lambda의 실제 account와 CF env account가 다르면 secret fetch 없�
   const result=await handle(post(),{invokedFunctionArn:'arn:aws:lambda:ap-northeast-2:999999999999:function:fixture-agent'});
   assert.equal(result.statusCode,503);assert.equal(parse(result).error.code,'CLOUD_RUNTIME_UNAVAILABLE');
   assert.equal(f.secretsCalls.length,0);assert.equal(f.storeCalls.length,0);assert.equal(f.modelCalls.length,0);
+});
+
+
+test('Lambda env에서 ARN이 없으면 plaintext key를 읽거나 local factory를 구성하지 않는다',async()=>{
+  let factoryCalls=0,modelCalls=0;
+  const env={AWS_LAMBDA_FUNCTION_NAME:'fixture-agent',AWS_REGION:'ap-northeast-2'};
+  Object.defineProperty(env,'OPENAI_API_KEY',{get(){throw new Error('PRIVATE plaintext key read forbidden');}});
+  const getRuntime=createCloudRuntimeGetter({env,runtimeFactory:()=>{factoryCalls++;throw new Error('local factory forbidden');},fetchImpl:()=>{modelCalls++;throw new Error('paid fetch forbidden');}});
+  await assert.rejects(getRuntime(),safeError);
+  assert.equal(factoryCalls,0);assert.equal(modelCalls,0);
+});
+
+test('Lambda context가 있으면 ARN 누락을503/capsfalse로 처리하고 preview는 유지한다',async()=>{
+  let factoryCalls=0,modelCalls=0;
+  const getRuntime=createCloudRuntimeGetter({env:{OPENAI_API_KEY:KEY,AWS_REGION:'ap-northeast-2'},runtimeFactory:()=>{factoryCalls++;throw new Error('local factory forbidden');},fetchImpl:()=>{modelCalls++;throw new Error('paid fetch forbidden');}});
+  const handle=createCloudAgentRequestHandler({getRuntime});
+  const failure=await handle(post(),COMMAND_CONTEXT);
+  assert.equal(failure.statusCode,503);assert.equal(parse(failure).error.code,'CLOUD_RUNTIME_UNAVAILABLE');
+  const caps=await handle({method:'GET',path:'/api/agent/capabilities'},COMMAND_CONTEXT);
+  assert.equal(caps.statusCode,200);assert.equal(parse(caps).llm,false);
+  const preview=await handle(post({scenarioId:'aewol-parent-visit',requestId},'/api/agent/preview'),COMMAND_CONTEXT);
+  assert.equal(preview.statusCode,200);assert.equal(parse(preview).isPreview,true);
+  assert.equal(factoryCalls,0);assert.equal(modelCalls,0);
+});
+
+test('이미 구성한 local warm cache도 ARN 없는 Lambda 호출에는 재사용하지 않는다',async()=>{
+  let modelCalls=0;
+  const env={OPENAI_API_KEY:KEY,AWS_PROFILE:'fixture-profile',AWS_REGION:'ap-northeast-2'};
+  const getRuntime=createCloudRuntimeGetter({env,fetchImpl:()=>{modelCalls++;throw new Error('paid fetch forbidden');}});
+  const local=await getRuntime();assert.equal(local.getCapabilities().llm,true);
+  await assert.rejects(getRuntime({accountId:ACCOUNT}),safeError);
+  env.AWS_LAMBDA_FUNCTION_NAME='fixture-agent';await assert.rejects(getRuntime(),safeError);
+  assert.equal(modelCalls,0);
 });
