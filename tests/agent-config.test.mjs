@@ -63,13 +63,17 @@ test('실제 서비스 loop가 Responses tool call과 reasoning을 이어주고 
     ]});
     return Response.json(textResponse('합성 사례와 준비 상태를 확인했습니다.'));
   }});
-  const first=await post(service),body=JSON.parse(first.body);
+  const progressToken='p'.repeat(43),first=await post(service,{message,requestId,progressToken}),body=JSON.parse(first.body);
   assert.equal(first.statusCode,200);
   assert.equal(body.events[0].tool,'get_case');
   assert.ok(JSON.stringify(requests[1].input).includes(reasoning));
   assert.ok(requests[1].input.some(item=>item.type==='function_call_output' && item.call_id==='call_fixture_case'));
   assert.equal(first.body.includes(reasoning),false);
   assert.equal(JSON.stringify(store.inspect()).includes(reasoning),false);
+  assert.equal(JSON.stringify(store.inspectProgress()).includes(reasoning),false);
+  assert.equal(JSON.stringify(store.inspectProgress()).includes(progressToken),false);
+  assert.equal(JSON.stringify(requests).includes(progressToken),false);
+  assert.equal(first.body.includes(progressToken),false);
   const second=await post(service,{message,requestId:'config-request-fixture-002',sessionId:body.sessionId});
   assert.equal(second.statusCode,200);
   assert.equal(JSON.stringify(requests[2].input).includes(reasoning),false);
@@ -101,7 +105,7 @@ test('8개 정상 순차 준비 계획도 8번째 호출을 도구 없는 요약
       {id:`fc_${requests.length}`,type:'function_call',call_id:`bounded_${requests.length}`,name,arguments:JSON.stringify(input),status:'completed'},
     ]});
   }});
-  const result = await post(service,{message:'제주우리병원 진료 자료와 택시·동행 준비를 부탁해요.',requestId}),body = JSON.parse(result.body);
+  const result = await post(service,{message:'제주우리병원 진료 자료와 택시·동행 준비를 부탁해요.',requestId,progressToken:'q'.repeat(43)}),body = JSON.parse(result.body);
   assert.equal(result.statusCode,200);
   assert.equal(requests.length,8);
   assert.equal(body.caseState.selectedHospital.companyName,'제주우리병원');
@@ -117,6 +121,9 @@ test('8개 정상 순차 준비 계획도 8번째 호출을 도구 없는 요약
   assert.deepEqual(store.inspect()[0].requestIds,[requestId]);
   assert.equal(JSON.stringify(store.inspect()).includes(reasoning),false);
   assert.equal(result.body.includes(reasoning),false);
+  assert.equal(store.inspectProgress()[0].progress.status,'completed');
+  assert.ok(store.inspectProgress()[0].progress.events.length<=32);
+  assert.equal(JSON.stringify(store.inspectProgress()).includes(reasoning),false);
 });
 
 test('Node env-file 부팅에서 키 한 줄만으로 API가 구성되고 실제 네트워크 없이 응답한다',async t=>{

@@ -3,7 +3,9 @@ import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
 import { createRuntimeAgent } from './config.mjs';
 import { AgentError, isObject } from './errors.mjs';
-import { readBody, validateMessageRequest } from './validation.mjs';
+import { readBody, validateMessageRequest, validateProgressRequest } from './validation.mjs';
+import { createAgentService } from './service.mjs';
+import { PROGRESS_IO_TIMEOUT_MS } from './progress.mjs';
 
 const REGION = 'ap-northeast-2';
 const SDK_CONFIG = Object.freeze({maxAttempts:2,requestHandler:{connectionTimeout:1500,requestTimeout:3000}});
@@ -51,13 +53,45 @@ async function defaultStoreFactory(options) {
  */
 export function createCloudRuntimeGetter({env = process.env,secretsClient,documentClient,storeFactory = defaultStoreFactory,runtimeFactory = createRuntimeAgent,fetchImpl = globalThis.fetch,config = {},expectedAccountId,setupTimeoutMs = 8000} = {}) {
   if (!Number.isSafeInteger(setupTimeoutMs) || setupTimeoutMs < 1 || setupTimeoutMs > 10000 || typeof storeFactory !== 'function' || typeof runtimeFactory !== 'function') throw unavailable();
-  let runtimePromise, cacheKey, cacheMode, secretClient = secretsClient, docClient = documentClient;
+  let runtimePromise, cacheKey, cacheMode, storePromise, storeKey, progressPromise, progressCacheKey, secretClient = secretsClient, docClient = documentClient;
+  function getStore(settings) {
+    const identity=JSON.stringify({region:settings.region,tableName:settings.tableName,accountId:settings.accountId});
+    if(!storePromise || storeKey !== identity) {
+      storeKey=identity;
+      docClient ??= DynamoDBDocumentClient.from(new DynamoDBClient({region:settings.region,...SDK_CONFIG}),{marshallOptions:{removeUndefinedValues:true}});
+      const attempt=Promise.resolve().then(()=>storeFactory({client:docClient,tableName:settings.tableName,region:settings.region})).then(store=>{
+        if(!isObject(store) || store.kind !== 'dynamodb' || STORE_METHODS.some(name=>typeof store[name] !== 'function'))throw unavailable();
+        return store;
+      }).catch(()=>{if(storePromise===attempt){storePromise=undefined;storeKey=undefined;}throw unavailable();});
+      storePromise=attempt;
+    }
+    return storePromise;
+  }
+  async function boundedStore(settings,signal) {
+    const attempt=getStore(settings);
+    try {return await bounded(attempt,signal);}
+    catch(error){if(storePromise===attempt){storePromise=undefined;storeKey=undefined;}throw error;}
+  }
+  function progressRuntime(settings) {
+    const identity=JSON.stringify(settings);
+    if(!progressPromise || progressCacheKey !== identity) {
+      progressCacheKey=identity;
+      const attempt=(async()=>{
+        const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),PROGRESS_IO_TIMEOUT_MS);
+        try {
+          const store=await boundedStore(settings,controller.signal);
+          // 조회 전용 runtime은 secret·유료 provider 구성·세션·lease·budget을 실행하지 않는다.
+          return createAgentService({store,config,progressReadOnly:true});
+        } finally {clearTimeout(timer);controller.abort();}
+      })().catch(()=>{if(progressPromise===attempt){progressPromise=undefined;progressCacheKey=undefined;}throw unavailable();});
+      progressPromise=attempt;
+    }
+    return progressPromise;
+  }
   async function initialize(settings) {
     const controller = new AbortController(),timer = setTimeout(() => controller.abort(),setupTimeoutMs);
     try {
-      docClient ??= DynamoDBDocumentClient.from(new DynamoDBClient({region:settings.region,...SDK_CONFIG}),{marshallOptions:{removeUndefinedValues:true}});
-      const store = await bounded(Promise.resolve().then(() => storeFactory({client:docClient,tableName:settings.tableName,region:settings.region})),controller.signal);
-      if (!isObject(store) || store.kind !== 'dynamodb' || STORE_METHODS.some(name => typeof store[name] !== 'function')) throw unavailable();
+      const store = await boundedStore(settings,controller.signal);
       secretClient ??= new SecretsManagerClient({region:settings.region,...SDK_CONFIG});
       const response = await bounded(Promise.resolve().then(() => secretClient.send(new GetSecretValueCommand({SecretId:settings.arn,VersionStage:'AWSCURRENT'}),{abortSignal:controller.signal})),controller.signal);
       const key = secretKey(response,settings.arn);
@@ -70,16 +104,19 @@ export function createCloudRuntimeGetter({env = process.env,secretsClient,docume
     } catch { throw unavailable(); }
     finally {clearTimeout(timer);controller.abort();}
   }
-  return async function getRuntime({accountId} = {}) {
+  return async function getRuntime({accountId,progressOnly=false} = {}) {
     try {
       if (!hasSecretSetting(env)) {
         // Lambda에서는 plaintext env key + memory store로 cloud gate를 우회하지 않는다.
         if (accountId !== undefined || env.AWS_LAMBDA_FUNCTION_NAME !== undefined) throw unavailable();
+        // 첫 local poll 자체로 provider/env 키를 구성하지 않는다. 진행 중인 local runtime만 읽는다.
+        if(progressOnly)return cacheMode === 'local' && runtimePromise ? await runtimePromise : createAgentService({config});
         if (cacheMode !== 'local') {runtimePromise=undefined;cacheKey=undefined;cacheMode='local';}
         if (!runtimePromise) runtimePromise = Promise.resolve().then(() => runtimeFactory({env,fetchImpl,config})).catch(() => {runtimePromise=undefined;throw unavailable();});
         return await runtimePromise;
       }
       const settings = cloudSettings(env,expectedAccountId,accountId);
+      if(progressOnly)return await progressRuntime(settings);
       const identity = JSON.stringify({...settings,configuration:CONFIG_FIELDS.map(name => env[name] ?? '')});
       if (!runtimePromise || cacheMode !== 'cloud' || cacheKey !== identity) {
         cacheMode='cloud';cacheKey = identity;
@@ -107,21 +144,24 @@ export function createCloudAgentRequestHandler({getRuntime = createCloudRuntimeG
   const fallback = createRuntimeAgent({env:{},config});
   return async function handleRequest(input = {}, lambdaContext = {}) {
     const path = typeof input.path === 'string' ? input.path.split('?')[0] : '/', method = input.method ?? 'GET';
-    if (path !== '/api/agent' && !(path === '/api/agent/capabilities' && method === 'GET')) return fallback.handleAgentRequest(input);
-    if (path === '/api/agent' && method !== 'POST') return fallback.handleAgentRequest(input);
+    const progressOnly=path === '/api/agent/progress';
+    if (path !== '/api/agent' && !progressOnly && !(path === '/api/agent/capabilities' && method === 'GET')) return fallback.handleAgentRequest(input);
+    if ((path === '/api/agent' || progressOnly) && method !== 'POST') return fallback.handleAgentRequest(input);
     let requestId = '';
-    if (path === '/api/agent') {
+    if (path === '/api/agent' || progressOnly) {
       try {
-        requestId = validateMessageRequest(readBody(input.body)).requestId;
+        if(progressOnly)validateProgressRequest(readBody(input.body));
+        else requestId = validateMessageRequest(readBody(input.body)).requestId;
       } catch { return fallback.handleAgentRequest(input); }
       const type = Object.entries(input.headers ?? {}).find(([name]) => name.toLowerCase() === 'content-type')?.[1];
       if (type !== undefined && !/^application\/json(?:;|$)/i.test(String(type))) return fallback.handleAgentRequest(input);
     }
     try {
-      const service = await getRuntime({accountId:lambdaAccount(lambdaContext)});
+      const accountId=lambdaAccount(lambdaContext);
+      const service = await getRuntime(progressOnly?{accountId,progressOnly:true}:{accountId});
       return await service.handleAgentRequest(input);
     } catch {
-      if (path === '/api/agent/capabilities') return fallback.handleAgentRequest(input);
+      if (path === '/api/agent/capabilities' || progressOnly) return fallback.handleAgentRequest(input);
       return errorResponse(requestId,fallback);
     }
   };

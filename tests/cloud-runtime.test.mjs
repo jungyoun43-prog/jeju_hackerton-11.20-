@@ -4,6 +4,7 @@ import { createCloudRuntimeGetter, createCloudAgentRequestHandler } from '../age
 import { createLambdaHandler } from '../agent/handler.mjs';
 import { createMemorySessionStore } from '../agent/store.mjs';
 import { AgentError } from '../agent/errors.mjs';
+import { createProgressReporter, progressKey } from '../agent/progress.mjs';
 
 const ACCOUNT = '123456789012';
 const ARN = `arn:aws:secretsmanager:ap-northeast-2:${ACCOUNT}:secret:fixture/openai-token-Ab12Cd`;
@@ -227,4 +228,71 @@ test('이미 구성한 local warm cache도 ARN 없는 Lambda 호출에는 재사
   await assert.rejects(getRuntime({accountId:ACCOUNT}),safeError);
   env.AWS_LAMBDA_FUNCTION_NAME='fixture-agent';await assert.rejects(getRuntime(),safeError);
   assert.equal(modelCalls,0);
+});
+
+test('cloud 진행 조회는 cold runtime에서도 DynamoDB Get만 수행하고 secret·provider·세션을 구성하지 않는다',async()=>{
+  const calls=[];let secrets=0,factories=0;
+  const getRuntime=createCloudRuntimeGetter({env:{...ENV},documentClient:{async send(command,options){calls.push({command,options});return {};}},
+    secretsClient:{async send(){secrets++;throw new Error('PRIVATE secret forbidden');}},runtimeFactory(){factories++;throw new Error('모델 runtime 구성 금지');}});
+  const handle=createCloudAgentRequestHandler({getRuntime}),progressToken='p'.repeat(43);
+  const result=await handle(post({progressToken},'/api/agent/progress'),COMMAND_CONTEXT);
+  assert.equal(result.statusCode,200);assert.deepEqual(parse(result),{available:false,progress:null});
+  assert.equal(secrets,0);assert.equal(factories,0);assert.equal(calls.length,1);
+  assert.equal(calls[0].command.constructor.name,'GetCommand');
+  assert.deepEqual(calls[0].command.input,{TableName:ENV.SESSION_TABLE_NAME,Key:{pk:progressKey(progressToken)},ConsistentRead:true});
+  assert.ok(calls[0].options.abortSignal instanceof AbortSignal);assert.equal(JSON.stringify(calls[0].command.input).includes(progressToken),false);
+});
+
+test('진행 전용 cloud runtime은 합성 준비 DTO만 읽고 원문·secret 오류를 반환하지 않는다',async()=>{
+  const memory=createMemorySessionStore(),progressToken='u'.repeat(43),reporter=createProgressReporter({store:memory,token:progressToken});
+  reporter.started('request_hospital_contact',{target:'mainland',query:'PRIVATE'});await reporter.flush();
+  const operations=[];
+  const store={kind:'dynamodb',...Object.fromEntries(['loadOrCreate','acquire','release','save','consumeTurn'].map(name=>[name,()=>{throw new Error('core store 접근 금지');}])),
+    async readProgress(...args){operations.push('read');return memory.readProgress(...args);},writeProgress(){throw new Error('poll write 금지');}};
+  const f=fixture({storeFactory:()=>store,secretsClient:{async send(){throw new Error('PRIVATE secret forbidden');}},runtimeFactory(){throw new Error('provider 구성 금지');}});
+  const handle=createCloudAgentRequestHandler({getRuntime:f.getRuntime});
+  const result=await handle(post({progressToken},'/api/agent/progress'),COMMAND_CONTEXT);
+  assert.equal(result.statusCode,200);assert.equal(parse(result).available,true);assert.equal(parse(result).progress.currentStage,'hospitals');
+  assert.deepEqual(operations,['read']);assert.equal(f.modelCalls.length,0);assert.equal(result.body.includes('PRIVATE'),false);assert.equal(result.body.includes(progressToken),false);
+});
+
+test('진행 조회의 잘못된 token·항목·method·content-type은 getter와 DB보다 먼저 거절된다',async()=>{
+  let calls=0;const handle=createCloudAgentRequestHandler({getRuntime:async()=>{calls++;throw new Error('금지');}});
+  const progressToken='v'.repeat(43);
+  for(const [input,status] of [
+    [post({progressToken:'bad'},'/api/agent/progress'),400],[post({progressToken,sessionId:'PRIVATE'},'/api/agent/progress'),400],
+    [post({},'/api/agent/progress'),400],[{method:'GET',path:'/api/agent/progress'},405],
+    [{...post({progressToken},'/api/agent/progress'),headers:{'content-type':'text/plain'}},415],
+  ])assert.equal((await handle(input,COMMAND_CONTEXT)).statusCode,status);
+  assert.equal(calls,0);
+});
+
+test('secret 초기화가 진행 중이어도 별도 poll은 기다리지 않고 DB만 읽는다',async t=>{
+  let releaseSecret,secretEntered;const gate=new Promise(resolve=>{releaseSecret=resolve;}),entered=new Promise(resolve=>{secretEntered=resolve;});
+  t.after(()=>releaseSecret());
+  let secretCalls=0;
+  const f=fixture({secretsClient:{async send(){secretCalls++;secretEntered();await gate;return secret();}}});
+  const handle=createCloudAgentRequestHandler({getRuntime:f.getRuntime});
+  const normal=handle(post(),COMMAND_CONTEXT);await entered;
+  const result=await handle(post({progressToken:'w'.repeat(43)},'/api/agent/progress'),COMMAND_CONTEXT);
+  assert.equal(result.statusCode,200);assert.deepEqual(parse(result),{available:false,progress:null});assert.equal(secretCalls,1);assert.equal(f.modelCalls.length,0);
+  releaseSecret();assert.equal((await normal).statusCode,200);assert.equal(secretCalls,1);assert.equal(f.modelCalls.length,1);
+});
+
+test('진행 store 초기화 timeout은200 unavailable로 끝나고 다음 시도에 다시 구성한다',async()=>{
+  let stores=0,secrets=0,factories=0;
+  const memory={...createMemorySessionStore(),kind:'dynamodb'};
+  const getRuntime=createCloudRuntimeGetter({env:{...ENV},documentClient:{send(){throw new Error('금지');}},storeFactory(){stores++;return stores===1?new Promise(()=>{}):memory;},secretsClient:{async send(){secrets++;throw new Error('금지');}},runtimeFactory(){factories++;throw new Error('금지');}});
+  const handle=createCloudAgentRequestHandler({getRuntime}),input=post({progressToken:'x'.repeat(43)},'/api/agent/progress'),start=performance.now();
+  assert.deepEqual(parse(await handle(input,COMMAND_CONTEXT)),{available:false,progress:null});assert.ok(performance.now()-start<800);
+  assert.deepEqual(parse(await handle(input,COMMAND_CONTEXT)),{available:false,progress:null});assert.equal(stores,2);assert.equal(secrets,0);assert.equal(factories,0);
+});
+
+test('cold local poll·ARN 누락 cloud poll은 env 키나 runtime factory를 읽지 않는다',async()=>{
+  const env={};Object.defineProperty(env,'OPENAI_API_KEY',{get(){throw new Error('PRIVATE key read forbidden');}});
+  let factories=0;
+  const getRuntime=createCloudRuntimeGetter({env,runtimeFactory(){factories++;throw new Error('구성 금지');}});
+  const handle=createCloudAgentRequestHandler({getRuntime}),input=post({progressToken:'y'.repeat(43)},'/api/agent/progress');
+  assert.deepEqual(parse(await handle(input)),{available:false,progress:null});
+  assert.deepEqual(parse(await handle(input,COMMAND_CONTEXT)),{available:false,progress:null});assert.equal(factories,0);
 });

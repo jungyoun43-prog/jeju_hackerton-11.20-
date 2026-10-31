@@ -1,6 +1,7 @@
 import { AgentError, assertKeys, fail, isObject } from './errors.mjs';
 import { JOURNEY_SCENARIOS, CALL_RECOVERY_SCENARIOS } from '../app/care-journey.js';
 import { normalizeCarePreferences } from '../app/care-preferences.js';
+import { isProgressToken } from './progress.mjs';
 
 export const LIMITS = Object.freeze({ bodyBytes: 24576, messageChars: 4000, historyTurns: 8, historyChars: 2000, totalTextChars: 16000 });
 const noControl = value => !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/u.test(value);
@@ -18,10 +19,11 @@ export function validateRequestId(value) {
   return value;
 }
 export function validateMessageRequest(body) {
-  assertKeys(body, ['message', 'sessionId', 'history', 'requestId', 'preferences', 'applyPreferences']);
+  assertKeys(body, ['message', 'sessionId', 'history', 'requestId', 'preferences', 'applyPreferences', 'progressToken']);
   const requestId = validateRequestId(body.requestId);
   fail(typeof body.message === 'string' && body.message.trim().length > 0 && body.message.length <= LIMITS.messageChars && noControl(body.message), 'INVALID_MESSAGE', '요청은 4,000자 이내의 텍스트로 입력해 주세요.');
   if (body.sessionId !== undefined) fail(typeof body.sessionId === 'string' && /^[A-Za-z0-9_-]{43}$/.test(body.sessionId), 'INVALID_SESSION', '세션 식별자 형식을 확인해 주세요.');
+  if (Object.hasOwn(body,'progressToken')) validateProgressToken(body.progressToken);
   const history = body.history ?? [];
   fail(Array.isArray(history) && history.length <= LIMITS.historyTurns, 'INVALID_HISTORY', '대화 이력은 최근 8개까지 보낼 수 있습니다.');
   let chars = body.message.length;
@@ -37,7 +39,15 @@ export function validateMessageRequest(body) {
     catch { throw new AgentError('INVALID_PREFERENCES','공개 택시 문의처와 휠체어·동행 필요 여부를 확인해 주세요.'); }
   }
   if (Object.hasOwn(body,'applyPreferences')) fail(typeof body.applyPreferences === 'boolean' && (body.applyPreferences === false || preferences !== undefined), 'INVALID_PREFERENCES','기본 설정을 적용하려면 올바른 설정을 함께 보내 주세요.');
-  return {message:body.message.trim(),sessionId:body.sessionId,history,requestId,...(preferences ? {preferences} : {}),...(Object.hasOwn(body,'applyPreferences') ? {applyPreferences:body.applyPreferences} : {})};
+  return {message:body.message.trim(),sessionId:body.sessionId,history,requestId,...(preferences ? {preferences} : {}),...(Object.hasOwn(body,'applyPreferences') ? {applyPreferences:body.applyPreferences} : {}),...(Object.hasOwn(body,'progressToken') ? {progressToken:body.progressToken} : {})};
+}
+function validateProgressToken(value) {
+  fail(isProgressToken(value),'INVALID_PROGRESS_TOKEN','진행 조회 식별자 형식을 확인해 주세요.');
+  return value;
+}
+export function validateProgressRequest(body) {
+  assertKeys(body,['progressToken']);
+  return {progressToken:validateProgressToken(body.progressToken)};
 }
 export function validatePreviewRequest(body) {
   assertKeys(body, ['scenarioId', 'requestId']);

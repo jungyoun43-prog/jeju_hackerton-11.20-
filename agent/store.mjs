@@ -1,14 +1,15 @@
 import { randomBytes } from 'node:crypto';
 import { createDemoCase } from '../app/domain.js';
 import { AgentError, fail } from './errors.mjs';
+import { isProgressKey, normalizeProgressSnapshot, PROGRESS_TTL_SECONDS } from './progress.mjs';
 
 /**
  * 저장 허용 대상: 합성 사례의 정규화된 준비 상태, requestId, 횟수, TTL.
  * message/history/model 출력은 저장하지 않는다. 운영 저장소는 같은 인터페이스로 교체한다.
  * 이 메모리 한도는 인스턴스별이며 공개 유료 모델의 전역 quota를 대체하지 않는다.
  */
-export function createMemorySessionStore({ now = () => Date.now(), ttlSeconds = 3600, maxSessions = 200 } = {}) {
-  const sessions = new Map(), budgets = new Map(), busy = new Set();
+export function createMemorySessionStore({ now = () => Date.now(), ttlSeconds = 3600, maxSessions = 200, maxProgress = 200 } = {}) {
+  const sessions = new Map(), budgets = new Map(), busy = new Set(), progress = new Map();
   const clone = value => structuredClone(value);
   const cleanup = () => {
     for (const [id, item] of sessions) if (item.expiresAt <= Math.floor(now() / 1000) && !busy.has(id)) sessions.delete(id);
@@ -44,7 +45,26 @@ export function createMemorySessionStore({ now = () => Date.now(), ttlSeconds = 
       if (used >= limit) throw new AgentError('DAILY_LIMIT', '오늘의 대화 시연 한도에 도달했습니다.', 429);
       budgets.set(day, used + 1);
     },
+    async writeProgress(key,value,{expiresAt,initial=false,signal} = {}) {
+      if(signal?.aborted)return false;
+      const time=Math.floor(now()/1000),snapshot=normalizeProgressSnapshot(value);
+      if(!isProgressKey(key) || !Number.isSafeInteger(expiresAt) || expiresAt <= time || expiresAt > time + PROGRESS_TTL_SECONDS || typeof initial !== 'boolean')throw new TypeError('진행 저장 형식을 확인해 주세요.');
+      for(const [id,item] of progress)if(item.expiresAt <= time)progress.delete(id);
+      const current=progress.get(key);
+      if(initial ? current || progress.size >= maxProgress : !current || current.expiresAt !== expiresAt || current.sequence >= snapshot.sequence)return false;
+      progress.set(key,clone({pk:key,expiresAt,sequence:snapshot.sequence,progress:snapshot}));
+      return true;
+    },
+    async readProgress(key,{signal} = {}) {
+      if(!isProgressKey(key))throw new TypeError('진행 조회 형식을 확인해 주세요.');
+      if(signal?.aborted)return null;
+      const item=progress.get(key);
+      if(!item)return null;
+      if(item.expiresAt <= Math.floor(now()/1000)){progress.delete(key);return null;}
+      return normalizeProgressSnapshot(item.progress);
+    },
     // 검사 전용 읽기. 입력 원문·모델 답변이 남지 않는지 검증한다.
     inspect() { return clone([...sessions.values()]); },
+    inspectProgress() {return clone([...progress.values()]);},
   };
 }

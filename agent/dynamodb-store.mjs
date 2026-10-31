@@ -9,6 +9,7 @@ import { AGENT_TOOLS } from './tools.mjs';
 import hospitalData from '../app/data/hospital-candidates.json' with { type: 'json' };
 import supportData from '../app/data/visit-support-providers.json' with { type: 'json' };
 import { AgentError } from './errors.mjs';
+import { isProgressKey, normalizeProgressSnapshot, PROGRESS_TTL_SECONDS } from './progress.mjs';
 
 const MAX_ITEM_BYTES = 192 * 1024;
 const OPERATION_TIMEOUT_MS = 4000;
@@ -179,6 +180,37 @@ export function createDynamoSessionStore({ client, tableName, region = 'ap-north
   }
   return {
     kind: 'dynamodb',
+    async writeProgress(key,value,{expiresAt,initial=false,...options} = {}) {
+      return safe(async()=>{
+        const time=seconds();
+        requireValue(isProgressKey(key) && Number.isSafeInteger(expiresAt) && expiresAt > time && expiresAt <= time + PROGRESS_TTL_SECONDS && typeof initial === 'boolean');
+        const snapshot=normalizeProgressSnapshot(value);
+        const item={pk:key,expiresAt,sequence:snapshot.sequence,progress:snapshot};
+        try {
+          await send(new PutCommand({TableName:tableName,Item:item,
+            ConditionExpression:initial?'attribute_not_exists(#pk) OR #expires <= :now':'#expires = :expires AND #sequence < :sequence AND #expires > :now',
+            ExpressionAttributeNames:initial?{'#pk':'pk','#expires':'expiresAt'}:{'#expires':'expiresAt','#sequence':'sequence'},
+            ExpressionAttributeValues:initial?{':now':time}:{':expires':expiresAt,':sequence':snapshot.sequence,':now':time},
+          }),options);
+          return true;
+        } catch(error){if(conditional(error))return false;throw error;}
+      });
+    },
+    async readProgress(key,options) {
+      return safe(async()=>{
+        requireValue(isProgressKey(key));
+        const {Item:item} = await send(new GetCommand({TableName:tableName,Key:{pk:key},ConsistentRead:true}),options) ?? {};
+        if(!item)return null;
+        keys(item,['pk','expiresAt','sequence','progress']);
+        requireValue(item.pk === key);
+        integer(item.expiresAt,0,Number.MAX_SAFE_INTEGER);
+        if(item.expiresAt <= seconds())return null;
+        requireValue(item.expiresAt <= seconds() + PROGRESS_TTL_SECONDS);
+        const snapshot=normalizeProgressSnapshot(item.progress);
+        requireValue(item.sequence === snapshot.sequence);
+        return snapshot;
+      });
+    },
     async loadOrCreate(sessionId, options) {
       return safe(async () => {
         if (sessionId !== undefined && sessionId !== null) {

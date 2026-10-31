@@ -6,6 +6,7 @@ import { createToolDispatcher } from '../agent/tools.mjs';
 import { buildFixedPreview } from '../agent/preview.mjs';
 import { getCareJourneySummary } from '../app/care-journey.js';
 import { AgentError } from '../agent/errors.mjs';
+import { createProgressReporter, progressKey, readProgress } from '../agent/progress.mjs';
 
 const tableName = 'test-synthetic-sessions';
 const initialTime = Date.parse('2026-10-31T12:00:00Z');
@@ -75,6 +76,76 @@ function fixture() {
     store: extra => createDynamoSessionStore({ client, tableName, now, ...extra }) };
 }
 async function locked(f) { const store = f.store(), item = await store.loadOrCreate(); await store.acquire(item.sessionId); return { store, item }; }
+
+test('진행 DTO는 별도 해시 키·120초 TTL로 저장되고 다른 인스턴스에서 Get만으로 읽는다',async()=>{
+  const f=fixture(),a=f.store(),progressToken='p'.repeat(43),reporter=createProgressReporter({store:a,token:progressToken,now:f.now});
+  reporter.started('request_records',{source:'demo',query:'PRIVATE_QUERY'});reporter.finished('request_records');reporter.completed();await reporter.flush();
+  const key=progressKey(progressToken),row=f.client.item(key);
+  assert.deepEqual(Object.keys(row).sort(),['pk','expiresAt','sequence','progress'].sort());assert.equal(row.expiresAt,initialTime/1000+120);
+  const b=f.store({client:new FakeDocumentClient(f.client.items)}),before=f.client.calls.length;
+  const value=await b.readProgress(key);assert.equal(value.status,'completed');assert.equal(value.version,1);
+  assert.equal(f.client.calls.length,before);assert.equal(f.client.calls.every(call=>call.input.Item?.pk.startsWith('progress#')),true);
+  assert.equal(JSON.stringify(row).includes(progressToken),false);assert.equal(JSON.stringify(row).includes('PRIVATE_QUERY'),false);
+  const reader=new FakeDocumentClient(f.client.items),readStore=f.store({client:reader});
+  await readStore.readProgress(key);assert.deepEqual(reader.calls.map(call=>call.name),['GetCommand']);assert.equal(reader.calls[0].input.ConsistentRead,true);
+  value.stages[0].status='failed';assert.notEqual((await b.readProgress(key)).stages[0].status,'failed');
+  f.advance(120);assert.equal(await b.readProgress(key),null);assert.ok(f.client.item(key),'DynamoDB TTL 삭제 전에도 앱에서 만료를 적용한다.');
+});
+
+test('진행 저장은 활성 토큰 재사용과 늦은 순번을 거절하고 만료 뒤 새 실행만 허용한다',async()=>{
+  const f=fixture(),store=f.store(),progressToken='q'.repeat(43),key=progressKey(progressToken),reporter=createProgressReporter({store,token:progressToken,now:f.now});
+  reporter.started('get_case');await reporter.flush();
+  const first=f.client.item(key),newer={...first.progress,sequence:2,status:'completed'};
+  assert.equal(await store.writeProgress(key,newer,{expiresAt:first.expiresAt}),true);
+  assert.equal(await store.writeProgress(key,first.progress,{expiresAt:first.expiresAt}),false);
+  assert.equal(await store.writeProgress(key,first.progress,{expiresAt:first.expiresAt,initial:true}),false);
+  assert.equal((await store.readProgress(key)).sequence,2);assert.equal(f.client.item(key).expiresAt,first.expiresAt);
+  f.advance(120);
+  await assert.rejects(store.writeProgress(key,newer,{expiresAt:first.expiresAt}),safeError('SESSION_STATE_INVALID',503));
+  const next=createProgressReporter({store,token:progressToken,now:f.now});next.completed();await next.flush();
+  assert.equal(f.client.item(key).expiresAt,first.expiresAt+120);assert.equal((await store.readProgress(key)).sequence,1);
+});
+
+test('진행의 원문 추가·알 수 없는 도구·raw 키·늘린 TTL은 SDK 호출 전에 거절한다',async()=>{
+  const f=fixture(),store=f.store(),progressToken='r'.repeat(43),key=progressKey(progressToken),reporter=createProgressReporter({store,token:progressToken,now:f.now});
+  reporter.completed();await reporter.flush();const base=f.client.item(key),before=f.client.calls.length;
+  for(const [badKey,progress,options] of [
+    [progressToken,base.progress,{expiresAt:base.expiresAt}],
+    [key,{...base.progress,patient:'PRIVATE'},{expiresAt:base.expiresAt}],
+    [key,{...base.progress,events:[{sequence:1,stage:'plan',tool:'PRIVATE_TOOL',status:'completed'}]},{expiresAt:base.expiresAt}],
+    [key,base.progress,{expiresAt:base.expiresAt+1}],[key,base.progress,{expiresAt:base.expiresAt,initial:'yes'}],
+  ])await assert.rejects(store.writeProgress(badKey,progress,options),error=>error.status===503&&!error.message.includes('PRIVATE'));
+  assert.equal(f.client.calls.length,before);
+  await assert.rejects(store.readProgress(progressToken),safeError('SESSION_STATE_INVALID',503));assert.equal(f.client.calls.length,before);
+});
+
+test('오염된 진행 행·SDK 오류는 unavailable이며 합성 세션과 budget·모델 결과를 바꾸지 않는다',async()=>{
+  const f=fixture(),store=f.store(),progressToken='s'.repeat(43),key=progressKey(progressToken),reporter=createProgressReporter({store,token:progressToken,now:f.now});
+  reporter.completed();await reporter.flush();const original=f.client.item(key);
+  for(const corrupt of [row=>{row.history='PRIVATE';},row=>{row.progress.events[0].result='PRIVATE';},row=>{row.progress.stages[0].lastTool='PRIVATE';},row=>{row.sequence=100;},row=>{row.expiresAt+=3600;}]) {
+    const row=clone(original);corrupt(row);f.client.items.set(f.client.key(tableName,key),row);
+    assert.deepEqual(await readProgress(store,progressToken),{available:false,progress:null});
+  }
+  const liveClient=new FakeDocumentClient();
+  liveClient.beforeSend=({input})=>{if((input.Item??input.Key).pk.startsWith('progress#'))throw new Error('PRIVATE SDK Bearer credential');};
+  const live=createDynamoSessionStore({client:liveClient,tableName});
+  let modelCalls=0;const provider={connected:true,model:'fixture',async respond(){modelCalls++;return {content:[{text:'합성 상태 안내'}],stopReason:'end_turn'};}};
+  const service=createAgentService({store:live,provider});
+  const result=await service.handleAgentRequest({method:'POST',path:'/api/agent',body:{message:'현재 합성 상태를 알려줘.',requestId:'progress-ddb-failure-001',progressToken}});
+  assert.equal(result.statusCode,200);assert.equal(modelCalls,1);assert.equal(result.body.includes('PRIVATE'),false);
+  const resultBody=JSON.parse(result.body);assert.equal((await live.loadOrCreate(resultBody.sessionId)).turns,1);
+  const day=new Date().toISOString().slice(0,10);assert.equal(liveClient.item(`budget#${day}`).used,1);
+});
+
+test('중단된 초기 진행 쓰기가 늦게 끝나도 새 실행의 진행을 덮지 않는다',async()=>{
+  const f=fixture(),store=f.store(),progressToken='t'.repeat(43),key=progressKey(progressToken),reporter=createProgressReporter({store,token:progressToken,now:f.now});
+  reporter.completed();await reporter.flush();const base=f.client.item(key);f.client.items.delete(f.client.key(tableName,key));
+  let finishOld;f.client.beforeSend=({name})=>{if(name==='PutCommand'){f.client.beforeSend=undefined;return new Promise(resolve=>{finishOld=resolve;});}};
+  const controller=new AbortController(),old=store.writeProgress(key,{...base.progress,status:'running'},{expiresAt:base.expiresAt,initial:true,signal:controller.signal});
+  await new Promise(resolve=>setImmediate(resolve));controller.abort();await assert.rejects(old,safeError('AGENT_TIMEOUT',504));
+  assert.equal(await store.writeProgress(key,base.progress,{expiresAt:base.expiresAt,initial:true}),true);
+  finishOld();await new Promise(resolve=>setImmediate(resolve));assert.equal((await store.readProgress(key)).status,'completed');
+});
 
 test('factory는 AWS 호출 없이 client·table·TTL을 검증한다', () => {
   const f = fixture(); assert.equal(f.store().kind, 'dynamodb'); assert.equal(f.client.calls.length, 0);
