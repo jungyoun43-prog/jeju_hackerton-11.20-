@@ -680,3 +680,8 @@ input:not([type=checkbox]), textarea, select { font-size: 13px; min-height: 44px
 .hospital-import-more { border-top: 1px solid var(--line); margin-top: 20px; padding-top: 14px; }
 .hospital-import-more summary { font-size: 13px; font-weight: 650; color: var(--teal); }
 .hospital-import-more .help-text { margin-top: 12px; }
+.hospital-candidate > div { align-items: flex-start; flex-wrap: wrap; }
+.hospital-candidate h3 { flex: 1 1 160px; min-width: 0; line-height: 1.6; overflow-wrap: anywhere; }
+.inquiry-heading > div { flex: 1; min-width: 0; }
+.inquiry-heading h3 { line-height: 1.6; overflow-wrap: anywhere; }
+.inquiry-heading > .badge { flex-shrink: 0; }
