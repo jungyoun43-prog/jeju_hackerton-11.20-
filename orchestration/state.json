@@ -300,26 +300,26 @@
       ]
     },
     "board-ui": {
-      "phase": "integrated",
+      "phase": "verified",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-board-ui",
-      "note": "전용 worktree 커밋 통합. root 최신 projection/backend/UI/QA 결합 후 새 지문 검증 중. 예비검사와 최종통합을 구분한다.",
+      "note": "root통합347/347·대화173/173·여정/인계222/222(실preview14,모델POST0)·수동47/47·네창104/104(6viewport,API200/400+fixture)·규칙51/51. 지문15a7315076aa969ee8866d32d982b8c94ba3076fd78af68f4b43a111c5acdf30. 독립UI/source검토차단0·DESIGN/sidecar1건수정resolved. 실제공개DDB/model·임상/법률은별도.",
       "integrationCommits": [
         "17e4c6c"
       ]
     },
     "board-progress": {
-      "phase": "integrated",
+      "phase": "verified",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-board-progress",
-      "note": "전용 worktree 커밋 통합. root 최신 projection/backend/UI/QA 결합 후 새 지문 검증 중. 예비검사와 최종통합을 구분한다.",
+      "note": "root통합347/347·대화173/173·여정/인계222/222(실preview14,모델POST0)·수동47/47·네창104/104(6viewport,API200/400+fixture)·규칙51/51. 지문15a7315076aa969ee8866d32d982b8c94ba3076fd78af68f4b43a111c5acdf30. 독립UI/source검토차단0·DESIGN/sidecar1건수정resolved. 실제공개DDB/model·임상/법률은별도.",
       "integrationCommits": [
         "32f4436",
         "a067827"
       ]
     },
     "board-qa": {
-      "phase": "integrated",
+      "phase": "verified",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-board-qa",
-      "note": "전용 worktree 커밋 통합. root 최신 projection/backend/UI/QA 결합 후 새 지문 검증 중. 예비검사와 최종통합을 구분한다.",
+      "note": "root통합347/347·대화173/173·여정/인계222/222(실preview14,모델POST0)·수동47/47·네창104/104(6viewport,API200/400+fixture)·규칙51/51. 지문15a7315076aa969ee8866d32d982b8c94ba3076fd78af68f4b43a111c5acdf30. 독립UI/source검토차단0·DESIGN/sidecar1건수정resolved. 실제공개DDB/model·임상/법률은별도.",
       "integrationCommits": [
         "9baabe0",
         "bfbd1d2"

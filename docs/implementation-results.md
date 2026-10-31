@@ -1,6 +1,6 @@
 # MVP 구현·검증 결과 기록
 
-기준일: 2026-10-31 · 현재 범위: 대화 UI·허브 계보3종·OpenAI Sol 공개 AWS 연결·DynamoDB 세션/전역 한도. 최신 통합·공공데이터 검증은3.8절, 진료 연결·실패 인계의 이전 검증은3.7절, 실제 모델·저장은 별도 공개 실행 증거를 따른다. 이전 결과는 해당 버전의 범위를 보존한다.
+기준일: 2026-10-31 · 현재 범위: 대화 UI·허브 계보3종·OpenAI Sol 공개 AWS 연결·DynamoDB 세션/전역 한도. 최신 네 작업창 통합 검증은3.9절, 공공데이터 이전 검증은3.8절, 진료 연결·실패 인계의 이전 검증은3.7절, 실제 모델·저장은 별도 공개 실행 증거를 따른다. 이전 결과는 해당 버전의 범위를 보존한다.
 
 개발 환경은 Linux·Node v22.23.2·npm 10.9.8, 브라우저 QA는 Playwright 1.64.1·Chromium이다. 실행 소스 지문·검사 수·캡처는 검증한 버전의 `orchestration/runs/` 증거를 따른다. 이전 버전의 통과 결과를 새 UI·데이터 버전의 검증으로 대신하지 않는다.
 
@@ -202,6 +202,29 @@ QA 서버가 종료된 첫 실행의 마지막 모바일 단계 실패는 전체
 저장CSV의offline 카탈로그 대조와4종CLI 검색/분석을 키·네트워크 없이 실행했다. 실제 테이블UI fixture는1440×1000·390×844·390×500에서 페이지 가로 넘침0, 표 내부 키보드스크롤·Tab/ShiftTab·출처링크44px이상·본문15px을 확인했다. 합성표 수치·기관을 실제 데이터 결과로 표시하지 않는다. 실제 모델 비교표/후보→초안/원자료없는 시간질문은 별도 공개모델 증거 `public-data-live-check.json`으로 구분한다.
 
 새 통합검사는 `orchestration/runs/latest-eval.json`·`conversation-browser.json`·`browser.json`·`journey-browser.json`·`public-data-browser.json`, 공개는 `care-journey-deployed.json`·위 두 실모델proof·`aws-deployment.json`을 따른다. 원문 query나 세션ID/키/provider reasoning은 실모델proof에 보존하지 않는다. 최종 독립ZIP 설치·검사·빌드는 `release.json`과ZIP 무결성 검사를 따르며 대회 업로드나15페이지PDF완료를 뜻하지 않는다.
+
+## 3.9 입력 하나·네 작업창과 실제 진행 관측
+
+사용자가 지정한2×2 작업창을 UI/진행API/브라우저검사3개 전용worktree에서 구현하고 root의 읽기전용 단계모델과 결합했다. PC는 요청·자료 / 병원·협진 / 이동·동행 / 방문계획·답변을 함께 읽고, 모바일은 네 단계 요약과 한 창을 읽는다. 아래 공통입력 하나를 유지하고 방문상세는 접힌details로 옮겼다.4번 답변은 열때의 읽기복사본으로 확대하며 action/중복id를 제거하고 닫기focus를 복원한다. 직접고른모바일창·초안은 유지하고 새답변을 별도로 알린다.
+
+단계 전환은 실제 provider/tool 이벤트다. 진행기록과 마지막확인 사례를 분리하고 최종응답전에는 사례 사실/준비를 바꾸지 않는다. 결과있음/답변완료를 실제 임상수락·예약·배차완료로 표시하지 않는다. 시각 변경·전화 실패·환자직접확인·AI거절 인계는 각 담당 창에서 기존근거/남은일과 함께 읽는다. timer로 단계나 퍼센트를 만들지 않는다.
+
+선택progressToken과POST진행조회 경로를 추가했다. 고정단계/도구명/상태/순번/시간만 토큰SHA256별 기존DynamoDB·로컬메모리에120초TTL로 보관한다. 원문/query/환자정보/인자/결과/연락처/URL/토큰원문/추론은 추가 저장하지 않는다. 조회는 모델/Secret준비/세션/lease/budget을 실행하지 않고 유효한미등록/만료는200unavailable·잘못된입력400이다. 쓰기는직렬coalescing·개별150ms·총1s·flush200ms 내의best-effort로 제한해 원래45초응답/저장을 막지 않는다. 기존session v1·65초lease·UTC80요청/모델8회·도구16개 한도는 유지한다. 노출 토큰의43자와해시키73자 길이·끝줄바꿈/유니코드줄구분자도검증한다.
+
+| 확인 | 이번 통합본 결과·범위 |
+| --- | --- |
+| 전체 단위·서버 | 347/347. 실제HTTP 중간진행, 토큰검증/해시·TTL·DDBfake왕복·cloudpoll Secret/provider/session/budget0·원문미저장·느린/실패진행비차단 포함 |
+| 기존 대화 | 173/173. 171개 기존기능과 history2개, 새읽기동선·접힌상세·입력/고지·모달·취소/재시도 유지 |
+| 진료 여정·전화 인계 | 222/222. 기본208+4번창 실제답변읽기14. 세여정/전화실패4종×PC/모바일 실제keylesspreview14·일반모델POST0 |
+| 개발용 수동화면 | 47/47 |
+| 새 네 작업창 | 104/104.6viewport·실API진행200unavailable/400·진행순서/최대26/단일inflight·late/token/cancel·실패/빈/완료DTO≠최종답변·표확대/키보드·case불변 fixture |
+| 자동규칙 eval | 51/51. 누적37등록worktree 중 이번3개이며 제품모델/임상Agent37개를뜻하지 않음 |
+| 실행지문 | `15a7315076aa969ee8866d32d982b8c94ba3076fd78af68f4b43a111c5acdf30`; 네 브라우저proof의source/finalhash일치. Lambda빌드통과 |
+| 독립검토·문서 | [첫검토](reviews/2026-10-31-preparation-board.md)는UI/sourceblocker없음·DESIGN/sidecar동기화1fix. 별도documenter가actualCSS와구성/토큰수정후 [verdictpass](reviews/2026-10-31-preparation-board-verdict.md)에서해당1건resolved·ship |
+
+실제HTML/JS/CSS bytes와source지문을대조한후 PC1440×900·1280×800, 모바일390×844·360×780·390×500·가로768×512를캡처했다. 보충11캡처는자료누락·시각변경/AI거절의실제keylesspreview4건과 확대답변UI fixture2건을구분한다. `.impeccable/review/board/review-captures.json`은같은지문/pass/errors[]이다. 실제스마트폰/마이크·의료진/기관/전화는검증하지 않았다. Impeccable detect는실제실행권한오류126이며자동디자인통과로표시하지않는다.
+
+진행fixture·DDBfake·keylessAPI의통과를실모델/공개DDB성공으로확대하지 않는다. 공개배포뒤 `orchestration/runs/preparation-board-deployed.json`·`preparation-board-live-check.json`·`aws-deployment.json`의같은revision/결과를따르고순서대로검증한다(공개동시처리상한2). ZIP은기존release와최종archive검사의소스지문·포함파일·독립설치결과를따른다. 최종15페이지PDF/센터실기기/실제환자운영과의료·법률검토는별도다.
 
 ## 4. 보존한 이전 검증 이력
 

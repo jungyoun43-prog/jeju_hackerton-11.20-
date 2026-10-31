@@ -2,8 +2,13 @@
   "schemaVersion": 1,
   "name": "혼디 · 보호자 진료 준비",
   "mode": "operate",
-  "direction": "제주 배경 위의 대화·현재 진료 연결/다음 행동·확인 후 전송할 입력 예시·단일 방문 요약과 읽기 전용 환자 기록/전화 준비/진료 연결 여정을 갖춘 보호자 작업 공간",
+  "direction": "인물 없는 제주 배경 위 PC2×2 준비 작업창·모바일 선택한 한 창과 단계 요약·아래 공통 텍스트/음성 입력·접힌 방문 상세·읽기 전용 답변 확대와 기록/전화/여정 창을 갖춘 보호자 작업 공간",
   "seedReference": "seed:a25f97f1d883646c",
+  "layoutAuthority": {
+    "contract": "docs/preparation-board-contract.md",
+    "seed": "none (user-pinned)",
+    "scope": "사용자가 선택한 네 작업창 배치. 기존 seedReference는 브랜드 이력으로 보존하며 새 브랜드 seed를 만들지 않음."
+  },
   "colors": {
     "background": "#F4F7F5",
     "navigation": "#FFFFFF",
@@ -11,25 +16,40 @@
     "text": "#233C34",
     "muted": "#5C6E64",
     "primary": "#AD4E2C",
+    "primaryHover": "#8E3D22",
     "secondary": "#285D4D",
-    "border": "#DCE5DE"
+    "border": "#DCE5DE",
+    "paneBorder": "#CEDBD1",
+    "soft": "#EDF4EF",
+    "warning": "#8D4A29",
+    "focus": "#B7643F"
   },
   "typography": {
     "display": "MaruBuri",
     "body": "Pretendard, Apple SD Gothic Neo, Malgun Gothic, sans-serif",
-    "desktopTitlePx": 27,
-    "mobileTitlePx": 23,
+    "desktopTitlePx": 24,
+    "mobileTitlePx": 21,
+    "paneTitlePx": 15,
+    "paneTitleWeight": 650,
+    "paneStatusPx": 14,
+    "paneSummaryPx": 14,
     "metadataMinimumPx": 13,
     "descriptiveTextPx": 15,
+    "answerLineHeight": 1.8,
+    "factsLineHeight": 1.7,
+    "answerMaxWidth": "72ch",
     "mobileInputPx": 16,
     "importantNoticePx": 14
   },
   "shape": {
-    "surfaceRadiusPx": 14,
+    "surfaceRadiusPx": 12,
     "buttonRadiusPx": 7,
-    "badgeRadiusPx": 2,
-    "visitPanelRadiusPx": 16,
-    "composerRadiusPx": 12
+    "badgeRadiusPx": 5,
+    "visitPanelRadiusPx": 12,
+    "composerRadiusPx": 12,
+    "mobileComposerRadiusPx": 10,
+    "dialogRadiusPx": 16,
+    "smallDialogRadiusPx": 13
   },
   "assets": {
     "logo": "/assets/hondi-logo-v1.png",
@@ -39,6 +59,7 @@
   },
   "viewports": [
     "1440x900",
+    "1280x800",
     "390x844",
     "360x780",
     "768x1024",
@@ -53,7 +74,7 @@
     "공개 기관의 지도 검색에 임의 좌표 사용 금지",
     "이번 방문1건의 이동·동행 준비와 반복방문 예산 가정을 구분",
     "보호자 자유 요청을 기본 진행 방식으로 사용하고 수동 분기 선택 폼을 첫 화면에 두지 않음",
-    "처리 이력은 API events만 표시하고 대기 중 가짜 통화·조회 진행을 생성하지 않음",
+    "최종 처리 이력은 API events, 대기 중 진행은 실제 관측한 고정 메타데이터로 구분하고 가짜 시각·퍼센트·통화·조회 진행을 생성하지 않음",
     "고정 합성 대화 미리보기와 실제 모델 API 요청을 명시적으로 구분",
     "모델 미연결·음성 미지원·API 오류를 표시하고 입력을 보존",
     "브라우저 음성 인식으로 전사한 요청도 같은 API 클라이언트로 전송",
@@ -63,18 +84,26 @@
     "음성은 인식 후 사용자가 확인·수정하고 보내며 실제 발신이 아님",
     "모바일 서랍의 포커스·Escape·복귀와 실제 작성 내용의 초기화 확인을 제공",
     "사용자 후속 요청에 따라 인물 사진·caption을 제거하고 바다·현무암 배경을 작업면에 은은하게 사용",
-    "우측 전체 방문 요약은 하나의 흰 패널과 soft shadow로 구분하고 모바일은 정상 흐름 유지",
+    "PC는 네 창을 같은 두 열·두 행으로 표시하고 4번에 대화/답변을 보존하며 별도 다섯 번째 채팅창을 만들지 않음",
+    "모바일은 네 단계 상태와 선택한 한 창을 표시하며 직접 선택한 창은 보존하고 다른 창의 새 답변은 알림으로 안내",
+    "이번 방문 상세는 공통입력/고지 아래 접힌 details이며 내부 흰 면은 정적 위치·얇은 경계·그림자 없음",
+    "창 선택은 읽기 동작이며 모델·전화·예약을 실행하거나 포커스를 자동 이동하지 않음",
+    "확대 답변은 열 때의 대화 복사본에서 버튼/id를 제거하고 닫기/Escape 뒤 연 버튼으로 포커스 복귀",
+    "결과 있음과 응답 완료는 환자의 준비완료·임상 수락·예약·배차 확정이 아님",
     "환자 정보·건강 기록은 현재 합성 상태의 읽기 전용 dialog이며 열기만으로 조회·인증하지 않음",
     "건강정보 고속도로는 특정 connector 미구현으로 항상 미연결·불러온 기록 없음이며 generic healthRecords와 구분",
     "예시는 보이는 문장만 초안으로 채우고 날짜·시각 추가/자동 POST 없이 확인 후 전송",
     "짧은 높이·긴 입력·큰 글자에서 강제 대화 높이를 풀어 문서 스크롤로 입력/전송/고지 접근",
     "일반 요청·미리보기 응답 대기 중지와 원문 보존을 제공하고 서버/실제발신 중단과 구분",
     "요청 토큰·대화 버전으로 늦은 응답/오류/finally가 새 초안과 대화를 덮지 않게 보호",
-    "실패 재시도는 원래 본문·ID·설정 snapshot을 유지하며 첫응답전 재실행 한계를 고지",
+    "실패 재시도는 원문·history·requestId·세션·설정 snapshot의 업무 본문을 유지하며 progressToken은 HTTP 시도마다 새로 만들 수 있고 첫응답전 재실행 한계를 고지",
+    "진행 중 창의 사실/상태는 마지막 확인 사례를 유지하고 유효한 running 진행만 경계와 활동 행을 강조",
+    "진행 조회 실패는 실제 응답을 막지 않으며 polling은 모델·세션 생성·budget·위임을 수행하지 않음",
+    "진행 저장은 토큰 SHA256 해시 키·고정 enum 메타데이터·120초TTL뿐이며 원문/query/환자·연락처/인자·실제결과/출처URL/토큰원문/추론을 저장하지 않음",
     "전화·협진 준비는 공통 call-policy 기반 네 대상의 읽기 전용 thin details",
     "최소 전달 항목은 허용 범위를 더 확인할 내용이며 실제 위임/인증/기록 처리 완료로 표시하지 않음",
     "전화 계획 초안 버튼은 현재 초안 보호 후 입력만 채우고 발신/예약/배차를 확정하지 않음",
-    "진료 연결 여정은 공유 summary의 현재 상태·다음 행동을 대화 앞 얇은 행으로 보여 주며 새 필수 입력 단계를 만들지 않음",
+    "진료 연결 여정은 공유 summary의 현재 상태·다음 행동을 4번 대화 앞 얇은 행으로 보여 주며 새 필수 입력 단계를 만들지 않음",
     "도내 전환·부분 제주 진행·도외 유지는 의료진 근거 전 모두 미확인이며 접수 거절을 임상 판단으로 바꾸지 않음",
     "여정 할 일은 담당·의존 조건·원문 발췌·작성일·확인 여부를 보존하며 합성 전화 응답과 실제 처리를 구분",
     "일정·지역·기관·휠체어 조건 변경의 이유와 이동·동행 재확인을 표시하고 이전 가능 응답을 실제 예약으로 유지하지 않음",
@@ -85,25 +114,79 @@
     "별도 네 실패 상황은 전화 준비 창의 접힌 예시에서만 합성 preview로 실행하고 인계 초안은 noPOST·현재초안 보호를 공유"
   ],
   "spacing": {
-    "workspaceGapPx": 25,
-    "mainTopPx": 26,
-    "desktopRailPx": 240
+    "workspaceGapPx": 12,
+    "mainTopPx": 18,
+    "workspacePadding": "18px 24px 24px",
+    "paneHeaderPadding": "7px 14px 4px",
+    "paneBodyPadding": "10px 14px 14px",
+    "promptMarginTopPx": 9,
+    "composerMarginTopPx": 8,
+    "desktopRailPx": 240,
+    "narrowDesktopRailPx": 230
+  },
+  "elevation": {
+    "preparationPane": "none",
+    "visitDetails": "none",
+    "dialog": "0 20px 64px rgba(16,39,29,.25)",
+    "dialogBackdrop": "rgba(19,40,30,.47)"
+  },
+  "focus": {
+    "controls": "3px solid #b7643f; outline-offset:3px",
+    "paneBody": "2px solid var(--secondary); outline-offset:-3px",
+    "composer": "border-color:#4c795c; outline:2px solid #dfebe0; outline-offset:1px"
+  },
+  "motion": {
+    "controlTransition": "background-color 150ms ease, color 150ms ease, border-color 150ms ease",
+    "drawerTransition": "transform 220ms cubic-bezier(.16,1,.3,1), visibility 220ms",
+    "pendingIndicator": "working 1.1s linear infinite",
+    "reducedMotion": "transition:none; animation:none; scroll-behavior:auto"
+  },
+  "responsive": {
+    "railNarrowMaxWidthPx": 1150,
+    "railDrawerMaxWidthPx": 1050,
+    "singlePaneMaxWidthPx": 900,
+    "smallDialogAndComposerMaxWidthPx": 600,
+    "shortViewportMaxHeightPx": 720,
+    "desktopBoard": {
+      "columns": "repeat(2,minmax(0,1fr))",
+      "rows": "repeat(2,minmax(0,1fr))",
+      "gap": "12px",
+      "height": "calc(100dvh - 490px)",
+      "minHeight": "330px",
+      "maxHeight": "540px"
+    },
+    "shortDesktopBoardHeight": "360px",
+    "mobileBoardHeight": "clamp(162px,calc(100dvh - 624px),210px)",
+    "mobileBoardMinHeight": "162px",
+    "expandedReadingTrigger": "입력 또는 보이는 창 제목의 계산 font-size가24px 이상",
+    "expandedReading": "창 높이 auto; 본문 min-height:140px; max-height:420px; overflow-y:auto",
+    "answerDialogWidth": "min(1050px,calc(100vw - 48px))",
+    "mobileAnswerDialogWidth": "calc(100vw - 24px)",
+    "textareaMaxHeight": "160px",
+    "tableMinWidth": "32rem"
   },
   "composition": {
     "conversation": [
       "caregiver-case-and-optional-preferences-rail",
       "compact-case-heading",
-      "short-welcome-without-person-imagery",
-      "compact-current-care-pathway-and-next-action-in-conversation-scroll",
-      "scrolling-conversation",
-      "request-examples-directly-above-composer",
-      "caregiver-text-or-reviewed-browser-voice",
-      "formatted-assistant-answer-with-collapsed-api-events",
-      "single-white-visit-panel-with-thin-preparation-rows",
+      "four-task-panes-in-user-selected-desktop-two-by-two-grid",
+      "records-and-hospitals-above-support-and-plan",
+      "compact-current-care-pathway-and-next-action-in-fourth-pane",
+      "scrolling-conversation-and-formatted-answer-only-in-fourth-pane",
+      "actual-observed-progress-separate-from-last-confirmed-case-facts",
+      "request-examples-directly-above-single-common-composer",
+      "common-text-or-reviewed-browser-voice-and-always-reachable-disclosure",
+      "collapsed-visit-details-below-common-input-and-notices",
+      "read-only-answer-dialog-snapshot-without-action-buttons",
       "read-only-patient-records-dialog-with-explicit-unconnected-service",
       "read-only-call-and-collaboration-plan-dialog-with-four-collapsed-targets",
       "read-only-care-journey-dialog-with-evidence-dependent-tasks-and-three-explicit-synthetic-scenarios",
       "conditional-call-failure-handoffs-and-collapsed-four-recovery-examples"
+    ],
+    "mobile": [
+      "four-stage-status-navigation-and-one-selected-pane",
+      "manual-selection-preserved-with-new-answer-notice",
+      "single-common-composer-and-document-scroll-to-disclosure"
     ],
     "preview": [
       "explicit-fixed-scenario-action",
@@ -112,6 +195,23 @@
       "explicit-missing-record-jeju-unavailable-time-changed-scenarios-with-existing-preview-preserved"
     ],
     "developmentWorkspace": "/workspace.html"
+  },
+  "progress": {
+    "stateSource": "app/preparation-stages.js:getPreparationBoard",
+    "caseStatuses": ["waiting", "available", "needs_input", "needs_recheck", "not_needed"],
+    "caseAvailableMeaning": "자료/답변 존재. 환자 준비완료를 뜻하지 않음.",
+    "pollIntervalMinimumMs": 2500,
+    "pollConcurrency": 1,
+    "pollMaximum": 26,
+    "previewPolling": false,
+    "storage": "memory or existing DynamoDB progress#sha256(token), fixed enum metadata, TTL120s",
+    "failureBehavior": "마지막 확인 사실을 유지하고 실제 응답은 계속 기다림"
+  },
+  "evidence": {
+    "checkedOn": "2026-10-31",
+    "sources": ["app/conversation.css", "app/conversation.js", "app/preparation-board-view.js", "app/preparation-stages.js"],
+    "captures": ".impeccable/review/board/: six initial viewports, time_changed, call_ai_declined, desktop/mobile answer-table, desktop-progress-final",
+    "limits": "보관 캡처와 소스 대조. context/detect CLI 오류126. 이 문서 작업에서 자동 디자인 검사·실모델·DynamoDB·공개 배포·전화·공단 연계를 검증하지 않음."
   },
   "references": {
     "observedOn": "2026-10-31",
