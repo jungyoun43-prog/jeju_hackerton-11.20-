@@ -5,7 +5,7 @@ import { DEFAULT_CARE_PREFERENCES, normalizeCarePreferences, getTaxiPreferenceOp
 import { formatMessage } from './message-format.js';
 import { buildCallPlan, CALL_TARGETS } from './call-policy.js';
 import { getCareJourneySummary, JOURNEY_SCENARIOS, CALL_RECOVERY_SCENARIOS } from './care-journey.js';
-import { PREPARATION_STAGE_IDS, getPreparationBoard, normalizePreparationProgress } from './preparation-stages.js';
+import { getPreparationBoard, normalizePreparationProgress } from './preparation-stages.js';
 import { preparationBoardMarkup, renderPreparationBoard } from './preparation-board-view.js';
 
 const API = '/api/agent';
@@ -61,21 +61,18 @@ function renderBoard() {
   const board=getPreparationBoard(caseState,{events:latestEvents,progress,pending,responseCount,requestProblem});
   if(!manualStageSelection)selectedStageId=board.activeStageId;
   document.getElementById('care-journey-summary').hidden=responseCount===0;
-  renderPreparationBoard(board,{selectedStageId,unreadAnswer,progress});
+  renderPreparationBoard(board,{unreadAnswer,progress});
 }
 
-function openStage(id,{manual=true}={}) {
-  if(!PREPARATION_STAGE_IDS.includes(id))return;
-  selectedStageId=id;
-  if(manual)manualStageSelection=true;
-  if(id==='plan')unreadAnswer=false;
-  renderBoard();
-  if(id==='plan')scrollToMessage(document.querySelector('#message-list .message.assistant:last-child'));
-  else {
-    const section=document.getElementById(`stage-${id}`);
-    section.focus({preventScroll:true});
-    section.scrollIntoView({block:'start',behavior:'instant'});
-  }
+function showLatestAnswer() {
+  selectedStageId='plan';manualStageSelection=true;unreadAnswer=false;renderBoard();
+  scrollToMessage(document.querySelector('#message-list .message.assistant:last-child'));
+}
+
+function focusRequest() {
+  manualStageSelection=false;selectedStageId='plan';unreadAnswer=false;renderBoard();
+  const input=document.getElementById('request-input');
+  input.focus({preventScroll:true});input.scrollIntoView({block:'center',behavior:'instant'});
 }
 
 function markAnswerReady() {
@@ -283,6 +280,8 @@ function renderCareJourney() {
   document.getElementById('care-journey-current').textContent=journey?.pathway?.label || '진료 연결 미확인';
   const next=journey?.nextActions?.[0];
   document.getElementById('care-journey-next').textContent=next?.title || '대화에서 필요한 준비를 확인해 주세요.';
+  const nextButton=document.getElementById('next-request-draft');
+  nextButton.hidden=!next?.requestDraft;nextButton.disabled=pending || Boolean(activeRecognition);
   if(!journey){host.innerHTML='<p class="journey-note">진료 여정을 읽지 못했어요. 현재 대화는 유지됩니다. 대화에서 준비 상태를 다시 확인해 주세요.</p>';return;}
   const openItems=new Set([...host.querySelectorAll('details[data-journey-task][open],details[data-journey-data][open]')].map(node=>node.dataset.journeyTask || node.dataset.journeyData));
   const focused=document.activeElement;
@@ -393,7 +392,7 @@ function updateCapabilities(next) {
   const notice = document.getElementById('mode-notice');
   notice.hidden = !previewMode && capabilities.llm === true;
   notice.classList.toggle('is-preview',previewMode);
-  notice.textContent = previewMode ? '작성된 예시 · 환자·회신은 합성, LLM·실제 발신 없음' : capabilityState === 'checking' ? '연결 범위를 확인하고 있어요.' : 'AI 모델 미연결 · ‘대화 흐름 미리보기’로 준비 과정을 볼 수 있어요.';
+  notice.textContent = previewMode ? '작성된 예시 · 환자·회신은 합성, LLM·실제 발신 없음' : capabilityState === 'checking' ? '연결 범위를 확인하고 있어요.' : 'AI 모델 미연결 · ‘예시 보기’로 준비 과정을 볼 수 있어요.';
 }
 
 function renderSnapshot() {
@@ -445,24 +444,19 @@ function appendMessage({role,text,id=makeId(),events=[],greeting=false,isExample
   const node = document.createElement('article');
   node.className = `message ${role} ${greeting?'greeting':''}`;
   node.dataset.messageId = id;
-  const body=greeting?`<div class="welcome-content"><h2>이번 진료에 필요한 일,<br>편하게 말씀해 주세요.</h2><div class="welcome-copy">${formatMessage(text)}</div></div>`:formatMessage(text);
+  if(role==='user')document.querySelector('#message-list .greeting')?.remove();
+  const body=greeting?`<div class="welcome-content">${formatMessage(text)}</div>`:formatMessage(text);
   node.innerHTML = `<div class="message-meta">${role==='assistant'?'<img src="/assets/hondi-mark-v1.png" alt="" width="23" height="23"/>':''}<strong>${role==='user'?'보호자':'혼디'}</strong>${isExample?'<span class="example-label">작성된 예시</span>':greeting?'':`<time>${escape(timeLabel(new Date()))}</time>`}</div><div class="message-body">${body}</div>${eventsMarkup(events)}`;
   document.getElementById('message-list').append(node);
   return node;
 }
 
-function scrollToLatest() {
-  const request=activeRequest;
-  requestAnimationFrame(()=>{
-    if(request && activeRequest!==request)return;
-    document.querySelector('#message-list .message:last-child')?.scrollIntoView({block:'start',behavior:'instant'});
-  });
-}
 
 function scrollToMessage(node) {
   if(!node)return;
   requestAnimationFrame(()=>{
     if(!node.isConnected)return;
+    node.setAttribute('tabindex','-1');node.focus({preventScroll:true});
     node.scrollIntoView({block:'start',behavior:'instant'});
   });
 }
@@ -473,7 +467,7 @@ function resizeInput() {
   input.style.height = `${Math.min(input.scrollHeight,160)}px`;
   document.getElementById('send-request').disabled = pending || Boolean(activeRecognition) || !input.value.trim();
   document.getElementById('character-count').textContent = `${input.value.length}/${MAX_MESSAGE}`;
-  for(const button of document.querySelectorAll('[data-contact-draft],[data-journey-draft],[data-journey-scenario],[data-call-recovery-scenario]'))button.disabled=pending || Boolean(activeRecognition);
+  for(const button of document.querySelectorAll('[data-contact-draft],[data-journey-draft],[data-journey-scenario],[data-call-recovery-scenario],#next-request-draft'))button.disabled=pending || Boolean(activeRecognition);
 }
 
 function fillRequestDraft(text,{source='요청 예시',focus=true}={}) {
@@ -499,9 +493,9 @@ function setPending(value) {
   document.getElementById('conversation-form').setAttribute('aria-busy',String(value));
   document.getElementById('send-request').setAttribute('aria-label',value?'요청 응답을 기다리는 중':'요청 보내기');
   for (const button of document.querySelectorAll('[data-example]')) button.disabled=value;
-  for (const button of document.querySelectorAll('[data-contact-draft],[data-journey-draft],[data-journey-scenario],[data-call-recovery-scenario]')) button.disabled=value || Boolean(activeRecognition);
+  for (const button of document.querySelectorAll('[data-contact-draft],[data-journey-draft],[data-journey-scenario],[data-call-recovery-scenario],#next-request-draft')) button.disabled=value || Boolean(activeRecognition);
   renderBoard();
-  if (value) scrollToLatest();
+  if(value){const cancel=document.getElementById('cancel-request');cancel.focus({preventScroll:true});document.getElementById('pending-message').scrollIntoView({block:'nearest',behavior:'instant'});}
 }
 
 function requestIsCurrent(request) {
@@ -522,7 +516,7 @@ function finishRequest(request) {
   stopProgress(request);
   if(!requestIsCurrent(request))return false;
   activeRequest=undefined;setPending(false);
-  if(request.kind==='preview')document.getElementById('preview-button').textContent='대화 흐름 미리보기';
+  if(request.kind==='preview')document.getElementById('preview-button').textContent='예시 보기';
   return true;
 }
 
@@ -705,6 +699,7 @@ async function sendRequest(text,retryId) {
   const coreBody=failed ? {...failed.body} : {message:text,...(sessionId?{sessionId}:{}),history:normalizeHistory(history),requestId,preferences:{...carePreferences},applyPreferences:preferencesNeedApply};
   delete coreBody.progressToken;
   const requestBody={...coreBody,...(capabilities.progress==='poll' && capabilities.llm===true?{progressToken:makeProgressToken()}: {})};
+  manualStageSelection=false;
   let messageNode,replyNode;
   if (retryId) {
     messageNode=document.querySelector(`[data-message-id="${requestId}"]`);
@@ -735,8 +730,7 @@ async function sendRequest(text,retryId) {
     updateCapabilities(/MODEL_NOT_CONFIGURED|MODEL_DISABLED|LLM_NOT_CONFIGURED|MODEL_NOT_CONNECTED/.test(code)?{llm:false}:undefined);
   } finally {
     if(finishRequest(request)) {
-      scrollToMessage(replyNode || messageNode);
-      if (window.matchMedia('(min-width:961px)').matches)input.focus({preventScroll:true});
+      if(!replyNode || !manualStageSelection || selectedStageId==='plan')scrollToMessage(replyNode || messageNode);
     }
   }
 }
@@ -820,12 +814,12 @@ function saveReport() {
 }
 
 function welcomeMessage() {
-  appendMessage({role:'assistant',greeting:true,text:'제주 진찰과 기존 도외 주치의 검토를 이어갈 자료·이동·동행 준비를 도와드려요.'});
+  appendMessage({role:'assistant',greeting:true,text:'요청하시면 확인한 내용과 남은 일을 이곳에 정리해 드려요.'});
 }
 
 function mount() {
   const brand=`<img src="/assets/hondi-logo-v1.png" alt="" width="480" height="168"/>`;
-  const planContent=`<div class="conversation-scroll stage-pane-body" id="conversation-scroll" aria-label="방문 계획과 준비 대화"><section class="care-journey-summary" id="care-journey-summary" aria-label="현재 진료 연결과 다음 행동"><div class="journey-summary-state"><h3>현재</h3><strong id="care-journey-current">미확인</strong></div><button type="button" id="open-care-journey" aria-haspopup="dialog" aria-controls="care-journey-dialog">여정·할 일 보기${icon('chevron')}</button><p class="journey-summary-next"><span>다음</span><strong id="care-journey-next"></strong></p></section><div class="message-list" id="message-list" role="log" aria-label="진료 준비 대화" aria-live="polite" aria-relevant="additions"></div><details class="stage-log" data-stage-log hidden><summary><span data-stage-log-label>처리 기록</span>${icon('chevron')}</summary><div data-stage-events></div></details></div>`;
+  const planContent=`<div class="conversation-scroll stage-pane-body" id="conversation-scroll" aria-label="방문 계획과 준비 대화"><div class="message-list" id="message-list" role="log" aria-label="진료 준비 대화" aria-live="polite" aria-relevant="additions"></div><section class="care-journey-summary" id="care-journey-summary" aria-label="현재 진료 연결과 다음 행동"><div class="journey-summary-state"><h3>현재</h3><strong id="care-journey-current">미확인</strong></div><button type="button" id="open-care-journey" aria-haspopup="dialog" aria-controls="care-journey-dialog">여정·할 일 보기${icon('chevron')}</button><p class="journey-summary-next"><span>이어서 할 일</span><strong id="care-journey-next"></strong></p><button type="button" class="next-request-draft" id="next-request-draft" hidden>다음 문의 초안 넣기${icon('arrow')}</button><p class="next-request-note">초안을 확인·수정한 뒤 직접 보내세요.</p></section><details class="stage-log" data-stage-log hidden><summary><span data-stage-log-label>처리 기록</span>${icon('chevron')}</summary><div data-stage-events></div></details></div>`;
   const menuIcon='<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>';
   document.getElementById('app').innerHTML=`
     <div class="app-shell">
@@ -872,11 +866,8 @@ function mount() {
           <div class="mobile-case-summary" id="mobile-case-summary" aria-label="이번 방문 요약" hidden></div>
           <div class="conversation-layout">
             <section class="chat-workspace" aria-labelledby="conversation-title">
-              <div class="chat-toolbar"><h2 id="conversation-title">진료 준비</h2><button type="button" id="preview-button" class="preview-button">대화 흐름 미리보기${icon('chevron')}</button></div>
+              <div class="chat-toolbar"><h2 id="conversation-title">어떤 준비가 필요하세요?</h2><button type="button" id="preview-button" class="preview-button">예시 보기${icon('chevron')}</button></div>
               <p class="mode-notice" id="mode-notice">연결 범위를 확인하고 있어요.</p>
-              <p class="board-activity" id="board-activity" role="status" aria-live="polite"></p>
-              ${preparationBoardMarkup(planContent)}
-              <div class="pending-message" id="pending-message" hidden><div class="pending-summary"><span class="working-mark"></span><p role="status">요청 응답을 기다리고 있어요.</p></div><button type="button" id="cancel-request" class="cancel-request">응답 대기 중지</button><p class="pending-note">이 화면의 대기만 중지해요. 서버 처리는 계속될 수 있습니다.</p></div>
               <div class="starter-prompts" id="starter-prompts"><p>이렇게 요청해 보세요</p>
                   <button type="button" data-example="저는 동행이 어려워요. 자료와 이동도 준비해 주세요."><span>저는 동행이 어려워요.<br> 자료와 이동도 준비해 주세요.</span>${icon('arrow')}</button>
                   <button type="button" class="secondary-prompt" data-example="어머니가 휠체어를 이용하세요. 무엇을 확인해야 할까요?"><span>어머니가 휠체어를 이용하세요.<br> 무엇을 확인해야 할까요?</span>${icon('arrow')}</button>
@@ -888,6 +879,9 @@ function mount() {
                 <p class="voice-help" id="voice-help" role="status">${SpeechRecognition?'음성은 인식한 내용을 확인한 뒤 보내요.':'음성 미지원 브라우저예요. 텍스트로 요청해 주세요.'}</p>
               </form>
               <div class="composer-notes"><p class="composer-disclosure" id="composer-disclosure">${icon('info')}가상 사례 · 실제 연락·예약 없음</p><p class="privacy-note" id="privacy-note">주민번호·인증정보·실제 의료기록 입력 금지 · 대화는 새로고침하면 사라져요.</p></div>
+              <div class="pending-message" id="pending-message" hidden><div class="pending-summary"><span class="working-mark"></span><p class="board-activity" id="board-activity" role="status" aria-live="polite"></p></div><button type="button" id="cancel-request" class="cancel-request">응답 대기 중지</button><p class="pending-note">이 화면의 대기만 중지해요. 서버 처리는 계속될 수 있습니다.</p></div>
+              ${preparationBoardMarkup(planContent)}
+
             </section>
             <details class="visit-summary" id="visit-summary"><summary><span>${icon('calendar')}이번 방문 상세</span><span>일정·준비 상태·출처</span>${icon('chevron')}</summary>
             <aside class="case-sidebar" aria-label="대화에서 준비한 내용">
@@ -937,8 +931,10 @@ function mount() {
   document.getElementById('new-conversation').addEventListener('click',()=>resetConversation());
   document.getElementById('preview-button').addEventListener('click',()=>showPreview());
   document.getElementById('save-report').addEventListener('click',saveReport);
-  document.getElementById('stage-navigation').addEventListener('click',event=>{const button=event.target.closest('[data-open-stage]');if(button)openStage(button.dataset.openStage);});
-  document.getElementById('answer-ready-notice').addEventListener('click',()=>openStage('plan'));
+  document.getElementById('preparation-board').addEventListener('toggle',event=>{if(event.target.matches('[data-stage-details]') && event.target.open){selectedStageId=event.target.closest('[data-stage-id]').dataset.stageId;manualStageSelection=true;renderBoard();}},true);
+  document.getElementById('return-to-request').addEventListener('click',focusRequest);
+  document.getElementById('next-request-draft').addEventListener('click',()=>{const next=getCareJourneySummary(caseState).nextActions[0];if(next?.requestDraft && fillRequestDraft(next.requestDraft,{source:'다음 문의 초안',focus:false}))focusRequest();});
+  document.getElementById('answer-ready-notice').addEventListener('click',showLatestAnswer);
   document.getElementById('expand-answer').addEventListener('click',openAnswer);
   const answerDialog=document.getElementById('answer-dialog');
   document.getElementById('close-answer').addEventListener('click',()=>answerDialog.close());
@@ -997,7 +993,7 @@ function mount() {
   document.getElementById('open-care-menu').addEventListener('click',openCareMenu);
   document.getElementById('close-care-menu').addEventListener('click',()=>closeCareMenu());
   document.getElementById('drawer-backdrop').addEventListener('click',()=>closeCareMenu());
-  document.getElementById('nav-preparation').addEventListener('click',event=>{event.preventDefault();closeCareMenu({restoreFocus:false});document.getElementById('nav-preparation').setAttribute('aria-current','location');document.getElementById('nav-preferences').removeAttribute('aria-current');input.focus({preventScroll:true});});
+  document.getElementById('nav-preparation').addEventListener('click',event=>{event.preventDefault();closeCareMenu({restoreFocus:false});document.getElementById('nav-preparation').setAttribute('aria-current','location');document.getElementById('nav-preferences').removeAttribute('aria-current');focusRequest();});
   document.getElementById('nav-preferences').addEventListener('click',event=>{event.preventDefault();document.getElementById('nav-preparation').removeAttribute('aria-current');document.getElementById('nav-preferences').setAttribute('aria-current','location');document.getElementById('pref-taxi').focus({preventScroll:true});document.getElementById('care-preferences').scrollIntoView({block:'nearest'});});
   document.addEventListener('keydown',event=>{
     if(!drawerOpen)return;
