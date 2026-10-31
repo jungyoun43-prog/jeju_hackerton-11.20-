@@ -38,6 +38,8 @@ function sourceMarkup(source) {
 export function renderPreparationBoard(board,{selectedStageId='records',unreadAnswer=false,progress=null}={}) {
   const realProgress=board.pending && progress?.status==='running' && board.progressAvailable && PREPARATION_STAGES.some(stage=>stage.id===progress.currentStage);
   const boardNode=document.getElementById('preparation-board');
+  const readingAnchor=board.pending && boardNode.contains(document.activeElement) && document.activeElement.matches('a[href]')?document.activeElement:null;
+  const readingBounds=readingAnchor?.getBoundingClientRect();
   boardNode.dataset.activeStage=realProgress?board.activeStageId:'';
   boardNode.dataset.pending=String(board.pending);
   const activity=document.getElementById('board-activity');
@@ -79,5 +81,8 @@ export function renderPreparationBoard(board,{selectedStageId='records',unreadAn
     replaceMarkup(eventHost.querySelector('[data-stage-confirmed-events]'),events.join(''));
     replaceMarkup(eventHost.querySelector('[data-stage-live-events]'),liveEvents.map(event=>`<li class="stage-live-event" data-progress-sequence="${event.sequence}"><p>${escape(progressActivity(event))}</p></li>`).join(''));
     eventHost.querySelector('.stage-log-empty').hidden=count>0;
+  }
+  if(readingAnchor?.isConnected && readingBounds.top<innerHeight && readingBounds.bottom>0 && document.activeElement===readingAnchor){
+    document.scrollingElement.scrollTop+=readingAnchor.getBoundingClientRect().top-readingBounds.top;
   }
 }
