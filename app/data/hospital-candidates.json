@@ -1,0 +1,414 @@
+{
+  "schemaVersion": 1,
+  "datasetId": "859",
+  "scope": "public-preview",
+  "sourceUrl": "https://jejudatahub.net/data/view/data/859",
+  "previewUrl": "https://jejudatahub.net/api/data/view?id=859&userId=",
+  "retrievedAt": "2026-10-31T11:32:40.705Z",
+  "totalPreviewRows": 20,
+  "excludedClosedRows": 7,
+  "excludedOtherRows": 0,
+  "time": {
+    "collectedAt": [
+      "2024-10-17 13:53"
+    ],
+    "earliestRowUpdate": "2018-08-31 23:59",
+    "latestRowUpdate": "2024-08-10 2:40",
+    "missingUpdateRows": 0,
+    "invalidUpdateRows": 0
+  },
+  "records": [
+    {
+      "id": "hospital-1",
+      "companyName": "지오요양병원",
+      "address": "제주특별자치도 제주시 서광로 222 (삼도일동)",
+      "addressDoro": "제주특별자치도 제주시 서광로 222 (삼도일동)",
+      "addressJibun": "제주특별자치도 제주시 삼도일동 570-1",
+      "departments": [
+        "내과",
+        "신경과",
+        "피부과",
+        "가정의학과",
+        "한방내과",
+        "한방부인과",
+        "침구과"
+      ],
+      "openStatus": "영업/정상",
+      "updatedAt": "2024-07-03 2:40",
+      "collectedAt": "2024-10-17 13:53",
+      "source": {
+        "datasetId": "859",
+        "url": "https://jejudatahub.net/data/view/data/859",
+        "retrievedAt": "2026-10-31T11:32:40.705Z",
+        "license": "공개 미리보기의 최소 기관 사실 변환 · 자유 라이선스 및 전체 원자료 재배포 허락 미확인",
+        "isSynthetic": false,
+        "kind": "public-preview",
+        "scope": "public-preview",
+        "candidateOrigin": "public-preview",
+        "totalPreviewRows": 20,
+        "apiVerified": false
+      },
+      "inquiryStatus": "unverified"
+    },
+    {
+      "id": "hospital-2",
+      "companyName": "의료법인 연강의료재단 연강참병원",
+      "address": "제주특별자치도 제주시 서광로 175, 아세아빌딩  B-101,301,401,501호 (용담일동)",
+      "addressDoro": "제주특별자치도 제주시 서광로 175, 아세아빌딩  B-101,301,401,501호 (용담일동)",
+      "addressJibun": "제주특별자치도 제주시 용담일동 2829-14 아세아빌딩",
+      "departments": [
+        "정신건강의학과"
+      ],
+      "openStatus": "영업/정상",
+      "updatedAt": "2024-08-10 2:40",
+      "collectedAt": "2024-10-17 13:53",
+      "source": {
+        "datasetId": "859",
+        "url": "https://jejudatahub.net/data/view/data/859",
+        "retrievedAt": "2026-10-31T11:32:40.705Z",
+        "license": "공개 미리보기의 최소 기관 사실 변환 · 자유 라이선스 및 전체 원자료 재배포 허락 미확인",
+        "isSynthetic": false,
+        "kind": "public-preview",
+        "scope": "public-preview",
+        "candidateOrigin": "public-preview",
+        "totalPreviewRows": 20,
+        "apiVerified": false
+      },
+      "inquiryStatus": "unverified"
+    },
+    {
+      "id": "hospital-3",
+      "companyName": "의료법인평촌의료재단 제주대림요양병원",
+      "address": "제주특별자치도 제주시 한림읍 한수풀로 58",
+      "addressDoro": "제주특별자치도 제주시 한림읍 한수풀로 58",
+      "addressJibun": "제주특별자치도 제주시 한림읍 대림리 1771-1 제주한림병원",
+      "departments": [
+        "가정의학과",
+        "한방내과"
+      ],
+      "openStatus": "영업/정상",
+      "updatedAt": "2024-07-13 2:40",
+      "collectedAt": "2024-10-17 13:53",
+      "source": {
+        "datasetId": "859",
+        "url": "https://jejudatahub.net/data/view/data/859",
+        "retrievedAt": "2026-10-31T11:32:40.705Z",
+        "license": "공개 미리보기의 최소 기관 사실 변환 · 자유 라이선스 및 전체 원자료 재배포 허락 미확인",
+        "isSynthetic": false,
+        "kind": "public-preview",
+        "scope": "public-preview",
+        "candidateOrigin": "public-preview",
+        "totalPreviewRows": 20,
+        "apiVerified": false
+      },
+      "inquiryStatus": "unverified"
+    },
+    {
+      "id": "hospital-4",
+      "companyName": "제주우리병원",
+      "address": "제주특별자치도 제주시 중앙로 373 (이도이동)",
+      "addressDoro": "제주특별자치도 제주시 중앙로 373 (이도이동)",
+      "addressJibun": "제주특별자치도 제주시 이도2동 1986번지 3호",
+      "departments": [
+        "정형외과",
+        "신경외과",
+        "마취통증의학과",
+        "영상의학과",
+        "가정의학과"
+      ],
+      "openStatus": "영업/정상",
+      "updatedAt": "2024-06-27 2:40",
+      "collectedAt": "2024-10-17 13:53",
+      "source": {
+        "datasetId": "859",
+        "url": "https://jejudatahub.net/data/view/data/859",
+        "retrievedAt": "2026-10-31T11:32:40.705Z",
+        "license": "공개 미리보기의 최소 기관 사실 변환 · 자유 라이선스 및 전체 원자료 재배포 허락 미확인",
+        "isSynthetic": false,
+        "kind": "public-preview",
+        "scope": "public-preview",
+        "candidateOrigin": "public-preview",
+        "totalPreviewRows": 20,
+        "apiVerified": false
+      },
+      "inquiryStatus": "unverified"
+    },
+    {
+      "id": "hospital-5",
+      "companyName": "의료법인 중앙의료재단 중앙병원",
+      "address": "제주특별자치도 제주시 월랑로 91-0 (이호이동,중앙병원)",
+      "addressDoro": "제주특별자치도 제주시 월랑로 91-0 (이호이동,중앙병원)",
+      "addressJibun": "",
+      "departments": [],
+      "openStatus": "영업/정상",
+      "updatedAt": "2023-11-12 2:40",
+      "collectedAt": "2024-10-17 13:53",
+      "source": {
+        "datasetId": "859",
+        "url": "https://jejudatahub.net/data/view/data/859",
+        "retrievedAt": "2026-10-31T11:32:40.705Z",
+        "license": "공개 미리보기의 최소 기관 사실 변환 · 자유 라이선스 및 전체 원자료 재배포 허락 미확인",
+        "isSynthetic": false,
+        "kind": "public-preview",
+        "scope": "public-preview",
+        "candidateOrigin": "public-preview",
+        "totalPreviewRows": 20,
+        "apiVerified": false
+      },
+      "inquiryStatus": "unverified"
+    },
+    {
+      "id": "hospital-6",
+      "companyName": "제주하늘의료소비자생활협동조합하나요양병원",
+      "address": "제주특별자치도 제주시 서사로 40, 3,5,6층 (삼도일동)",
+      "addressDoro": "제주특별자치도 제주시 서사로 40, 3,5,6층 (삼도일동)",
+      "addressJibun": "제주특별자치도 제주시 삼도일동 804-1",
+      "departments": [
+        "내과",
+        "가정의학과",
+        "침구과"
+      ],
+      "openStatus": "영업/정상",
+      "updatedAt": "2024-08-08 2:40",
+      "collectedAt": "2024-10-17 13:53",
+      "source": {
+        "datasetId": "859",
+        "url": "https://jejudatahub.net/data/view/data/859",
+        "retrievedAt": "2026-10-31T11:32:40.705Z",
+        "license": "공개 미리보기의 최소 기관 사실 변환 · 자유 라이선스 및 전체 원자료 재배포 허락 미확인",
+        "isSynthetic": false,
+        "kind": "public-preview",
+        "scope": "public-preview",
+        "candidateOrigin": "public-preview",
+        "totalPreviewRows": 20,
+        "apiVerified": false
+      },
+      "inquiryStatus": "unverified"
+    },
+    {
+      "id": "hospital-7",
+      "companyName": "토마토요양병원",
+      "address": "제주특별자치도 제주시 동광로 42 (이도이동)",
+      "addressDoro": "제주특별자치도 제주시 동광로 42 (이도이동)",
+      "addressJibun": "제주특별자치도 제주시 이도이동 1169번지 6호",
+      "departments": [
+        "내과",
+        "외과",
+        "신경외과",
+        "소아청소년과",
+        "피부과",
+        "재활의학과",
+        "가정의학과",
+        "한방내과",
+        "한방부인과",
+        "한방소아과",
+        "한방안·이비인후·피부과",
+        "한방신경정신과",
+        "한방재활의학과",
+        "사상체질과",
+        "침구과",
+        "한방응급과"
+      ],
+      "openStatus": "영업/정상",
+      "updatedAt": "2024-08-08 2:40",
+      "collectedAt": "2024-10-17 13:53",
+      "source": {
+        "datasetId": "859",
+        "url": "https://jejudatahub.net/data/view/data/859",
+        "retrievedAt": "2026-10-31T11:32:40.705Z",
+        "license": "공개 미리보기의 최소 기관 사실 변환 · 자유 라이선스 및 전체 원자료 재배포 허락 미확인",
+        "isSynthetic": false,
+        "kind": "public-preview",
+        "scope": "public-preview",
+        "candidateOrigin": "public-preview",
+        "totalPreviewRows": 20,
+        "apiVerified": false
+      },
+      "inquiryStatus": "unverified"
+    },
+    {
+      "id": "hospital-8",
+      "companyName": "제주사랑요양병원",
+      "address": "제주특별자치도 제주시 조천읍 신조로 203",
+      "addressDoro": "제주특별자치도 제주시 조천읍 신조로 203",
+      "addressJibun": "",
+      "departments": [
+        "내과",
+        "외과",
+        "정형외과",
+        "가정의학과",
+        "한방내과",
+        "한방재활의학과",
+        "침구과"
+      ],
+      "openStatus": "영업/정상",
+      "updatedAt": "2024-08-07 2:40",
+      "collectedAt": "2024-10-17 13:53",
+      "source": {
+        "datasetId": "859",
+        "url": "https://jejudatahub.net/data/view/data/859",
+        "retrievedAt": "2026-10-31T11:32:40.705Z",
+        "license": "공개 미리보기의 최소 기관 사실 변환 · 자유 라이선스 및 전체 원자료 재배포 허락 미확인",
+        "isSynthetic": false,
+        "kind": "public-preview",
+        "scope": "public-preview",
+        "candidateOrigin": "public-preview",
+        "totalPreviewRows": 20,
+        "apiVerified": false
+      },
+      "inquiryStatus": "unverified"
+    },
+    {
+      "id": "hospital-9",
+      "companyName": "제주제일요양병원",
+      "address": "제주특별자치도 제주시 연삼로 16 (연동)",
+      "addressDoro": "제주특별자치도 제주시 연삼로 16 (연동)",
+      "addressJibun": "제주특별자치도 제주시 연동 290번지 64호",
+      "departments": [
+        "신경과",
+        "재활의학과",
+        "가정의학과"
+      ],
+      "openStatus": "영업/정상",
+      "updatedAt": "2024-06-27 2:40",
+      "collectedAt": "2024-10-17 13:53",
+      "source": {
+        "datasetId": "859",
+        "url": "https://jejudatahub.net/data/view/data/859",
+        "retrievedAt": "2026-10-31T11:32:40.705Z",
+        "license": "공개 미리보기의 최소 기관 사실 변환 · 자유 라이선스 및 전체 원자료 재배포 허락 미확인",
+        "isSynthetic": false,
+        "kind": "public-preview",
+        "scope": "public-preview",
+        "candidateOrigin": "public-preview",
+        "totalPreviewRows": 20,
+        "apiVerified": false
+      },
+      "inquiryStatus": "unverified"
+    },
+    {
+      "id": "hospital-10",
+      "companyName": "그랜드치과병원",
+      "address": "제주특별자치도 제주시 서광로 301, 6.7.8층 (이도일동)",
+      "addressDoro": "제주특별자치도 제주시 서광로 301, 6.7.8층 (이도일동)",
+      "addressJibun": "제주특별자치도 제주시 이도일동 1774번지 2호 6.7.8층",
+      "departments": [
+        "치과보철과",
+        "치과교정과",
+        "소아치과",
+        "치주과",
+        "치과보존과"
+      ],
+      "openStatus": "영업/정상",
+      "updatedAt": "2024-05-29 2:40",
+      "collectedAt": "2024-10-17 13:53",
+      "source": {
+        "datasetId": "859",
+        "url": "https://jejudatahub.net/data/view/data/859",
+        "retrievedAt": "2026-10-31T11:32:40.705Z",
+        "license": "공개 미리보기의 최소 기관 사실 변환 · 자유 라이선스 및 전체 원자료 재배포 허락 미확인",
+        "isSynthetic": false,
+        "kind": "public-preview",
+        "scope": "public-preview",
+        "candidateOrigin": "public-preview",
+        "totalPreviewRows": 20,
+        "apiVerified": false
+      },
+      "inquiryStatus": "unverified"
+    },
+    {
+      "id": "hospital-11",
+      "companyName": "제주의료원부속요양병원",
+      "address": "제주특별자치도 제주시 산천단남길 10 (아라일동, 제주의료원)",
+      "addressDoro": "제주특별자치도 제주시 산천단남길 10 (아라일동, 제주의료원)",
+      "addressJibun": "",
+      "departments": [
+        "내과",
+        "신경과",
+        "정형외과",
+        "재활의학과",
+        "가정의학과",
+        "침구과"
+      ],
+      "openStatus": "영업/정상",
+      "updatedAt": "2024-05-29 2:40",
+      "collectedAt": "2024-10-17 13:53",
+      "source": {
+        "datasetId": "859",
+        "url": "https://jejudatahub.net/data/view/data/859",
+        "retrievedAt": "2026-10-31T11:32:40.705Z",
+        "license": "공개 미리보기의 최소 기관 사실 변환 · 자유 라이선스 및 전체 원자료 재배포 허락 미확인",
+        "isSynthetic": false,
+        "kind": "public-preview",
+        "scope": "public-preview",
+        "candidateOrigin": "public-preview",
+        "totalPreviewRows": 20,
+        "apiVerified": false
+      },
+      "inquiryStatus": "unverified"
+    },
+    {
+      "id": "hospital-12",
+      "companyName": "아라요양병원",
+      "address": "제주특별자치도 제주시 한북로 309 (아라일동)",
+      "addressDoro": "제주특별자치도 제주시 한북로 309 (아라일동)",
+      "addressJibun": "제주특별자치도 제주시 아라일동 1960번지 5호",
+      "departments": [
+        "내과",
+        "마취통증의학과",
+        "영상의학과",
+        "재활의학과",
+        "가정의학과"
+      ],
+      "openStatus": "영업/정상",
+      "updatedAt": "2024-06-27 2:40",
+      "collectedAt": "2024-10-17 13:53",
+      "source": {
+        "datasetId": "859",
+        "url": "https://jejudatahub.net/data/view/data/859",
+        "retrievedAt": "2026-10-31T11:32:40.705Z",
+        "license": "공개 미리보기의 최소 기관 사실 변환 · 자유 라이선스 및 전체 원자료 재배포 허락 미확인",
+        "isSynthetic": false,
+        "kind": "public-preview",
+        "scope": "public-preview",
+        "candidateOrigin": "public-preview",
+        "totalPreviewRows": 20,
+        "apiVerified": false
+      },
+      "inquiryStatus": "unverified"
+    },
+    {
+      "id": "hospital-13",
+      "companyName": "제주선한병원",
+      "address": "제주특별자치도 제주시 중앙로 616, 2~4층 (아라일동)",
+      "addressDoro": "제주특별자치도 제주시 중앙로 616, 2~4층 (아라일동)",
+      "addressJibun": "제주특별자치도 제주시 아라일동 1798",
+      "departments": [
+        "재활의학과",
+        "가정의학과"
+      ],
+      "openStatus": "영업/정상",
+      "updatedAt": "2024-06-27 2:40",
+      "collectedAt": "2024-10-17 13:53",
+      "source": {
+        "datasetId": "859",
+        "url": "https://jejudatahub.net/data/view/data/859",
+        "retrievedAt": "2026-10-31T11:32:40.705Z",
+        "license": "공개 미리보기의 최소 기관 사실 변환 · 자유 라이선스 및 전체 원자료 재배포 허락 미확인",
+        "isSynthetic": false,
+        "kind": "public-preview",
+        "scope": "public-preview",
+        "candidateOrigin": "public-preview",
+        "totalPreviewRows": 20,
+        "apiVerified": false
+      },
+      "inquiryStatus": "unverified"
+    }
+  ],
+  "rawDataStored": false,
+  "limitations": [
+    "공개 미리보기 최대 20행 중 당시 행정상 정상 등록된 기관만 조회합니다.",
+    "2024년 수집 자료의 과거 등록정보이며 현재 진료·예약·실시간 수용·협진 참여는 미확인입니다.",
+    "원자료 전체·운영 API가 아니며 자유 라이선스나 공적 승인을 주장하지 않습니다."
+  ]
+}

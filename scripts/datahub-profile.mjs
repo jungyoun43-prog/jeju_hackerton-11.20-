@@ -1,6 +1,6 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
-import { DATASET, summarizeHospitalRecords } from '../app/datahub.js';
+import { DATASET, summarizeHospitalRecords, buildPublicHospitalCandidates } from '../app/datahub.js';
 
 const args = process.argv.slice(2);
 const hasFetch = args.includes('--fetch');
@@ -24,7 +24,9 @@ try {
   profile.generatedAt = fetchedAt;
   profile.dataset.pageModifiedAt = envelope.updateAt || null;
   profile.dataset.displayedCollectionPeriod = { start: envelope.startDate || null, end: envelope.endDate || null };
+  const candidates = buildPublicHospitalCandidates(envelope.csvData, { retrievedAt: profile.fetchedAt });
   await mkdir(dirname(output), { recursive: true });
   await writeFile(output, `${JSON.stringify(profile, null, 2)}\n`);
-  console.log(`집계 ${profile.totalRows}행 분석 완료: 정상등록 ${profile.activeRegistrationRows}, 폐업 ${profile.closedRows}. 원자료 저장 없음. 집계 공개 재배포 권한은 미확인입니다.`);
+  await writeFile(resolve(dirname(output), 'hospital-candidates.json'), `${JSON.stringify(candidates, null, 2)}\n`);
+  console.log(`공개 표본 ${profile.totalRows}행 분석: 당시 정상등록 ${profile.activeRegistrationRows}, 폐업 ${profile.closedRows} 제외, 최소 기관 사실 ${candidates.records.length}개 변환. 원자료 전체 저장 없음. 현재 진료·협진 미확인.`);
 } catch (error) { console.error(error.message); process.exitCode = 1; }

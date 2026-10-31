@@ -149,3 +149,36 @@ export async function loadDataProfile(fetcher = globalThis.fetch) {
   ensure(Object.keys(profile).every(key => allowed.includes(key)), '지원하지 않는 집계 항목입니다.');
   return profile;
 }
+
+/** 공개 미리보기의 최소 기관 사실만 변환한다. 전체 원본과 운영 API 응답이 아니다. */
+export function buildPublicHospitalCandidates(rows, { retrievedAt = '' } = {}) {
+  const canonical = tableRows(rows);
+  ensure(canonical.length <= 20, '공개 미리보기는 최대 20행만 처리합니다.');
+  const profile = summarizeHospitalRecords(canonical, { scope: 'public-preview-aggregates', fetchedAt: retrievedAt });
+  const records = normalizeHospitals(canonical, { datasetId: '859', url: DATASET.sourceUrl, retrievedAt, license: '공개 미리보기의 최소 기관 사실 변환 · 자유 라이선스 및 전체 원자료 재배포 허락 미확인' })
+    .filter(record => active(record.openStatus))
+    .map(record => ({ ...record, source: { ...record.source, kind: 'public-preview', scope: 'public-preview', candidateOrigin: 'public-preview', totalPreviewRows: canonical.length, apiVerified: false } }));
+  return {
+    schemaVersion: 1, datasetId: '859', scope: 'public-preview', sourceUrl: DATASET.sourceUrl, previewUrl: DATASET.previewUrl,
+    retrievedAt, totalPreviewRows: canonical.length, excludedClosedRows: profile.closedRows, excludedOtherRows: profile.otherRows,
+    time: profile.time, records, rawDataStored: false,
+    limitations: ['공개 미리보기 최대 20행 중 당시 행정상 정상 등록된 기관만 조회합니다.', '2024년 수집 자료의 과거 등록정보이며 현재 진료·예약·실시간 수용·협진 참여는 미확인입니다.', '원자료 전체·운영 API가 아니며 자유 라이선스나 공적 승인을 주장하지 않습니다.'],
+  };
+}
+
+export async function loadHospitalCandidates(fetcher = globalThis.fetch) {
+  const response = await fetcher('/data/hospital-candidates.json', { credentials: 'omit' });
+  ensure(response.ok, '허브 공개 미리보기 후보를 불러오지 못했습니다.');
+  const data = await response.json();
+  ensure(isObject(data) && data.schemaVersion === 1 && data.datasetId === '859' && data.scope === 'public-preview' && data.sourceUrl === DATASET.sourceUrl && data.previewUrl === DATASET.previewUrl && data.rawDataStored === false, '허브 공개 미리보기 출처를 확인해 주세요.');
+  ensure(Number.isInteger(data.totalPreviewRows) && data.totalPreviewRows > 0 && data.totalPreviewRows <= 20 && Array.isArray(data.records) && data.records.length <= data.totalPreviewRows, '공개 미리보기 표본 범위를 확인해 주세요.');
+  ensure(Number.isInteger(data.excludedClosedRows) && data.excludedClosedRows >= 0 && Number.isInteger(data.excludedOtherRows) && data.excludedOtherRows >= 0 && data.records.length + data.excludedClosedRows + data.excludedOtherRows === data.totalPreviewRows, '기관 제외 집계를 확인해 주세요.');
+  ensure(typeof data.retrievedAt === 'string' && isObject(data.time) && Array.isArray(data.time.collectedAt), '공개 자료의 조회·수집 시점을 확인해 주세요.');
+  const allowed = ['id', 'companyName', 'address', 'addressDoro', 'addressJibun', 'departments', 'openStatus', 'updatedAt', 'collectedAt', 'source', 'inquiryStatus'];
+  for (const record of data.records) {
+    ensure(isObject(record) && Object.keys(record).every(key => allowed.includes(key)) && ['id', 'companyName', 'address', 'addressDoro', 'addressJibun', 'updatedAt', 'collectedAt'].every(key => typeof record[key] === 'string' && record[key].length <= 1000) && record.companyName && record.address, '공개 기관의 최소 등록정보를 확인해 주세요.');
+    ensure(active(record.openStatus) && Array.isArray(record.departments) && record.departments.every(subject => typeof subject === 'string' && subject.length <= 300) && record.inquiryStatus === 'unverified', '기관 행정 상태와 미확인 운영 상태를 확인해 주세요.');
+    ensure(record.source?.datasetId === '859' && record.source.url === DATASET.sourceUrl && record.source.kind === 'public-preview' && record.source.candidateOrigin === 'public-preview' && record.source.retrievedAt === data.retrievedAt && record.source.apiVerified === false && record.source.isSynthetic === false, '공개 미리보기 후보의 출처가 일치하지 않습니다.');
+  }
+  return data;
+}

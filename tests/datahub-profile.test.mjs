@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { parseHospitalImport, summarizeHospitalRecords, loadDataProfile } from '../app/datahub.js';
+import { parseHospitalImport, summarizeHospitalRecords, loadDataProfile, loadHospitalCandidates, buildPublicHospitalCandidates } from '../app/datahub.js';
+import { filterHospitals } from '../app/hospitals.js';
 
 const sample = [
   { companyName: '합성기관 A', addressDoro: '합성주소 A', medicalSubject: '내과, 내과;가정의학과', openStatus: '영업/정상', updateAt: '2024-06-27 2:40', collectedAt: '2024-10-17 13:53' },
@@ -79,4 +80,42 @@ test('공개 snapshot은 20행 품질 분석만 포함하며 운영 API·원자�
   await assert.rejects(loadDataProfile(async () => ({ ok: false })), /불러오지/);
   await assert.rejects(loadDataProfile(async () => ({ ok: true, json: async () => ({ ...profile, activeRegistrationRows: 99 }) })), /행 수/);
   await assert.rejects(loadDataProfile(async () => ({ ok: true, json: async () => ({ ...profile, rows: sample }) })), /원자료/);
+});
+
+test('실제 공개 후보 13개는 폐업을 제외하고 최소 등록 사실·20행 표본 출처만 보존한다', async () => {
+  const bundle = JSON.parse(await readFile(new URL('../app/data/hospital-candidates.json', import.meta.url)));
+  const loaded = await loadHospitalCandidates(async (url, options) => {
+    assert.equal(url, '/data/hospital-candidates.json'); assert.equal(options.credentials, 'omit');
+    return { ok: true, json: async () => structuredClone(bundle) };
+  });
+  assert.equal(loaded.records.length, 13);
+  assert.equal(loaded.totalPreviewRows, 20);
+  assert.equal(loaded.excludedClosedRows, 7);
+  assert.equal(filterHospitals(loaded.records, { department: '영상의학과' }).length, 2);
+  assert.equal(filterHospitals(loaded.records, { area: '서광로' }).length, 3);
+  for (const record of loaded.records) {
+    assert.equal(record.openStatus, '영업/정상');
+    assert.equal(record.collectedAt, '2024-10-17 13:53');
+    assert.equal(record.source.candidateOrigin, 'public-preview');
+    assert.equal(record.source.apiVerified, false);
+    assert.equal(record.inquiryStatus, 'unverified');
+    assert.ok(!('phone' in record) && !('latitude' in record) && !('hospitalBedCount' in record));
+  }
+  assert.doesNotMatch(JSON.stringify(bundle), /csvData|medicalWorkerCount|licensingDate|172\.25\./);
+  const forged = structuredClone(bundle); forged.records[0].source.candidateOrigin = 'user-import';
+  await assert.rejects(loadHospitalCandidates(async () => ({ ok: true, json: async () => forged })), /출처가 일치하지/);
+  const closed = structuredClone(bundle); closed.records[0].openStatus = '폐업';
+  await assert.rejects(loadHospitalCandidates(async () => ({ ok: true, json: async () => closed })), /행정 상태/);
+  await assert.rejects(loadHospitalCandidates(async () => ({ ok: false })), /불러오지/);
+});
+
+test('공개 후보 변환은 원본을 바꾸지 않으며 사용자 가져오기와 구분한다', () => {
+  const before = structuredClone(sample);
+  const result = buildPublicHospitalCandidates(sample, { retrievedAt: '2026-10-31T12:00:00Z' });
+  assert.deepEqual(sample, before);
+  assert.equal(result.records.length, 1);
+  assert.equal(result.excludedClosedRows, 1);
+  assert.equal(result.excludedOtherRows, 1);
+  assert.equal(result.records[0].source.kind, 'public-preview');
+  assert.throws(() => buildPublicHospitalCandidates(Array.from({ length: 21 }, () => sample[0])), /최대 20행/);
 });

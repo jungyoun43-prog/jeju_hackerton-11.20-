@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createDemoCase, applyAction, getTasks, getProgress, getSummary, calculateBurden, buildReport } from '../app/domain.js';
 import { parseHospitalImport } from '../app/datahub.js';
+import { buildPublicHospitalCandidates } from '../app/datahub.js';
 
 const action = (state, type, values = {}) => applyAction(state, { type, ...values });
 function readyState() {
@@ -222,4 +223,19 @@ test('같은 기관을 다시 선택하면 회신을 유지하고 폐업·출처
   const changed = action(missing, 'SELECT_LOCAL_HOSPITAL', { hospital });
   assert.equal(changed.documents.find(doc => doc.id === 'exam').status, 'not_performed');
   assert.equal(changed.review.outcome, null);
+});
+
+test('허브 공개 미리보기 후보도 사례와 문의 단계에 연결하고 보고서에 출처를 남긴다', () => {
+  const hospital = buildPublicHospitalCandidates([{ companyName: '공개 스키마 합성기관', addressDoro: '합성 제주 주소', medicalSubject: '내과', openStatus: '영업/정상', updateAt: '2024-07-03', collectedAt: '2024-10-17 13:53' }], { retrievedAt: '2026-10-31T12:00:00Z' }).records[0];
+  const original = reviewedState();
+  const next = action(original, 'SELECT_LOCAL_HOSPITAL', { hospital });
+  assert.equal(next.patient.localHospital, hospital.companyName);
+  assert.equal(next.selectedHospital.source.candidateOrigin, 'public-preview');
+  assert.equal(next.inquiries.jeju.status, 'not_contacted');
+  assert.equal(next.packet.status, 'draft');
+  assert.deepEqual(next.documents, original.documents);
+  assert.match(buildReport(next), /제주데이터허브 859 공개 미리보기/);
+  assert.match(buildReport(next), /2024-10-17 13:53/);
+  assert.throws(() => action(next, 'SUBMIT_PACKET'), /두 기관/);
+  assert.throws(() => action(next, 'SELECT_LOCAL_HOSPITAL', { hospital: { ...hospital, source: { ...hospital.source, url: 'https://example.invalid/' } } }), /기관 자료/);
 });

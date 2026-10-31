@@ -13,7 +13,7 @@
     }
   },
   "scope": "public-preview-aggregates",
-  "fetchedAt": "2026-10-31T11:29:19.458Z",
+  "fetchedAt": "2026-10-31T11:32:40.705Z",
   "totalRows": 20,
   "activeRegistrationRows": 13,
   "closedRows": 7,
@@ -188,5 +188,5 @@
     "전체 운영 API·인증키·실시간 정보는 검증하지 않았습니다."
   ],
   "rawDataStored": false,
-  "generatedAt": "2026-10-31T11:29:19.458Z"
+  "generatedAt": "2026-10-31T11:32:40.705Z"
 }
