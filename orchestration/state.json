@@ -386,6 +386,18 @@
         "a5f2386"
       ],
       "note": "사용자정정범위PC2×2복원/모바일1열4칸·칸내부Y스크롤없음. 단위360/360·대화180/180·여정224/224(실preview14,일반POST0)·수동47/47·그리드193/193·규칙58/58·Lambda빌드/전부종료0. 동일지문e5fcd7636893d8d8fef9e470a8ca06542f5cd6b5f89e62919658ab612faf0bf5. 독립source/docs차단0. API/모델로직변경없어실모델은9fc11bc기존증거로구분하며재호출없음. 공개/ZIP은최신runs증거기준."
+    },
+    "task-ui": {
+      "phase": "implementing",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-task-ui",
+      "integrationCommits": [],
+      "note": "사용자관점: 입력상단·2×2핵심·native상세·다음요청직결. docs/task-first-ui-contract.md 기준"
+    },
+    "task-qa": {
+      "phase": "implementing",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-task-qa",
+      "integrationCommits": [],
+      "note": "사용자관점: 입력상단·2×2핵심·native상세·다음요청직결. docs/task-first-ui-contract.md 기준"
     }
   },
   "review": {

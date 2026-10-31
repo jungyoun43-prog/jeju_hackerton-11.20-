@@ -532,6 +532,26 @@
         "scripts/journey-browser-check.mjs",
         "scripts/preparation-board-browser-check.mjs"
       ]
+    },
+    {
+      "id": "task-ui",
+      "branch": "design/task-first-ui",
+      "baseCommit": "e762da8cb5884bc299de66159b562e6b296c71a2",
+      "allow": [
+        "app/conversation.js",
+        "app/conversation.css",
+        "app/preparation-board-view.js"
+      ]
+    },
+    {
+      "id": "task-qa",
+      "branch": "test/task-first-ui",
+      "baseCommit": "e762da8cb5884bc299de66159b562e6b296c71a2",
+      "allow": [
+        "scripts/conversation-browser-check.mjs",
+        "scripts/journey-browser-check.mjs",
+        "scripts/preparation-board-browser-check.mjs"
+      ]
     }
   ],
   "rules": [
