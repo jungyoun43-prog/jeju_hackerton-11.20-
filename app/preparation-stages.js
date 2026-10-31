@@ -15,11 +15,12 @@ const TOOL_STAGE=Object.freeze({
   prepare_review:'plan',get_care_journey:'plan',build_report:'plan',summarize_preparation:'plan',
 });
 export function getToolStage(name,input={}) {
+  input=input&&typeof input==='object'&&!Array.isArray(input)?input:{};
   if(name==='search_public_data')return ['taxi','companion','travel'].includes(input.purpose)?'support':'records';
   if(name==='analyze_public_data')return ['support_candidates','travel_time'].includes(input.analysis)?'support':'records';
   if(name==='run_journey_demo')return ({missing_record:'records',jeju_unavailable:'hospitals',time_changed:'support'})[input.scenarioId]??'plan';
   if(name==='run_call_recovery_demo')return ['call_identity_required','call_documents_or_schedule'].includes(input.scenarioId)?'hospitals':'support';
-  return TOOL_STAGE[name]??null;
+  return Object.hasOwn(TOOL_STAGE,name)?TOOL_STAGE[name]:null;
 }
 const TOOL_LABELS=Object.freeze({
   apply_care_preferences:'기본 이동 조건',get_case:'현재 준비 상태',update_visit:'방문 조건',request_records:'자료 연결·보유 현황',
@@ -30,9 +31,32 @@ const TOOL_LABELS=Object.freeze({
   run_journey_demo:'합성 진료 여정',run_call_recovery_demo:'합성 전화 인계 상황',
 });
 export function progressActivity(event) {
-  const label=TOOL_LABELS[event?.tool];
+  const label=Object.hasOwn(TOOL_LABELS,event?.tool)?TOOL_LABELS[event.tool]:null;
   if(!label)return event?.stage==='plan'?'혼디가 답변을 정리하고 있어요.':'혼디가 요청을 확인하고 있어요.';
   return `${label} · ${event.status==='started'?'확인 중':event.status==='failed'?'추가 확인 필요':event.status==='needs_input'?'확인할 내용 있음':'결과 도착'}`;
+}
+const ownKeys=(value,keys)=>value&&typeof value==='object'&&!Array.isArray(value)&&Object.keys(value).length===keys.length&&keys.every(key=>Object.hasOwn(value,key));
+const isTool=value=>value===null||typeof value==='string'&&Object.hasOwn(TOOL_LABELS,value);
+/** 고정 진행 메타데이터만 받는다. 입력·결과·자유문을 진행 정보에 섞지 않는다. */
+export function normalizePreparationProgress(value) {
+  if(!ownKeys(value,['version','status','sequence','updatedAt','currentStage','stages','events'])||value.version!==1
+    ||!['running','completed','failed'].includes(value.status)||!Number.isSafeInteger(value.sequence)||value.sequence<0||value.sequence>128
+    ||typeof value.updatedAt!=='string'||value.updatedAt.length>40||!Number.isFinite(Date.parse(value.updatedAt))
+    ||value.currentStage!==null&&!PREPARATION_STAGE_IDS.includes(value.currentStage)||!Array.isArray(value.stages)||value.stages.length!==4
+    ||!Array.isArray(value.events)||value.events.length>32)return null;
+  const ids=new Set();
+  for(const stage of value.stages){
+    if(!ownKeys(stage,['id','status','lastTool'])||!PREPARATION_STAGE_IDS.includes(stage.id)||ids.has(stage.id)
+      ||!['waiting','running','observed','needs_input','failed'].includes(stage.status)||!isTool(stage.lastTool))return null;
+    ids.add(stage.id);
+  }
+  let previous=-1;
+  for(const event of value.events){
+    if(!ownKeys(event,['sequence','stage','tool','status'])||!Number.isSafeInteger(event.sequence)||event.sequence<=previous||event.sequence>value.sequence
+      ||!PREPARATION_STAGE_IDS.includes(event.stage)||!isTool(event.tool)||!['started','completed','needs_input','failed'].includes(event.status))return null;
+    previous=event.sequence;
+  }
+  return structuredClone(value);
 }
 const source=value=>value&&typeof value.url==='string'?{url:value.url,label:value.datasetId?`제주데이터허브 ${value.datasetId}`:'공식 서비스 안내'}:null;
 const uniqueSources=items=>[...new Map(items.filter(Boolean).map(item=>[item.url,item])).values()];
@@ -43,12 +67,13 @@ function baseStage(definition,status,label,summary,facts=[],gaps=[],sources=[]) 
 
 /** 읽기 전용 화면 projection. 단계 완료는 임상 수락·예약·배차 완료를 뜻하지 않는다. */
 export function getPreparationBoard(state,{events=[],progress=null,pending=false,responseCount=0,requestProblem=''}={}) {
+  progress=normalizePreparationProgress(progress);
   const journey=getCareJourneySummary(state),support=getVisitSupportSummary(state),requirements=state.visitSupport.requirements;
   const docs=state.documents??[],available=docs.filter(doc=>doc.status==='ready').length;
   const recordGaps=docs.filter(doc=>doc.status!=='ready').map(doc=>`${doc.label} · ${doc.status==='not_performed'?'의료진 수행·확인 필요':'보유 여부 확인 필요'}`);
   if(!requirements.appointmentTime)recordGaps.unshift('진료 시각을 확인해 주세요.');
   const records=baseStage(PREPARATION_STAGES[0],recordGaps.length?'needs_input':'available',recordGaps.length?'확인할 정보 있음':'자료 확인 결과',
-    `자료 ${available}/${docs.length}개 보유 표시 · 합성 사례`,[
+    `보유 표시 ${available}개 · 나머지 자료와 의료진 기록 확인`,[
       {label:'출발',value:state.patient.area},{label:'방문',value:`${state.patient.nextVisit} · ${requirements.appointmentTime||'시각 미정'}`},
       {label:'자료',value:docs.filter(doc=>doc.status==='ready').map(doc=>doc.label).join(' · ')||'보유 자료 확인 전'},
     ],recordGaps);
@@ -66,24 +91,32 @@ export function getPreparationBoard(state,{events=[],progress=null,pending=false
   const selected=['taxi','companion'].some(kind=>!['not_selected','not_needed'].includes(support[kind].status));
   const supportBlocked=!!supportHandoffs.length||['taxi','companion'].some(kind=>['unavailable_demo','unreachable_demo'].includes(support[kind].status));
   const mobility=baseStage(PREPARATION_STAGES[2],recheck?'needs_recheck':supportBlocked?'needs_input':selected?'available':support.totalNeeded?'waiting':'not_needed',
-    recheck?'변경 조건 재확인':supportBlocked?'인계·추가 확인 필요':selected?'문의 준비 결과':'문의 준비 전',
-    requirements.wheelchair?'휠체어 탑승·승하차 지원과 동행 조건을 함께 확인해요.':'출발 지역과 방문 시각에 맞는 이동·동행을 준비해요.',
-    ['taxi','companion'].map(kind=>({label:kind==='taxi'?'이동':'동행',value:`${support[kind].providerName||'문의처 선택 전'} · ${support[kind].label}`})),
+    !support.totalNeeded?'이번 조건에서 필요 없음':recheck?'변경 조건 재확인':supportBlocked?'인계·추가 확인 필요':selected?'문의 준비 결과':'문의 준비 전',
+    !support.totalNeeded?'이번 조건에서는 별도의 이동·동행 지원을 요청하지 않았어요.':requirements.wheelchair?'휠체어 탑승·승하차 지원과 동행 조건을 함께 확인해요.':'출발 지역과 방문 시각에 맞는 이동·동행을 준비해요.',
+    ['taxi','companion'].map(kind=>({label:kind==='taxi'?'이동':'동행',value:support[kind].status==='not_needed'?'필요 없음':`${support[kind].providerName||'문의처 선택 전'} · ${support[kind].label}`})),
     [...journey.schedule.recheckReasons,...supportHandoffs.map(item=>`${item.owner} · ${item.detail}`),...support.unresolved],
-    ['taxi','companion'].map(kind=>source(support[kind].source)));
+    ['taxi','companion'].map(kind=>support[kind].status==='not_needed'?null:source(support[kind].source)));
   const plan=baseStage(PREPARATION_STAGES[3],responseCount?'available':'waiting',responseCount?'이번 요청의 답변':'말씀을 기다리고 있어요.',
     responseCount?'확인된 준비와 남은 일을 함께 읽어 보세요.':'아래 입력창에 필요한 준비를 한 번에 말씀해 주세요.',
     [{label:'다음 확인',value:journey.nextActions[0]?.title||'요청하실 내용을 말씀해 주세요.'}],[]);
   const stages=[records,hospitals,mobility,plan];
-  for(const event of events){const id=getToolStage(event.tool);if(id)stages.find(stage=>stage.id===id).events.push(safeEvent(event));}
+  for(const event of Array.isArray(events)?events:[]){
+    if(!event||typeof event!=='object')continue;
+    const id=PREPARATION_STAGE_IDS.includes(event.stage)?event.stage:event.tool==='analyze_public_data'&&/이동|동행/.test(event.label)?'support':getToolStage(event.tool);
+    if(id)stages.find(stage=>stage.id===id).events.push(safeEvent(event));
+  }
   for(const stage of stages){stage.events=stage.events.slice(-5);stage.gapCount=stage.gaps.length;stage.gaps=[...new Set(stage.gaps)].slice(0,3);}
   let activeStageId=responseCount?'plan':'records';
-  if(pending&&progress?.status==='running'&&PREPARATION_STAGE_IDS.includes(progress.currentStage))activeStageId=progress.currentStage;
-  if(pending){
-    const active=stages.find(stage=>stage.id===activeStageId);
-    active.live=true;
-    const observed=(progress?.events??[]).filter(event=>event.stage===active.id).at(-1);
-    active.liveActivity=progressActivity(observed??{stage:active.id});
+  const live=pending&&progress?.status==='running'&&PREPARATION_STAGE_IDS.includes(progress.currentStage);
+  if(live)activeStageId=progress.currentStage;
+  if(pending&&progress){
+    for(const stage of stages){
+      const reported=progress.stages.find(item=>item.id===stage.id);
+      const observed=progress.events.filter(event=>event.stage===stage.id).at(-1);
+      if(observed)stage.liveActivity=progressActivity(observed);
+      else if(reported&&reported.status!=='waiting')stage.liveActivity=progressActivity({stage:stage.id,tool:reported.lastTool,status:reported.status==='running'?'started':reported.status==='observed'?'completed':reported.status});
+      stage.live=!!live&&stage.id===activeStageId;
+    }
   }
   if(requestProblem){plan.status='needs_input';plan.label='응답 확인 필요';plan.summary=requestProblem;activeStageId='plan';}
   return {version:1,activeStageId,stages,pending,hasResponse:responseCount>0,progressAvailable:!!progress,
