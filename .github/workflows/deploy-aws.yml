@@ -1,0 +1,140 @@
+name: Deploy AWS demonstration
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# main 배포를 직렬화한다. 이미 업로드 중인 배포를 중간에 끊지 않는다.
+concurrency:
+  group: aws-production
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate the same commit
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+
+  deployment-not-configured:
+    name: AWS setup pending
+    needs: validate
+    if: ${{ vars.AWS_DEPLOY_ENABLED != 'true' }}
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Explain the skipped deployment
+        run: |
+          echo '### 검사는 성공했고 AWS 배포 설정을 기다립니다.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'AWS_DEPLOY_ENABLED와 production OIDC 역할·버킷·배포 변수를 설정한 뒤 이 workflow를 다시 실행하세요.' >> "$GITHUB_STEP_SUMMARY"
+
+  deploy:
+    name: Deploy validated artifact to AWS
+    needs: validate
+    if: ${{ github.ref == 'refs/heads/main' && vars.AWS_DEPLOY_ENABLED == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment:
+      name: production
+      url: ${{ vars.AWS_SITE_URL }}
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      AWS_SITE_BUCKET: ${{ vars.AWS_SITE_BUCKET }}
+      AWS_DISTRIBUTION_ID: ${{ vars.AWS_DISTRIBUTION_ID }}
+      AWS_SITE_URL: ${{ vars.AWS_SITE_URL }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+      - name: Check deployment configuration
+        env:
+          AWS_DEPLOY_ROLE_ARN: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+        run: |
+          node --input-type=module <<'JS'
+          const required = ['AWS_REGION','AWS_SITE_BUCKET','AWS_DISTRIBUTION_ID','AWS_SITE_URL','AWS_DEPLOY_ROLE_ARN'];
+          for (const key of required) if (!process.env[key]) throw new Error(`배포 변수 ${key}가 비어 있습니다.`);
+          const url = new URL(process.env.AWS_SITE_URL);
+          if (url.protocol !== 'https:' || url.username || url.password) throw new Error('배포 주소는 공개 HTTPS URL이어야 합니다.');
+          JS
+      - name: Skip a superseded main commit
+        id: latest
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          node --input-type=module <<'JS'
+          import { appendFile } from 'node:fs/promises';
+          const response = await fetch(`https://api.github.com/repos/${process.env.GITHUB_REPOSITORY}/git/ref/heads/main`, {
+            headers: {Authorization:`Bearer ${process.env.GITHUB_TOKEN}`,Accept:'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'},
+            signal: AbortSignal.timeout(15000),
+          });
+          if (!response.ok) throw new Error(`main 버전 확인 실패: HTTP ${response.status}`);
+          const current = (await response.json()).object.sha === process.env.GITHUB_SHA;
+          await appendFile(process.env.GITHUB_OUTPUT, `current=${current}\n`);
+          if (!current) await appendFile(process.env.GITHUB_STEP_SUMMARY, '더 새로운 main 커밋이 있어 이전 배포를 건너뛰었습니다.\n');
+          JS
+      # https://api.github.com/repos/actions/download-artifact/git/ref/tags/v8.0.2
+      - name: Download the exact validated build
+        if: steps.latest.outputs.current == 'true'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: jeju-static-${{ github.sha }}
+          path: dist/
+      # https://api.github.com/repos/aws-actions/configure-aws-credentials/git/ref/tags/v6.3.0
+      - name: Assume the production role with OIDC
+        if: steps.latest.outputs.current == 'true'
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          aws-region: ${{ vars.AWS_REGION }}
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          role-session-name: jeju-${{ github.run_id }}
+          mask-aws-account-id: true
+      - name: Publish only the static artifact
+        if: steps.latest.outputs.current == 'true'
+        run: node scripts/aws-publish.mjs --directory dist
+      - name: Verify the public deployment and revision
+        if: steps.latest.outputs.current == 'true'
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import { appendFile } from 'node:fs/promises';
+          const base = new URL(process.env.AWS_SITE_URL);
+          let last;
+          for (let attempt = 0; attempt < 12; attempt++) {
+            try {
+              const get = async path => {
+                const url = new URL(path, base);
+                url.searchParams.set('revision', process.env.GITHUB_SHA);
+                const response = await fetch(url, {signal:AbortSignal.timeout(10000)});
+                assert.ok(response.ok, `${path}: HTTP ${response.status}`);
+                return response;
+              };
+              const deployment = await (await get('/deployment.json')).json();
+              assert.equal(deployment.revision, process.env.GITHUB_SHA, '공개 버전이 검사한 커밋과 다릅니다.');
+              assert.equal(deployment.mode, 'simulation');
+              const health = await (await get('/api/health')).json();
+              assert.equal(health.runtime, 'static');
+              assert.equal(health.mode, 'simulation');
+              assert.equal(health.phoneConnected, false);
+              assert.equal(health.medicalRecordTransfer, false);
+              assert.match(await (await get('/')).text(), /제주 진료 나침반/);
+              await appendFile(process.env.GITHUB_STEP_SUMMARY, `### 합성 시연 배포 확인\n[사이트 열기](${base.href})\n\n검증한 커밋: \`${process.env.GITHUB_SHA}\`\n실제 전화·의료기관 전송은 미연동입니다.\n`);
+              last = undefined;
+              break;
+            } catch (error) {
+              last = error;
+              console.log(`배포 확인 대기 ${attempt + 1}/12: ${error.message}`);
+              if (attempt < 11) await new Promise(resolve => setTimeout(resolve, 5000));
+            }
+          }
+          if (last) throw last;
+          JS
