@@ -512,6 +512,26 @@
         "scripts/journey-browser-check.mjs",
         "scripts/preparation-board-browser-check.mjs"
       ]
+    },
+    {
+      "id": "grid-ui",
+      "branch": "fix/grid-ui",
+      "baseCommit": "53faed1cf492002749d23beb8cacab59646dff76",
+      "allow": [
+        "app/conversation.js",
+        "app/conversation.css",
+        "app/preparation-board-view.js"
+      ]
+    },
+    {
+      "id": "grid-qa",
+      "branch": "test/grid-flow",
+      "baseCommit": "53faed1cf492002749d23beb8cacab59646dff76",
+      "allow": [
+        "scripts/conversation-browser-check.mjs",
+        "scripts/journey-browser-check.mjs",
+        "scripts/preparation-board-browser-check.mjs"
+      ]
     }
   ],
   "rules": [
