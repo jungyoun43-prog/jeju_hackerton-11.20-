@@ -175,10 +175,11 @@ test('지원하지 않는 작업·타깃·출처 없는 자료·잘못된 숫자
   ]) assert.throws(() => applyAction(state, input), Error, JSON.stringify(input));
 });
 
-test('보고서는 시연·출처·미확인·모델 미연동을 공개하고 HTML을 이스케이프한다', () => {
+test('보고서는 시연·출처·미확인을 공개하고 모델 연결 상태를 추정하지 않으며 HTML을 이스케이프한다', () => {
   const state = action(createDemoCase(), 'UPDATE_PATIENT', { values: { name: '<script>alert(1)</script>' } });
   const report = buildReport(state);
-  for (const pattern of [/합성 환자/, /실제 통화/, /시연용 합성 치료 이력/, /미확인/, /런타임 AI 모델은 연결되지/]) assert.match(report, pattern);
+  for (const pattern of [/합성 환자/, /실제 통화/, /시연용 합성 치료 이력/, /미확인/, /규칙 기반 준비 상태·공개 자료·합성 외부 응답/, /모델의 연결 여부를 판정하지/, /실제 모델 연결 상태는 별도 대화 API/]) assert.match(report, pattern);
+  assert.doesNotMatch(report,/런타임 AI 모델은 연결(?:되지|되었습니다|됐습니다)/);
   assert.doesNotMatch(report, /<script>/);
 });
 
