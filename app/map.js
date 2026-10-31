@@ -16,6 +16,11 @@ export function googleMapUrl(directions = false) {
   return `${base}?${new URLSearchParams(params)}`;
 }
 
+export function hospitalMapUrl(record) {
+  const query = [record.companyName, record.address].filter(Boolean).join(' ');
+  return `https://www.google.com/maps/search/?${new URLSearchParams({ api: '1', query })}`;
+}
+
 export function destroyMap() {
   clearTimeout(fallbackTimer);
   if (map) { map.remove(); map = undefined; }

@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "name": "제주 진료 나침반 · 보호자 진료 준비",
+  "mode": "operate",
+  "direction": "돌봄 연락장의 내용 밀도",
+  "seedReference": "seed:a25f97f1d883646c",
+  "colors": {
+    "background": "#F8F6F0",
+    "navigation": "#F0EEE5",
+    "surface": "#FFFEFA",
+    "text": "#263631",
+    "muted": "#6D7369",
+    "primary": "#AD4E2C",
+    "secondary": "#315F52",
+    "border": "#DDDCD2"
+  },
+  "typography": {
+    "display": "MaruBuri",
+    "body": "Apple SD Gothic Neo, Noto Sans KR, Malgun Gothic, sans-serif",
+    "desktopTitlePx": 39,
+    "mobileTitlePx": 31
+  },
+  "shape": {"surfaceRadiusPx": 4,"buttonRadiusPx": 4,"badgeRadiusPx": 2},
+  "assets": {"logo":"/assets/jeju-mark-v1.png","illustration":"/assets/jeju-care-v2.png"},
+  "viewports": ["1440x900","390x844"],
+  "constraints": ["현재 작업과 부족 자료를 우선 표시","실제 기관 등록 정보와 시연 응답 구분","실제 발신·예약·협진 완료를 주장하지 않음","공개 기관의 지도 검색에 임의 좌표 사용 금지"]
+}
