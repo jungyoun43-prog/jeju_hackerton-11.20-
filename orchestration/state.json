@@ -353,16 +353,23 @@
       ]
     },
     "reading-ui": {
-      "phase": "implementing",
+      "phase": "verified",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-reading-ui",
-      "integrationCommits": [],
-      "note": "사용자지정: 2×2폐기·세부창내부세로스크롤제거·○△×/색/텍스트로핵심요약. docs/reading-flow-contract.md 기준"
+      "integrationCommits": [
+        "c44b1b9",
+        "de4bd86",
+        "2bb41ac"
+      ],
+      "note": "root통합 단위360/360·대화180/180·여정224/224(실제keylesspreview14/모델POST0)·수동47/47·단일페이지193/193·규칙56/56·Lambda빌드. 동일지문9efde4f2f1ec03d1bfb84b1a823f35cccb13e084984fe0771a99b97e10fa3786. source링크node/focus/viewport회귀포함·독립수정확인차단0. wrapper종료143관측과별도proof검증종료0은results에구분. 공개/실모델/ZIP은현재runs증거기준. 실기관·기록·마이크·의료법률/센터실기기미검증."
     },
     "reading-qa": {
-      "phase": "implementing",
+      "phase": "verified",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-reading-qa",
-      "integrationCommits": [],
-      "note": "사용자지정: 2×2폐기·세부창내부세로스크롤제거·○△×/색/텍스트로핵심요약. docs/reading-flow-contract.md 기준"
+      "integrationCommits": [
+        "60e540f",
+        "8bcdb36"
+      ],
+      "note": "root통합 단위360/360·대화180/180·여정224/224(실제keylesspreview14/모델POST0)·수동47/47·단일페이지193/193·규칙56/56·Lambda빌드. 동일지문9efde4f2f1ec03d1bfb84b1a823f35cccb13e084984fe0771a99b97e10fa3786. source링크node/focus/viewport회귀포함·독립수정확인차단0. wrapper종료143관측과별도proof검증종료0은results에구분. 공개/실모델/ZIP은현재runs증거기준. 실기관·기록·마이크·의료법률/센터실기기미검증."
     }
   },
   "review": {

@@ -80,12 +80,12 @@ Lambda는 전용 `OPENAI_SECRET_ARN`·`SESSION_TABLE_NAME`을 함께 요구하�
 
 정책 설정은 같은 절에 해당 대상·정확한 횟수·기간·명시적 긍정 요청이 있어야 합니다. 예: “택시에 15분 안에 최초 포함 최대 2회 재시도를 허용해줘.” 부정문·인용/태그·다른 대상의 허용·예약 시각의 숫자를 권한으로 사용하지 않습니다. 모호하면 설정하지 않습니다. 기관 변경은 이전 성공/실패에 관계없이 새 대행 범위 확인으로 넘기며 이전 연락처에 새 실패를 귀속하지 않습니다.
 
-## 네 작업창의 진행 상태
+## 준비 현황의 진행 상태
 
 일반 POST의 선택progressToken은 UI가 생성하는256bit URL-safe43자다. capabilities의 progress가poll일때만 UI가 별도 POST `/api/agent/progress`에 `{progressToken}`을 보내며, 최대26번·2.5초 이상 간격·동시1개로 읽는다. 이 경로는 모델·budget·세션 생성/lease를 실행하지 않는다. 유효한 미등록/만료 토큰은200 unavailable이고 잘못된입력은400이다. preview는 진행poll을 쓰지 않는다.
 
 실제tool시작·관측결과·답변완료/실패에서 고정enum DTO를 생성한다. 원문·인자·결과·환자정보·번호·URL·reasoning·토큰원문은 진행 기록에 없다. 로컬은메모리, AWS는기존DynamoDB의별도 `progress#sha256(token)` 키·120초TTL을 사용하고 기존session v1/lease/80요청 한도를 유지한다. cloud진행읽기는Secrets Manager/모델준비와 분리한다. 짧은timeout·단일writer·제한된기록예산을 적용해 진행 실패가 실제 모델/저장 응답을 막지 않게 한다. 일시적I/O실패뒤다음실제전이의최신snapshot부터재개하며, 내부128bit writer소유표식과조건부기록으로초기ack유실과다른요청의같은토큰사용을구분한다. 소유표식은외부진행DTO/모델/세션/로그에보내지않고TTL을연장하지않는다.
 
-진행 DTO와 고정 도구 목록은 `app/preparation-stages.js`에서 한 번 정의하며 브라우저 수신·작업창·서버 저장/조회가 같은 엄격 검증을 사용한다. 서버의 `normalizeProgressSnapshot`은 기존 오류 경계를 유지한다.
+진행 DTO와 고정 도구 목록은 `app/preparation-stages.js`에서 한 번 정의하며 브라우저 수신·화면·서버 저장/조회가 같은 엄격 검증을 사용한다. 서버의 `normalizeProgressSnapshot`은 기존 오류 경계를 유지한다.
 
-진행 DTO는 최종 caseState가 아니다. 화면은 마지막 확인된 사실과 실제 실행 관측을 구분하고, 원래 응답을 받은 뒤 사례를 갱신한다. 중지·완료·새대화·재시도에서 늦은 진행도 무시하며 중지는 서버중단이 아니다. 요청id/원문/이력/설정은 재시도에 보존하고 비업무메타데이터인progressToken은 HTTP시도마다 새로 만든다. 이 토큰을 모델/세션/로그/URL/최종응답에 넣지 않는다. [고정 DTO와 범위](../docs/preparation-board-contract.md)를 따른다.
+화면은 자료·병원·이동 요약과 한 페이지 대화이며 진행 DTO는 최종 caseState가 아니다. 화면은 마지막 확인된 사실과 실제 실행 관측을 구분하고, 원래 응답을 받은 뒤 사례를 갱신한다. 중지·완료·새대화·재시도에서 늦은 진행도 무시하며 중지는 서버중단이 아니다. 요청id/원문/이력/설정은 재시도에 보존하고 비업무메타데이터인progressToken은 HTTP시도마다 새로 만든다. 이 토큰을 모델/세션/로그/URL/최종응답에 넣지 않는다. [고정 DTO와 범위](../docs/preparation-board-contract.md)를 따른다.
