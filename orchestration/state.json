@@ -246,7 +246,7 @@
     "journey-backend": {
       "phase": "verified",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-journey-backend",
-      "note": "자연형시연요청liveness보완통합. backend264tests,새공공데이터와통합후rootfresh검증예정.",
+      "note": "자연형 시연 요청 인식 보완 e39fe94 통합. 독립 backend 264검사 통과; 공공데이터 포함 root 통합·공개 모델 재검증 중.",
       "integrationCommits": [
         "04b864d",
         "39d63ac",
@@ -275,19 +275,29 @@
       ]
     },
     "public-data-store": {
-      "phase": "assigned",
+      "phase": "integrated",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-public-data-store",
-      "note": "진료준비내부공공데이터계약에따라분리구현예정. 공개데이터/원자료미확보/표본경계보존."
+      "note": "전용 worktree 커밋 통합 완료. 읽기 전용 공공데이터·표본/분모·개인기록 미사용 경계를 root에서 새로 검증 중.",
+      "integrationCommits": [
+        "6fd3df7",
+        "031e514"
+      ]
     },
     "public-data-adapter": {
-      "phase": "assigned",
+      "phase": "integrated",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-public-data-adapter",
-      "note": "진료준비내부공공데이터계약에따라분리구현예정. 공개데이터/원자료미확보/표본경계보존."
+      "note": "전용 worktree 커밋 통합 완료. 읽기 전용 공공데이터·표본/분모·개인기록 미사용 경계를 root에서 새로 검증 중.",
+      "integrationCommits": [
+        "e43010b"
+      ]
     },
     "public-data-tables": {
-      "phase": "assigned",
+      "phase": "integrated",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-public-data-tables",
-      "note": "진료준비내부공공데이터계약에따라분리구현예정. 공개데이터/원자료미확보/표본경계보존."
+      "note": "전용 worktree 커밋 통합 완료. 읽기 전용 공공데이터·표본/분모·개인기록 미사용 경계를 root에서 새로 검증 중.",
+      "integrationCommits": [
+        "0eac1f7"
+      ]
     }
   },
   "review": {

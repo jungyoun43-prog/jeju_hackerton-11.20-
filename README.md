@@ -13,6 +13,7 @@
 | 자유로운 텍스트·음성 요청 | 키 설정 시 Responses API→검증된 도구→응답. 키가 없으면 `MODEL_NOT_CONNECTED`/503과 입력 복원 |
 | 대화 흐름 미리보기 | 별도 preview API에서 사전 작성 예시를 실행. 실제 공공 snapshot 검색·준비 상태 전이와 합성 응답을 함께 표시 |
 | 기관·지원 데이터 | 허브 계보 3종과 공식 안내 2건으로 문의처·질문·초안·다음 행동 구성 |
+| 내부 공공데이터 스킬 | 의료·돌봄·이동 분류에서 관련 자료 검색 → 보유 snapshot 코드 집계 → 출처·범위·빠진 자료 설명 → 기존 문의 준비에 연결 |
 | 개인 진료기록·전화·의료진 회신 | 합성 사례·시연 어댑터. 공단 조회·실제 발신·예약·배차·동행 배정·결제·병원 전송 미연동 |
 | 수동 작업 화면 | `/workspace.html`에 보존한 개발 검증 도구. 보호자가 순서대로 채워야 하는 서비스 첫 화면이 아님 |
 
@@ -104,6 +105,26 @@ node scripts/datahub-profile.mjs --fetch
 
 후속 우선 후보는 **229 전문질환센터·1304 보건지소 관할구역·216 공공심야약국**입니다. 센터 7·8·10의 도로망·시간대별 평균소요시간은 원자료 확보 후 검토합니다. 현재 구현 데이터 수에는 포함하지 않으며, 문의 대상·질문·시간 조건을 실제로 바꾸는 자료만 추가합니다.
 
+### 대화에서 필요한 공공데이터 찾아 쓰기
+
+공공데이터 검색은 **혼디가 진료 준비 중 사용하는 내부 스킬**입니다. 새 챗봇이나 데이터 메뉴를 만들지 않습니다. “애월과 서귀포의 의료·돌봄 등록 자료를 비교해줘”, “우리 동네 이동·동행 문의처를 찾아줘”처럼 기존 대화창에 요청하면 모델이 `search_public_data`·`analyze_public_data`를 선택할 수 있습니다. 지역별 집계·분모·중복 제외는 코드가 계산하고, 답변은 근거와 다음 문의를 설명합니다.
+
+저장소는 분류 카탈로그와 실제 계산 자료를 분리한 **읽기 전용 JSON/CSV**입니다. 허브1,259개·센터70개, 총1,329개 **메타데이터**를 의료·돌봄·이동 등으로 색인하며, 원자료를 모두 확보한 뜻은 아닙니다. 계산·후보 조회에는 위의3종과 별도 공식안내2건만 사용합니다. 새로운 관리형 DB나 실시간 API는 추가하지 않았습니다.
+
+병원13개는 공개20행에서 폐업7행을 제외한 표본입니다. 특정 지역에서 관측0행이어도 시설이 없다는 뜻은 아닙니다. 돌봄 자료도2020년 등록 주소 기준이며 서비스 관할·현재 인력을 나타내지 않습니다. 애월읍과 서귀포시처럼 행정 수준이 다르면 분모를 따로 표시하고 비율을 직접 비교하지 않습니다. 센터 이동시간 원자료가 없으면 시간대별 ETA를 만들지 않고, 필요한 자료와 택시에 확인할 질문을 반환합니다. 비교 질문만으로 환자의 실제 출발지·휠체어 조건·예약 상태를 바꾸지 않습니다.
+
+키·네트워크 없이 같은 조회를 재현할 수 있습니다.
+
+```bash
+npm run data:catalog -- --check
+npm run data:query -- search --purpose hospital --query 병원
+npm run data:query -- analyze --analysis facility_compare --areas 애월,서귀포
+npm run data:query -- analyze --analysis support_candidates --area '제주시 애월읍' --wheelchair true
+npm run data:query -- analyze --analysis travel_time --area '제주시 애월읍'
+```
+
+`data:catalog --check`는 저장된 감사CSV로 색인을 대조하는 검사이며 원자료/API 갱신이 아닙니다. 자료별 재취득 명령과 이용조건은 [데이터 명세](docs/data-sources.md), 입력·출력과 준비 도구 연결은 [스킬 계약](docs/public-data-skill-contract.md)을 따릅니다.
+
 ## AWS 데모와 자동 배포
 
 **[공개 데모](https://d1mfksxrj025bx.cloudfront.net)** · [GitHub Actions](https://github.com/jungyoun43-prog/jeju_hackerton-11.20-/actions/workflows/deploy-aws.yml)
@@ -141,7 +162,7 @@ npm run package
 
 Lambda 빌드와 ZIP 패키징에는 Python 3가 필요합니다. Lambda ZIP은 `index.mjs`·`deployment.json`으로 구성하며 제출용 `output/jeju-care-compass-mvp.zip`과 구분합니다. 제출 ZIP은 개발 스냅샷이며 이번 버전의 재생성·독립 설치·최종 제출 확인은 [추적표](docs/submission-checklist.md)를 따릅니다. 센터 PC의 GPU·로컬 모델은 요구하지 않지만 센터 실기기 검증은 별도입니다.
 
-- [PRD v0.12](docs/prd.md): 대화 중심 UX, 전화로 협진·휠체어 이동 준비, 실제·시연·후속 기능과 대회 요구사항.
+- [PRD v0.13](docs/prd.md): 대화 중심 UX, 전화 협진·휠체어 이동 준비와 내부 공공데이터 스킬, 실제·시연·후속 기능과 대회 요구사항.
 - [기능 파이프라인](docs/agent-pipeline.md): 요청부터 도구·처리 기록·재확인까지.
 - [외부 의존성](THIRD_PARTY.md): AWS SDK3.1161.0·esbuild0.28.2·라이선스·모델·이미지 기록.
 - [AGENTS.md](AGENTS.md): 조사 방식·데이터·병렬 개발 지침.

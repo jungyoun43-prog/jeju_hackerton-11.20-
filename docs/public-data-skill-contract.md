@@ -8,6 +8,7 @@
 - 원자료 조회는 이미 정제한859(공개20행→정상13후보),327(연결최신파일34업체),254(공개19문의처)와 별도 공식2건을 등록 loader로 읽는다. 새 자료는 저장/이용조건/항목을 확인한 뒤 adapter를 추가한다. 목록의 metadata_updated를 원자료 기준일로 쓰지 않는다.
 - `app/public-data-skill.js`(Node/browser 공유 순수 모듈)와 `app/data/public-data-catalog.json`, 재생성/조회 CLI를 데이터 담당이 소유한다. `agent/public-data-tools.mjs`와 별도 adapter검사는 도구 담당이 소유한다. root가 기존 Agent tool목록·Prompt·기존 준비도구에 연결한다.
 - 집계/비율/중복 제외/후보선정은 코드가 수행한다. LLM은 도구 선택과 설명을 맡고 값·출처·분모·표본/결측·자료 시점·한계를 보존한다. 임의SQL/파일경로/URL·원자료 fetch를 모델 인자로 받지 않는다.
+- coverage.collectedAt은 현재 저장snapshot을 취득한 날짜다. 859의 원자료 수집일2024-10-17과 행별 갱신 범위는 coverage.label에서 별도로 보존하며 취득일2026-10-31을 기준일로 사용하지 않는다.
 
 ## 공개 모듈 API
 

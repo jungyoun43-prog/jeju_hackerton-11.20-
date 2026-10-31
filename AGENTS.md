@@ -37,6 +37,8 @@
 
 ## 자료조사
 
+- 공공데이터 조회는 [내부 스킬 계약](docs/public-data-skill-contract.md)을 따른다. 분류 카탈로그1,329건과 보유 원자료3종·별도 공식안내2건을 구분하고 읽기 전용 JSON/CSV를 사용한다. 임의SQL/URL/경로·환자 기록을 분석 도구에 넣지 않는다. 비교는 출처·시점·관측 분모·주소 결측을 보존하며0을 지역 부재로 해석하지 않는다. 다른 지역 탐색은 실제 방문 조건을 바꾸지 않는다. 센터 이동시간 명세만으로 ETA를 만들지 않는다. 데이터 조회 결과는 기존 문의 준비 도구에 연결하며 별도 범용 챗봇을 만들지 않는다.
+
 - **자료조사를 할 때는 `insane_search`를 사용한다.** 이는 사용자가 지정한 작업 방식이다.
 - 해당 도구는 [fivetaku/insane-search](https://github.com/fivetaku/insane-search) 스킬이며, Codex 설치명은 `insane-search`다.
 - 스킬 경로는 `$CODEX_HOME/skills/insane-search`이며, 기본 경로는 `~/.codex/skills/insane-search`다. 사용 전 해당 경로의 `SKILL.md`를 확인한다.

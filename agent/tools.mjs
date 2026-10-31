@@ -1,3 +1,5 @@
+import { PUBLIC_DATA_TOOLS, executePublicDataTool, PUBLIC_DATA_SOURCE_URLS } from './public-data-tools.mjs';
+import { getPreparationDataEvidence } from '../app/public-data-skill.js';
 import { randomUUID } from 'node:crypto';
 import { applyAction, createDemoCase, getTasks, buildReport } from '../app/domain.js';
 import { getVisitSupportSummary, buildSupportInquiry } from '../app/visit-support.js';
@@ -15,7 +17,7 @@ import { getCareJourneySummary, JOURNEY_SCENARIOS } from '../app/care-journey.js
 const registry = validateSupportRegistry(supportData);
 const HOSPITAL_SOURCE = 'https://jejudatahub.net/data/view/data/859';
 const NHIS_SOURCE = 'https://www.nhis.or.kr/';
-const SOURCE_URLS = new Set([HOSPITAL_SOURCE, NHIS_SOURCE, ...registry.providers.flatMap(item => [item.source.url, item.source.hubUrl]).filter(Boolean)]);
+const SOURCE_URLS = new Set([HOSPITAL_SOURCE, NHIS_SOURCE, ...registry.providers.flatMap(item => [item.source.url, item.source.hubUrl]).filter(Boolean), ...PUBLIC_DATA_SOURCE_URLS.map(value=>new URL(value).href)]);
 export function assertSourceUrl(value) {
   let parsed; try { parsed = new URL(value); } catch { throw new AgentError('INVALID_SOURCE', '확인된 공식 출처 URL이 필요합니다.'); }
   fail(parsed.protocol === 'https:' && !parsed.username && !parsed.password && !parsed.port && SOURCE_URLS.has(parsed.href), 'INVALID_SOURCE', '확인된 공식 출처만 사용할 수 있습니다.');
@@ -54,8 +56,20 @@ export const AGENT_TOOLS = Object.freeze([
   {name:'request_support_contact', description:'현재 초안과 공통 전화 계획으로 합성 응답을 실행한다. 휠체어 이용자격·등록·탑승·승하차·동행인 탑승·희망 시각의 차량 여부도 문의 항목이다. 실제 예약·배차·동행인 배정은 하지 않는다.', inputSchema:objectSchema({kind:kindSchema}, ['kind'])},
   {name:'prepare_review', description:'현재 보유 자료와 접수 조건으로 의료진 검토 준비 상태를 정리한다. 미시행 대면진찰과 공유 동의는 대신 만들지 않는다.', inputSchema:objectSchema()},
   {name:'build_report', description:'확인된 준비 상태·근거와 미확인 사항을 보고서로 정리한다. 의료적 결론을 내리지 않는다.', inputSchema:objectSchema()},
+  ...PUBLIC_DATA_TOOLS,
 ]);
 const toolMap = new Map(AGENT_TOOLS.map(tool => [tool.name, tool]));
+const PUBLIC_DATA_TOOL_NAMES = new Set(PUBLIC_DATA_TOOLS.map(tool=>tool.name));
+function preparationDataContext(state) {
+  return {area:state.patient.area,wheelchair:state.visitSupport.requirements.wheelchair,hospitalName:state.selectedHospital?.companyName || state.patient.localHospital};
+}
+function preparationDataEvidence(state,purpose) {
+  const evidence=getPreparationDataEvidence(preparationDataContext(state),purpose);
+  // 이미 선택·준비한 문의를 다른 후보 제안으로 덮지 않고 근거와 질문만 붙인다.
+  const {preparationActions,...compact}=evidence;
+  return compact;
+}
+
 
 export function createPhoneSimulationAdapter() {
   return Object.freeze({
@@ -271,6 +285,12 @@ export function createToolDispatcher({phoneAdapter = createPhoneSimulationAdapte
     validateSchema(input, spec.inputSchema);
     if (signal?.aborted) throw new AgentError('AGENT_TIMEOUT', '요청 처리를 중단했습니다.', 504);
     let next = state, data = {}, item, events = [], pendingActions = [];
+    if (PUBLIC_DATA_TOOL_NAMES.has(name)) {
+      const result=executePublicDataTool({name,input,state});
+      for (const item of result.events) if(item.source?.startsWith('https:'))assertSourceUrl(item.source);
+      return result;
+    }
+
     const callAt = () => new Date(clock()).toISOString();
     let attemptedAt;
     const checkCallGate = target => {
@@ -331,6 +351,7 @@ export function createToolDispatcher({phoneAdapter = createPhoneSimulationAdapte
         const found = filterHospitals(hospitalData.records,{department:input.department ?? '',area:input.area ?? ''}).filter(record => !input.name || record.companyName.includes(input.name));
         data = {records:found.slice(0,5),total:found.length,registeredRecords:13,previewRows:20,source:HOSPITAL_SOURCE,collectedAt:'2024-10-17 13:53',capacityVerified:false,clinicalSuitabilityVerified:false};
         events.push(event(name,'공개 기관 등록정보 조회',`공개13개 기관에서 문의 조건에 맞는 ${found.length}개 등록 정보를 찾았습니다. 현재 수용·협진 참여·진료 적합성은 미확인입니다.`,{source:HOSPITAL_SOURCE}));
+        data.publicDataEvidence=preparationDataEvidence(next,'hospital');
         break;
       }
       case 'select_hospital_contact': {
@@ -427,6 +448,7 @@ export function createToolDispatcher({phoneAdapter = createPhoneSimulationAdapte
         data = {provider:publicProvider(provider),draft:buildSupportInquiry(next,input.kind),...realCallStatus,callPlan:buildCallPlan(next,input.kind),...(preferenceNotice ? {preferenceNotice} : {})};
         if (preferenceNotice) events.push(event(name,'선호 택시 적용 조건 확인',preferenceNotice.message,{status:'needs_input',source:provider.source.url}));
         events.push(event(name,`${input.kind === 'taxi' ? '택시' : '동행'} 문의 초안 준비`,`${provider.name}에 날짜·지역·지원 범위를 확인할 초안을 준비했습니다. 환자 실명·진단·의료기록은 포함하지 않았습니다.`,{source:provider.source.url}));
+        data.publicDataEvidence=preparationDataEvidence(next,input.kind);
         break;
       }
       case 'request_support_contact': {

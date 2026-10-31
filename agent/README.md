@@ -16,6 +16,18 @@
 
 도구 인자는 allowlist 스키마로 검증합니다. 상태는 공공 snapshot·고정 합성 템플릿·도메인 reducer로만 변경합니다. 실명·상세주소·임의 의료기록·출처 URL을 도구 인자로 받지 않고 진찰 소견·임상 결론을 작성하지 않습니다. 공단 연계의 승인된 어댑터가 없어 조회 완료를 표시하지 않습니다. Bedrock 어댑터는 보존하되 선택하지 않습니다.
 
+## 진료 준비용 공공데이터 스킬
+
+등록 도구는17개이며 그중 `search_public_data`·`analyze_public_data`는 읽기 전용입니다. 전자는 업무 목적(hospital/taxi/companion/travel)과200자 이내 검색어로 최대8개 메타데이터를 반환합니다. 후자는 두 지역의 관측 등록 현황, 지역·휠체어 조건의 문의 후보, 이동시간 원자료 접근 범위를 고정 함수로 계산합니다. 임의SQL·파일경로·URL·원자료 fetch를 모델 인자로 받지 않습니다.
+
+`app/data/public-data-catalog.json`은 기존 감사CSV의 허브1,259건·센터70건을 분류한 목록입니다. 별도 공식안내2건과 실제 보유3종 snapshot을 구별합니다. 카탈로그 갱신일은 원자료 기준일이 아닙니다. `app/public-data-skill.js`가 자료별 출처·기준일·수집일·관측 분모·폐업/중복 제외·주소 결측·조회 한계를 반환하고, `agent/public-data-tools.mjs`가 스키마·공식HTTPS출처를 검증합니다. 새 관리형 DB·운영 API·개인 기록 연결은 없습니다.
+
+병원은 공개20행→정상13행의 표본, 돌봄은2020년19개 등록 문의처입니다. 관측0행을 지역 시설 부재로 설명하지 않습니다. 읍면동·시를 섞으면 각 주소 해상도의 분모를 따로 보존합니다. 센터7/8/10은 명세만 있어 `travel_time`은 unavailable·수치 없음으로 반환합니다. LLM은 이 값을 설명하고 문의 질문으로 이어가며 ETA나 전체 분포를 만들지 않습니다.
+
+분석에는 출발지역·휠체어 여부·방문기관명만 context로 넘기고 환자 이름·진료기록은 넘기지 않습니다. 읽기 도구는 caseState와 새 저장 필드를 바꾸지 않으며 query를 새 로그/세션 필드에 저장하지 않습니다. 사용자의 원래 메시지가 모델에 전달되는 기존 대화 경로와는 구분합니다. 다른 지역·지원조건을 탐색한 결과에는 현재 사례의 문의 실행 제안을 붙이지 않습니다. 현재 조건과 맞으면 검증한 providerId의 `prepare_inquiries` 제안을 반환하며 실제 초안 작성은 기존 도구가 별도로 수행합니다. `search_hospital_contacts`·`prepare_inquiries` 결과에도 사용한 데이터 근거를 붙입니다.
+
+같은 CLI 계산은 키·네트워크 없이 `npm run data:query -- ...`로 재현합니다. `npm run data:catalog -- --check`는 저장 감사CSV와의 대조이며 API/raw 갱신이 아닙니다. [계약](../docs/public-data-skill-contract.md)·[데이터 명세](../docs/data-sources.md)와 실제 검증 기록을 따릅니다.
+
 ## 보관과 한도
 
 로컬은 메모리, AWS는 `createDynamoSessionStore`입니다. AWS 저장 필드는 opaque sessionId·requestIds·턴 수·정규화된 합성 상태·TTL 및 처리 중 lease입니다. 원문·이력·모델 답변·reasoning·키는 저장하지 않습니다. 강한 읽기와65초 lease 소유권 조건으로 동시 저장을 보호하고, 애플리케이션에서도1시간 TTL 만료를 검사합니다. DynamoDB의 실제 삭제는 TTL 정책에 따라 지연될 수 있습니다.

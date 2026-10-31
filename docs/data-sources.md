@@ -247,7 +247,7 @@ insane-search의 `weak_ok`는 본문 검토의 출발점으로 취급했다. 제
 | 초기 지도 마커 | 애월 인근·제주 시내의 합성 지점 | 실제 환자 주소·협진 참여 병원·공공데이터 좌표가 아님. 지도에 합성 표시 |
 | 환자·문서·통화·회신 | 자체 시연용 합성 fixture | 실제 개인정보·의료행위 수행 증거가 아님. 합성 출처를 결과물까지 유지 |
 | 이전 진료 연결 배너 v2 | 내장 Imagegen으로 만든 부모·의사·자녀 연결 일러스트 `app/assets/jeju-care-v2.png`. 사용자 후속 피드백으로 현재 화면에서 제거하고 이력 자산으로 보존 | 현재 대화 화면의 적용 자산이 아님. 도구의 상세 모델 ID는 공개되지 않아 추정 기재하지 않음. 정확 프롬프트·사용 도구·최종 파일은 `app/assets/manifest.json` 기준. 적용 계정의 생성 서비스 이용조건은 최종 제출 때 확인 |
-| 이미지 로고 | 내장 Imagegen으로 만든 현무암·연결 모티브의 투명 PNG `app/assets/hondi-logo-v1.png` | 원본·정확 프롬프트·사용 도구·생성일은 같은 manifest에 기록. 상표 등록·유사상표 조사는 수행하지 않음. 현재 대화·수동 화면 로고로 사용, 새 PC·모바일·ZIP 검증은 결과 기록 기준 |
+| 이미지 로고 | 사용자가 지정한 에이전트 대화의 최종 Imagegen 귤 심볼·소문자hondi 투명PNG `app/assets/hondi-logo-v1.png` | 원본·정확 프롬프트·사용 도구·생성일·trim/resize 범위는 같은 manifest에 기록. 상표 등록·유사상표 조사는 수행하지 않음. 현재 대화·수동 화면 로고로 사용, 새 PC·모바일·ZIP 검증은 결과 기록 기준 |
 | Impeccable | [원본](https://github.com/pbakaus/impeccable), revision `b7a89176e4e87422b40f98adabceb051dbb5448b` | 개발 시 디자인 지침으로 사용. 자동 context 로더 권한 실패 후 프로젝트 문맥·Operate/craft 지침을 직접 적용. 사용자 화면의 런타임 AI 모델이 아님 |
 | Awesome Design Skills · Refined | [원본 스킬](https://github.com/bergside/awesome-design-skills/blob/f631a09b4fcc0166f2e2c1a8c81906ef680c57e8/skills/refined/SKILL.md) | MIT 표기 확인. 토큰·간격·상태·접근성 지침 참고. 예시 팔레트·영문 글꼴을 그대로 복제하지 않음 |
 | Sites·Imagegen·Codex | 로컬 웹 구현·생성 이미지·코드/문서 작성 보조 | 개발 도구 사용과 제품 런타임 기능을 구분. 숨겨진 모델 버전·사용량을 추정하지 않음 |
@@ -257,3 +257,29 @@ insane-search의 `weak_ok`는 본문 검토의 출발점으로 취급했다. 제
 | 세션·budget | 로컬 메모리·AWS DynamoDB | 합성 상태 TTL1시간·UTC 전역80요청. 원문·답변 미저장. 동일 세션 중복 재전송 미차감 확인 |
 
 ZIP에는 최소 기관 사실 snapshot·집계·출처·재취득 코드, 합성 의료 사례와 라이브러리 고지·생성 자산 명세를 포함한다. 원자료 전체 파일·지도 타일·외부 논문 전문은 포함하지 않는다. 최종 소스·데이터·환경·외부 코드·모델 기록은 [제출 체크리스트](submission-checklist.md)와 [구현 결과](implementation-results.md)에 연결한다.
+
+## 10. 진료 준비용 분류 카탈로그·코드 계산
+
+이 기능은 기존 감사자료를 재사용한 읽기 전용JSON/CSV 저장소다. 새 원자료1,329종을 수집하거나 새로운 실시간 API·관리형DB를 연결한 것이 아니다.
+
+| 저장 구분 | 파일·범위 | 사용 방법·한계 |
+| --- | --- | --- |
+| 분류 카탈로그 | `app/data/public-data-catalog.json`; 허브 목록1,259·센터 명세70=1,329건, 공식안내2건 별도 | 제목·의료/돌봄/이동 폴더·태그·항목·공식URL·조사 상태로 관련 최대8건 검색. 목록 수정일≠원자료 기준일 |
+| 계산·후보 snapshot | 기존 병원859·택시327·돌봄254와 별도 공식안내2건 | 데이터셋3종+공식안내2건이다. 병원은20행중 정상13개·돌봄19개·택시34개. 메타데이터만 있는 자료를 계산에 섞지 않음 |
+| 공통 계산 모듈 | `app/public-data-skill.js` | 주소기준 지역 집계·중복/폐업 제외·분모·결측, 지원 후보/질문과 유효한 문의준비 제안. 개인 진료기록 미사용 |
+| Agent 어댑터 | `agent/public-data-tools.mjs` | 고정 schema·허용 공식HTTPS출처 검증. 임의SQL/URL/경로 없음, 사례 상태 불변·query를 새 로그/세션필드에 저장하지 않음 |
+
+병원 데이터의 공통 원자료 기준일은 미확인(null)이며 원자료 수집2024-10-17, 행별 갱신 범위와2026-10-31 공개응답 취득일을 따로 보존한다. 도구의 `coverage.collectedAt`은 저장 snapshot 취득일이고 원자료 수집일은 `coverage.label`에 표시한다. 병원/돌봄 비교는 관측 등록 주소 기준의 부분 집계다. 서귀포 병원 관측0행을 실제 시설 부재로 해석할 수 없다. 읍면동이 미표기된 돌봄12행은 읍면동 집계 분모에서 빠지며, 시 비교에서는 시를 알 수 있는19행을 사용한다. 읍면동과 시를 섞으면 각 해상도/분모를 따로 반환하고 비율의 직접 비교를 제한한다. 기관 수로 질적 우열·환자 적합성을 판단하지 않는다.
+
+센터7도로망·8노드·10시간대별 평균소요시간은 항목 명세만 확인했다. `travel_time`은 unavailable·수치/평균/ETA 없음과 필요한 원자료·택시 문의 질문을 반환한다. 웹 설명이나 목록 수정일만으로 이동시간을 계산하지 않는다.
+
+```bash
+npm run data:catalog -- --check
+npm run data:query -- search --purpose taxi --query 택시
+npm run data:query -- analyze --analysis facility_compare --areas 제주시,서귀포시
+npm run data:query -- analyze --analysis facility_compare --areas 애월,서귀포
+npm run data:query -- analyze --analysis support_candidates --area '제주시 애월읍' --wheelchair true
+npm run data:query -- analyze --analysis travel_time --area '제주시 애월읍'
+```
+
+`--check`는 보관한 `research/datahub_catalog_screening_2026-10-31.csv`와 `research/center_schema_index_2026-10-31.csv`에서 색인을 재생성해 현재JSON과 대조한다. 이 검사는 네트워크/API/raw갱신이 아니다. 원자료 갱신은 앞 절의 `datahub-profile.mjs --fetch`와 확인한 공개파일 취득·`support-data.mjs` 변환 절차를 따른다. 새 자료는 이용조건·항목·시점·저장 범위를 확인하고 loader를 등록해야 계산 가능하다. 목록·공식URL의 보관이 원자료 전체 재배포 허락을 뜻하지 않는다.
