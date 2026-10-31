@@ -101,11 +101,23 @@ function supportCandidates(state,kind) { return getSupportCandidates(registry,{k
 function publicProvider(item) { return {...item,source:{...item.source,url:assertSourceUrl(item.source.url)}}; }
 
 function explicitJourneyDemo(message, scenarioId) {
-  const request = typeof message === 'string' ? message.normalize('NFKC') : '';
+  const request = typeof message === 'string' ? message.normalize('NFKC').replace(/\s+/g,' ') : '';
   if (/(?:시연|데모|미리\s*보기)(?:은|는|을|를)?\s*(?:하지|말|없이|금지|아니|원치)|(?:실제|진짜)로만/.test(request)) return false;
+  // 실패 상황의 "받지 않는다"와 사용자의 "시연하지 말라"는 서로 다른 뜻이다.
+  if (/(?:시연|데모|미리\s*보기).{0,40}(?:보여(?:\s*주|줘)?|(?:실행|진행|재현|시작)(?:해\s*주|하)?)(?:지\s*(?:마|말)|면\s*안\s*(?:돼|되)|서는\s*안)/.test(request)
+    || /(?:시연|데모|미리\s*보기)(?:은|는|을|를)?\s*(?:하|해(?:\s*주)?)(?:면|서는)\s*안\s*(?:돼|되)/.test(request)) return false;
   const requested = /(?:시연|데모|미리\s*보기).{0,30}(?:보여|실행|진행|재현|시작)|(?:보여|실행|진행|재현|시작).{0,30}(?:시연|데모|미리\s*보기)|\b(?:run|show)\b.{0,30}\b(?:demo|preview)\b/i.test(request) || /(?:시연|데모|미리\s*보기)(?:을|를)?\s*(?:해\s*줘|해\s*주|해주세요)/.test(request);
-  const terms = { call_no_answer:/무응답|call_no_answer/,call_ai_declined:/AI.{0,8}(?:응대\s*)?거절|call_ai_declined/i,call_identity_required:/본인\s*확인|call_identity_required/,call_documents_or_schedule:/서류.{0,8}일정|서류.{0,8}막힘|call_documents_or_schedule/,missing_record:/자료\s*(?:누락|부족)|판독문\s*(?:누락|없)|missing_record/, jeju_unavailable:/제주.{0,12}(?:접수\s*)?거절|접수\s*거절|jeju_unavailable/, time_changed:/(?:진료\s*)?(?:시각|시간|일정)\s*변경|time_changed/ };
-  return requested && terms[scenarioId].test(request);
+  // 상황 표현만 조사·시제·띄어쓰기를 허용한다. 실행 의도 검사는 위에서 별도로 유지한다.
+  const terms = {
+    missing_record: /(?:자료|판독문|기록|문서).{0,8}(?:누락|부족|빠졌|빠진|빠져|없)|missing_record/,
+    jeju_unavailable: /제주.{0,12}(?:접수\s*)?거절|접수거절|제주.{0,12}(?:요청|접수|협진).{0,12}(?:받지않|안받|수락하지않|거부|불가)|jeju_unavailable/,
+    time_changed: /(?:시간|시각|일정).{0,8}(?:변경|바뀌|바뀐|달라졌|달라진)|time_changed/,
+    call_no_answer: /무응답|(?:전화|연락).{0,12}(?:안받|받지않|받을수없|연결되지않|연결안되|응답하지않|응답이없)|call_no_answer/,
+    call_ai_declined: /(?:AI|인공지능).{0,18}(?:거절|거부|응대하지않|응답하지않|받지않|안받)|call_ai_declined/i,
+    call_identity_required: /(?:본인|신원).{0,5}(?:확인|인증)|call_identity_required/,
+    call_documents_or_schedule: /서류.{0,8}(?:일정|막힘|부족|빠졌|빠진|없|미비)|(?:예약|일정|접수).{0,8}(?:안되|되지않|불가|못잡|잡지못)|call_documents_or_schedule/,
+  };
+  return requested && terms[scenarioId].test(request.replace(/\s+/g,''));
 }
 const REQUEST_ENDING = String.raw`(?:해\s*(?:줘(?:요)?|주세요|주십시오|주셔요)|하(?:세요|십시오)|(?:를\s*)?허용(?:해\s*(?:줘(?:요)?|주세요)|합니다|할게요))(?=\s*$)`;
 const RETRY_ACTION = String.raw`(?:재시도|다시\s*(?:문의|연락|시도))(?:를|는|만|도)?\s*`;

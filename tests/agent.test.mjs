@@ -574,3 +574,80 @@ test('일반 방문 요청은 기존 도구 뒤 get_care_journey의 실제 변�
   for(const userMessage of ['자료가 없으니 준비해줘','자료 누락 시연하지 말고 실제로 해줘','자료 누락 시연이 무엇인지 설명해줘']) await assert.rejects(dispatch({name:'run_journey_demo',input:{scenarioId:'missing_record'},state:createDemoCase(),userMessage}),e=>e.code==='EXPLICIT_DEMO_REQUIRED');
   for(const input of [{scenarioId:'missing_record',outcome:'local_transfer'},{scenarioId:'missing_record',date:'2026-11-20'},{scenarioId:'missing_record',excerpt:'임의 원문'}]) await assert.rejects(dispatch({name:'run_journey_demo',input,state:createDemoCase(),userMessage:'자료 누락 상황을 합성 시연으로 실행해줘'}),e=>e.code==='INVALID_TOOL_ARGUMENTS');
 });
+
+
+const liveTimeChangeRequest='진료 시간이 바뀌었을 때의 합성 시연을 보여줘. 기존 차량·동행 안내에서 무엇을 다시 확인해야 하는지와 아직 실행하지 않은 일을 정리해줘.';
+const naturalDemoRequests=[
+  ['missing_record','run_journey_demo','진료 자료가 빠졌을 때의 합성 시연을 보여줘.'],
+  ['missing_record','run_journey_demo','판독문이 빠진 상황을 합성 시연으로 재현해줘.'],
+  ['missing_record','run_journey_demo','필요한 자료가 없는 상황의 합성 시연을 보여줘.'],
+  ['jeju_unavailable','run_journey_demo','제주 기관이 요청을 받지 않는 상황을 합성 시연으로 보여줘.'],
+  ['jeju_unavailable','run_journey_demo','제주 병원이 접수 요청을 안 받는 합성 시연을 보여줘.'],
+  ['time_changed','run_journey_demo',liveTimeChangeRequest],
+  ['time_changed','run_journey_demo','진료 시각이 바뀐 상황을 합성 시연으로 보여줘.'],
+  ['time_changed','run_journey_demo','일정이 변경된 상황의 합성 시연을 보여줘.'],
+  ['call_no_answer','run_call_recovery_demo','전화를 안 받는 상황을 합성 시연으로 보여줘.'],
+  ['call_no_answer','run_call_recovery_demo','전화를 받지 않는 상황의 합성 시연을 보여줘.'],
+  ['call_ai_declined','run_call_recovery_demo','AI 응대를 거절하는 상황을 합성 시연으로 보여줘.'],
+  ['call_identity_required','run_call_recovery_demo','기관이 본인확인을 요구하는 합성 시연을 보여줘.'],
+  ['call_identity_required','run_call_recovery_demo','본인 인증이 필요한 상황의 합성 시연을 보여줘.'],
+  ['call_documents_or_schedule','run_call_recovery_demo','서류가 부족한 상황을 합성 시연으로 보여줘.'],
+  ['call_documents_or_schedule','run_call_recovery_demo','예약이 안 되는 상황을 합성 시연으로 보여줘.'],
+  ['call_documents_or_schedule','run_call_recovery_demo','예약이 되지 않는 상황의 합성 시연을 보여줘.'],
+];
+function assertNaturalDemoResult(data,scenarioId) {
+  assert.equal(data.pathway.outcome,'unconfirmed');
+  assert.ok(Object.values(data.boundary).every(value=>value===false));
+  if(scenarioId.startsWith('call_')) assert.ok(data.handoffs.length>0);
+  else assert.equal(data.activeScenario.id,scenarioId);
+  if(scenarioId==='time_changed') {
+    assert.equal(data.schedule.time,'14:00');assert.equal(data.schedule.taxiStatus,'needs_recheck');assert.equal(data.schedule.companionStatus,'needs_recheck');
+    assert.equal(data.schedule.recheckReasons.length,2);assert.match(data.schedule.recheckReasons.join(' '),/10:00 → 14:00/);
+  }
+}
+
+test('7개 합성 상황은 한국어 조사·시제·빠짐·받지않음 자연형을 dispatcher에서 실행한다',async()=>{
+  const dispatch=createToolDispatcher();
+  for(const [scenarioId,name,userMessage] of naturalDemoRequests) {
+    const original=createDemoCase(),before=structuredClone(original),result=await dispatch({name,input:{scenarioId},state:original,userMessage});
+    assertNaturalDemoResult(result.data,scenarioId);assert.deepEqual(original,before);
+    assert.ok(result.events.some(item=>item.tool===name&&item.isSimulation===true),userMessage);
+  }
+});
+
+test('실제 실패 문장과 7상황 자연형은 provider fixture의 get_case→demo 도구→최종 응답으로 이어진다',async()=>{
+  for(const [index,[scenarioId,name,message]] of naturalDemoRequests.entries()) {
+    const provider=scripted([
+      use(call('get_case',{},`natural-case-${index}`)),
+      use(call(name,{scenarioId},`natural-demo-${index}`)),
+      input=>{
+        const result=input.messages.at(-1).content[0].toolResult;assert.equal(result.status,'success',message);
+        assertNaturalDemoResult(result.content[0].json,scenarioId);
+        return done('요청한 합성 상황의 준비 상태와 재확인·사람 인계를 정리했습니다. 실제 발신·기관 전송·예약은 하지 않았습니다.');
+      },
+    ]);
+    const store=createMemorySessionStore(),response=await post(createAgentService({provider,store}),req({message,requestId:`natural-demo-request-${index}`})),body=json(response);
+    assert.equal(response.statusCode,200,message);assert.equal(provider.calls.length,3);
+    assert.ok(body.events.some(item=>item.tool===name&&item.status==='completed'),message);
+    assert.ok(!body.events.some(item=>item.status==='error'),message);
+    assert.equal(JSON.stringify(store.inspect()).includes(message),false);
+    if(scenarioId==='time_changed') {
+      assert.equal(body.caseState.visitSupport.requirements.appointmentTime,'14:00');
+      assert.equal(body.caseState.visitSupport.taxi.status,'needs_recheck');assert.equal(body.caseState.visitSupport.companion.status,'needs_recheck');
+    }
+  }
+});
+
+test('자연형 상황을 알아도 일반 요청·설명만 요청·부정한 시연 명령은 실행하지 않는다',async()=>{
+  const dispatch=createToolDispatcher(),contexts=[
+    ['missing_record','자료가 빠진'],['jeju_unavailable','제주 기관이 요청을 받지 않는'],['time_changed','진료 시간이 바뀌었을 때의'],
+    ['call_no_answer','전화를 안 받는'],['call_ai_declined','AI 응대를 거절하는'],['call_identity_required','본인확인을 요구하는'],['call_documents_or_schedule','예약이 안 되는'],
+  ];
+  for(const [scenarioId,context] of contexts) {
+    const name=scenarioId.startsWith('call_')?'run_call_recovery_demo':'run_journey_demo';
+    for(const userMessage of [`${context} 상황에서 남은 준비를 정리해줘.`,`${context} 상황의 합성 시연이 무엇인지 설명해줘.`,`${context} 상황을 시연하지 말아줘.`,`${context} 상황의 합성 시연을 보여주지 마.`,`${context} 상황의 합성 시연을 실행하면 안 돼.`]) {
+      const state=createDemoCase(),before=structuredClone(state);
+      await assert.rejects(dispatch({name,input:{scenarioId},state,userMessage}),e=>e.code==='EXPLICIT_DEMO_REQUIRED',userMessage);assert.deepEqual(state,before);
+    }
+  }
+});
