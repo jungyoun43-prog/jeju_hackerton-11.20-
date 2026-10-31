@@ -9,7 +9,7 @@ import { runtimeFingerprint } from '../orchestration/checks.mjs';
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const servedRoot=process.env.QA_SERVED_SOURCE_ROOT?resolve(process.env.QA_SERVED_SOURCE_ROOT):root;
 const require=createRequire(import.meta.url);
-const directory='.impeccable/review/reading/journey';
+const directory='.impeccable/review/grid/journey';
 const scenarioIds=['missing_record','jeju_unavailable','time_changed'];
 const recoveryScenarioIds=['call_no_answer','call_ai_declined','call_identity_required','call_documents_or_schedule'];
 const allowedScenarioIds=[...scenarioIds,...recoveryScenarioIds];
@@ -155,7 +155,7 @@ async function runPreview(page,button,id,posts,prefix) {
   if(!actual)throw new Error('실제 preview 응답 계약이 맞지 않습니다.');
   await readPlan(page);
   const answer=page.locator('[data-stage-id="plan"] #conversation-scroll .message.assistant:not(.greeting)').last();
-  record(`${prefix} 미리보기 답변은 상시 본문에서 문서 스크롤로 읽음`,await answer.isVisible() && includes(await answer.innerText(),data.reply) && await page.locator('#conversation-scroll').evaluate(node=>!node.closest('#preparation-details') && getComputedStyle(node).overflowY==='visible' && node.scrollHeight<=node.clientHeight+2));
+  record(`${prefix} 미리보기 답변칸은 내부 스크롤 없이 문서로 읽음`,await answer.isVisible() && includes(await answer.innerText(),data.reply) && await page.locator('#conversation-scroll').evaluate(node=>node.closest('[data-stage-id]')?.dataset.stageId==='plan' && getComputedStyle(node).overflowY==='visible' && node.scrollHeight<=node.clientHeight+2));
   const summary=await page.evaluate(async state=>(await import('/care-journey.js')).getCareJourneySummary(state),data.caseState);
   return {preview,data,summary};
 }

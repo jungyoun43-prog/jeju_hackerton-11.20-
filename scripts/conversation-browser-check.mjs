@@ -17,7 +17,7 @@ catch {throw new Error('선택 QA 도구 Playwright가 필요합니다. README�
 const base=new URL(process.env.BASE_URL||'http://127.0.0.1:4173');
 // 이 검사는 실제 503/고정 preview와 주입 응답을 함께 쓴다. 공개 유료 서버에서는 실행하지 않는다.
 if(!['localhost','127.0.0.1','[::1]'].includes(base.hostname) || !['http:','https:'].includes(base.protocol) || base.username || base.password)throw new Error('BASE_URL은 키를 끈 localhost QA 서버여야 합니다.');
-const directory='.impeccable/review/reading/conversation';
+const directory='.impeccable/review/grid/conversation';
 const storageKey='jeju-care-preferences-v1';
 const fixtureSessionId='q'.repeat(43);
 const configuredCaps={llm:true,model:'gpt-6.1-sol',phone:'simulation',healthRecords:'demo',voiceInput:'browser'};
@@ -254,7 +254,7 @@ try {
       proof[label].screenshot=await screenshot(page,`initial-${label}`);
       record(`${width}px 가로 넘침과 문서 흐름의 입력 접근`,proof[label].noOverflow && (await reachable(page.locator('#request-input'))).reachable && (await reachable(page.locator('#send-request'))).reachable);
       const stageNames=await page.locator('#stage-navigation').textContent();
-      record(`${width}px 상시 답변 본문과 병원·자료·이동·동행 읽기 요약`,await page.locator('#preparation-board [data-stage-id]').count()===4 && await page.locator('#stage-navigation [data-open-stage]').count()===3 && await page.locator('[data-stage-id="plan"]').isVisible() && await page.locator('#preparation-details').evaluate(node=>node instanceof HTMLDetailsElement && !node.open) && await page.locator('[data-case-status]').count()===4 && ['자료','병원','이동'].every(term=>stageNames.includes(term)));
+      record(`${width}px 네 작업칸은 모두 보이고 네 요약에서 자료·병원·이동·답변으로 이동`,await page.locator('#preparation-board>[data-stage-id]').evaluateAll(nodes=>nodes.length===4 && nodes.every(node=>node.checkVisibility())) && await page.locator('#stage-navigation [data-open-stage]').count()===4 && await page.locator('[data-stage-id="plan"]').isVisible() && await page.locator('#preparation-details').count()===0 && await page.locator('[data-case-status]').count()===4 && ['자료','병원','이동'].every(term=>stageNames.includes(term)));
       record(`${width}px 로고·자가 호스팅 Pretendard·제주 배경, 인물사진 비노출`,await page.locator('.brand img').first().evaluate(e=>e.complete && e.naturalWidth>0) && await backgroundLoaded(page) && await page.locator('.welcome-photo').count()===0 && await page.evaluate(()=>getComputedStyle(document.body).fontFamily.includes('Pretendard') && [...document.fonts].some(font=>font.family.replaceAll('"','')==='Pretendard' && font.status==='loaded')));
       record(`${width}px 설정은 선택이며 준비 대화에 필수 수동 폼 없음`,await page.locator('#conversation-form select,#conversation-form input[type=checkbox]').count()===0 && await page.locator('#preferences-form [required]').count()===0 && await page.locator('#preferences-form select').count()===1);
       record(`${width}px 입력 가까이 실제 연락·예약 한계 표시`,await disclosure(page));
