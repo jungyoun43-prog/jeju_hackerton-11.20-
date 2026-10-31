@@ -236,7 +236,7 @@ test('새 세션 기본 설정은 실제 택시 초안 선택에 쓰고 동의·
     input => {
       const context = JSON.parse(input.messages[0].content[0].text);
       assert.deepEqual(context.carePreferences,preferences);
-      assert.equal(context.preferencesApplied,true);
+      assert.equal(context.visitPreferencesApplied,true);
       assert.equal(input.system.includes('taxi327-6'),false);
       return use(call('get_case',{},'case'));
     },
@@ -266,7 +266,7 @@ test('기존 세션 조건은 applyPreferences 전까지 유지하고 이번 메
   const changed = {...preferences,wheelchair:false,companionNeeded:true};
   const provider = scripted([
     done('기본 이동 조건을 확인했습니다.'),
-    input => {assert.equal(JSON.parse(input.messages[0].content[0].text).preferencesApplied,false); return use(call('get_case',{},'old-case'));},
+    input => {assert.equal(JSON.parse(input.messages[0].content[0].text).visitPreferencesApplied,false); return use(call('get_case',{},'old-case'));},
     input => {assert.equal(input.messages.at(-1).content[0].toolResult.content[0].json.requirements.wheelchair,true); return done('이번 사례의 휠체어 조건을 유지했습니다.');},
     use(call('get_case',{},'applied-case')),
     input => {assert.equal(input.messages.at(-1).content[0].toolResult.content[0].json.requirements.wheelchair,false); return use(call('update_visit',{wheelchair:true,companionNeeded:false},'explicit-override'));},
@@ -281,6 +281,55 @@ test('기존 세션 조건은 applyPreferences 전까지 유지하고 이번 메
   assert.equal(third.caseState.visitSupport.requirements.wheelchair,true);
   assert.equal(third.caseState.visitSupport.requirements.companionNeeded,false);
   assert.deepEqual(third.caseState.permissions,{inquiry:true,share:false});
+});
+
+test('첫 사례 확인 뒤 적용하지 않은 요청의 택시 선호는 유효하며 현재 이동 조건과 명시 문의처를 덮지 않는다',async () => {
+  const preferences = {taxiProviderId:'taxi327-6',wheelchair:false,companionNeeded:true};
+  const laterPreferences = {...preferences,wheelchair:true};
+  const provider = scripted([
+    use(call('get_case',{},'initial-case')),
+    done('현재 준비 자료를 확인했습니다.'),
+    input => {
+      const context = JSON.parse(input.messages[0].content[0].text);
+      assert.equal(context.visitPreferencesApplied,false);
+      assert.deepEqual(context.carePreferences,laterPreferences);
+      return use(call('get_case',{},'next-case'));
+    },
+    input => {
+      const {requirements} = input.messages.at(-1).content[0].toolResult.content[0].json;
+      assert.equal(requirements.wheelchair,false);
+      return use(call('update_visit',{wheelchair:false,companionNeeded:false},'explicit-mobility'));
+    },
+    use(call('prepare_inquiries',{kind:'taxi'},'preferred-taxi')),
+    done('선호한 5.16콜의 문의 초안을 준비했습니다.'),
+    use(call('get_case',{},'override-case')),
+    input => {
+      const {requirements} = input.messages.at(-1).content[0].toolResult.content[0].json;
+      assert.equal(requirements.wheelchair,false);
+      assert.equal(requirements.companionNeeded,false);
+      return use(call('prepare_inquiries',{kind:'taxi',providerId:'taxi327-14'},'explicit-taxi'));
+    },
+    done('이번에 지정한 애월콜의 문의 초안을 준비했습니다.'),
+  ]);
+  const store = createMemorySessionStore(),service = createAgentService({provider,store});
+  const first = json(await post(service,req({message:'먼저 현재 준비 자료만 알려줘.',preferences})));
+  assert.deepEqual(first.events.filter(item => item.tool !== 'apply_care_preferences').map(item => item.tool),['get_case']);
+  assert.equal(first.caseState.visitSupport.taxi.provider,null);
+  const next = await post(service,req({sessionId:first.sessionId,requestId:'request-pref-later-0002',message:'휠체어와 동행은 필요 없어요. 선호 택시에 보낼 초안을 준비해줘.',preferences:laterPreferences,applyPreferences:false}));
+  assert.equal(next.statusCode,200);
+  const second = json(next);
+  assert.equal(second.caseState.visitSupport.taxi.provider.id,'taxi327-6');
+  assert.match(second.caseState.visitSupport.taxi.inquiry,/5\.16콜/);
+  assert.equal(second.caseState.visitSupport.requirements.wheelchair,false);
+  assert.equal(second.caseState.visitSupport.requirements.companionNeeded,false);
+  const changed = await post(service,req({sessionId:first.sessionId,requestId:'request-pref-later-0003',message:'이번에는 애월콜로 문의 초안을 바꿔줘.',preferences:laterPreferences,applyPreferences:false}));
+  assert.equal(changed.statusCode,200);
+  const third = json(changed);
+  assert.equal(third.caseState.visitSupport.taxi.provider.id,'taxi327-14');
+  assert.match(third.caseState.visitSupport.taxi.inquiry,/애월콜/);
+  assert.equal(third.caseState.visitSupport.requirements.wheelchair,false);
+  assert.equal(third.caseState.visitSupport.requirements.companionNeeded,false);
+  assert.equal(Object.hasOwn(store.inspect()[0],'preferences'),false);
 });
 
 test('이동 기본값 변경은 이전 합성 가능 응답을 재확인으로 돌리고 문의 위임을 새로 부여하지 않는다',async () => {

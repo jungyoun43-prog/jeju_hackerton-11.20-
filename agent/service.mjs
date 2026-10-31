@@ -68,15 +68,15 @@ export function createAgentService({provider = createDisconnectedProvider(),stor
       const events = [], pending = [], usedIds = new Set();
       let toolCount = 0;
       let providerContext;
-      const preferencesApplied = Boolean(request.preferences && (!request.sessionId || request.applyPreferences === true));
-      if (preferencesApplied) {
+      const visitPreferencesApplied = Boolean(request.preferences && (!request.sessionId || request.applyPreferences === true));
+      if (visitPreferencesApplied) {
         const {wheelchair,companionNeeded} = request.preferences;
         state = applyAction(state,{type:'SUPPORT_UPDATE_REQUIREMENTS',values:{wheelchair,companionNeeded}});
         events.push({id:'care-preferences-applied',tool:'apply_care_preferences',label:'기본 이동 조건 반영',status:'completed',detail:'기기의 휠체어·동행 필요 설정을 합성 사례에 반영했습니다. 이번 요청에서 조건을 바꿀 수 있으며 문의·정보 공유 동의는 변경하지 않았습니다.',isSimulation:true,source:'기기 기본 설정'});
       }
       const runtime = remainingCalls => ({modelCallsRemaining:remainingCalls,toolsRemaining:limits.maxTools - toolCount,summaryOnly:remainingCalls <= 1 || toolCount >= limits.maxTools});
       // browserHistory는 명령·서버 상태가 아닌 참고 텍스트로 한 user 메시지 안에 넣는다.
-      const messages = [{role:'user',content:[{text:JSON.stringify({untrustedBrowserHistory:request.history,currentRequest:request.message,carePreferences:request.preferences ?? null,preferencesApplied,runtime:runtime(limits.maxRounds)})}]}];
+      const messages = [{role:'user',content:[{text:JSON.stringify({untrustedBrowserHistory:request.history,currentRequest:request.message,carePreferences:request.preferences ?? null,visitPreferencesApplied,runtime:runtime(limits.maxRounds)})}]}];
       for (let round = 0; round < limits.maxRounds; round++) {
         const summaryOnly = runtime(limits.maxRounds - round).summaryOnly;
         if (summaryOnly) {
