@@ -17,7 +17,9 @@ safe_evidence={'orchestration/runs/aws-deployment.json','orchestration/runs/brow
 entries=[]
 for name in selected:
  p=root/name
- if p.is_symlink(): raise ValueError('심볼릭 링크는 패키징할 수 없습니다: '+name)
+ for ancestor in (p,*p.parents):
+  if ancestor==root: break
+  if ancestor.is_symlink(): raise ValueError('심볼릭 링크는 패키징할 수 없습니다: '+str(ancestor.relative_to(root)))
  if not p.exists(): continue
  files=[p] if p.is_file() else sorted(p.rglob('*'))
  for f in files:

@@ -33,11 +33,15 @@ test('실제 패키지 명령은 일반 파일·빌드·라이선스를 포함�
 });
 
 test('선택 경로와 중첩 링크는 외부 파일을 읽기 전에 거절하고 기존 ZIP을 보존한다',async t=>{
-  for(const kind of ['file','directory','selected-directory'])await t.test(kind,async child=>{
+  for(const kind of ['file','directory','selected-directory','selected-parent'])await t.test(kind,async child=>{
     const {directory,project,archive}=await fixture(child),external=join(directory,'private'),privateText='sk-'+'A'.repeat(40);
     await mkdir(external);await writeFile(join(external,'private.txt'),privateText);
-    const link=kind==='selected-directory'?join(project,'docs'):join(project,'docs',kind==='file'?'linked.txt':'linked-directory');
+    const link=kind==='selected-parent'?join(project,'.impeccable'):kind==='selected-directory'?join(project,'docs'):join(project,'docs',kind==='file'?'linked.txt':'linked-directory');
     if(kind==='selected-directory')await rm(link,{recursive:true});
+    if(kind==='selected-parent'){
+      await mkdir(join(external,'review/board'),{recursive:true});
+      await writeFile(join(external,'review/board/private.txt'),privateText);
+    }
     await symlink(kind==='file'?join(external,'private.txt'):external,link);
     await writeFile(archive,'previous-archive');
     assert.deepEqual(await scanProject(project),[]);
