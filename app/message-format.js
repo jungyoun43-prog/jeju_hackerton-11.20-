@@ -24,6 +24,11 @@ function listItem(line) {
   return match ? {indent:match[1].replace(/\t/g,'  ').length,type:/\d/.test(match[2])?'ol':'ul',start:parseInt(match[2],10),text:match[3]} : null;
 }
 
+function headingItem(line) {
+  const match = /^\s{0,3}(#{1,6})\s+(.+?)\s*#*\s*$/.exec(line);
+  return match && match[2].trim() ? {level:Math.min(6,match[1].length+2),text:match[2]} : null;
+}
+
 function renderList(lines,start) {
   const first = listItem(lines[start]);
   let index = start, html = `<${first.type}${first.type==='ol' && first.start!==1?` start="${first.start}"`:''}>`;
@@ -53,14 +58,14 @@ export function formatMessage(value) {
   while (index < lines.length) {
     const line = lines[index];
     if (!line.trim()) {index++;continue;}
-    const heading = /^\s{0,3}(#{1,6})\s+(.+?)\s*#*\s*$/.exec(line);
+    const heading = headingItem(line);
     if (heading) {
-      const level = Math.min(6,heading[1].length+2);
-      html += `<h${level}>${inline(heading[2])}</h${level}>`;index++;continue;
+      html += `<h${heading.level}>${inline(heading.text)}</h${heading.level}>`;index++;continue;
     }
     if (listItem(line)) {const list=renderList(lines,index);html+=list.html;index=list.next;continue;}
-    const paragraph = [];
-    while (index<lines.length && lines[index].trim() && !listItem(lines[index]) && !/^\s{0,3}#{1,6}\s+/.test(lines[index])) paragraph.push(inline(lines[index++]));
+    // 문단도 첫 줄을 반드시 소비하고, 제목 분기와 같은 조건으로 다음 줄을 판별한다.
+    const paragraph = [inline(lines[index++])];
+    while (index<lines.length && lines[index].trim() && !listItem(lines[index]) && !headingItem(lines[index])) paragraph.push(inline(lines[index++]));
     html += `<p>${paragraph.join('<br>')}</p>`;
   }
   return html;

@@ -1,6 +1,23 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { formatMessage } from '../app/message-format.js';
+
+test('빈 제목과 잘못된 제목 뒤에도 진행하며 회귀 시 하위 프로세스만 제한 시간 내 종료한다',()=>{
+  const inputs=['# ','### \t','###','####### malformed','#   \n\n## 정상 제목\n\n- **판독문**'];
+  const moduleUrl=new URL('../app/message-format.js',import.meta.url).href;
+  const script=`import { formatMessage } from ${JSON.stringify(moduleUrl)};process.stdout.write(JSON.stringify(${JSON.stringify(inputs)}.map(formatMessage)));`;
+  const result=spawnSync(process.execPath,['--input-type=module','-e',script],{timeout:2000,killSignal:'SIGKILL',encoding:'utf8',maxBuffer:1024*1024});
+  assert.ifError(result.error);
+  assert.equal(result.status,0,result.stderr);
+  assert.deepEqual(JSON.parse(result.stdout),[
+    '<p># </p>',
+    '<p>### \t</p>',
+    '<p>###</p>',
+    '<p>####### malformed</p>',
+    '<p>#   </p><h4>정상 제목</h4><ul><li><strong>판독문</strong></li></ul>',
+  ]);
+});
 
 test('진료 준비 제목·강조·목록과 다음 문단을 각각 읽을 수 있다',()=>{
   const html=formatMessage('## 준비할 자료\n\n- **판독문**을 챙겨 주세요.\n- 검사 영상\n\n병원에서 발급 방법을 확인해 주세요.');
