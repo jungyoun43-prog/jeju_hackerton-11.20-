@@ -2,36 +2,38 @@
   "schemaVersion": 1,
   "name": "제주 진료 나침반 · 보호자 진료 준비",
   "mode": "operate",
-  "direction": "대화와 읽기용 준비 요약으로 이어지는 보호자 업무 화면",
+  "direction": "실제 의료·돌봄 공개 화면을 참고한 왼쪽 최소 설정·대화·읽기용 방문 상태의 보호자 작업 공간",
   "seedReference": "seed:a25f97f1d883646c",
   "colors": {
-    "background": "#F8F6F0",
-    "navigation": "#F0EEE5",
-    "surface": "#FFFEFA",
-    "text": "#263631",
-    "muted": "#62695F",
+    "background": "#F4F7F5",
+    "navigation": "#FFFFFF",
+    "surface": "#FFFFFF",
+    "text": "#233C34",
+    "muted": "#5C6E64",
     "primary": "#AD4E2C",
-    "secondary": "#315F52",
-    "border": "#DDDCD2"
+    "secondary": "#285D4D",
+    "border": "#DCE5DE"
   },
   "typography": {
     "display": "MaruBuri",
-    "body": "Apple SD Gothic Neo, Noto Sans KR, Malgun Gothic, sans-serif",
+    "body": "Pretendard, Apple SD Gothic Neo, Malgun Gothic, sans-serif",
     "desktopTitlePx": 27,
-    "mobileTitlePx": 24,
+    "mobileTitlePx": 23,
     "metadataMinimumPx": 12,
-    "descriptiveTextPx": 14,
+    "descriptiveTextPx": 15,
     "mobileInputPx": 16
   },
   "shape": {
-    "surfaceRadiusPx": 8,
-    "buttonRadiusPx": 4,
+    "surfaceRadiusPx": 14,
+    "buttonRadiusPx": 7,
     "badgeRadiusPx": 2,
-    "visitPanelRadiusPx": 6,
-    "composerRadiusPx": 6
+    "visitPanelRadiusPx": 0,
+    "composerRadiusPx": 12
   },
   "assets": {
-    "logo": "/assets/jeju-mark-v1.png"
+    "logo": "/assets/jeju-mark-v1.png",
+    "carePhoto": "/assets/care-journey-v3.webp",
+    "bodyFont": "/assets/PretendardVariable.woff2"
   },
   "viewports": [
     "1440x900",
@@ -44,24 +46,32 @@
     "실제 기관 등록 정보와 시연 응답 구분",
     "실제 발신·예약·협진 완료를 주장하지 않음",
     "공개 기관의 지도 검색에 임의 좌표 사용 금지",
-    "사용자 피드백에 따라 의사·가족 생성 일러스트를 화면에서 제거",
     "이번 방문1건의 이동·동행 준비와 반복방문 예산 가정을 구분",
     "보호자 자유 요청을 기본 진행 방식으로 사용하고 수동 분기 선택 폼을 첫 화면에 두지 않음",
     "처리 이력은 API events만 표시하고 대기 중 가짜 통화·조회 진행을 생성하지 않음",
     "고정 합성 대화 미리보기와 실제 모델 API 요청을 명시적으로 구분",
     "모델 미연결·음성 미지원·API 오류를 표시하고 입력을 보존",
-    "브라우저 음성 인식으로 전사한 요청도 같은 API 클라이언트로 전송"
+    "브라우저 음성 인식으로 전사한 요청도 같은 API 클라이언트로 전송",
+    "실제 관측한 공개 사이트의 업무 구조만 참고하고 타사 로고·사진·문구를 복제하지 않음",
+    "사용자 요청에 따른 가상 어머니 일상 사진을 작은 환영 영역에 표시하고 의사·풍경 배너는 사용하지 않음",
+    "왼쪽 기본 설정은 선택이며 공개 택시 ID와 boolean 두 개만 기기에 저장",
+    "설정 변경은 API를 호출하지 않고 다음 요청에 반영하며 이번 명시적 요청을 우선함",
+    "음성은 인식 후 사용자가 확인·수정하고 보내며 실제 발신이 아님",
+    "모바일 서랍의 포커스·Escape·복귀와 실제 작성 내용의 초기화 확인을 제공"
   ],
   "spacing": {
-    "workspaceGapPx": 28,
-    "mainTopPx": 25
+    "workspaceGapPx": 25,
+    "mainTopPx": 26,
+    "desktopRailPx": 240
   },
   "composition": {
     "conversation": [
+      "caregiver-case-and-optional-preferences-rail",
       "compact-case-heading",
-      "caregiver-text-or-browser-voice",
-      "assistant-reply-with-api-events",
-      "read-only-four-preparation-states",
+      "small-original-family-photo-and-short-welcome",
+      "caregiver-text-or-reviewed-browser-voice",
+      "formatted-assistant-answer-with-collapsed-api-events",
+      "read-only-four-preparation-rows",
       "pending-questions-and-source-details"
     ],
     "preview": [
@@ -70,5 +80,18 @@
       "api-returned-synthetic-state-and-real-public-facts"
     ],
     "developmentWorkspace": "/workspace.html"
+  },
+  "references": {
+    "observedOn": "2026-10-31",
+    "designRecord": "docs/medical-reference-design.md",
+    "publicSites": [
+      "goodoc.co.kr",
+      "ddocdoc.com",
+      "doctornow.co.kr",
+      "wellthy.com",
+      "birdie.care",
+      "mavenclinic.com"
+    ],
+    "limits": "공개 페이지와 공개 제품 이미지 관측. 로그인 서비스 내부는 미확인."
   }
 }
