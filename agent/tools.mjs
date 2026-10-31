@@ -8,6 +8,7 @@ import supportData from '../app/data/visit-support-providers.json' with {type:'j
 import { AgentError, fail } from './errors.mjs';
 import { validateSchema } from './validation.mjs';
 import { normalizeCarePreferences } from '../app/care-preferences.js';
+import { CALL_TARGETS, buildCallPlan } from '../app/call-policy.js';
 
 const registry = validateSupportRegistry(supportData);
 const HOSPITAL_SOURCE = 'https://jejudatahub.net/data/view/data/859';
@@ -33,7 +34,7 @@ const objectSchema = (properties = {}, required = [], extra = {}) => ({type:'obj
 const shortText = maxLength => ({type:'string', maxLength});
 const kindSchema = {type:'string', enum:['taxi','companion']};
 export const AGENT_TOOLS = Object.freeze([
-  {name:'get_case', description:'서버에 있는 합성 사례의 현재 조건, 공공 기관, 준비 상태와 빠진 작업을 확인한다.', inputSchema:objectSchema()},
+  {name:'get_case', description:'서버의 합성 사례, 준비 상태·빠진 작업과 병원·이동·동행 전화 준비 요약을 확인한다. 실제 환자 위임 검증이 아니다.', inputSchema:objectSchema()},
   {name:'update_visit', description:'보호자가 명시한 방문일·행정지역·시각·이동/동행 필요만 변경한다. 실명·의료기록·주소 상세는 받지 않는다.', inputSchema:objectSchema({
     date:{type:'string',format:'date',maxLength:10}, area:{type:'string',enum:ADMIN_AREAS}, appointmentTime:{type:'string',format:'time',maxLength:5},
     transportNeeded:{type:'boolean'}, companionNeeded:{type:'boolean'}, wheelchair:{type:'boolean'}, caregiverAvailable:{type:'integer',minimum:0,maximum:100},
@@ -41,10 +42,10 @@ export const AGENT_TOOLS = Object.freeze([
   {name:'search_hospital_contacts', description:'허브859 공개13개 기관의 등록 사실을 검색한다. 현재 수용·협진·환자 적합성을 판단하지 않는다.', inputSchema:objectSchema({name:shortText(100),department:shortText(100),area:shortText(100)})},
   {name:'select_hospital_contact', description:'보호자가 현재 요청에서 이름을 명시한 공개 기관을 문의 대상으로 설정한다. 임상 장소 추천은 하지 않는다.', inputSchema:objectSchema({hospitalId:{type:'string',pattern:'^hospital-[0-9]{1,2}$',maxLength:20}}, ['hospitalId'])},
   {name:'request_records', description:'demo는 서버의 고정 합성 자료만 정리한다. nhis는 승인된 기록 연계가 미설정인 상태를 반환한다. 진찰 소견을 작성하지 않는다.', inputSchema:objectSchema({source:{type:'string',enum:['demo','nhis']}}, ['source'])},
-  {name:'request_hospital_contact', description:'지정한 기관 역할에 접수·필요 자료를 묻는 합성 전화 시연을 실행한다. 실제 발신이나 환자 수용 확인이 아니다.', inputSchema:objectSchema({target:{type:'string',enum:['mainland','jeju']}}, ['target'])},
+  {name:'request_hospital_contact', description:'제주 또는 기존 도외 병원 역할에 협진·의뢰/회송 창구와 접수·자료 절차를 묻는 합성 전화 시연. 공통 위임·최소정보·AI·기록 처리 계획을 포함하며 실제 발신·진료 수락·예약이 아니다.', inputSchema:objectSchema({target:{type:'string',enum:['mainland','jeju']}}, ['target'])},
   {name:'find_support', description:'택시327·돌봄254·별도 공식서비스에서 현재 행정지역과 지원 유형의 문의 후보를 찾는다. 가능 시간·예약은 미확인이다.', inputSchema:objectSchema({kind:kindSchema}, ['kind'])},
   {name:'prepare_inquiries', description:'공개 문의처 선택과 문의 초안을 함께 준비한다. providerId 생략 시 지역·휠체어 조건과 검증한 선호 택시를 반영한다. find_support 선행은 필수가 아니며 의료기록은 포함하지 않는다.', inputSchema:objectSchema({kind:kindSchema,providerId:{type:'string',maxLength:100,pattern:'^[a-z0-9_-]+$'}}, ['kind'])},
-  {name:'request_support_contact', description:'현재 초안으로 서버가 정한 합성 전화 응답을 실행·해석한다. 사용자가 가능/불가를 고르지 않는다. 실제 예약·배차·배정은 하지 않는다.', inputSchema:objectSchema({kind:kindSchema}, ['kind'])},
+  {name:'request_support_contact', description:'현재 초안과 공통 전화 계획으로 합성 응답을 실행한다. 휠체어 이용자격·등록·탑승·승하차·동행인 탑승·희망 시각의 차량 여부도 문의 항목이다. 실제 예약·배차·동행인 배정은 하지 않는다.', inputSchema:objectSchema({kind:kindSchema}, ['kind'])},
   {name:'prepare_review', description:'현재 보유 자료와 접수 조건으로 의료진 검토 준비 상태를 정리한다. 미시행 대면진찰과 공유 동의는 대신 만들지 않는다.', inputSchema:objectSchema()},
   {name:'build_report', description:'확인된 준비 상태·근거와 미확인 사항을 보고서로 정리한다. 의료적 결론을 내리지 않는다.', inputSchema:objectSchema()},
 ]);
@@ -65,6 +66,14 @@ function event(tool, label, detail, {status = 'completed', isSimulation = false,
   return {id:randomUUID(), tool,label,status,detail,isSimulation,...(source ? {source} : {})};
 }
 function pending(kind,label,reason) { return {id:`pending-${kind}`,kind,label,reason}; }
+const realCallStatus = Object.freeze({realDelegationVerified:false,realAdapterConfigured:false,actualCallPlaced:false,reservationConfirmed:false,clinicalAcceptanceConfirmed:false});
+function callPlanSummaries(state) {
+  return CALL_TARGETS.map(target => {
+    const plan = buildCallPlan(state,target);
+    return {target,recipient:plan.recipient.name,status:plan.simulation.status,label:plan.simulation.label,
+      requiredChecks:plan.preCallChecks.filter(check => ['delegation','recipient','record-handling'].includes(check.id)).map(({label,status}) => ({label,status}))};
+  });
+}
 export function getPendingActions(state) {
   const tasks = getTasks(state).slice(0, 8).map(task => pending(task.id,task.title,task.description));
   const support = getVisitSupportSummary(state);
@@ -77,7 +86,7 @@ function caseFacts(state) {
     permissions:state.permissions,documents:state.documents.map(({id,label,status,source}) => ({id,label,status,source})),
     inquiries:Object.fromEntries(Object.entries(state.inquiries).map(([target,item]) => [target,{status:item.status,requestedDocuments:item.requestedDocuments,source:'합성 전화 역할 · 실제 발신 없음'}])),
     packet:state.packet,review:state.review,visitSupport:getVisitSupportSummary(state),requirements:state.visitSupport.requirements,
-    nextActions:getPendingActions(state),
+    nextActions:getPendingActions(state),callPlans:callPlanSummaries(state),
   };
 }
 function supportCandidates(state,kind) { return getSupportCandidates(registry,{kind,area:state.patient.area,wheelchair:state.visitSupport.requirements.wheelchair}); }
@@ -140,20 +149,22 @@ export function createToolDispatcher({phoneAdapter = createPhoneSimulationAdapte
           events.push(event(name,'합성 자료 정리','서버의 고정 합성 치료 이력·판독문 보유 예시를 정리했습니다. 대면 진찰 소견과 의뢰서는 의료진 확인이 필요합니다.',{isSimulation:true,source:'서버 고정 합성 자료'}));
         }
         break;
-      case 'request_hospital_contact':
+      case 'request_hospital_contact': {
+        const plan = buildCallPlan(next,input.target);
         if (!phoneAdapter) {
-          data = {status:'not_connected'};
+          data = {status:'not_connected',...realCallStatus,callPlan:plan};
           events.push(event(name,'병원 전화 연결 미설정','전화 사업자 어댑터가 없어 발신하지 않았습니다.',{status:'not_connected'}));
           pendingActions.push(pending('phone','전화 연결 설정','발신 사업자·위임·수신처 검증이 필요합니다.'));
           break;
         }
-        fail(next.permissions.inquiry === true, 'PERMISSION_REQUIRED', '전화 문의 위임을 먼저 확인해 주세요.');
-        item = await phoneAdapter.hospital({target:input.target,signal});
+        fail(next.permissions.inquiry === true, 'PERMISSION_REQUIRED', '합성 전화 문의 시연의 허용 범위를 먼저 확인해 주세요. 실제 환자 위임은 미검증입니다.');
+        item = await phoneAdapter.hospital({target:input.target,plan,signal});
         fail(item?.isSimulation === true && ['documents','referral','unreachable','not_participating'].includes(item.outcome), 'INVALID_ADAPTER_RESPONSE', '시연 어댑터 응답을 확인해 주세요.', 502);
         next = applyAction(next,{type:'RECORD_CALL',target:input.target,outcome:item.outcome});
-        data = {...next.inquiries[input.target],isSimulation:true,actualCallPlaced:false};
+        data = {...next.inquiries[input.target],isSimulation:true,...realCallStatus,callPlan:buildCallPlan(next,input.target)};
         events.push(event(name,`${input.target === 'mainland' ? '기존 도외' : '제주'} 병원 접수 문의 시연`,`${next.inquiries[input.target].response} 기관 역할의 고정 합성 응답이며 실제 발신·수용 확인은 하지 않았습니다.`,{isSimulation:true,source:'기관 역할의 합성 전화 시뮬레이터'}));
         break;
+      }
       case 'find_support': {
         const candidates = supportCandidates(next,input.kind).map(publicProvider);
         data = {candidates:candidates.slice(0,5),total:candidates.length,scope:'등록 지역·서비스 유형에 따른 문의 우선순위',availabilityVerified:false,datasets:registry.datasets};
@@ -163,7 +174,7 @@ export function createToolDispatcher({phoneAdapter = createPhoneSimulationAdapte
       }
       case 'prepare_inquiries': {
         if (!next.visitSupport.requirements[input.kind === 'taxi' ? 'transportNeeded' : 'companionNeeded']) {
-          data = {status:'not_needed',actualCallPlaced:false};
+          data = {status:'not_needed',...realCallStatus,callPlan:buildCallPlan(next,input.kind)};
           events.push(event(name,'현재 조건에서는 지원 필요 없음','이동·동행 필요 조건에 따라 해당 문의 초안은 준비하지 않았습니다.'));
           break;
         }
@@ -191,7 +202,7 @@ export function createToolDispatcher({phoneAdapter = createPhoneSimulationAdapte
         }
         next = applyAction(next,{type:'SUPPORT_SELECT_PROVIDER',kind:input.kind,provider});
         next = applyAction(next,{type:'SUPPORT_PREPARE_INQUIRY',kind:input.kind});
-        data = {provider:publicProvider(provider),draft:buildSupportInquiry(next,input.kind),actualCallPlaced:false,...(preferenceNotice ? {preferenceNotice} : {})};
+        data = {provider:publicProvider(provider),draft:buildSupportInquiry(next,input.kind),...realCallStatus,callPlan:buildCallPlan(next,input.kind),...(preferenceNotice ? {preferenceNotice} : {})};
         if (preferenceNotice) events.push(event(name,'선호 택시 적용 조건 확인',preferenceNotice.message,{status:'needs_input',source:provider.source.url}));
         events.push(event(name,`${input.kind === 'taxi' ? '택시' : '동행'} 문의 초안 준비`,`${provider.name}에 날짜·지역·지원 범위를 확인할 초안을 준비했습니다. 환자 실명·진단·의료기록은 포함하지 않았습니다.`,{source:provider.source.url}));
         break;
@@ -199,25 +210,26 @@ export function createToolDispatcher({phoneAdapter = createPhoneSimulationAdapte
       case 'request_support_contact': {
         if (!phoneAdapter) {
           events.push(event(name,'지원 전화 연결 미설정','전화 사업자 어댑터가 없어 실제 문의하지 않았습니다.',{status:'not_connected'}));
-          data = {status:'not_connected'};
+          data = {status:'not_connected',...realCallStatus,callPlan:buildCallPlan(next,input.kind)};
           break;
         }
-        fail(next.permissions.inquiry === true, 'PERMISSION_REQUIRED', '전화 문의 위임을 먼저 확인해 주세요.');
+        fail(next.permissions.inquiry === true, 'PERMISSION_REQUIRED', '합성 전화 문의 시연의 허용 범위를 먼저 확인해 주세요. 실제 환자 위임은 미검증입니다.');
         const entry = next.visitSupport[input.kind];
         fail(entry.provider, 'INQUIRY_REQUIRED', '먼저 해당 지원의 문의 초안을 준비해 주세요.');
         if (entry.status !== 'prepared') next = applyAction(next,{type:'SUPPORT_PREPARE_INQUIRY',kind:input.kind});
-        item = await phoneAdapter.support({kind:input.kind,providerId:entry.provider.id,signal});
+        item = await phoneAdapter.support({kind:input.kind,providerId:entry.provider.id,plan:buildCallPlan(next,input.kind),signal});
         fail(item?.isSimulation === true && ['available','unavailable','unreachable'].includes(item.outcome), 'INVALID_ADAPTER_RESPONSE', '시연 어댑터 응답을 확인해 주세요.', 502);
         for (const key of ['wheelchairConfirmed','eligibilityConfirmed']) fail(item[key] === undefined || typeof item[key] === 'boolean', 'INVALID_ADAPTER_RESPONSE', '시연 어댑터 응답을 확인해 주세요.', 502);
         next = applyAction(next,{type:'SUPPORT_RECORD_RESPONSE',kind:input.kind,outcome:item.outcome,wheelchairConfirmed:item.wheelchairConfirmed,eligibilityConfirmed:item.eligibilityConfirmed});
         const summary = getVisitSupportSummary(next)[input.kind];
-        data = {...summary,isSimulation:true,actualCallPlaced:false,reservationConfirmed:false};
+        data = {...summary,isSimulation:true,...realCallStatus,callPlan:buildCallPlan(next,input.kind)};
         events.push(event(name,`${input.kind === 'taxi' ? '택시' : '동행'} 합성 전화 응답`,next.visitSupport[input.kind].response,{isSimulation:true,source:entry.provider.source.url,status:item.outcome === 'available' ? 'completed' : 'needs_input'}));
         break;
       }
       case 'prepare_review': {
         const missing = next.documents.filter(doc => ['history','report','exam',...Object.values(next.inquiries).flatMap(item => item.requestedDocuments)].includes(doc.id) && doc.status !== 'ready');
-        data = {packet:next.packet,missingDocuments:missing.map(({id,label,status}) => ({id,label,status})),sharePermission:next.permissions.share,actualTransferMade:false};
+        data = {packet:next.packet,missingDocuments:missing.map(({id,label,status}) => ({id,label,status})),sharePermission:next.permissions.share,
+          procedureStatus:Object.fromEntries(Object.entries(next.inquiries).map(([target,inquiry]) => [target,inquiry.status])),actualTransferMade:false,clinicalAcceptanceConfirmed:false,reservationConfirmed:false};
         events.push(event(name,'의료진 검토 준비 상태 정리','보유 자료와 빠진 자료를 정리했습니다. 실제 진찰 소견·의뢰서·자료 공유 동의와 의료진 검토가 필요하며 기관 전송은 하지 않았습니다.',{status:'needs_input',isSimulation:true,source:'합성 사례의 자료 준비 상태'}));
         pendingActions.push(pending('physician-exam','제주 대면 진찰·의료진 기록 확인','Agent는 진찰 소견이나 임상 판단을 대신 작성하지 않습니다.'));
         break;

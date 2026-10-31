@@ -98,9 +98,9 @@ function callResponse(target, outcome) {
   return {
     status: 'confirmed', response, requestedDocuments,
     transcript: [
-      { speaker: '문의 도우미 역할', text: '보호자가 위임한 범위에서 협진 접수 창구와 준비 자료를 문의합니다. (시연·실제 발신 없음)' },
+      { speaker: '문의 도우미 역할', text: '합성 문의 시연 허용 범위에서 협진 접수 창구와 준비 자료를 문의하는 예시입니다. 실제 환자 위임·대리 권한은 미검증이며 발신하지 않았습니다.' },
       { speaker: department, text: `${response} (합성 응답)` },
-      { speaker: '문의 도우미 역할', text: '접수 안내를 기록하겠습니다. 예약 확정이나 환자별 진료 가능 판단으로 표시하지 않겠습니다.' },
+      { speaker: '문의 도우미 역할', text: '합성 접수 안내를 요약한 예시입니다. 실제 녹음·전사·보관 정책은 미설정이며 예약·환자별 진료 수락은 확인하지 않았습니다.' },
     ],
   };
 }
@@ -149,13 +149,13 @@ export function applyAction(state, action) {
       if (next.permissions[action.permission] === action.value) return next;
       next.permissions[action.permission] = action.value;
       if (!action.value) invalidateReview(next);
-      event(next, '위임 범위를 갱신했어요', `${action.permission === 'share' ? '자료 공유' : '전화 문의'} ${action.value ? '허용' : '해제'} · 시연 설정`, 'permission', '사용자 입력');
+      event(next, '합성 시연 허용 범위를 갱신했어요', `${action.permission === 'share' ? '합성 자료 공유' : '합성 전화 문의'} ${action.value ? '허용' : '해제'} · 실제 환자 위임·공유 동의 미검증`, 'permission', '사용자 입력 · 시연 설정');
       break;
     }
     case 'RECORD_CALL': {
       assert(TARGETS.includes(action.target), '문의할 기관을 선택해 주세요.');
       assert(CALL_OUTCOMES.includes(action.outcome), '지원하지 않는 문의 응답입니다.');
-      assert(next.permissions.inquiry, '전화 문의 위임을 허용한 뒤 문의를 진행해 주세요.');
+      assert(next.permissions.inquiry, '합성 전화 문의 시연의 허용 범위를 확인한 뒤 진행해 주세요. 실제 환자 위임은 미검증입니다.');
       const old = next.inquiries[action.target];
       const result = callResponse(action.target, action.outcome);
       const requestedDocuments = result.requestedDocuments ?? old.requestedDocuments;
@@ -184,7 +184,7 @@ export function applyAction(state, action) {
       break;
     }
     case 'SUBMIT_PACKET': {
-      assert(next.permissions.inquiry, '전화 문의 위임 상태를 다시 확인해 주세요.');
+      assert(next.permissions.inquiry, '합성 전화 문의 시연 허용 상태를 다시 확인해 주세요. 실제 환자 위임은 미검증입니다.');
       assert(proceduresConfirmed(next), '두 기관의 협진 접수 절차를 먼저 확인해 주세요.');
       const missing = missingDocuments(next);
       assert(missing.length === 0, `필수 자료를 준비해 주세요: ${missing.map(doc => doc.label).join(', ')}`);
@@ -257,13 +257,15 @@ export function getTasks(state) {
     if (target === 'jeju' && state.inquiries.mainland.status !== 'confirmed') continue;
     tasks.push({
       id: `call-${target}`, title: `${target === 'mainland' ? '기존 도외' : '제주'} 병원에 접수 절차를 문의해 주세요`,
-      description: !state.permissions.inquiry ? '전화 문의 위임 범위를 먼저 허용해 주세요.' : inquiry.status === 'unreachable' ? '연결되지 않아 절차는 미확인입니다. 다시 문의할 창구를 확인해 주세요.' : inquiry.status === 'not_participating' ? '협진 미참여는 운영 상태입니다. 다른 참여 창구를 확인할 수 있으며 임상 판단을 뜻하지 않습니다.' : '접수 창구와 필요한 자료를 확인합니다. 통화 응답을 시연합니다.',
+      description: !state.permissions.inquiry ? '합성 전화 문의 시연의 허용 범위를 먼저 확인해 주세요. 실제 환자 위임은 미검증입니다.' : inquiry.status === 'unreachable' ? '연결되지 않아 절차는 미확인입니다. 다시 문의할 창구를 확인해 주세요.' : inquiry.status === 'not_participating' ? '협진 미참여는 운영 상태입니다. 다른 참여 창구를 확인할 수 있으며 임상 판단을 뜻하지 않습니다.' : '접수 창구와 필요한 자료를 확인합니다. 통화 응답을 시연합니다.',
       owner: '진행 도우미', action: 'call', target,
     });
   }
   for (const doc of missingDocuments(state)) {
     const definition = DOCUMENT_DEFINITIONS.find(item => item.id === doc.id);
-    tasks.push({ id: `prepare-${doc.id}`, title: `${doc.label}를 준비해 주세요`, description: doc.id === 'exam' ? '제주 의료진의 대면 진찰이 필요합니다. 도우미는 진찰 소견을 대신 작성하지 않습니다.' : doc.id === 'referral' ? '의료진이 작성·확인해야 하는 의뢰서입니다.' : definition.description, owner: definition.owner, action: 'document', target: doc.id });
+    const lastSyllable = doc.label.charCodeAt(doc.label.length - 1) - 0xac00;
+    const particle = lastSyllable >= 0 && lastSyllable <= 11171 && lastSyllable % 28 !== 0 ? '을' : '를';
+    tasks.push({ id: `prepare-${doc.id}`, title: `${doc.label}${particle} 준비해 주세요`, description: doc.id === 'exam' ? '제주 의료진의 대면 진찰이 필요합니다. 도우미는 진찰 소견을 대신 작성하지 않습니다.' : doc.id === 'referral' ? '의료진이 작성·확인해야 하는 의뢰서입니다.' : definition.description, owner: definition.owner, action: 'document', target: doc.id });
   }
   if (proceduresConfirmed(state) && missingDocuments(state).length === 0) tasks.push({ id: 'submit-packet', title: '준비한 자료의 검토 접수를 진행해 주세요', description: state.permissions.share ? '자료 목록과 출처를 확인한 뒤 접수를 재현합니다. 실제 기관 전송은 하지 않습니다.' : '자료 공유 범위를 확인하고 허용한 뒤 접수를 재현할 수 있어요.', owner: '보호자', action: 'submit' });
   return tasks;
@@ -307,5 +309,5 @@ export function buildReport(state) {
   const burden = calculateBurden(state.plan);
   const rows = state.documents.map(doc => `| ${md(doc.label)} | ${doc.status === 'ready' ? '자료 보유' : doc.status === 'not_performed' ? '진찰 시행 전' : '미보유/보완 필요'} | ${md(doc.source || '미확인')} |`).join('\n');
   const hospitalSource = state.selectedHospital ? `\n\n제주 기관 선택 출처: ${state.selectedHospital.source.kind === 'public-preview' ? '제주데이터허브 859 공개 미리보기 · 최대20행 표본 · 전체 운영 API 미검증' : '사용자 가져오기 · 공식 운영 API 미검증'}. 출처 URL: ${md(state.selectedHospital.source.url || '사용자 제공 파일·원출처 미확인')}. 행정 상태: ${md(state.selectedHospital.openStatus)}, 행별 갱신일: ${md(state.selectedHospital.updatedAt || '미확인')}, 자료 수집일: ${md(state.selectedHospital.collectedAt || '미확인')}. 현재 진료·예약·실시간 수용·협진 참여는 미확인입니다.` : '';
-  return `# 제주 진료 나침반 진행 보고서\n\n합성 환자의 시연 결과입니다. 초기 기관은 가상이며 허브 공개 미리보기 또는 사용자 파일에서 선택한 기관은 출처를 따로 표시합니다. 실제 통화·기관 전송·예약·의료진 판단은 수행하지 않았습니다.\n\n작성 시각: ${now()}\n\n## 사례\n\n- 환자: ${md(state.patient.name)} (합성 사례)\n- 보호자: ${md(state.patient.caregiver)}\n- 지역: ${md(state.patient.area)}\n- 기존 병원: ${md(state.patient.existingHospital)}\n- 제주 병원: ${md(state.patient.localHospital)}\n- 목적: ${md(state.patient.purpose)}\n- 준비 일정: ${md(state.patient.nextVisit)} (시연 일정·예약 확정 아님)${hospitalSource}\n\n## 현재 진행\n\n${getSummary(state)}\n\n전화 문의 허용: ${state.permissions.inquiry ? '허용' : '해제'} / 자료 공유 허용: ${state.permissions.share ? '허용' : '해제'}\n\n${TARGETS.map(target => `- ${target === 'mainland' ? '기존 도외' : '제주'} 병원: ${md(state.inquiries[target].status)} · ${md(state.inquiries[target].response || '미문의')} · 출처: 합성 전화 응답`).join('\n')}\n\n## 준비 자료 (${progress.prepared}/${progress.total})\n\n| 자료 | 상태 | 출처 |\n| --- | --- | --- |\n${rows}\n\n## 다음 행동\n\n${getTasks(state).map(task => `- ${md(task.title)} / 담당: ${md(task.owner)} / ${md(task.description)}`).join('\n')}\n\n## 의료진 역할 회신\n\n${md(state.review.note || '회신 전입니다.')}\n\n출처: ${md(state.review.source || '미확인')}\n\n## 부담 가정\n\n방문 ${state.plan.visits}회, 보호자 동행 가능 ${state.plan.caregiverAvailable}회. 입력한 예산의 소계: ${burden.estimatedSubtotal.toLocaleString('ko-KR')}원. 미확인 항목은 합계에 포함하지 않았으며 0원 확정이 아닙니다.\n\n- 미확인: ${burden.unknownItems.join(', ') || '입력 가정 내 없음'}\n- 동행 미배정 방문: ${burden.careGap}회\n- 계산 범위: 방문당 제주 왕복 이동·환자 도외 왕복 교통·일행 공동 숙박·진료비를 방문 횟수로 곱하고, 보호자 왕복 교통은 동행 가능한 횟수만 곱합니다. 불필요한 항목은 사용자가 명시적으로 0을 입력합니다.\n- 금액·방문 횟수는 사용자 입력 가정이며 실제 견적·급여 판정·의학적 계획이 아닙니다.\n\n${buildVisitSupportReport(state)}\n\n## 실행 이력\n\n${state.events.map(item => `- ${item.at}: ${md(item.title)} — ${md(item.detail)} (출처: ${md(item.source)})`).join('\n')}\n\n## 한계\n\n결정적 규칙으로 동작하며 런타임 AI 모델은 연결되지 않았습니다. 공공데이터의 병원명·진료과는 실제 협진 참여나 환자별 적합성을 보장하지 않습니다. 실제 데이터 접근·이용조건, 기관 연동, 통화, 임상 검증은 별도로 필요합니다.\n`;
+  return `# 제주 진료 나침반 진행 보고서\n\n합성 환자의 시연 결과입니다. 초기 기관은 가상이며 허브 공개 미리보기 또는 사용자 파일에서 선택한 기관은 출처를 따로 표시합니다. 실제 통화·기관 전송·예약·의료진 판단은 수행하지 않았습니다.\n\n작성 시각: ${now()}\n\n## 사례\n\n- 환자: ${md(state.patient.name)} (합성 사례)\n- 보호자: ${md(state.patient.caregiver)}\n- 지역: ${md(state.patient.area)}\n- 기존 병원: ${md(state.patient.existingHospital)}\n- 제주 병원: ${md(state.patient.localHospital)}\n- 목적: ${md(state.patient.purpose)}\n- 준비 일정: ${md(state.patient.nextVisit)} (시연 일정·예약 확정 아님)${hospitalSource}\n\n## 현재 진행\n\n${getSummary(state)}\n\n합성 전화 문의 시연 허용: ${state.permissions.inquiry ? '허용' : '해제'} / 합성 자료 공유 시연 허용: ${state.permissions.share ? '허용' : '해제'}\n실제 환자 위임·대리 권한·민감정보 공유 동의는 미검증입니다. 실제 녹음·전사·보관 정책은 미설정이며 국외 이전 근거는 별도 확인 대상입니다.\n\n${TARGETS.map(target => `- ${target === 'mainland' ? '기존 도외' : '제주'} 병원: ${md(state.inquiries[target].status)} · ${md(state.inquiries[target].response || '미문의')} · 출처: 합성 전화 응답`).join('\n')}\n\n## 준비 자료 (${progress.prepared}/${progress.total})\n\n| 자료 | 상태 | 출처 |\n| --- | --- | --- |\n${rows}\n\n## 다음 행동\n\n${getTasks(state).map(task => `- ${md(task.title)} / 담당: ${md(task.owner)} / ${md(task.description)}`).join('\n')}\n\n## 의료진 역할 회신\n\n${md(state.review.note || '회신 전입니다.')}\n\n출처: ${md(state.review.source || '미확인')}\n\n## 부담 가정\n\n방문 ${state.plan.visits}회, 보호자 동행 가능 ${state.plan.caregiverAvailable}회. 입력한 예산의 소계: ${burden.estimatedSubtotal.toLocaleString('ko-KR')}원. 미확인 항목은 합계에 포함하지 않았으며 0원 확정이 아닙니다.\n\n- 미확인: ${burden.unknownItems.join(', ') || '입력 가정 내 없음'}\n- 동행 미배정 방문: ${burden.careGap}회\n- 계산 범위: 방문당 제주 왕복 이동·환자 도외 왕복 교통·일행 공동 숙박·진료비를 방문 횟수로 곱하고, 보호자 왕복 교통은 동행 가능한 횟수만 곱합니다. 불필요한 항목은 사용자가 명시적으로 0을 입력합니다.\n- 금액·방문 횟수는 사용자 입력 가정이며 실제 견적·급여 판정·의학적 계획이 아닙니다.\n\n${buildVisitSupportReport(state)}\n\n## 실행 이력\n\n${state.events.map(item => `- ${item.at}: ${md(item.title)} — ${md(item.detail)} (출처: ${md(item.source)})`).join('\n')}\n\n## 한계\n\n결정적 규칙으로 동작하며 런타임 AI 모델은 연결되지 않았습니다. 공공데이터의 병원명·진료과는 실제 협진 참여나 환자별 적합성을 보장하지 않습니다. 실제 데이터 접근·이용조건, 기관 연동, 통화, 임상 검증은 별도로 필요합니다.\n`;
 }

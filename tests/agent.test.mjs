@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { createAgentService } from '../agent/service.mjs';
 import { createLambdaHandler } from '../agent/handler.mjs';
 import { createMemorySessionStore } from '../agent/store.mjs';
-import { createToolDispatcher, assertSourceUrl } from '../agent/tools.mjs';
-import { createDemoCase } from '../app/domain.js';
+import { AGENT_TOOLS, createToolDispatcher, assertSourceUrl } from '../agent/tools.mjs';
+import { createDemoCase, buildReport } from '../app/domain.js';
 import { createConverseProvider } from '../agent/providers.mjs';
 
 const req = (extra = {}) => ({message:'합성 방문 준비를 도와줘',requestId:'request-test-0001',...extra});
@@ -46,11 +46,18 @@ test('고정 preview만 공개 snapshot과 reducer를 실행하며 실제 API �
   assert.equal(body.caseState.documents.find(doc => doc.id === 'exam').status,'not_performed');
   assert.equal(body.caseState.review.status,'not_requested');
   assert.equal(body.caseState.permissions.share,false);
+  assert.equal(body.events.length,15);
   assert.ok(body.events.some(item => item.source === 'https://jejudatahub.net/data/view/data/859' && item.isSimulation === false));
   assert.ok(body.events.some(item => item.source === 'https://www.data.go.kr/data/15056321/fileData.do'));
   assert.ok(body.events.some(item => item.tool === 'request_records' && item.status === 'not_connected'));
   for (const item of body.events.filter(item => /request_(hospital|support)_contact/.test(item.tool))) assert.equal(item.isSimulation,true);
   assert.match(body.caseState.visitSupport.companion.inquiry,/실명·진단명·병력·검사 결과는 이 초안에 포함하지 않았/);
+  assert.equal(body.caseState.visitSupport.taxi.wheelchairConfirmed,false);
+  assert.equal(body.caseState.visitSupport.taxi.eligibilityConfirmed,false);
+  for (const inquiry of Object.values(body.caseState.inquiries)) {
+    assert.match(inquiry.transcript[0].text,/실제 환자 위임·대리 권한은 미검증/);
+    assert.match(inquiry.transcript.at(-1).text,/실제 녹음·전사·보관 정책은 미설정/);
+  }
 });
 
 test('preview는 임의 자연어·caseState·다른 scenario를 받지 않는다',async () => {
@@ -166,6 +173,106 @@ test('도구는 실제 발신 어댑터를 거절하고 전화 위임을 우회�
   const disconnected = createToolDispatcher({phoneAdapter:null});
   const result = await disconnected({name:'request_hospital_contact',input:{target:'jeju'},state:createDemoCase()});
   assert.equal(result.events[0].status,'not_connected');
+});
+
+test('get_case는 기존 11개 도구 계약을 유지하고 전체 계획 대신 작은 전화 준비 요약만 반환한다',async () => {
+  const {data,state} = await createToolDispatcher()({name:'get_case',input:{},state:createDemoCase()});
+  assert.equal(AGENT_TOOLS.length,11);
+  assert.deepEqual(data.callPlans.map(plan => plan.target),['mainland','jeju','taxi','companion']);
+  assert.ok(JSON.stringify(data.callPlans).length < 1800);
+  for (const plan of data.callPlans) {
+    assert.equal(typeof plan.recipient,'string'); assert.equal(typeof plan.status,'string');
+    assert.equal(Object.hasOwn(plan,'openingScript'),false);
+    assert.equal(Object.hasOwn(plan,'minimumDisclosure'),false);
+    assert.equal(plan.requiredChecks.length,3);
+  }
+  assert.equal(Object.hasOwn(state,'callPlans'),false);
+});
+
+test('네 전화 대상의 계획을 합성 adapter에 전달하고 결과에 실제 위임·발신·예약·진료 수락을 확정하지 않는다',async () => {
+  const captured = [];
+  const dispatch = createToolDispatcher({phoneAdapter:{
+    isSimulation:true,
+    async hospital(input) {captured.push(input); return {isSimulation:true,outcome:input.target === 'mainland' ? 'referral' : 'documents'};},
+    async support(input) {captured.push(input); return {isSimulation:true,outcome:'available',wheelchairConfirmed:false,eligibilityConfirmed:false};},
+  }});
+  let state = createDemoCase();
+  for (const target of ['mainland','jeju']) {
+    const result = await dispatch({name:'request_hospital_contact',input:{target},state}); state = result.state;
+    assert.equal(result.events.length,1); assert.equal(result.events[0].isSimulation,true);
+    assert.equal(result.data.callPlan.target,target);
+    assert.equal(result.data.callPlan.simulation.status,'confirmed');
+    for (const field of ['realDelegationVerified','realAdapterConfigured','actualCallPlaced','reservationConfirmed','clinicalAcceptanceConfirmed']) {
+      assert.equal(result.data[field],false); assert.equal(result.data.callPlan[field],false);
+    }
+  }
+  state = (await dispatch({name:'update_visit',input:{wheelchair:true,appointmentTime:'10:00'},state})).state;
+  for (const kind of ['taxi','companion']) {
+    const prepared = await dispatch({name:'prepare_inquiries',input:{kind},state}); state = prepared.state;
+    assert.equal(prepared.data.callPlan.target,kind);
+    const result = await dispatch({name:'request_support_contact',input:{kind},state}); state = result.state;
+    assert.equal(result.events.length,1); assert.equal(result.data.callPlan.simulation.status,'available_demo');
+    assert.equal(result.data.reservationConfirmed,false); assert.equal(result.data.callPlan.recipient.contactVerified,false);
+    assert.equal(Object.hasOwn(state.visitSupport[kind],'callPlan'),false);
+  }
+  assert.deepEqual(captured.map(item => item.plan.target),['mainland','jeju','taxi','companion']);
+  assert.ok(captured.every(item => item.plan.realDelegationVerified === false && item.plan.actualCallPlaced === false));
+  const taxi = captured.find(item => item.kind === 'taxi').plan;
+  assert.equal(taxi.recipient.serviceType,'accessible_transport');
+  for (const topic of ['회원등록','승하차','동행인','희망 시각','차량 가능']) assert.ok(taxi.questions.join(' ').includes(topic));
+  assert.equal(state.visitSupport.taxi.wheelchairConfirmed,false);
+  assert.equal(state.visitSupport.taxi.eligibilityConfirmed,false);
+  assert.equal(Object.hasOwn(state,'callPlans'),false);
+});
+
+test('미연결 전화도 계획을 반환하고 합성 문의 허용을 해제하면 모든 전화 adapter 실행을 막는다',async () => {
+  const disconnected = createToolDispatcher({phoneAdapter:null}), state = createDemoCase();
+  for (const [name,input] of [['request_hospital_contact',{target:'jeju'}],['request_support_contact',{kind:'taxi'}]]) {
+    const result = await disconnected({name,input,state});
+    assert.equal(result.data.status,'not_connected'); assert.equal(result.data.callPlan.actualCallPlaced,false);
+    assert.equal(result.events[0].status,'not_connected'); assert.deepEqual(result.state,state);
+  }
+  let adapterCalls = 0;
+  const dispatch = createToolDispatcher({phoneAdapter:{isSimulation:true,async hospital(){adapterCalls++;},async support(){adapterCalls++;}}});
+  state.permissions.inquiry = false;
+  for (const [name,input] of [['request_hospital_contact',{target:'mainland'}],['request_support_contact',{kind:'companion'}]]) {
+    await assert.rejects(dispatch({name,input,state}),error => error.code === 'PERMISSION_REQUIRED');
+  }
+  assert.equal(adapterCalls,0);
+});
+
+test('주입 provider의 협진 요청 흐름은 양 기관 접수 문의와 자료 공백·후속 확인으로 이어진다',async () => {
+  const provider = scripted([
+    input => {
+      for (const topic of ['성인 자녀','위임 범위','AI 고지','녹음·전사·보관','국외 이전','의뢰/회송','wheelchairConfirmed/eligibilityConfirmed=false']) assert.ok(input.system.includes(topic),topic);
+      return use(call('get_case',{},'case-policy'));
+    },
+    use(call('request_hospital_contact',{target:'mainland'},'mainland-policy'),call('request_hospital_contact',{target:'jeju'},'jeju-policy'),call('request_records',{source:'demo'},'records-policy')),
+    input => {
+      const results = input.messages.at(-1).content.map(item => item.toolResult.content[0].json);
+      for (const result of results.slice(0,2)) {
+        assert.equal(result.callPlan.realDelegationVerified,false);
+        assert.equal(result.callPlan.clinicalAcceptanceConfirmed,false);
+        assert.equal(result.callPlan.recordHandling.recording,'not_configured');
+      }
+      return use(call('prepare_review',{},'review-policy'));
+    },
+    input => {
+      const facts = input.messages.at(-1).content[0].toolResult.content[0].json;
+      assert.deepEqual(facts.procedureStatus,{mainland:'confirmed',jeju:'confirmed'});
+      assert.deepEqual(facts.missingDocuments.map(item => item.id),['exam','referral']);
+      assert.equal(facts.actualTransferMade,false); assert.equal(facts.clinicalAcceptanceConfirmed,false);
+      return done('양 기관의 합성 접수 안내와 자료 공백을 정리했습니다. 실제 진찰 소견·의뢰서, 환자 위임·공유 확인과 의료진 검토가 필요합니다.');
+    },
+  ]);
+  const result = await post(createAgentService({provider}),req({message:'전화로 제주 병원과 기존 도외 병원의 협진 접수와 자료 준비를 이어서 알아봐 줘.'}));
+  assert.equal(result.statusCode,200); const body = json(result);
+  assert.deepEqual(body.events.map(item => item.tool),['get_case','request_hospital_contact','request_hospital_contact','request_records','prepare_review']);
+  assert.equal(body.caseState.review.status,'not_requested'); assert.equal(body.caseState.packet.status,'draft');
+  assert.equal(body.caseState.permissions.share,false);
+  const report = buildReport(body.caseState);
+  assert.match(report,/합성 전화 문의 시연 허용: 허용/);
+  assert.match(report,/실제 환자 위임·대리 권한·민감정보 공유 동의는 미검증/);
 });
 
 test('출처 URL은 정확한 확인된 HTTPS URL만 허용한다',() => {
