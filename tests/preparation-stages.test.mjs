@@ -25,6 +25,9 @@ test('준비 기호는 미확인·문의 실패·시각 변경을 구분하고 �
  }
  const partial=applyAction(createDemoCase(),{type:'RECORD_CALL',target:'mainland',outcome:'documents'});
  assert.equal(getPreparationBoard(partial).stages[1].signal,'attention');
+ const drafted=await preview('missing_record');
+ const selected=applyAction(createDemoCase(),{type:'SUPPORT_SELECT_PROVIDER',kind:'taxi',provider:drafted.caseState.visitSupport.taxi.provider});
+ assert.equal(getPreparationBoard(selected).stages[2].signal,'attention');
  const pending=getPreparationBoard(createDemoCase(),{pending:true,progress:progress('hospitals')});
  assert.deepEqual(pending.stages.map(stage=>stage.signal),initial.stages.map(stage=>stage.signal));
 });

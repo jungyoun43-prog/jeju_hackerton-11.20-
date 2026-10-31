@@ -112,8 +112,9 @@ export function getPreparationBoard(state,{events=[],progress=null,pending=false
   // 기호는 자료·문의 준비만 요약한다. 미확인은 문의 실패나 임상 부적합이 아니다.
   records.signal=recordGaps.length?'attention':'available';
   hospitals.signal=hospitalBlocked?'blocked':confirmed===inquiries.length?'available':confirmed?'attention':'waiting';
-  const missingSupport=['taxi','companion'].some(kind=>support[kind].status==='not_selected');
-  mobility.signal=!support.totalNeeded?'not_needed':recheck?'attention':supportBlocked?'blocked':selected?(missingSupport?'attention':'available'):'waiting';
+  const requiredSupport=['taxi','companion'].filter(kind=>support[kind].status!=='not_needed');
+  const draftedSupport=requiredSupport.every(kind=>['prepared','available_demo'].includes(support[kind].status));
+  mobility.signal=!support.totalNeeded?'not_needed':recheck?'attention':supportBlocked?'blocked':draftedSupport?'available':selected?'attention':'waiting';
   plan.signal=responseCount?'available':'waiting';
   for(const event of Array.isArray(events)?events:[]){
     if(!event||typeof event!=='object')continue;
