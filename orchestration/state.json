@@ -1,6 +1,6 @@
 {
   "baseCommit": "e1e7e44",
-  "updatedAt": "2026-10-31T15:34:39.259327+00:00",
+  "updatedAt": "2026-10-31T16:05:37.002057+00:00",
   "tasks": {
     "ui": {
       "phase": "verified",
@@ -244,19 +244,34 @@
       "note": "통합·단위233·대화171·수동47·규칙40 통과. 실행 지문 cfbcb480893bdab26debe0281d2c9453ce5131b1632185b7d74913b1f96e3cc4. 실제 전화/개인기록·임상·법률은 미검증."
     },
     "journey-backend": {
-      "phase": "in_progress",
+      "phase": "verified",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-journey-backend",
-      "note": "계약 f0dc9f4 기준 전용 worktree에서 병렬 구현 중. root 통합/최종검증 전."
+      "note": "root통합 단위261/261·대화171/171·수동47/47·여정208/208(실preview14)·규칙44/44, 독립ship/blocker0. 지문 d1881920a45699aa00f683830bb347bed880af15fca2c8ac8efb73184c991185; 실제전화/개인기록·임상/법률은미검증.",
+      "integrationCommits": [
+        "04b864d",
+        "39d63ac",
+        "7647dda"
+      ]
     },
     "journey-ui": {
-      "phase": "in_progress",
+      "phase": "verified",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-journey-ui",
-      "note": "계약 f0dc9f4 기준 전용 worktree에서 병렬 구현 중. root 통합/최종검증 전."
+      "note": "root통합 단위261/261·대화171/171·수동47/47·여정208/208(실preview14)·규칙44/44, 독립ship/blocker0. 지문 d1881920a45699aa00f683830bb347bed880af15fca2c8ac8efb73184c991185; 실제전화/개인기록·임상/법률은미검증.",
+      "integrationCommits": [
+        "dc3759e",
+        "d2659b3",
+        "2778290"
+      ]
     },
     "journey-qa": {
-      "phase": "in_progress",
+      "phase": "verified",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-journey-qa",
-      "note": "계약 f0dc9f4 기준 전용 worktree에서 병렬 구현 중. root 통합/최종검증 전."
+      "note": "root통합 단위261/261·대화171/171·수동47/47·여정208/208(실preview14)·규칙44/44, 독립ship/blocker0. 지문 d1881920a45699aa00f683830bb347bed880af15fca2c8ac8efb73184c991185; 실제전화/개인기록·임상/법률은미검증.",
+      "integrationCommits": [
+        "d69ab02",
+        "585769f",
+        "0479e62"
+      ]
     }
   },
   "review": {
