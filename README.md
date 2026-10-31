@@ -1,56 +1,86 @@
-# 제주 AI·빅데이터 AI Agent 프로젝트
+# 제주 진료 나침반
 
-「제주 AI·빅데이터 활용 AI Agent 개발 챌린지」 참가를 위한 저장소입니다.
-제주데이터허브 데이터를 활용해 비전문가도 데이터 탐색과 분석 결과를 이용할 수 있는 AI Agent 서비스를 개발합니다.
+멀리 사는 보호자가 텍스트나 음성으로 요청하면, 제주 부모님의 병원 문의·진료 자료·이동·동행 준비를 이어주는 대화형 서비스를 개발합니다. 「제주 AI·빅데이터 활용 AI Agent 개발 챌린지」 참가 프로젝트입니다.
 
-## AWS 데모와 자동 배포
+> “서울에 사는 딸입니다. 애월 어머니가 11월 12일에 진료를 받으세요. 저는 못 가니 필요한 자료와 택시·병원 동행도 알아봐 주세요.”
 
-**[제주 진료 나침반 데모](https://d1mfksxrj025bx.cloudfront.net)** · [GitHub 배포 실행 기록](https://github.com/jungyoun43-prog/jeju_hackerton-11.20-/actions/workflows/deploy-aws.yml)
+## 지금 실행되는 범위
 
-서울 리전의 비공개 S3와 CloudFront HTTPS로 데모를 공개합니다. 배포 흐름은 `main` push → 재사용 CI 검사·빌드 → 같은 artifact → GitHub production OIDC 역할 → 게시·캐시 무효화 → 공개 revision 확인입니다. AWS 장기 키를 GitHub Secrets에 저장하지 않습니다. 이동·동행 확장 이전 버전 `ad6fc2c`는 [자동 배포 41198504055](https://github.com/jungyoun43-prog/jeju_hackerton-11.20-/actions/runs/41198504055)가 성공했습니다. 이번 지원 흐름과 새 대시보드의 최종 통합·공개 배포 결과는 [검증 기록](docs/implementation-results.md)에 별도로 갱신합니다.
+첫 화면은 대화·음성 입력, 처리 기록과 이번 방문 요약입니다. **실제 LLM 연결은 사용자 요청으로 후속 작업으로 남겼습니다.** 일반 요청을 고정 답변으로 대신 처리하지 않습니다.
 
-배포 구조·변수·수동 재게시·롤백은 [AWS 배포 매뉴얼](docs/deployment.md)을 따릅니다. 인프라 코드는 [CloudFormation 템플릿](infra/aws-static-site.yaml)에 있습니다. 서비스의 실제 전화·LLM·의료기관 연동 상태는 아래 MVP 설명과 같습니다.
+| 구분 | 현재 동작 |
+| --- | --- |
+| 자유로운 텍스트·음성 요청 | 입력 UI와 API 준비. 일반 `POST /api/agent`는 `MODEL_NOT_CONNECTED`/503을 반환하고 입력을 복원 |
+| 대화 흐름 미리보기 | 별도 preview API에서 사전 작성 예시를 실행. 실제 공공 snapshot 검색·준비 상태 전이와 합성 응답을 함께 표시 |
+| 기관·지원 데이터 | 허브 계보 3종과 공식 안내 2건으로 문의처·질문·초안·다음 행동 구성 |
+| 개인 진료기록·전화·의료진 회신 | 합성 사례·시연 어댑터. 공단 조회·실제 발신·예약·배차·동행 배정·결제·병원 전송 미연동 |
+| 수동 작업 화면 | `/workspace.html`에 보존한 개발 검증 도구. 보호자가 순서대로 채워야 하는 서비스 첫 화면이 아님 |
 
-## MVP 실행
+공급자는 `createAgentService({provider})`에 연결합니다. 도구 호출 루프·인자 검증·실패 처리와 Bedrock Converse 어댑터를 준비했으며, 연결 절차와 한도는 [Agent API 문서](agent/README.md)를 따릅니다. 모델 ID나 SDK 설치만으로 연결 성공을 표시하지 않습니다. 현재 Bedrock 실제 호출은 계정 Error 002로 차단되어 추가 시도를 중단했습니다.
 
-기존 MVP의 **기관 조회·병원 문의 시연 → 자료 보완 → 검토 접수·합성 회신**에, **방문일·출발지역·지원 필요 → 택시·동행 문의처 → 문의 초안·응답 시연 → 조건 변경 시 재확인**을 추가하는 중입니다. 메인에서는 이번 방문의 병원·자료·택시·동행 준비 상태와 다음 행동을 함께 보여줍니다. 새 동선의 최종 통합 검증은 진행 중입니다. 환자·의료진 회신·문의 응답은 합성이며, 런타임 LLM·실제 전화·배차·동행 배정·결제·의료기관 전송은 연결하지 않았습니다.
+## 실행과 첫 확인
 
-현재 코드에 연결하는 자료는 허브 계보 **3종**입니다. 공식 서비스 소개 두 건은 별도 출처로 보완하며 데이터셋 수에 더하지 않습니다.
-
-| 자료 | 실제 사용 범위 | 바꾸는 준비 작업 |
-| --- | --- | --- |
-| [859 병·의원 정보](https://jejudatahub.net/data/view/data/859) | 공개 20행 분석·폐업 제외13개 등록 기관 | 제주 문의 대상과 필요한 자료 확인 |
-| [327 콜택시업체현황](https://jejudatahub.net/data/view/data/327) → [연결 원출처](https://www.data.go.kr/data/15056321/fileData.do) | 2026-03-19 기준 최신 공개 파일 34업체 | 출발 지역에 맞는 호출 문의처·연락처 선택 |
-| [254 노인돌봄서비스시설현황](https://jejudatahub.net/data/view/data/254) | 2020-04-17 기준 공개19개 등록 문의처 | 가족 동행 공백에 대해 담당지역·동행 제공 여부 질문 |
-
-[아름동행](https://www.jjcsc.co.kr/Business/Market)의 병원동행 소개와 [교통약자 이동지원센터](https://www.jejuhappycall.com/?mcode=guide01)의 이용 안내를 구분해 연결합니다. 기관 목록·지역 일치는 현재 배차나 동행 가능의 확인이 아닙니다.
-
-Node.js 22 이상과 npm을 설치한 뒤 실행합니다.
+Node.js 22 이상과 npm으로 저장소 루트에서 실행합니다. 기본 실행과 고정 예시는 모델 키·AWS 인증 없이 사용할 수 있습니다.
 
 ```bash
 npm ci --ignore-scripts
 npm run dev
 ```
 
-터미널에 표시된 **http://127.0.0.1:4173** 을 엽니다. 키 없이 실행됩니다. 병원 후보·집계와 이동·돌봄 문의처는 포함된 출처별 snapshot에서 읽습니다. 사례 변경·가져온 파일은 화면 메모리에만 있으며 새로고침하면 초기 사례와 기본 후보로 돌아갑니다. 다른 기기에서 열 때는 해당 호스트의 접근 경로를 별도로 구성해야 합니다.
+터미널의 **http://127.0.0.1:4173** 을 열고 **대화 흐름 미리보기**를 누릅니다. 병원·자료·택시·동행의 처리 기록과 출처, 아직 확인할 조건을 읽을 수 있습니다. 이 예시는 자유 입력을 해석한 모델 응답이 아닙니다. 직접 요청을 보내면 현재는 모델 미연결 안내가 나옵니다.
+
+**말로 요청**은 지원 브라우저의 한국어 음성 인식을 사용합니다. 말이 끝나면 인식한 텍스트를 API로 보내며, 실제 병원에 전화를 걸지 않습니다. 미지원·권한 거절·인식 실패 때는 텍스트로 계속할 수 있습니다. 실제 마이크 인식 검증과 음성 API 모의 검사는 구분합니다.
 
 ```bash
 npm test
 npm run build
 npm run preview
-npm run package
 ```
 
-`npm run preview`도 기본 4173 포트를 사용하므로 개발 서버를 먼저 종료합니다. ZIP 패키징에는 Python 3의 표준 `zipfile`이 추가로 필요합니다. ZIP 경로는 `output/jeju-care-compass-mvp.zip`이며 **개발 스냅샷**입니다. 현재의 미완료 제출 요건은 [제출 추적표](docs/submission-checklist.md)에 남겨두었습니다.
+`npm run preview`는 빌드한 화면과 같은 Node API를 제공합니다. 기본 4173 포트를 쓰므로 개발 서버를 먼저 종료합니다. 단순 파일 서버나 정적 S3만으로는 대화·preview API가 실행되지 않습니다. 대화 이력은 브라우저 메모리에 두고 서버에 원문을 저장하지 않습니다. 요청은 동일 출처의 API로 전달되며, 음성 처리의 외부 전송 여부는 브라우저 구현·정책을 따릅니다. 실제 환자 기록·인증정보는 입력하지 않습니다.
 
-- 기술: 브라우저 ES modules + Node.js 정적 서버 + Leaflet 1.9.4. 별도 DB·GPU·유료 API 없음.
-- 외부 의존성: 최초 npm 설치와 OSM 지도 타일은 인터넷이 필요합니다. 지도 실패 시 설명과 외부 지도 링크를 제공하며 나머지 시연은 유지됩니다. 타일을 ZIP에 수집하지 않습니다.
-- 환경변수: [예시](.env.example)의 `HOST`, `PORT`, `MAP_TILE_URL`. `.env`는 선택 사항이며 제출하지 않습니다. Google Maps 외부 링크는 키 없이 열고, Google Embed는 미구현입니다.
-- 사용법·오류: [사용자 매뉴얼](docs/user-manual.md). 모델·스킬·자산·오픈소스: [외부 의존성 명세](THIRD_PARTY.md). 실제 확인 결과: [검증 기록](docs/implementation-results.md).
+- 실행 환경변수: [예시](.env.example)의 `HOST`, `PORT`, `MAP_TILE_URL`. 실제 `.env`는 제출하지 않습니다.
+- 지도: 개발용 수동 화면의 Leaflet 1.9.4·OSM과 키 없는 Google Maps 외부 링크. 실제 경로·ETA·배차 API는 연결하지 않았습니다.
+- 저장: 기본 세션 저장소는 인스턴스별 메모리입니다. DynamoDB 어댑터는 미구현이며 메모리 예산은 분산 Lambda의 전역 호출 한도가 아닙니다.
+- 자세한 사용법·오류: [사용자 매뉴얼](docs/user-manual.md), [연결 준비](agent/README.md), [실제 검증 기록](docs/implementation-results.md).
 
-## 개발 오케스트레이션과 검사
+## 실제 활용하는 데이터
 
-UI·Workflow·문서를 별도 worktree와 브랜치에서 병렬 개발하고, 읽기 전용 독립 검토를 거쳐 작업별 커밋으로 통합합니다. 개발용 서브에이전트 구조와 서비스 런타임 구조는 구분합니다.
+허브 계보 **3종**을 코드에 연결했습니다. 공식 서비스 소개 2건은 별도 출처로 보완하며 데이터셋 수에 더하지 않습니다.
+
+| 자료 | 실제 사용 범위 | 바꾸는 준비 작업 |
+| --- | --- | --- |
+| [859 병·의원 정보](https://jejudatahub.net/data/view/data/859) | 공개 20행 분석·폐업 제외 13개 등록 기관 | 이름·주소·등록 과목으로 문의 대상 확인 |
+| [327 콜택시업체현황](https://jejudatahub.net/data/view/data/327) → [연결 원출처](https://www.data.go.kr/data/15056321/fileData.do) | 2026-03-19 기준 최신 공개 파일 34업체 | 출발 지역의 호출 문의처·연락처와 질문 구성 |
+| [254 노인돌봄서비스시설현황](https://jejudatahub.net/data/view/data/254) | 2020-04-17 기준 공개 19개 등록 문의처 | 담당지역·병원동행 제공 여부·대상·가능일 확인 |
+
+[아름동행](https://www.jjcsc.co.kr/Business/Market)의 병원동행 소개와 [교통약자 이동지원센터](https://www.jejuhappycall.com/?mcode=guide01)의 이용 안내를 구분해 연결합니다. 지원 snapshot에는 택시 34·돌봄 19·공식 서비스 2의 **55개 문의 경로**가 있습니다. 문의처가 있다는 사실을 실제 차량·동행인 확보로 표시하지 않습니다.
+
+병원 공개 표본의 수집 시점은 **2024-10-17 13:53**이며 행별 갱신일·허브 페이지 수정일과 다릅니다. 집계 20행에는 폐업 7행도 포함됩니다. 표본을 전체 제주 의료기관 현황이나 현재 수용·협진 참여 확인 결과로 확대하지 않습니다. 공개 자료의 기본 활용에 별도 사용권이나 사용자 파일 업로드를 요구하지 않습니다.
+
+```bash
+node scripts/datahub-profile.mjs --fetch
+```
+
+이 명령은 병원 공개 메타데이터·미리보기를 읽어 최소 후보와 집계를 재생성합니다. 택시·돌봄 자료의 재현 명령, 필드·기준일·이용조건은 [데이터 명세](docs/data-sources.md)를 따릅니다. 원문 전체 재배포 허락이나 자유 라이선스를 추정하지 않습니다.
+
+### 더 찾아본 자료와 후속 후보
+
+[데이터 활용 감사](research/datahub_opportunities_2026-10-31.md)에서 허브 1,259건의 목록 메타데이터, 보건·복지 198건, 관련 허브 상세 58종, 연결 원출처 최신 CSV 5종, 센터 명세 70종을 확인했습니다. 센터는 Excel 74시트와 등록 70종의 컬럼을 대조했으며 실제 원자료에는 접근하지 않았습니다. 1,259종의 원자료를 모두 검증한 결과가 아닙니다.
+
+후속 우선 후보는 **229 전문질환센터·1304 보건지소 관할구역·216 공공심야약국**입니다. 센터 7·8·10의 도로망·시간대별 평균소요시간은 원자료 확보 후 검토합니다. 현재 구현 데이터 수에는 포함하지 않으며, 문의 대상·질문·시간 조건을 실제로 바꾸는 자료만 추가합니다.
+
+## AWS 데모와 자동 배포
+
+**[공개 데모](https://d1mfksxrj025bx.cloudfront.net)** · [GitHub Actions](https://github.com/jungyoun43-prog/jeju_hackerton-11.20-/actions/workflows/deploy-aws.yml)
+
+비공개 S3·CloudFront의 기존 공개 데모가 있습니다. **이번 대화 UI·API의 새 revision 배포와 PC·모바일 최종 검증은 진행 중**이며, 확인한 결과만 [검증 기록](docs/implementation-results.md)에 갱신합니다. 이전 `ad6fc2c`의 [자동 배포 성공](https://github.com/jungyoun43-prog/jeju_hackerton-11.20-/actions/runs/41198504055)을 이번 버전의 성공 증거로 사용하지 않습니다.
+
+CI는 같은 커밋의 `dist/`와 별도 `output/agent-lambda.zip`을 검사·보존합니다. backend는 명시한 배포 toggle에서만 Lambda에 직접 게시하며 사이트 S3에 ZIP을 올리지 않습니다. Lambda URL은 AWS_IAM과 CloudFront OAC를 사용하고 모델·DynamoDB는 기본 비활성입니다. AWS 장기 키를 GitHub Secrets에 넣지 않습니다. [배포 매뉴얼](docs/deployment.md)에 변수·게시·검증·롤백을 기록했습니다.
+
+## 개발·검사·제출
+
+UI·Agent·인프라·문서는 전용 worktree에서 작업하고 커밋 단위로 통합합니다. [하네스 규칙](orchestration/README.md), [공통 인터페이스](docs/conversation-agent-contract.md), [검증 기록](docs/implementation-results.md)을 따릅니다. 개발용 서브에이전트 분업은 제품의 다중 임상 Agent 기능이 아닙니다.
 
 ```bash
 npm run observe
@@ -58,42 +88,22 @@ npm run eval
 npm run rollback -- <통합-커밋-SHA>
 ```
 
-위 세 명령은 Git 브랜치·worktree가 유지된 개발 저장소용입니다. `rollback`은 기본적으로 미리보기만 하며, 기록된 통합 커밋에 한해 `--apply`로 revert 커밋을 만듭니다. 미커밋 변경이 있으면 중단합니다. 압축 해제한 소스에서는 `npm test`, `npm run build`, 앱 실행으로 검증합니다.
-
-[하네스 규칙](orchestration/README.md), [파일·인터페이스 계약](docs/implementation-contract.md), [회고와 규칙 개선](orchestration/retrospective.md)을 확인하세요. 자동 eval의 준수율은 기계 검증한 항목만의 결과이며, 실제 데이터 사용 권리·임상·기관 연동 등 미검증 항목을 별도로 표시합니다.
-
-선택 브라우저 QA는 Playwright와 Chromium이 필요합니다. 앱 실행 의존성과 분리되어 있습니다. 먼저 개발 서버를 켠 뒤 다른 터미널에서 실행합니다.
+이 명령은 브랜치·worktree가 있는 개발 저장소용입니다. 자동 eval은 기계 검증한 규칙만 평가하며 임상·법률·데이터 권리·제출 준비 전체를 보장하지 않습니다. 선택 브라우저 검사는 Playwright와 Chromium이 필요합니다. 기존 `npm run test:browser`는 수동 화면을, `npm run test:conversation`은 대화 화면을 확인합니다. 모의 음성 결과를 실제 마이크 검증으로 표시하지 않습니다.
 
 ```bash
-npm install --no-save --package-lock=false playwright@1.64.1
-npx playwright install chromium
-npm run test:browser
+APP_REVISION=local-preview npm run build:agent
+npm run package
 ```
 
-기존 도구를 쓸 때는 `PLAYWRIGHT_MODULE`, `CHROMIUM_PATH`, 다른 서버 주소는 `BASE_URL`을 사용할 수 있습니다. QA는 최초 두 viewport만 타일을 조회하고, 반복 기능 검사는 외부 타일 요청을 막습니다. 결과는 `orchestration/runs/browser.json`과 `.impeccable/review/desktop.png`, `mobile.png`에 저장합니다.
+Lambda 빌드와 ZIP 패키징에는 Python 3가 필요합니다. Lambda ZIP은 `index.mjs`·`deployment.json`으로 구성하며 제출용 `output/jeju-care-compass-mvp.zip`과 구분합니다. 제출 ZIP은 개발 스냅샷이며 이번 버전의 재생성·독립 설치·최종 제출 확인은 [추적표](docs/submission-checklist.md)를 따릅니다. 센터 PC의 GPU·로컬 모델은 요구하지 않지만 센터 실기기 검증은 별도입니다.
 
-## 확정된 프로젝트 방향
+- [PRD v0.6](docs/prd.md): 대화 중심 UX, 실제·시연·후속 기능과 대회 요구사항.
+- [기능 파이프라인](docs/agent-pipeline.md): 요청부터 도구·처리 기록·재확인까지.
+- [외부 의존성](THIRD_PARTY.md): Bedrock SDK 3.1161.0·esbuild 0.28.2·라이선스·모델·이미지 기록.
+- [AGENTS.md](AGENTS.md): 조사 방식·데이터·병렬 개발 지침.
+- [원격협진 사례 조사](research/remote_collaboration_cases_2026-10-31.md): 비교 사례의 확인 범위.
 
-- 저장소: [jeju_hackerton-11.20-](https://github.com/jungyoun43-prog/jeju_hackerton-11.20-)
-- 참가 대회: [제주 AI·빅데이터 활용 AI Agent 개발 챌린지](https://daker.ai/public/hackathons/jeju-ai-bigdata-agent-challenge)
-- 활용 자료: [사용자가 지정한 제주데이터허브 데이터 목록](https://jejudatahub.net/data/list/12)에 있는 데이터
-- 데이터 명세 참고: [제주데이터허브 센터 데이터 페이지](https://jejudatahub.net/center/data) — 사용자가 추가로 지정한 명세 확인처
-- 자료조사 도구: `insane_search` — [fivetaku/insane-search 스킬](https://github.com/fivetaku/insane-search), 설치명 `insane-search`
-- 에이전트 작업 지침: [AGENTS.md](AGENTS.md)
-
-## 서비스 방향과 PRD
-
-**제주 진료 나침반** — 제주에서 받는 대면 진찰과 도외의 기존 주치의·전문의 협진이 이어지도록, 기록 정리부터 전화 문의·자료 보완·회신·방문 이동·동행 준비까지 연결하는 Agent를 기획합니다.
-
-- [현재 기능 파이프라인](docs/agent-pipeline.md): 요청·기록 정리 → 병원 문의·자료 보완 → 의료진 검토 → 택시·동행 조건과 후보 확인 → 문의 초안·응답 → 실행 계획·재확인.
-- [PRD v0.5](docs/prd.md): 보호자 중심 원격협진 준비, 실제 기관 데이터 활용, 도구·판단 범위, UI, 센터 실행과 제출 요건을 연결한 현재 요구사항.
-- [데이터와 출처 명세](docs/data-sources.md): 사용 중인 필수 데이터의 항목·시점·변환·제약, 의학적 근거·급여·통신 의존성과 확인 범위.
-- [원격협진 유사 사례 조사](research/remote_collaboration_cases_2026-10-31.md): 제주 DHIS, 국내 병원 간 협진, 해외 암 원격협진과 eConsult, 피클의 전화·예약 대행 공개 기능 비교.
-- 첫 시연의 질환·상세 사례는 재검토 중이며 암 치료 후 추적 진료를 예시로 검토합니다. 현재의 범위 제안은 합성 환자 1명과 제주·도외 기관 역할 각 1곳, 협진 요청 1건입니다.
-- 기록·문헌 근거 정리, 전화 문의, 자료 보완과 회신 추적을 Agent가 맡고, 진찰과 환자별 협진·진료 계획의 임상 판단은 의료진이 맡는 구조입니다.
-- 의료진이 검토한 실행안에 대해 한국의 급여·의료비와 반복 방문의 비용·시간·동행 부담을 계산하고 조건 변경 시 갱신합니다.
-
-런타임 모델·음성 사업자는 아직 미정입니다. UI·상태 엔진의 기술 스택은 위 MVP 실행 설명을 따릅니다. 전화 문의는 실제 발신 경로부터 별도로 검증하며, 브라우저 음성 대화를 전화망 발신 완료로 표시하지 않습니다.
+실제 모델 선택·연결, 승인된 개인 기록 어댑터, 실제 전화·예약·배차, 의료기관 참여와 임상 검증은 후속입니다. 환자의 진료 장소·검사·치료 계획은 의료진이 판단합니다. 구체 암종·치료 단계·급여·견적은 확정하지 않았고 반복방문 비용은 가정으로만 표시합니다.
 
 ## 대회 주요 요건
 
@@ -124,42 +134,3 @@ npm run test:browser
 관련 문서: [수상 전략 제안](docs/award-strategy.md), [평가기준별 심사 역할·재사용 지시문](docs/judging-agents.md), [첫 검토 기록](docs/reviews/2026-10-31.md).
 
 심사 에이전트는 개발 과정의 검토 역할입니다. 상시 실행 시스템이나 제출 서비스의 다중 에이전트 구조를 구현한 상태는 아닙니다.
-
-## 데이터 활용 기록
-
-지정된 목록에서 구체적인 데이터셋을 선정할 때는 [센터 데이터 페이지](https://jejudatahub.net/center/data)의 명세도 함께 확인하고 다음을 기록합니다.
-
-- 데이터명과 상세 출처 URL
-- 제공 기간, 갱신 주기, 활용 항목과 단위
-- 수집 방식과 이용조건
-- 전처리 방법과 분석 흐름
-
-병원 자료는 [병·의원 정보 · ID859](https://jejudatahub.net/data/view/data/859), 원 제공처 표기 LOCALDATA입니다. 2026-10-31 공개 미리보기 **20행을 실제 분석**하고, 폐업 7행을 제외한 **13개 기관의 최소 등록 사실**을 후보 조회·선택·문의 대상에 연결했습니다. 기관명·주소·등록 진료과·행정 상태·갱신일·수집일을 표시합니다. 선택을 바꾸면 제주 문의와 검토 접수를 다시 준비하도록 상태가 갱신됩니다.
-
-- 후보: `app/data/hospital-candidates.json`의 13개 행정 정상 등록 기관. 현재 수용·협진 참여 확인 결과가 아닙니다.
-- 집계: `app/data/datahub-profile.json`의 20행 기준 상태·과목 빈도·주소/과목 결측·시점 분석. 후보 13곳의 집계와 구분합니다.
-- 원자료 수집 시점: **2024-10-17 13:53**. 허브 페이지 수정일과 현재 병원 운영 상태는 별개입니다.
-- 기본 공개 미리보기 조회에는 프로젝트 키나 사용자 파일 업로드가 필요하지 않습니다. 전체 운영 API는 미연결입니다.
-
-```bash
-node scripts/datahub-profile.mjs --fetch
-```
-
-이 명령은 공개 메타데이터·미리보기를 읽어 두 JSON을 다시 생성합니다. 전체 원문 CSV는 저장하지 않습니다. 공개 데이터의 출처를 표시하며 자유 라이선스나 전체 원자료 재배포 허락을 확인했다고 주장하지 않습니다. 사용자 지정 URL의 `/12`는 전체 목록의 페이지 번호입니다.
-
-이동·동행 문의처는 `app/data/visit-support-providers.json`에 출처별로 보존합니다. 택시 327의 연결 원출처 최신 34행, 돌봄 254 공개 19행, 별도 공식 서비스 2건으로 총55개 문의 경로입니다. `scripts/support-data.mjs`는 다운로드한 공식CSV와 허브 254 공개응답JSON을 읽어 최소 사실을 재생성합니다. 실제 재현 명령과 파일 지문은 데이터 명세를 따릅니다. 원출처가 다른 자료의 날짜·전화·서비스 범위를 섞지 않습니다.
-
-최신 확인 범위와 전처리 계획은 [데이터와 출처 명세](docs/data-sources.md)에 기록했습니다. 이전 목록 조사와 전략 제안은 [수상 전략의 데이터 확인 기록](docs/award-strategy.md)에 남아 있습니다.
-
-## 현재 상태와 다음 결정 사항
-
-기존 보호자 UI·지도·결정적 상태 엔진·병원 공개 후보 13곳에 이동·돌봄 문의처55개(최신 택시 34·과거 돌봄 19·공식 서비스2)를 추가했습니다. 지역·지원 필요·휠체어 조건이 후보·질문·재확인 작업을 바꾸도록 지원 흐름과 대시보드를 통합하는 중입니다. 준비 단계 도우미와 합성 의료진 응답은 실제 모델 추론·임상 판단과 다릅니다. 공개 표본을 넘어 전체 제주 기관을 조회하거나 실시간 수용 여부를 확인하지는 않습니다.
-
-화면은 큰 홍보 배너와 반복 카드 대신 사례 제목·현재 병목·다음 행동·담당자 중심으로 재설계했습니다. 의사·가족 일러스트는 사용자 피드백으로 제거했고, Imagegen으로 만든 현무암·연결 모티브의 투명 PNG 로고 `app/assets/jeju-mark-v1.png`를 사용합니다. 정확한 프롬프트는 자산 명세에 기록합니다. 이전 버전의 단위58·브라우저33·자동규칙19 검사와 이번 확장의 증거를 [검증 기록](docs/implementation-results.md)에서 구분합니다.
-
-- 첫 시연 질환·치료 단계·합성 기록과 협진 참여 의료진.
-- 전체 운영 API 확장 여부와 사례별 근거 문헌·급여 항목.
-- 국내 전화 발신 경로, 실제 문의 창구, 음성 품질과 비용.
-- 런타임 모델·Prompt/Tool 연동과 센터 실기기 실행 검증.
-
-기능과 수락 기준은 PRD, 실제 확인 범위는 구현·검증 결과와 제출 추적표를 따릅니다. 최종 기획서 PDF의 15페이지 이내 편집·확인은 아직 남아 있습니다.
