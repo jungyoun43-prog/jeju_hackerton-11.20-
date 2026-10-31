@@ -141,11 +141,11 @@ insane-search의 `weak_ok`는 본문 검토의 출발점으로 취급했다. 제
 | --- | --- | --- |
 | Leaflet 1.9.4 | 브라우저 지도 라이브러리. [공식 문서](https://leafletjs.com/examples/quick-start/), 잠금 파일로 버전 고정 | 설치된 `node_modules/leaflet/LICENSE`에서 BSD-2-Clause 본문 확인. 소스·정적 배포에 저작권·라이선스 고지 보존 필요 |
 | OpenStreetMap | 기본 지형·지명 타일. [타일 정책](https://operations.osmfoundation.org/policies/tiles/) | 데이터·타일 서비스의 조건을 구분하고 출처 표시. 화면에 필요한 타일만 요청하며 사전 대량 수집·오프라인 배포를 하지 않는 구성. 타일 실제 표시·실패 상태는 통합 검증 대상 |
-| Google Maps URLs | 사용자가 별도 지도에서 위치·길찾기를 여는 링크. [공식 문서](https://developers.google.com/maps/documentation/urls/get-started) | 외부 링크와 앱 내부 경로 API 조회를 구분. 링크가 있다고 실제 경로·시간을 조회한 것은 아님 |
-| Google Maps Embed | 별도 키가 있는 경우의 선택 구성. [공식 설정 문서](https://developers.google.com/maps/documentation/embed/get-api-key) | 현재 실키 미설정·실연동 미검증. 키는 제출 제외, 허용 도메인·API 제한과 공급자 이용조건 확인 |
+| Google Maps URLs | 키 없이 별도 지도에서 위치·길찾기를 여는 외부 링크. [공식 문서](https://developers.google.com/maps/documentation/urls/get-started) | 외부 링크와 앱 내부 경로 API 조회를 구분. 링크가 있다고 실제 경로·시간을 조회한 것은 아님 |
+| Google Maps Embed | [공식 설정 문서](https://developers.google.com/maps/documentation/embed/get-api-key)는 과거 검토 참고 | 현재 미구현·향후 검토. 키 설정이나 앱 내부 임베드를 지원한다고 설명하지 않음. 현재 환경변수는 `HOST`, `PORT`, `MAP_TILE_URL`뿐 |
 | 초기 지도 마커 | 애월 인근·제주 시내의 합성 지점 | 실제 환자 주소·협진 참여 병원·공공데이터 좌표가 아님. 지도에 합성 표시 |
 | 환자·문서·통화·회신 | 자체 시연용 합성 fixture | 실제 개인정보·의료행위 수행 증거가 아님. 합성 출처를 결과물까지 유지 |
-| 제주 해안 배너 | 내장 Imagegen 도구로 생성 성공, `app/assets/jeju-coast.png` 원본 보존 예정 | 실제 도구의 상세 모델 ID는 공개되지 않아 추정 기재하지 않음. 정확 프롬프트·사용 도구·최종 파일은 `app/assets/manifest.json` 기준. UI 표시·패키지 포함 검증은 별도 |
+| 진료 연결 배너 v2 | 내장 Imagegen으로 부모님·현지 의사·멀리 사는 자녀·영상 전문의를 잇는 일러스트 생성·전환 진행. 화면용 경로 `app/assets/jeju-care-v2.png`. 기존 풍경 v1 `app/assets/jeju-coast.png`는 보존·참조용 | v2 생성 완료는 아직 미확인. 도구의 상세 모델 ID는 공개되지 않아 추정 기재하지 않음. 정확 프롬프트·사용 도구·최종 파일은 `app/assets/manifest.json` 기준. UI 표시·패키지 포함 검증은 별도 |
 | Impeccable | [원본](https://github.com/pbakaus/impeccable), revision `b7a89176e4e87422b40f98adabceb051dbb5448b` | 개발 시 디자인 지침으로 사용. 자동 context 로더 권한 실패 후 프로젝트 문맥·Operate/craft 지침을 직접 적용. 사용자 화면의 런타임 AI 모델이 아님 |
 | Awesome Design Skills · Refined | [원본 스킬](https://github.com/bergside/awesome-design-skills/blob/f631a09b4fcc0166f2e2c1a8c81906ef680c57e8/skills/refined/SKILL.md) | MIT 표기 확인. 토큰·간격·상태·접근성 지침 참고. 예시 팔레트·영문 글꼴을 그대로 복제하지 않음 |
 | Sites·Imagegen·Codex | 로컬 웹 구현·생성 이미지·코드/문서 작성 보조 | 개발 도구 사용과 제품 런타임 기능을 구분. 숨겨진 모델 버전·사용량을 추정하지 않음 |

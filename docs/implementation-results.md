@@ -20,8 +20,8 @@
 | 보완·회신 | 추가 자료→재접수, 변경 시 기존 결과 무효화 | 통합 전, root 갱신 |
 | 부담 계산 | 가정 비용·null 미확인·동행 공백 | 통합 전, root 갱신 |
 | 기관 어댑터 | 허브 필드 정규화·행정 상태·지역·진료과 필터 | 합성 fixture 검사 예정. 실데이터 활용 증거 없음 |
-| 지도 | Leaflet·OSM, 합성 마커, Google 외부 링크/선택적 Embed | 네트워크·UI 확인 전, root 갱신 |
-| Imagegen 배너 | 제주 해안 일러스트 생성 성공. 원본 `app/assets/jeju-coast.png`, 명세 `app/assets/manifest.json` | 통합 담당자 생성 성공 확인. UI·패키지 포함 검증 대기 |
+| 지도 | Leaflet·OSM, 합성 마커, 키 없는 Google Maps URLs 외부 링크 | Google Maps Embed는 미구현·향후 검토. 네트워크·UI 검증 결과는 root 갱신 |
+| Imagegen 배너 | 부모님·제주 의사·멀리 사는 자녀·영상 전문의를 잇는 화면용 v2 `app/assets/jeju-care-v2.png` 생성·전환 진행. 명세 `app/assets/manifest.json` | v2 생성 완료·UI·패키지 포함 검증 대기. 생성 성공한 v1 풍경 `app/assets/jeju-coast.png`는 보존·참조용 |
 | 런타임 LLM | 미연동 | 모델 추론 성능·자율 도구 선택을 검증했다고 주장하지 않음 |
 | 실제 전화·병원 전송·예약 | 미연동 | 실제 완료·기관 참여 주장 없음 |
 
