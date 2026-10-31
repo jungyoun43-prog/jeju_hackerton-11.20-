@@ -25,7 +25,7 @@ await mkdir(resolve(root,'orchestration/runs'),{recursive:true});
 const browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH||undefined,args:['--no-sandbox','--disable-dev-shm-usage']});
 const checks=[],errors=[];
 const record=(name,ok,detail='')=>{checks.push({name,status:ok?'pass':'fail',detail});console.log(`${ok?'PASS':'FAIL'} ${name}${detail?' · '+detail:''}`);};
-const proof={result:'fail',checkedAt:new Date().toISOString(),url:base.href,sourceHash:await runtimeFingerprint(root),checks,errors,apiLive:false,modelInvoked:false,phoneInvoked:false,healthRecordsQueried:false,microphone:'permission-denied and transcript-review fixtures only',fixedPreview:false,normalInputDisconnected:false,desktop:{width:1440,noOverflow:false},mobile:{width:390,noOverflow:false},fixtureCoverage:{preferences:false,markdown:false,recovery:false,voiceReview:false},sourceHashScope:'invoking checkout; rerun after integration when server source differs'};
+const proof={result:'fail',checkedAt:new Date().toISOString(),url:base.href,sourceHash:await runtimeFingerprint(root),checks,errors,apiLive:false,modelInvoked:false,phoneInvoked:false,healthRecordsQueried:false,microphone:'permission-denied and transcript-review fixtures only',fixedPreview:false,normalInputDisconnected:false,desktop:{width:1440,noOverflow:false},mobile:{width:390,noOverflow:false},fixtureCoverage:{preferences:false,markdown:false,recovery:false,voiceReview:false,exampleDrafts:false,cancellation:false,contactPlan:false,shortViewport:false},shortViewport:[],sourceHashScope:'invoking checkout; rerun after integration when server source differs'};
 const overflow=page=>page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth);
 const visibleInViewport=locator=>locator.evaluate(node=>{const r=node.getBoundingClientRect(),s=getComputedStyle(node);return s.display!=='none' && s.visibility!=='hidden' && r.width>0 && r.height>0 && r.top>=0 && r.bottom<=innerHeight;});
 const json=request=>JSON.parse(request.postData());
@@ -81,8 +81,7 @@ async function open(width,height,{configured=false,voice,storageSeed,onPost}={})
 async function send(page,text) {
   await page.locator('#request-input').fill(text);
   const response=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/agent' && r.request().method()==='POST');
-  await page.locator('#send-request').click();
-  const result=await response;
+  const [result]=await Promise.all([response,page.locator('#send-request').click()]);
   await page.waitForFunction(()=>document.querySelector('#conversation-form').getAttribute('aria-busy')==='false');
   await page.evaluate(()=>new Promise(done=>requestAnimationFrame(done)));
   return result;
@@ -90,7 +89,7 @@ async function send(page,text) {
 async function confirmAction(page,selector,accept=true) {
   let dialogType='',message='';
   page.once('dialog',async dialog=>{dialogType=dialog.type();message=dialog.message();if(accept)await dialog.accept();else await dialog.dismiss();});
-  await page.locator(selector).click();
+  await (typeof selector==='string'?page.locator(selector):selector).click();
   return {confirmed:dialogType==='confirm',message};
 }
 async function editPreferences(page,values) {
@@ -148,6 +147,80 @@ async function recordsMatch(panel,state) {
   return true;
 }
 const highwayDisconnected=async panel=>(await panel.locator('#health-highway-status').innerText()).trim()==='미연결' && /불러온 기록 없음/.test(await panel.locator('#health-highway-last-sync').innerText());
+const normalizedText=value=>value.replace(/\s+/g,' ').trim();
+const settleUI=page=>page.evaluate(()=>new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(done))));
+// 화면 아래에 있는 문구는 사용자가 스크롤할 수 있으면 접근 가능하다.
+// overflow:hidden 조상을 프로그램으로 움직여서만 보인 경우는 통과시키지 않는다.
+async function reachable(locator) {
+  const before=await locator.evaluate(node=>{
+    const r=node.getBoundingClientRect(),ancestors=[];
+    for(let parent=node.parentElement;parent;parent=parent.parentElement)ancestors.push({top:parent.scrollTop,left:parent.scrollLeft,locked:/^(hidden|clip)$/.test(getComputedStyle(parent).overflowY)});
+    return {initial:r.bottom<=0?'above-fold':r.top>=innerHeight?'below-fold':r.top<0 || r.bottom>innerHeight?'partly-in-viewport':'in-viewport',ancestors};
+  });
+  try {await locator.scrollIntoViewIfNeeded({timeout:3000});}
+  catch(error) {return {initial:before.initial,reachable:false,reason:error.message};}
+  return locator.evaluate((node,before)=>{
+    const r=node.getBoundingClientRect(),s=getComputedStyle(node);
+    let top=0,bottom=innerHeight,left=0,right=innerWidth,hiddenScroll=false,index=0;
+    for(let parent=node.parentElement;parent;parent=parent.parentElement,index++) {
+      const style=getComputedStyle(parent),p=parent.getBoundingClientRect(),old=before.ancestors[index];
+      if(old?.locked && (Math.abs(parent.scrollTop-old.top)>1 || Math.abs(parent.scrollLeft-old.left)>1))hiddenScroll=true;
+      if(/^(hidden|clip|auto|scroll)$/.test(style.overflowY)){top=Math.max(top,p.top+parent.clientTop);bottom=Math.min(bottom,p.top+parent.clientTop+parent.clientHeight);}
+      if(/^(hidden|clip|auto|scroll)$/.test(style.overflowX)){left=Math.max(left,p.left+parent.clientLeft);right=Math.min(right,p.left+parent.clientLeft+parent.clientWidth);}
+    }
+    const selfClipped=/^(hidden|clip)$/.test(s.overflowY) && node.scrollHeight>node.clientHeight+2;
+    const fits=r.top>=top-2 && r.bottom<=bottom+2 && r.left>=left-2 && r.right<=right+2;
+    return {initial:before.initial,reachable:s.display!=='none' && s.visibility!=='hidden' && r.width>0 && r.height>0 && fits && !hiddenScroll && !selfClipped,hiddenScroll,selfClipped,rect:{top:Math.round(r.top),bottom:Math.round(r.bottom)},visibleRange:{top:Math.round(top),bottom:Math.round(bottom)}};
+  },before);
+}
+async function accessSet(page,selectors) {
+  const result={};
+  for(const selector of selectors)result[selector]=await reachable(page.locator(selector));
+  return result;
+}
+async function openContactPlan(page) {
+  if(await page.locator('#open-care-menu').isVisible())await page.locator('#open-care-menu').click();
+  await page.locator('#nav-contact-plan').click();
+  const panel=page.locator('#contact-plan-dialog');await panel.waitFor();return panel;
+}
+async function closeContactPlan(page,{escape=false}={}) {
+  if(escape)await page.keyboard.press('Escape');else await page.locator('#close-contact-plan').click();
+  await page.locator('#contact-plan-dialog').waitFor({state:'hidden'});
+  const expected=await page.locator('#open-care-menu').isVisible()?'open-care-menu':'nav-contact-plan';
+  await page.waitForFunction(id=>document.activeElement.id===id,expected);return true;
+}
+// AbortSignal을 일부러 무시한다. 중지 후 늦게 도착한 fetch 결과와 이전 finally의 경합을 검사한다.
+async function deferAgentFetch(page) {
+  await page.evaluate(()=>{
+    const original=window.fetch.bind(window),calls=[],pending=[];
+    window.__qaDeferredAgent={calls,settle(index,status,body,errorName){
+      if(!pending[index] || pending[index].settled)throw new Error('알 수 없거나 이미 완료한 fixture');
+      const request=pending[index];request.settled=true;
+      if(errorName)request.reject(new DOMException('지연 응답 fixture',errorName));
+      else request.resolve(new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json'}}));
+    }};
+    window.fetch=(input,options={})=>{
+      const path=new URL(typeof input==='string'?input:input.url,location.href).pathname;
+      if(options.method!=='POST' || !['/api/agent','/api/agent/preview'].includes(path))return original(input,options);
+      return new Promise((resolve,reject)=>{
+        const index=calls.length;
+        calls.push({path,body:options.body,headers:Object.fromEntries(new Headers(options.headers)),aborted:options.signal?.aborted===true});
+        pending.push({resolve,reject,settled:false});
+        options.signal?.addEventListener('abort',()=>{calls[index].aborted=true;},{once:true});
+      });
+    };
+  });
+}
+async function deferredCall(page,index) {
+  await page.waitForFunction(index=>window.__qaDeferredAgent?.calls.length>index,index);
+  return page.evaluate(index=>window.__qaDeferredAgent.calls[index],index);
+}
+async function releaseDeferred(page,index,body,{status=200,errorName}={}) {
+  await page.evaluate(({index,status,body,errorName})=>window.__qaDeferredAgent.settle(index,status,body,errorName),{index,status,body,errorName});
+  await settleUI(page);
+}
+const deferredHashMatches=call=>call.headers['x-amz-content-sha256']===createHash('sha256').update(call.body).digest('hex');
+const deferredResponse=(call,state,reply)=>fixtureResponse({postData:()=>call.body},state,reply);
 try {
   const capResponse=await fetch(new URL('/api/agent/capabilities',base));
   const caps=await capResponse.json();
@@ -361,6 +434,141 @@ try {
       record('음성 인식 fixture는 검토 가능한 초안으로 남고 자동 전송하지 않음',requests.length===0 && /확인|고친/.test(await page.locator('#voice-help').textContent()) && await page.locator('#send-request').isEnabled());
       await send(page,'11월 20일 어머니 이동을 준비해 주세요.');
       record('인식 내용을 수정한 뒤 보내야 요청됨',requests.length===1 && json(requests[0]).message==='11월 20일 어머니 이동을 준비해 주세요.' && hashMatches(requests[0]),'실제 음성 서비스·모델 호출 아님');proof.fixtureCoverage.voiceReview=true;
+    } finally {await context.close();}
+  });
+  for(const [width,height] of [[1440,900],[390,844]])await scenario(`${width}px 예시 초안 fixture`,async()=>{
+    const {page,context,requests}=await open(width,height,{configured:true,onPost:request=>({body:fixtureResponse(request,createDemoCase())})});
+    try {
+      const input=page.locator('#request-input'),example=page.locator('[data-example]:visible').first();
+      const visible=normalizedText(await example.locator('span').innerText());
+      await example.click();
+      record(`${width}px 예시는 보이는 문구만 초안으로 채우고 POST 없음`,requests.length===0 && normalizedText(await input.inputValue())===visible && !/11월\s*12|오전\s*10/.test(await input.inputValue()) && await page.locator('.message.user').count()===0);
+      const examples=page.locator('[data-example]:visible');
+      for(let index=1;index<await examples.count();index++) {
+        await input.fill('');const other=examples.nth(index),copy=normalizedText(await other.locator('span').innerText());await other.click();
+        record(`${width}px 추가 예시 ${index+1}도 보이는 초안만 입력`,requests.length===0 && normalizedText(await input.inputValue())===copy && !/11월\s*12|오전\s*10/.test(await input.inputValue()));
+      }
+      const existing='직접 쓰던 요청은 예시를 눌러도 먼저 보호해야 합니다.';await input.fill(existing);
+      const cancelled=await confirmAction(page,example,false);
+      record(`${width}px 예시 교체 취소는 기존 초안 보존`,cancelled.confirmed && await input.inputValue()===existing && requests.length===0);
+      const accepted=await confirmAction(page,example);
+      record(`${width}px 예시 교체 확인도 전송 없이 초안만 변경`,accepted.confirmed && normalizedText(await input.inputValue())===visible && requests.length===0);
+      const edited=visible+' 방문 날짜와 희망 시간은 아직 미정입니다.';await send(page,edited);
+      record(`${width}px 예시를 고친 뒤 보내야 수정한 본문 1건 전송`,requests.length===1 && json(requests[0]).message===edited && hashMatches(requests[0]) && await page.locator('.message.user').count()===1);
+      proof.fixtureCoverage.exampleDrafts=true;
+    } finally {await context.close();}
+  });
+  for(const width of [390,360])await scenario(`${width}x500 읽기·입력 접근 fixture`,async()=>{
+    const reply='# 긴 답변의 시작\n\n'+Array.from({length:24},(_,index)=>`확인 ${index+1}. 제주 병원과 기존 도외 병원의 접수 창구·전달할 자료를 확인합니다. 실제 진료 수락이나 예약은 미확정입니다.`).join('\n\n')+'\n\n긴 답변의 마지막 안내입니다.';
+    const {page,context,requests}=await open(width,500,{configured:true,onPost:request=>({body:fixtureResponse(request,createDemoCase(),reply)})});
+    const controls=['#request-input','#send-request','#composer-disclosure','.privacy-note'];
+    try {
+      const initial=await accessSet(page,controls),conversation=await page.locator('#conversation-scroll').evaluate(node=>({height:node.clientHeight,scrollable:/auto|scroll/.test(getComputedStyle(node).overflowY) || getComputedStyle(node).overflowY==='visible' && document.scrollingElement.scrollHeight>innerHeight}));
+      record(`${width}x500 첫 화면은 아래 fold와 실제 clip을 구분해 입력·고지 접근`,await overflow(page) && Object.values(initial).every(value=>value.reachable) && conversation.height>=80 && conversation.scrollable,JSON.stringify(initial));
+      const input=page.locator('#request-input'),multiline=Array.from({length:12},(_,index)=>`${index+1}번째 요청 내용: 진료 자료와 이동을 확인해 주세요.`).join('\n');
+      await input.fill(multiline);await input.press('Control+End');
+      const multiple=await accessSet(page,controls),textarea=await input.evaluate(node=>({lines:node.value.split('\n').length,lastLine:node.scrollTop+node.clientHeight>=node.scrollHeight-3,scrollable:/auto|scroll/.test(getComputedStyle(node).overflowY)}));
+      record(`${width}x500 12줄 입력도 마지막 줄·보내기·고지 접근`,textarea.lines===12 && textarea.lastLine && textarea.scrollable && Object.values(multiple).every(value=>value.reachable),JSON.stringify(multiple));
+      await send(page,multiline);
+      const answer='.message.assistant:not(.greeting) .message-body';
+      const longAnswer=await accessSet(page,[`${answer} h3`,`${answer} p:last-child`,...controls]);
+      record(`${width}x500 긴 답변은 시작과 마지막까지 읽고 다시 입력 가능`,requests.length===1 && Object.values(longAnswer).every(value=>value.reachable) && await overflow(page),JSON.stringify(longAnswer));
+      const before=await page.locator(answer).last().evaluate(node=>parseFloat(getComputedStyle(node).fontSize));
+      // CSS zoom은 화면 전체를 축소·확대하므로 쓰지 않고 실제 텍스트의 계산 크기를 2배로 바꾼다.
+      await page.evaluate(()=>{
+        const nodes=[document.body,...document.body.querySelectorAll('*')].filter(node=>node instanceof HTMLElement && !['SCRIPT','STYLE'].includes(node.tagName));
+        const sizes=nodes.map(node=>parseFloat(getComputedStyle(node).fontSize));
+        nodes.forEach((node,index)=>{if(sizes[index]>0)node.style.fontSize=`${sizes[index]*2}px`;});
+      });
+      await input.fill(multiline);await input.press('Control+End');
+      const enlarged=await accessSet(page,[`${answer} h3`,`${answer} p:last-child`,...controls]);
+      record(`${width}x500 텍스트 200%에서 대화·입력·전송·고지 접근`,await page.locator(answer).last().evaluate(node=>parseFloat(getComputedStyle(node).fontSize))>=before*1.95 && await input.evaluate(node=>parseFloat(getComputedStyle(node).fontSize)>=31 && node.value.split('\n').length===12 && node.scrollTop+node.clientHeight>=node.scrollHeight-3) && Object.values(enlarged).every(value=>value.reachable) && await overflow(page),JSON.stringify(enlarged));
+      proof.shortViewport.push({width,height:500,textScale:2,initial,multiple,longAnswer,enlarged});
+      await screenshot(page,`short-${width}-text-200`);proof.fixtureCoverage.shortViewport=true;
+    } finally {await context.close();}
+  });
+  for(const kind of ['normal','preview'])await scenario(`${kind} 대기 중지·늦은 응답 fixture`,async()=>{
+    const {page,context,requests}=await open(390,844,{configured:true,onPost:request=>({body:fixtureResponse(request,createDemoCase(),'중지 전에 보존할 세션 응답입니다.')})});
+    try {
+      await send(page,'기존 합성 세션을 준비해 주세요.');
+      const original='중지한 뒤에도 보존할 원문입니다.',input=page.locator('#request-input');
+      await input.fill(original);await deferAgentFetch(page);
+      if(kind==='normal')await page.locator('#send-request').click();else await confirmAction(page,'#preview-button');
+      const first=await deferredCall(page,0),beforeMessages=await page.locator('.message').count();
+      record(`${kind} 대기 중 중지 버튼과 진행 상태 제공`,await page.locator('#cancel-request').isVisible() && await page.locator('#conversation-form').getAttribute('aria-busy')==='true' && deferredHashMatches(first));
+      await page.locator('#cancel-request').click();
+      await page.waitForFunction(()=>document.querySelector('#conversation-form').getAttribute('aria-busy')==='false');
+      const stoppedCopy=await page.locator('#conversation-status').innerText(),stopped=await deferredCall(page,0);
+      record(`${kind} 중지는 원문 복원·클라이언트 대기와 서버 처리 구분`,await input.inputValue()===original && await input.isEditable() && stopped.aborted && /대기.*중지|중지.*대기/.test(stoppedCopy) && /서버.*(?:계속|확인)|처리.*계속/.test(stoppedCopy) && await page.locator('.message').count()===beforeMessages,stoppedCopy);
+      const changed={taxiProviderId:'taxi327-14',wheelchair:true,companionNeeded:true};await editPreferences(page,changed);
+      if(kind==='normal')await page.locator('[data-retry]').last().click();else await confirmAction(page,'#preview-button');
+      const retry=await deferredCall(page,1);
+      record(`${kind} 중지 재시도는 설정 변경 뒤에도 원래 본문·ID·해시 보존`,retry.body===first.body && retry.path===first.path && deferredHashMatches(retry) && (kind!=='normal' || JSON.parse(retry.body).sessionId===fixtureSessionId));
+      const stale=deferredResponse(first,createDemoCase(),'늦게 도착해 화면에 보이면 안 되는 응답');
+      if(kind==='preview')Object.assign(stale,{isPreview:true,previewMessages:[{role:'user',text:'늦은 예시'},{role:'assistant',text:stale.reply}],capabilities:{...configuredCaps,llm:false}});
+      await releaseDeferred(page,0,stale);
+      record(`${kind} 늦은 성공과 이전 finally는 새 요청의 대기를 해제하지 않음`,await page.locator('#conversation-form').getAttribute('aria-busy')==='true' && await page.locator('#send-request').isDisabled() && await page.locator('#cancel-request').isVisible() && !(await page.locator('#message-list').innerText()).includes(stale.reply) && await page.locator('.example-label').count()===0);
+      await page.locator('#cancel-request').click();await page.waitForFunction(()=>document.querySelector('#conversation-form').getAttribute('aria-busy')==='false');
+      const newDraft='다음 요청으로 직접 고쳐 쓴 새 초안입니다.';await input.fill(newDraft);
+      const errorsBefore=await page.locator('.request-error').count();
+      await releaseDeferred(page,1,null,{errorName:'AbortError'});
+      record(`${kind} 늦은 실패와 이전 finally는 새 초안·오류 상태를 덮지 않음`,await input.inputValue()===newDraft && await input.isEditable() && await page.locator('#send-request').isEnabled() && await page.locator('.request-error').count()===errorsBefore);
+      if(kind==='normal') {
+        const kept=await confirmAction(page,page.locator('[data-retry]').last(),false);
+        record('normal 중지 재시도의 교체 취소는 새 초안 보존',kept.confirmed && await input.inputValue()===newDraft && await page.evaluate(()=>window.__qaDeferredAgent.calls.length)===2);
+      }
+      await page.locator('#send-request').click();const next=await deferredCall(page,2),payload=JSON.parse(next.body);
+      await releaseDeferred(page,2,deferredResponse(next,createDemoCase(),'중지 후 새 요청의 정상 합성 응답'));
+      await page.waitForFunction(()=>document.querySelector('#conversation-form').getAttribute('aria-busy')==='false');
+      record(`${kind} 중지 뒤 새 요청도 기존 세션·새 설정으로 회복`,next.path==='/api/agent' && payload.sessionId===fixtureSessionId && payload.message===newDraft && samePreferences(payload.preferences,changed) && payload.applyPreferences===true && deferredHashMatches(next) && (await page.locator('#message-list').innerText()).includes('중지 후 새 요청의 정상 합성 응답') && requests.length===1,'fetch fixture만 사용·서버 취소 또는 실제 발신 중단을 검증하지 않음');
+      proof.fixtureCoverage.cancellation=true;
+    } finally {await context.close();}
+  });
+  for(const [width,height] of [[1440,900],[390,500]])await scenario(`${width}px 전화·협진 계획 fixture`,async()=>{
+    let state=preparedState({taxiProviderId:'auto',wheelchair:true,companionNeeded:true});
+    for(const target of ['mainland','jeju'])state=applyAction(state,{type:'RECORD_CALL',target,outcome:'documents'});
+    const {page,context,requests,networkRequests}=await open(width,height,{configured:true,onPost:request=>({body:fixtureResponse(request,state)})});
+    try {
+      const input=page.locator('#request-input'),existing='전화 계획을 열기 전에 쓰던 요청입니다.';await input.fill(existing);
+      const beforeNetwork=networkRequests.length;let panel=await openContactPlan(page);
+      record(`${width}px 전화 계획은 이름·focus를 가진 4대상 native dialog`,await panel.evaluate(node=>node instanceof HTMLDialogElement && node.open && node.matches(':modal') && node.contains(document.activeElement) && Boolean(document.getElementById(node.getAttribute('aria-labelledby'))?.textContent.trim())) && await panel.locator('[data-contact-target]').count()===4);
+      const mobile=await page.locator('#open-care-menu').isVisible();
+      record(`${width}px 전화 계획 Escape는 기존 초안과 focus 복원`,(!mobile || await page.locator('#care-rail').evaluate(node=>node.inert && node.getAttribute('role')!=='dialog')) && await closeContactPlan(page,{escape:true}) && await input.inputValue()===existing);
+      panel=await openContactPlan(page);await page.locator('#close-contact-plan').focus();await page.keyboard.press('Shift+Tab');
+      const backwards=await panel.evaluate(node=>node.contains(document.activeElement) && document.activeElement.id!=='close-contact-plan');await page.keyboard.press('Tab');
+      const forwards=await page.locator('#close-contact-plan').evaluate(node=>document.activeElement===node),closed=await closeContactPlan(page);
+      record(`${width}px 전화 계획 Tab 양방향 경계·닫기 focus 복원`,backwards && forwards && closed);
+      record(`${width}px 전화 계획 열기·닫기만으로 조회·전송·추가 저장 없음`,requests.length===0 && networkRequests.length===beforeNetwork && Object.keys(await snapshotStorage(page)).length===0);
+      await send(page,'휠체어 이동과 제주·기존 도외 병원의 문의 계획을 준비해 주세요.');
+      panel=await openContactPlan(page);
+      let contentOK=true;
+      for(const target of ['mainland','jeju','taxi','companion']) {
+        const row=panel.locator(`[data-contact-target="${target}"]`);
+        if(!await row.evaluate(node=>node.open))await row.locator('summary').click();
+        for(const field of ['purpose','recipient','questions','disclosure','excluded','opening','records','checks','simulation','next-actions','request-draft'])contentOK &&=await row.locator(`[data-contact-${field}]`).count()===1 && Boolean((await row.locator(`[data-contact-${field}]`).innerText()).trim());
+        const disclosed=await row.locator('[data-contact-disclosure]').innerText(),excluded=await row.locator('[data-contact-excluded]').innerText(),opening=await row.locator('[data-contact-opening]').innerText(),recording=await row.locator('[data-contact-records]').innerText(),checks=await row.locator('[data-contact-checks]').innerText(),simulation=await row.locator('[data-contact-simulation]').innerText();
+        contentOK &&=![state.patient.name,state.patient.caregiver,state.patient.purpose,state.documents.find(document=>document.id==='history').content].some(value=>value && disclosed.includes(value)) && /이름|실명/.test(excluded) && /나이/.test(excluded) && /진단|병명/.test(excluded) && /주민/.test(excluded) && /주소/.test(excluded) && /AI/.test(opening) && /위임|대행|동의/.test(opening) && ['녹음','전사','보관','미설정'].every(term=>recording.includes(term)) && /국외|해외/.test(recording) && /미확인|미검증/.test(recording) && /위임|권한/.test(checks) && /미확인|미검증|확인 필요/.test(checks) && /합성|시연/.test(simulation);
+      }
+      record(`${width}px 4대상 목적·최소 공유·제외·AI 고지·위임 미검증·기록 미설정·합성 결과`,contentOK);
+      const mainland=await panel.locator('[data-contact-target="mainland"] [data-contact-questions]').innerText(),jeju=await panel.locator('[data-contact-target="jeju"] [data-contact-questions]').innerText(),taxi=await panel.locator('[data-contact-target="taxi"] [data-contact-questions]').innerText(),companion=await panel.locator('[data-contact-target="companion"] [data-contact-questions]').innerText();
+      record(`${width}px 협진은 양 기관 접수·의뢰·자료 전달 절차를 구분`,/협진|회송/.test(mainland) && /의뢰|의료진/.test(mainland) && /자료|전달/.test(mainland) && /진찰|검사/.test(jeju) && /창구|전달/.test(jeju) && /참여|협진/.test(jeju));
+      record(`${width}px 휠체어 자격·회원·승하차·동행인·시각·차량 질문`,['자격','회원','휠체어','승하차','동행','시각','차량'].every(term=>taxi.includes(term)) && ['지역','역할','비용','휠체어'].every(term=>companion.includes(term)) && /시간|시각/.test(companion));
+      const dialogSize=await panel.evaluate(node=>{const r=node.getBoundingClientRect();return r.left>=0 && r.top>=0 && r.right<=innerWidth+1 && r.bottom<=innerHeight+1 && node.scrollWidth<=node.clientWidth+1;});
+      const closeAccess=await reachable(page.locator('#close-contact-plan')),lastDraft=await reachable(panel.locator('[data-contact-target="companion"] [data-contact-draft]'));
+      record(`${width}px 전화 계획 내용·마지막 문의 준비·닫기 반응형 접근`,dialogSize && closeAccess.reachable && lastDraft.reachable && await overflow(page),JSON.stringify({closeAccess,lastDraft}));
+      await screenshot(page,`contact-plan-${width}`);
+      const first=panel.locator('[data-contact-draft="mainland"]');await input.evaluate((node,text)=>{node.value=text;node.dispatchEvent(new Event('input',{bubbles:true}));},existing);
+      const rejected=await confirmAction(page,first,false);
+      record(`${width}px 문의 준비 교체 취소는 dialog와 기존 초안 보존`,rejected.confirmed && await panel.isVisible() && await input.inputValue()===existing && requests.length===1);
+      await closeContactPlan(page);
+      for(const target of ['mainland','jeju','taxi','companion']) {
+        await input.fill('');panel=await openContactPlan(page);
+        const row=panel.locator(`[data-contact-target="${target}"]`);if(!await row.evaluate(node=>node.open))await row.locator('summary').click();
+        const visible=normalizedText(await row.locator('[data-contact-request-draft]').innerText());
+        await row.locator(`[data-contact-draft="${target}"]`).click();await panel.waitFor({state:'hidden'});
+        record(`${width}px ${target} 문의 준비는 보이는 초안만 채우고 POST 없음`,normalizedText(await input.inputValue())===visible && requests.length===1 && await input.evaluate(node=>document.activeElement===node));
+      }
+      proof.fixtureCoverage.contactPlan=true;
     } finally {await context.close();}
   });
   record('브라우저 실행 오류 없음',errors.length===0,errors.join('; '));
