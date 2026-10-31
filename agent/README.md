@@ -86,4 +86,6 @@ Lambda는 전용 `OPENAI_SECRET_ARN`·`SESSION_TABLE_NAME`을 함께 요구하�
 
 실제tool시작·관측결과·답변완료/실패에서 고정enum DTO를 생성한다. 원문·인자·결과·환자정보·번호·URL·reasoning·토큰원문은 진행 기록에 없다. 로컬은메모리, AWS는기존DynamoDB의별도 `progress#sha256(token)` 키·120초TTL을 사용하고 기존session v1/lease/80요청 한도를 유지한다. cloud진행읽기는Secrets Manager/모델준비와 분리한다. 짧은timeout·단일writer·제한된기록예산을 적용해 진행 실패가 실제 모델/저장 응답을 막지 않게 한다. 일시적I/O실패뒤다음실제전이의최신snapshot부터재개하며, 내부128bit writer소유표식과조건부기록으로초기ack유실과다른요청의같은토큰사용을구분한다. 소유표식은외부진행DTO/모델/세션/로그에보내지않고TTL을연장하지않는다.
 
+진행 DTO와 고정 도구 목록은 `app/preparation-stages.js`에서 한 번 정의하며 브라우저 수신·작업창·서버 저장/조회가 같은 엄격 검증을 사용한다. 서버의 `normalizeProgressSnapshot`은 기존 오류 경계를 유지한다.
+
 진행 DTO는 최종 caseState가 아니다. 화면은 마지막 확인된 사실과 실제 실행 관측을 구분하고, 원래 응답을 받은 뒤 사례를 갱신한다. 중지·완료·새대화·재시도에서 늦은 진행도 무시하며 중지는 서버중단이 아니다. 요청id/원문/이력/설정은 재시도에 보존하고 비업무메타데이터인progressToken은 HTTP시도마다 새로 만든다. 이 토큰을 모델/세션/로그/URL/최종응답에 넣지 않는다. [고정 DTO와 범위](../docs/preparation-board-contract.md)를 따른다.

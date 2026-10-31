@@ -327,22 +327,30 @@
       ]
     },
     "ponytail-progress": {
-      "phase": "implementing",
+      "phase": "verified",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-ponytail-progress",
-      "note": "Ponytail 읽기전용 감사의 확인된 문제만 정리; docs/refactoring-contract.md 준수",
-      "integrationCommits": []
+      "note": "root통합359/359·대화178/178·여정222/222(실preview14,모델POST0)·수동47/47·네창108/108·규칙54/54·Lambda build통과. 동일지문b74ddf4901db7185bb959546bc19abe6cc55bc96e8a5d99c00f5645dd9269a64. 독립Ponytail source리뷰발견0/Ship. source/API경계·화면보존,실마이크·실기관/기록/의료법률은미검증. 공개/ZIP은최신runs증거기준.",
+      "integrationCommits": [
+        "dd33f2d"
+      ]
     },
     "ponytail-frontend": {
-      "phase": "implementing",
+      "phase": "verified",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-ponytail-frontend",
-      "note": "Ponytail 읽기전용 감사의 확인된 문제만 정리; docs/refactoring-contract.md 준수",
-      "integrationCommits": []
+      "note": "root통합359/359·대화178/178·여정222/222(실preview14,모델POST0)·수동47/47·네창108/108·규칙54/54·Lambda build통과. 동일지문b74ddf4901db7185bb959546bc19abe6cc55bc96e8a5d99c00f5645dd9269a64. 독립Ponytail source리뷰발견0/Ship. source/API경계·화면보존,실마이크·실기관/기록/의료법률은미검증. 공개/ZIP은최신runs증거기준.",
+      "integrationCommits": [
+        "e9d45e1",
+        "ed8ccf95cc001b9d357e5c52a34ed6bf7805bb16"
+      ]
     },
     "ponytail-package": {
-      "phase": "implementing",
+      "phase": "verified",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-ponytail-package",
-      "note": "Ponytail 읽기전용 감사의 확인된 문제만 정리; docs/refactoring-contract.md 준수",
-      "integrationCommits": []
+      "note": "root통합359/359·대화178/178·여정222/222(실preview14,모델POST0)·수동47/47·네창108/108·규칙54/54·Lambda build통과. 동일지문b74ddf4901db7185bb959546bc19abe6cc55bc96e8a5d99c00f5645dd9269a64. 독립Ponytail source리뷰발견0/Ship. source/API경계·화면보존,실마이크·실기관/기록/의료법률은미검증. 공개/ZIP은최신runs증거기준.",
+      "integrationCommits": [
+        "d6c510b",
+        "9fc80a2"
+      ]
     }
   },
   "review": {

@@ -125,6 +125,10 @@ npm run data:query -- analyze --analysis travel_time --area '제주시 애월읍
 
 `data:catalog --check`는 저장된 감사CSV로 색인을 대조하는 검사이며 원자료/API 갱신이 아닙니다. 자료별 재취득 명령과 이용조건은 [데이터 명세](docs/data-sources.md), 입력·출력과 준비 도구 연결은 [스킬 계약](docs/public-data-skill-contract.md)을 따릅니다.
 
+## 코드 정리와 검증
+
+Ponytail 감사에서 확인한 미사용 함수·전용 CSS를 제거하고 진행 DTO 검증을 공통화했습니다. 취소한 음성 인식의 늦은 이벤트와 패키징 심볼릭 링크 경계를 회귀 검사합니다. 기존 화면·도구·의존성과 전화/개인기록의 시연 범위는 유지합니다. [감사와 수정 기록](docs/refactoring-audit.md), [작업 범위·소유권](docs/refactoring-contract.md)을 따릅니다.
+
 ## AWS 데모와 자동 배포
 
 **[공개 데모](https://d1mfksxrj025bx.cloudfront.net)** · [GitHub Actions](https://github.com/jungyoun43-prog/jeju_hackerton-11.20-/actions/workflows/deploy-aws.yml)
