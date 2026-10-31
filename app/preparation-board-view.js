@@ -3,7 +3,6 @@ import { icon } from './icons.js';
 
 const escape=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 const expandIcon='<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5M3 3l6 6m12-6-6 6M3 21l6-6m12 6-6-6"/></svg>';
-const preparationStages=PREPARATION_STAGES.filter(stage=>stage.id!=='plan');
 const signalLabel=(stage,short=false)=>({available:short?'결과 있음':'준비 결과 있음',attention:stage.status==='needs_recheck'?'재확인':short?'추가 확인':'추가 확인 필요',blocked:short?'실패·인계':'문의 실패 · 인계',waiting:'확인 전',not_needed:'필요 없음'})[stage.signal]||'확인 전';
 function signalMarkup(signal) {
   const shape=({available:'<circle cx="12" cy="12" r="7"/>',attention:'<path d="M12 4 21 20H3Z"/>',blocked:'<path d="m5 5 14 14M19 5 5 19"/>'})[signal]||'<path d="M5 12h14"/>';
@@ -16,9 +15,10 @@ export function preparationBoardMarkup(planContent) {
       <p class="stage-summary" data-stage-summary></p><p class="stage-live" data-stage-live hidden></p>
       ${stage.id==='plan'?planContent:`<div class="stage-pane-body"><dl class="stage-facts" data-stage-facts></dl><section class="stage-gaps" data-stage-gaps></section><div class="stage-sources" data-stage-sources></div><details class="stage-log" data-stage-log><summary><span data-stage-log-label>처리 기록</span>${icon('chevron')}</summary><div data-stage-events></div></details></div>`}
     </section>`;
-  return `<nav id="stage-navigation" class="stage-navigation" aria-label="진료 준비 상태와 내역">${preparationStages.map(stage=>`<button type="button" data-open-stage="${stage.id}" data-signal="waiting" aria-controls="stage-${stage.id}" aria-pressed="false" aria-expanded="false"><span class="stage-nav-title">${stage.shortTitle}</span><span class="stage-nav-result">${signalMarkup('waiting')}<span data-navigation-status>확인 전</span></span><span data-navigation-live hidden>확인 중</span><span class="visually-hidden" data-navigation-summary></span></button>`).join('')}</nav>
+  return `<nav id="stage-navigation" class="stage-navigation" aria-label="진료 준비 상태와 내역">${PREPARATION_STAGES.map(stage=>`<button type="button" data-open-stage="${stage.id}" data-signal="waiting" aria-controls="stage-${stage.id}" aria-pressed="false"><span class="stage-nav-title">${stage.shortTitle}</span><span class="stage-nav-result">${signalMarkup('waiting')}<span data-navigation-status>확인 전</span></span><span data-navigation-live hidden>확인 중</span><span class="visually-hidden" data-navigation-summary></span></button>`).join('')}</nav>
     <div id="answer-ready-notice" class="answer-ready-notice" hidden><button type="button" data-open-stage="plan">새 답변이 도착했어요. 혼디의 정리 보기${icon('arrow')}</button></div>
-    <div id="preparation-board" class="preparation-board" aria-label="진료 준비 내역과 답변"><details id="preparation-details" class="preparation-details"><summary><span>준비 내역</span><span>확인한 사실·남은 일·출처</span>${icon('chevron')}</summary><p class="preparation-note">기호는 자료와 문의 준비 상태예요. 실제 진료·예약·배차 확정은 아닙니다.</p>${preparationStages.map(section).join('')}</details>${section(PREPARATION_STAGES.find(stage=>stage.id==='plan'))}</div>`;
+    <p class="preparation-note">기호는 자료와 문의 준비 상태예요. 실제 진료·예약·배차 확정은 아닙니다.</p>
+    <div id="preparation-board" class="preparation-board" aria-label="진료 준비 내역과 답변">${PREPARATION_STAGES.map(section).join('')}</div>`;
 }
 
 const renderedMarkup=new WeakMap();
@@ -61,7 +61,6 @@ export function renderPreparationBoard(board,{selectedStageId='records',unreadAn
     const navigation=document.querySelector(`#stage-navigation [data-open-stage="${stage.id}"]`);
     if(navigation){
       navigation.setAttribute('aria-pressed',String(stage.id===selectedStageId));
-      navigation.setAttribute('aria-expanded',String(document.getElementById('preparation-details').open));
       navigation.dataset.live=String(realProgress && stage.live);
       navigation.dataset.stageStatus=stage.status;navigation.dataset.signal=stage.signal;
       replaceMarkup(navigation.querySelector('.stage-nav-result'),`${signalMarkup(stage.signal)}<span data-navigation-status>${escape(signalLabel(stage,true))}</span>`);

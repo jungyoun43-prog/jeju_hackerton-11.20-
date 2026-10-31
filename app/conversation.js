@@ -72,7 +72,6 @@ function openStage(id,{manual=true}={}) {
   renderBoard();
   if(id==='plan')scrollToMessage(document.querySelector('#message-list .message.assistant:last-child'));
   else {
-    document.getElementById('preparation-details').open=true;
     const section=document.getElementById(`stage-${id}`);
     section.focus({preventScroll:true});
     section.scrollIntoView({block:'start',behavior:'instant'});
@@ -806,7 +805,6 @@ function resetConversation({focus=true,force=false}={}) {
   caseState=createDemoCase();sessionId=undefined;history=[];latestActions=[];latestEvents=[];responseCount=0;previewMode=false;failedRequests.clear();
   preferencesNeedApply=true;
   document.getElementById('message-list').replaceChildren();
-  document.getElementById('preparation-details').open=false;
   welcomeMessage();document.getElementById('starter-prompts').hidden=false;
   document.getElementById('request-input').value='';resizeInput();renderSnapshot();updateCapabilities();
   document.getElementById('conversation-status').textContent='새 가상 사례로 대화를 시작합니다.';
@@ -940,7 +938,6 @@ function mount() {
   document.getElementById('preview-button').addEventListener('click',()=>showPreview());
   document.getElementById('save-report').addEventListener('click',saveReport);
   document.getElementById('stage-navigation').addEventListener('click',event=>{const button=event.target.closest('[data-open-stage]');if(button)openStage(button.dataset.openStage);});
-  document.getElementById('preparation-details').addEventListener('toggle',renderBoard);
   document.getElementById('answer-ready-notice').addEventListener('click',()=>openStage('plan'));
   document.getElementById('expand-answer').addEventListener('click',openAnswer);
   const answerDialog=document.getElementById('answer-dialog');
