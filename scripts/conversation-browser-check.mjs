@@ -276,7 +276,7 @@ try {
       await page.locator('.request-error').waitFor();
       const normalPayload=await normal.json(),disconnected=normal.status()===503 && normalPayload.error?.code==='MODEL_NOT_CONNECTED';
       proof.normalInputDisconnected ||= disconnected;
-      record(`${width}px 자유 입력은 실제 503·입력 보존·가짜 응답 없음`,disconnected && await input.inputValue()==='모델 연결 전 자유 입력입니다.' && await page.locator('.message.assistant').count()===1 && await page.locator('.tool-record').count()===0);
+      record(`${width}px 자유 입력은 실제 503·입력 보존·가짜 응답 없음`,disconnected && await input.inputValue()==='모델 연결 전 자유 입력입니다.' && await page.locator('.message.assistant:not(.greeting)').count()===0 && await page.locator('.message.user').count()===1 && await page.locator('.tool-record').count()===0);
       const first=requests.at(-1);
       record(`${width}px 동일 JSON UTF-8 SHA256`,hashMatches(first));
       const retryResponse=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/agent' && r.request().method()==='POST');
@@ -418,12 +418,13 @@ try {
   });
   for(const [code,status,match,exclude] of [['LOOP_LIMIT',429,/나누|확인할 일/,/오늘.*한도|새 대화/],['DAILY_LIMIT',429,/오늘.*한도/,/세션.*만료/],['SESSION_BUSY',409,/앞선.*처리|아직.*처리/,/만료|새 대화/]])await scenario(`${code} 복구 fixture`,async()=>{
     let count=0;
-    const {page,context,requests}=await open(390,844,{configured:true,onPost:request=>++count===1?{status,body:{error:{code,message:'정제된 fixture 오류'},requestId:json(request).requestId}}:{body:fixtureResponse(request,createDemoCase())}});
+    const reply=`${code} 오류 뒤 합성 준비 상태를 확인했습니다.`;
+    const {page,context,requests}=await open(390,844,{configured:true,onPost:request=>++count===1?{status,body:{error:{code,message:'정제된 fixture 오류'},requestId:json(request).requestId}}:{body:fixtureResponse(request,createDemoCase(),reply)}});
     try {
       const text=`${code} 뒤에도 남겨야 할 요청`;await send(page,text);const copy=await page.locator('.request-error').innerText();
       record(`${code}은 구분되는 다음 행동·입력 복구 안내`,match.test(copy) && !exclude.test(copy) && (code!=='DAILY_LIMIT' || /9시|09:00/.test(copy)) && await page.locator('#request-input').inputValue()===text && await page.locator('#send-request').isEnabled());
       const before=requests[0].postData(),next=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/agent' && r.request().method()==='POST');await page.locator('[data-retry]').click();await next;await page.waitForFunction(()=>document.querySelector('#conversation-form').getAttribute('aria-busy')==='false');
-      record(`${code} 재시도는 같은 요청으로 회복`,requests[1].postData()===before && await page.locator('.request-error').count()===0 && await page.locator('.message.assistant').count()===2);
+      record(`${code} 재시도는 같은 요청으로 회복`,requests.length===2 && requests[1].postData()===before && hashMatches(requests[1]) && await page.locator('.request-error').count()===0 && await page.locator('.message.user').count()===1 && await page.locator('.message.assistant:not(.greeting)').count()===1 && (await page.locator('.message.assistant:not(.greeting) .message-body').innerText()).trim()===reply);
       proof.fixtureCoverage.recovery=true;
     } finally {await context.close();}
   });
