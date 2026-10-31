@@ -1,0 +1,17 @@
+{
+  "name": "jeju-care-compass",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "제주 진료 나침반 — 보호자를 위한 진료 연결 워크스페이스",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "dev": "node scripts/server.mjs",
+    "start": "node scripts/server.mjs",
+    "build": "node scripts/build.mjs",
+    "preview": "node scripts/server.mjs --dist",
+    "test": "node --test tests/*.test.mjs",
+    "package": "node scripts/package.mjs"
+  },
+  "dependencies": { "leaflet": "1.9.4" }
+}
