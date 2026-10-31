@@ -21,6 +21,7 @@
 | --- | --- | --- |
 | visit-ui | feature/visit-dashboard | app/app.js, app/styles.css, app/index.html, app/icons.js, app/map.js, DESIGN.md, .impeccable/design.json |
 | visit-workflow | feature/visit-support-workflow | app/visit-support.js, app/domain.js, tests/visit-support.test.mjs, tests/domain.test.mjs |
+| visit-docs | docs/visit-support | README.md, AGENTS.md, PRODUCT.md, THIRD_PARTY.md, docs/prd.md, docs/agent-pipeline.md, docs/data-sources.md, docs/user-manual.md, docs/implementation-results.md, docs/submission-checklist.md |
 | root | main | app/support-data.js, app/data/visit-support-providers.json, scripts/support-data.mjs, tests/support-data.test.mjs, 공통 계약·문서·하네스·브라우저 검사·통합·배포 |
 
 각 수정자는 전용 worktree에 커밋한다. root가 통합한다. 독립 조사는 읽기 전용이다.
