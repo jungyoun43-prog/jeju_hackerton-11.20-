@@ -1,0 +1,522 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Jeju Care Compass synthetic demo. CloudFormation JSON syntax (also valid YAML): private S3, CloudFront OAC, scoped GitHub OIDC delivery role.",
+  "Metadata": {
+    "CheckedAt": "2026-10-31",
+    "Sources": [
+      "https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-resource-iam-oidcprovider.html",
+      "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-s3.html",
+      "https://docs.github.com/en/actions/how-tos/secure-your-work/security-harden-deployments/oidc-in-aws"
+    ],
+    "Verification": "Official source bodies read through insane-search. Structural tests are local; actual AWS validation and resource creation require authenticated execution.",
+    "AWSToolsMetrics": {
+      "AWSAgentToolkit": "aws-cloudformation@3"
+    },
+    "com.aws.cloudformation.Context": {
+      "arch": "GitHub protected environment -> OIDC role -> dedicated private S3 -> signed CloudFront origin -> public HTTPS synthetic demo",
+      "must": [
+        "Only synthetic application artifacts; never credentials or patient records",
+        "No static AWS access keys in GitHub",
+        "Public demo access is via this distribution, not S3 website endpoints"
+      ],
+      "ref": [
+        {
+          "at": "docs/aws-deployment-contract.md",
+          "has": "ownership, outputs, protected environment and static hosting contract",
+          "scope": "project"
+        }
+      ]
+    }
+  },
+  "Parameters": {
+    "ProjectName": {
+      "Type": "String",
+      "Default": "jeju-care-compass",
+      "AllowedPattern": "[a-z][a-z0-9-]{2,29}"
+    },
+    "GitHubRepository": {
+      "Type": "String",
+      "AllowedPattern": "[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+"
+    },
+    "ExistingGitHubOidcProviderArn": {
+      "Type": "String",
+      "Default": "",
+      "AllowedPattern": "^$|arn:[a-z0-9-]+:iam::[0-9]{12}:oidc-provider/token[.]actions[.]githubusercontent[.]com"
+    }
+  },
+  "Conditions": {
+    "CreateGitHubOidcProvider": {
+      "Fn::Equals": [
+        {
+          "Ref": "ExistingGitHubOidcProviderArn"
+        },
+        ""
+      ]
+    }
+  },
+  "Resources": {
+    "SiteBucket": {
+      "Type": "AWS::S3::Bucket",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256"
+              }
+            }
+          ]
+        },
+        "OwnershipControls": {
+          "Rules": [
+            {
+              "ObjectOwnership": "BucketOwnerEnforced"
+            }
+          ]
+        },
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true
+        },
+        "VersioningConfiguration": {
+          "Status": "Enabled"
+        },
+        "Tags": [
+          {
+            "Key": "Application",
+            "Value": "jeju-care-compass"
+          },
+          {
+            "Key": "Project",
+            "Value": {
+              "Ref": "ProjectName"
+            }
+          },
+          {
+            "Key": "DataMode",
+            "Value": "synthetic-demo"
+          }
+        ]
+      },
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Retain versioned build objects for rollback; avoid public S3 website endpoint",
+          "must": [
+            "Block all public access",
+            "Encrypt at rest",
+            "Retain on delete and replacement",
+            "Tag as this application before publish"
+          ],
+          "mutable": "change-with-constraints"
+        }
+      }
+    },
+    "SiteOriginAccessControl": {
+      "Type": "AWS::CloudFront::OriginAccessControl",
+      "Properties": {
+        "OriginAccessControlConfig": {
+          "Name": {
+            "Fn::Sub": "${ProjectName}-${AWS::Region}-demo-oac"
+          },
+          "Description": "Read the private synthetic-demo S3 origin",
+          "OriginAccessControlOriginType": "s3",
+          "SigningBehavior": "always",
+          "SigningProtocol": "sigv4"
+        }
+      },
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Sign private-origin requests instead of public read access",
+          "must": [
+            "Always SigV4 sign to the S3 origin"
+          ],
+          "mutable": "change-with-constraints"
+        }
+      }
+    },
+    "SiteCachePolicy": {
+      "Type": "AWS::CloudFront::CachePolicy",
+      "Properties": {
+        "CachePolicyConfig": {
+          "Name": {
+            "Fn::Sub": "${ProjectName}-${AWS::Region}-demo-cache"
+          },
+          "MinTTL": 0,
+          "DefaultTTL": 60,
+          "MaxTTL": 300,
+          "ParametersInCacheKeyAndForwardedToOrigin": {
+            "EnableAcceptEncodingBrotli": true,
+            "EnableAcceptEncodingGzip": true,
+            "CookiesConfig": {
+              "CookieBehavior": "none"
+            },
+            "HeadersConfig": {
+              "HeaderBehavior": "none"
+            },
+            "QueryStringsConfig": {
+              "QueryStringBehavior": "none"
+            }
+          }
+        }
+      },
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Short cache lifetime for unversioned JS/CSS; no cookies or user query forwarded",
+          "must": [
+            "Minimum TTL zero so no-cache HTML is respected"
+          ],
+          "mutable": "free-to-tune"
+        }
+      }
+    },
+    "SiteResponseHeaders": {
+      "Type": "AWS::CloudFront::ResponseHeadersPolicy",
+      "Properties": {
+        "ResponseHeadersPolicyConfig": {
+          "Name": {
+            "Fn::Sub": "${ProjectName}-${AWS::Region}-demo-headers"
+          },
+          "SecurityHeadersConfig": {
+            "ContentTypeOptions": {
+              "Override": true
+            },
+            "FrameOptions": {
+              "FrameOption": "DENY",
+              "Override": true
+            },
+            "ReferrerPolicy": {
+              "ReferrerPolicy": "strict-origin-when-cross-origin",
+              "Override": true
+            },
+            "StrictTransportSecurity": {
+              "AccessControlMaxAgeSec": 31536000,
+              "IncludeSubdomains": true,
+              "Override": true
+            }
+          }
+        }
+      },
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Browser safety headers while preserving map provider Referer",
+          "must": [
+            "Keep strict-origin-when-cross-origin or provider-compatible Referer policy"
+          ],
+          "mutable": "change-with-constraints"
+        }
+      }
+    },
+    "SiteDistribution": {
+      "Type": "AWS::CloudFront::Distribution",
+      "Properties": {
+        "DistributionConfig": {
+          "Enabled": true,
+          "Comment": "Jeju Care Compass synthetic public demo",
+          "DefaultRootObject": "index.html",
+          "HttpVersion": "http2and3",
+          "IPV6Enabled": true,
+          "Origins": [
+            {
+              "Id": "PrivateSiteS3",
+              "DomainName": {
+                "Fn::GetAtt": [
+                  "SiteBucket",
+                  "RegionalDomainName"
+                ]
+              },
+              "OriginAccessControlId": {
+                "Ref": "SiteOriginAccessControl"
+              },
+              "S3OriginConfig": {
+                "OriginAccessIdentity": ""
+              }
+            }
+          ],
+          "DefaultCacheBehavior": {
+            "TargetOriginId": "PrivateSiteS3",
+            "ViewerProtocolPolicy": "redirect-to-https",
+            "AllowedMethods": [
+              "GET",
+              "HEAD",
+              "OPTIONS"
+            ],
+            "CachedMethods": [
+              "GET",
+              "HEAD"
+            ],
+            "Compress": true,
+            "CachePolicyId": {
+              "Ref": "SiteCachePolicy"
+            },
+            "ResponseHeadersPolicyId": {
+              "Ref": "SiteResponseHeaders"
+            }
+          },
+          "ViewerCertificate": {
+            "CloudFrontDefaultCertificate": true
+          }
+        },
+        "Tags": [
+          {
+            "Key": "Application",
+            "Value": "jeju-care-compass"
+          },
+          {
+            "Key": "Project",
+            "Value": {
+              "Ref": "ProjectName"
+            }
+          }
+        ]
+      },
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Managed HTTPS URL for a serverless synthetic preview",
+          "must": [
+            "Private S3 origin with OAC",
+            "Redirect viewer HTTP to HTTPS",
+            "Read-only viewer methods"
+          ],
+          "mutable": "change-with-constraints"
+        }
+      }
+    },
+    "SiteBucketPolicy": {
+      "Type": "AWS::S3::BucketPolicy",
+      "Properties": {
+        "Bucket": {
+          "Ref": "SiteBucket"
+        },
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "OnlyThisCloudFrontDistribution",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "cloudfront.amazonaws.com"
+              },
+              "Action": "s3:GetObject",
+              "Resource": {
+                "Fn::Sub": "${SiteBucket.Arn}/*"
+              },
+              "Condition": {
+                "StringEquals": {
+                  "AWS:SourceArn": {
+                    "Fn::Sub": "arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${SiteDistribution}"
+                  }
+                },
+                "StringEqualsIfExists": {
+                  "AWS:SourceAccount": {
+                    "Ref": "AWS::AccountId"
+                  }
+                }
+              }
+            },
+            {
+              "Sid": "DenyInsecureTransport",
+              "Effect": "Deny",
+              "Principal": "*",
+              "Action": "s3:*",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "SiteBucket",
+                    "Arn"
+                  ]
+                },
+                {
+                  "Fn::Sub": "${SiteBucket.Arn}/*"
+                }
+              ],
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": "false"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Use required distribution ARN (contains this account) to authorize origin reads; supplement SourceAccount when the service supplies it; reject plaintext transport",
+          "must": [
+            "No public Allow principal",
+            "Require this distribution ARN including this account; supplemental SourceAccount must match when present",
+            "Deny non-TLS bucket and object requests"
+          ],
+          "mutable": "change-with-constraints"
+        }
+      }
+    },
+    "GitHubOidcProvider": {
+      "Type": "AWS::IAM::OIDCProvider",
+      "Condition": "CreateGitHubOidcProvider",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "Url": "https://token.actions.githubusercontent.com",
+        "ClientIdList": [
+          "sts.amazonaws.com"
+        ],
+        "Tags": [
+          {
+            "Key": "Application",
+            "Value": "jeju-care-compass"
+          }
+        ]
+      },
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Reuse external provider or retain stack-owned shared account identity provider",
+          "must": [
+            "Never transition a stack-owned provider into an external parameter during rerun",
+            "Retain when stack is removed"
+          ],
+          "mutable": "change-with-constraints"
+        }
+      }
+    },
+    "DeployRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "Description": "Only the protected GitHub production environment can publish this synthetic demo",
+        "MaxSessionDuration": 3600,
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Federated": {
+                  "Fn::If": [
+                    "CreateGitHubOidcProvider",
+                    {
+                      "Ref": "GitHubOidcProvider"
+                    },
+                    {
+                      "Ref": "ExistingGitHubOidcProviderArn"
+                    }
+                  ]
+                }
+              },
+              "Action": "sts:AssumeRoleWithWebIdentity",
+              "Condition": {
+                "StringEquals": {
+                  "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
+                  "token.actions.githubusercontent.com:sub": {
+                    "Fn::Sub": "repo:${GitHubRepository}:environment:production"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "PublishOnlyThisSite",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Sid": "InspectDedicatedSiteBucket",
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:ListBucket",
+                    "s3:GetBucketLocation",
+                    "s3:GetBucketTagging"
+                  ],
+                  "Resource": {
+                    "Fn::GetAtt": [
+                      "SiteBucket",
+                      "Arn"
+                    ]
+                  }
+                },
+                {
+                  "Sid": "UploadSiteObjects",
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:GetObject",
+                    "s3:PutObject"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "${SiteBucket.Arn}/*"
+                  }
+                },
+                {
+                  "Sid": "InspectAndInvalidateOnlyThisDistribution",
+                  "Effect": "Allow",
+                  "Action": [
+                    "cloudfront:GetDistribution",
+                    "cloudfront:CreateInvalidation"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${SiteDistribution}"
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Application",
+            "Value": "jeju-care-compass"
+          },
+          {
+            "Key": "Project",
+            "Value": {
+              "Ref": "ProjectName"
+            }
+          }
+        ]
+      },
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Allow protected production environment to publish this site without long-lived keys",
+          "must": [
+            "Exact repository/environment and audience trust",
+            "Dedicated bucket and distribution resources only",
+            "No IAM or infrastructure mutation permissions"
+          ],
+          "mutable": "change-with-constraints"
+        }
+      }
+    }
+  },
+  "Outputs": {
+    "SiteBucketName": {
+      "Value": {
+        "Ref": "SiteBucket"
+      },
+      "Description": "Dedicated private site bucket"
+    },
+    "DistributionId": {
+      "Value": {
+        "Ref": "SiteDistribution"
+      },
+      "Description": "Only this distribution may read the private origin"
+    },
+    "SiteUrl": {
+      "Value": {
+        "Fn::Sub": "https://${SiteDistribution.DomainName}"
+      },
+      "Description": "Public HTTPS synthetic demo URL"
+    },
+    "DeployRoleArn": {
+      "Value": {
+        "Fn::GetAtt": [
+          "DeployRole",
+          "Arn"
+        ]
+      },
+      "Description": "Protected GitHub production OIDC role"
+    }
+  }
+}
