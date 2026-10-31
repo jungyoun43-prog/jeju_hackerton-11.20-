@@ -463,7 +463,7 @@ try {
   if(checks.every(check=>check.status==='pass') && errors.length===0)proof.result='pass';
 } catch(error) {errors.push(error.message);record('네 작업창 브라우저 검사 완료',false,error.message);}
 finally {
-  await browser?.close();
+  try {await browser?.close();} catch(error) {errors.push(error.message);proof.result='fail';}
   await mkdir(resolve(root,'orchestration/runs'),{recursive:true});
   await writeFile(resolve(root,'orchestration/runs/preparation-board-browser.json'),JSON.stringify(proof,null,2)+'\n');
   console.log('네 작업창 브라우저 검증: '+checks.filter(check=>check.status==='pass').length+'/'+checks.length+' · 실제 LLM/전화/개인기록 조회 없음');
