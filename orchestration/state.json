@@ -300,19 +300,30 @@
       ]
     },
     "board-ui": {
-      "phase": "assigned",
+      "phase": "integrated",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-board-ui",
-      "note": "네 작업창 계약에 따른 분리 구현. 실제 진행·합성 전화·임상/예약 경계를 보존하고 root가 통합한다."
+      "note": "전용 worktree 커밋 통합. root 최신 projection/backend/UI/QA 결합 후 새 지문 검증 중. 예비검사와 최종통합을 구분한다.",
+      "integrationCommits": [
+        "17e4c6c"
+      ]
     },
     "board-progress": {
-      "phase": "assigned",
+      "phase": "integrated",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-board-progress",
-      "note": "네 작업창 계약에 따른 분리 구현. 실제 진행·합성 전화·임상/예약 경계를 보존하고 root가 통합한다."
+      "note": "전용 worktree 커밋 통합. root 최신 projection/backend/UI/QA 결합 후 새 지문 검증 중. 예비검사와 최종통합을 구분한다.",
+      "integrationCommits": [
+        "32f4436",
+        "a067827"
+      ]
     },
     "board-qa": {
-      "phase": "assigned",
+      "phase": "integrated",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-board-qa",
-      "note": "네 작업창 계약에 따른 분리 구현. 실제 진행·합성 전화·임상/예약 경계를 보존하고 root가 통합한다."
+      "note": "전용 worktree 커밋 통합. root 최신 projection/backend/UI/QA 결합 후 새 지문 검증 중. 예비검사와 최종통합을 구분한다.",
+      "integrationCommits": [
+        "9baabe0",
+        "bfbd1d2"
+      ]
     }
   },
   "review": {

@@ -37,7 +37,7 @@ export function progressActivity(event) {
     if(event?.status==='failed')return '이번 요청을 마치지 못했어요. 응답을 확인해 주세요.';
     if(event?.status==='needs_input')return '다음 준비에 필요한 확인이 있어요.';
     if(event?.status==='completed')return '확인한 준비 결과를 받고 있어요.';
-    return event?.stage==='plan'?'혼디가 답변을 정리하고 있어요.':'혼디가 요청을 확인하고 있어요.';
+    return event?.stage==='plan'?'혼디가 다음 준비와 답변을 확인하고 있어요.':'혼디가 요청을 확인하고 있어요.';
   }
   return `${label} · ${event.status==='started'?'확인 중':event.status==='failed'?'추가 확인 필요':event.status==='needs_input'?'확인할 내용 있음':'결과 도착'}`;
 }
@@ -79,7 +79,7 @@ export function getPreparationBoard(state,{events=[],progress=null,pending=false
   const recordGaps=docs.filter(doc=>doc.status!=='ready').map(doc=>`${doc.label} · ${doc.status==='not_performed'?'의료진 수행·확인 필요':'보유 여부 확인 필요'}`);
   if(!requirements.appointmentTime)recordGaps.unshift('진료 시각을 확인해 주세요.');
   const records=baseStage(PREPARATION_STAGES[0],recordGaps.length?'needs_input':'available',recordGaps.length?'확인할 정보 있음':'자료 확인 결과',
-    `보유 표시 ${available}개 · 나머지 자료와 의료진 기록 확인`,[
+    `보유 표시 ${available}개 · 합성 자료`,[
       {label:'출발',value:state.patient.area},{label:'방문',value:`${state.patient.nextVisit} · ${requirements.appointmentTime||'시각 미정'}`},
       {label:'자료',value:docs.filter(doc=>doc.status==='ready').map(doc=>doc.label).join(' · ')||'보유 자료 확인 전'},
     ],recordGaps);
