@@ -342,7 +342,7 @@ function saveReport() {
 }
 
 function welcomeMessage() {
-  appendMessage({role:'assistant',greeting:true,text:'애월에 계신 어머님의 진료 준비를 함께 챙길게요.\n현재 가상 사례에는 11월 12일 방문이 예정되어 있어요.\n\n바뀐 일정이나 필요한 도움을 말씀해 주세요. 병원 문의와 자료, 이동·동행을 확인하고 필요한 내용만 다시 여쭙겠습니다.'});
+  appendMessage({role:'assistant',greeting:true,text:'제주에서 대면 진찰을 받고, 그 자료로 기존 도외 주치의에게 검토받을 수 있도록 준비할게요.\n현재 가상 사례에는 11월 12일 방문이 예정되어 있어요.\n\n바뀐 일정이나 필요한 도움을 말씀해 주세요. 병원 문의와 자료, 이동·동행을 확인하고 필요한 내용만 다시 여쭙겠습니다.'});
 }
 
 function mount() {
