@@ -79,6 +79,7 @@ export function createSupportRegistry({taxiRows, careResponse, retrievedAt = '',
 
 export function validateSupportRegistry(registry) {
   if (registry?.schemaVersion !== 1 || !Array.isArray(registry.datasets) || !Array.isArray(registry.providers) || registry.providers.length > 2000) throw new Error('이동·동행 문의처 자료 형식이 다릅니다.');
+  if (typeof registry.retrievedAt !== 'string' || !registry.retrievedAt || Number.isNaN(Date.parse(registry.retrievedAt))) throw new Error('실제 자료 조회일을 --retrieved-at으로 기록하세요.');
   const ids = new Set();
   for (const provider of registry.providers) {
     if (!provider || !/^[a-z0-9_-]+$/.test(provider.id) || ids.has(provider.id)) throw new Error('지원기관 식별자를 확인하세요.');
@@ -92,7 +93,7 @@ export function validateSupportRegistry(registry) {
       : provider.serviceType === 'care_contact' ? ['254', 'public-preview', 'jejudatahub.net']
       : provider.serviceType === 'hospital_escort' ? ['', 'official-service-page', 'www.jjcsc.co.kr'] : ['', 'official-service-page', 'www.jejuhappycall.com'];
     if (provider.source.datasetId !== expected[0] || provider.source.scope !== expected[1] || url.hostname !== expected[2]) throw new Error('허브 자료와 공식 서비스 소개의 출처가 다릅니다.');
-    if (typeof provider.source.asOf !== 'string' || typeof provider.source.retrievedAt !== 'string') throw new Error('자료 시점을 확인하세요.');
+    if (typeof provider.source.asOf !== 'string' || typeof provider.source.retrievedAt !== 'string' || !provider.source.retrievedAt || Number.isNaN(Date.parse(provider.source.retrievedAt))) throw new Error('자료 시점을 확인하세요.');
   }
   for (const dataset of registry.datasets) if (!Number.isInteger(dataset.rowCount) || dataset.rowCount !== registry.providers.filter(provider => provider.source.datasetId === dataset.id).length) throw new Error('출처별 행 수가 다릅니다.');
   return registry;

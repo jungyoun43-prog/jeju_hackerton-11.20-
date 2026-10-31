@@ -118,7 +118,7 @@ node scripts/datahub-profile.mjs --input /path/to/허브 859-메타데이터.jso
 node scripts/support-data.mjs --taxi-csv /path/to/제주특별자치도_콜택시업체현황_20260319.csv --care-json /path/to/허브 254.json --retrieved-at 2026-10-31 --source-file-name 제주특별자치도_콜택시업체현황_20260319.csv --output /tmp/visit-support-providers.json
 ```
 
-`--retrieved-at`은 실제 조회일로 기록한다. 원조회일을 모르는 입력은 이 인자를 생략해 빈 값으로 남긴다. `--source-file-name`을 생략하면 입력파일 이름을 기록하고 `--output` 생략 시 `app/data/visit-support-providers.json`에 쓴다. 운영 인증키나 사용자별 의료기록은 입력하지 않는다.
+`--retrieved-at`은 실제 조회일로 기록한다. 원조회일을 모르면 앱에 연결할 지원 snapshot 생성을 중단한다. 실제 조회일을 임의 생성하지 않는다. `--source-file-name`을 생략하면 입력파일 이름을 기록하고 `--output` 생략 시 `app/data/visit-support-providers.json`에 쓴다. 운영 인증키나 사용자별 의료기록은 입력하지 않는다.
 
 분석 흐름은 **방문일·출발지역·지원요건 → 지역·유형별 문의처 → 미확인 질문·최소정보 초안 → 합성 응답 → 변경 시 재확인**이다. 택시/동행 문의 초안에 환자 실명·진단·검사내용을 자동 포함하지 않는다. 병원·일정·지역·요건 변경 시 관련 가능 응답과 확인조건을 무효화한다. 이 흐름의 최종 도메인·브라우저·배포 검증은 구현 결과에서 별도 기록한다.
 

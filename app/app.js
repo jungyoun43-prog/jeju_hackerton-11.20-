@@ -112,8 +112,8 @@ function readinessStrip() {
   const items = [
     { label: '병원 연결', value: `${confirmed}/2곳 절차 확인`, detail: confirmed === 2 ? '자료 검토 준비' : '접수 창구 확인 필요', nav: 'calls', tone: confirmed === 2 ? 'ready' : '' },
     { label: '진료 자료', value: `${progress.prepared}/${progress.total}개 준비`, detail: progress.prepared === progress.total ? '필요 자료 준비됨' : '빠진 자료 확인', nav: 'documents', tone: progress.prepared === progress.total ? 'ready' : '' },
-    { label: '택시 이동', value: support.taxi.label, detail: state.visitSupport.requirements.transportNeeded ? support.taxi.providerName || '지역 문의처 찾기' : '별도 지원 없음', nav: 'plan', focus: 'visit-support-taxi', tone: support.taxi.status === 'available_demo' && !support.nextActions.some(task=>task.kind==='taxi') ? 'ready' : '' },
-    { label: '병원 동행', value: support.companion.label, detail: state.visitSupport.requirements.companionNeeded ? support.companion.providerName || '보호자 대신 함께 갈 사람' : '별도 지원 없음', nav: 'plan', focus: 'visit-support-companion', tone: support.companion.status === 'available_demo' && !support.nextActions.some(task=>task.kind==='companion') ? 'ready' : '' },
+    { label: '택시 이동', value: support.taxi.label, detail: state.visitSupport.requirements.transportNeeded ? support.taxi.providerName || '지역 문의처 찾기' : '별도 지원 없음', nav: 'plan', focus: 'visit-support-taxi', tone: support.taxi.ready ? 'ready' : '' },
+    { label: '병원 동행', value: support.companion.label, detail: state.visitSupport.requirements.companionNeeded ? support.companion.providerName || '보호자 대신 함께 갈 사람' : '별도 지원 없음', nav: 'plan', focus: 'visit-support-companion', tone: support.companion.ready ? 'ready' : '' },
   ];
   return `<section class="readiness-strip" aria-label="이번 방문의 준비 상태">${items.map(item => `<button class="readiness-item ${item.tone}" data-nav="${item.nav}" ${item.focus ? `data-focus="${item.focus}"` : ''}><span>${escape(item.label)}${icon('chevron')}</span><strong>${escape(item.value)}</strong><small>${escape(item.detail)}</small></button>`).join('')}</section>`;
 }

@@ -80,6 +80,11 @@ test('CSV의 BOM·인용 쉼표를 처리하고 열 수·따옴표·중복 헤�
 test('잘못된 원자료의 빈 대표번호와 다른 데이터 ID를 거부한다', () => {
   const taxiRows = [{'지역별': '애월읍', '호출(콜)택시명': '합성 테스트', '전화번호': '', '데이터기준일자': '2026-03-19'}];
   const careResponse = {id: 254, csvData: [['구분', '읍면동', '기관명', '소재지', '전화번호', '데이터기준일자'], ['가상', '제주시', '가상기관', '제주시', '064-000-0000', '2020-04-17']]};
-  assert.throws(() => createSupportRegistry({taxiRows, careResponse}), /기관명·지역·대표번호/);
+  assert.throws(() => createSupportRegistry({taxiRows, careResponse, retrievedAt: '2026-10-31'}), /기관명·지역·대표번호/);
   assert.throws(() => createSupportRegistry({taxiRows, careResponse: {...careResponse, id: 278}}), /허브254/);
+});
+
+test('조회일 미상의 결과를 앱에 연결되는 검증된 출처로 내보내지 않는다', () => {
+  const changed = structuredClone(registry); changed.retrievedAt = '';
+  assert.throws(() => validateSupportRegistry(changed), /실제 자료 조회일/);
 });

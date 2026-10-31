@@ -44,7 +44,7 @@ provider: `{id,kind:'taxi'|'companion',name,region,address,phone,serviceType:'ca
 - `createVisitSupport()` → 초기 지원 상태.
 - `applyVisitSupportAction(state,action)` → 사례 전체의 immutable 새 상태. `SUPPORT_` action만 처리한다.
 - `reconcileVisitSupport(previous,next)` → 병원·방문일·출발지역·지원조건 변경 시 관련 문의 응답을 `needs_recheck`로 돌려 오래된 응답 재사용을 막는다. 새 사례 전체를 반환한다.
-- `getVisitSupportSummary(state)` → `{taxi,companion,unresolved:string[],nextActions:[{kind,title,reason}],preparedCount,totalNeeded}`. 각 taxi/companion은 `{status,label,providerName,source,questions:string[]}`. 단일 방문 준비의 상태이지 반복 방문 전체의 배정 수가 아니다.
+- `getVisitSupportSummary(state)` → `{taxi,companion,unresolved:string[],nextActions:[{kind,title,reason}],preparedCount,totalNeeded}`. 각 taxi/companion은 `{status,label,providerName,source,questions:string[],ready:boolean,unresolved:string[]}`. 단일 방문 준비의 상태이지 반복 방문 전체의 배정 수가 아니다. 방문 기관·공개 주소 등 빠진 조건이 있으면 가능 응답도 ready로 표시하지 않는다.
 - `buildSupportInquiry(state,kind)` → 질환·검사내용 없이 출발 지역·방문일·선택 기관·지원조건·미확인 항목을 담은 한국어 문의 초안 문자열.
 - `buildVisitSupportReport(state)` → 시연·출처·응답·재확인 조건을 포함하는 문자열.
 

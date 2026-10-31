@@ -16,7 +16,7 @@ await mkdir(resolve(root,'orchestration/runs'),{recursive:true});
 const browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH || undefined,args:['--no-sandbox','--disable-dev-shm-usage']});
 const errors=[],checks=[];
 const record=(name,ok,detail='')=>checks.push({name,status:ok?'pass':'fail',detail});
-const proof={result:'fail',checkedAt:new Date().toISOString(),url:base,sourceHash:await runtimeFingerprint(root),errors,checks,flowCompleted:false,supplementLoop:false,desktop:{width:1440,noOverflow:false,screenshot:shots+'/desktop.png'},mobile:{width:390,noOverflow:false,screenshot:shots+'/mobile.png'},map:{liveTiles:false,automatedPanZoom:false},data:{datasetId:'859',scope:'public-preview',candidateCount:13}};
+const proof={result:'fail',checkedAt:new Date().toISOString(),url:base,sourceHash:await runtimeFingerprint(root),errors,checks,flowCompleted:false,supplementLoop:false,supportFlowCompleted:false,supportRecheck:false,desktop:{width:1440,noOverflow:false,screenshot:shots+'/desktop.png'},mobile:{width:390,noOverflow:false,screenshot:shots+'/mobile.png'},map:{liveTiles:false,automatedPanZoom:false},data:{datasetId:'859',scope:'public-preview',candidateCount:13,supportDatasetIds:['327','254']}};
 const watch=page=>page.on('pageerror',error=>errors.push(error.message));
 const overflow=page=>page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth);
 const primaryInViewport=page=>page.locator('#mission-primary').evaluate(e=>{const r=e.getBoundingClientRect();return r.top>=0 && r.bottom<=innerHeight && r.left>=0 && r.right<=innerWidth;});
@@ -25,10 +25,55 @@ async function initialMap(page) {
  try {await page.waitForFunction(()=>document.querySelectorAll('.leaflet-tile-loaded').length>0,{},{timeout:5000});return true;}
  catch {await page.waitForTimeout(1800);return false;}
 }
+async function captureAtTop(page,name) {
+ await page.evaluate(()=>{document.activeElement?.blur();window.scrollTo(0,0);});
+ await page.waitForFunction(()=>window.scrollY===0);
+ await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+ await page.screenshot({path:resolve(root,shots+'/'+name+'.png'),fullPage:true});
+}
+async function supportScenario(page, selectedName) {
+ const status=kind=>page.locator('#support-status-'+kind).getAttribute('data-support-state');
+ const respond=async(kind,outcome)=>{await page.locator('#support-outcome-'+kind).selectOption(outcome);await page.locator(`form[data-support-response-form=${kind}] button[type=submit]`).click();};
+ await page.locator('#support-appointment-time').fill('10:00');
+ await page.locator('#support-requirements-form button[type=submit]').click();
+ await page.locator('[data-support-select][data-support-kind=taxi]').first().click();
+ record('지역 콜택시 선택과 초안 전 응답 차단',await status('taxi')==='selected' && await page.locator('form[data-support-response-form=taxi] button[type=submit]').isDisabled());
+ await page.locator('[data-support-prepare=taxi]').click();
+ const draft=await page.locator('#support-inquiry-taxi').inputValue();
+ record('지역·방문기관·시간으로 최소 문의 초안 생성',draft.includes('애월콜') && draft.includes(selectedName) && draft.includes('10:00') && !draft.includes('김정희') && !draft.includes('암 치료'));
+ await respond('taxi','unreachable');
+ record('택시 불통은 배차 완료가 아닌 재문의 상태',await status('taxi')==='unreachable_demo' && (await page.locator('.support-open-items').textContent()).includes('불통'));
+ await page.locator('[data-support-prepare=taxi]').click();await respond('taxi','available');
+ record('택시 가능 응답은 시연 상태로 기록',await status('taxi')==='available_demo' && await page.locator('form[data-support-response-form=taxi] button[type=submit]').isDisabled());
+ await page.locator('[data-support-select][data-support-kind=companion]').first().click();
+ await page.locator('[data-support-prepare=companion]').click();
+ record('공식 병원동행 서비스와 자격·범위 질문',(await page.locator('#support-inquiry-companion').inputValue()).includes('아름동행') && (await page.locator('#support-inquiry-companion').inputValue()).includes('자격'));
+ await respond('companion','unavailable');record('동행 불가 시 준비 공백 유지',await status('companion')==='unavailable_demo');
+ await page.locator('[data-support-prepare=companion]').click();await respond('companion','available');
+ proof.supportFlowCompleted=await status('taxi')==='available_demo' && await status('companion')==='available_demo';
+ record('차량·동행 합성 응답을 같은 방문에 연결',proof.supportFlowCompleted);
+ await page.locator('.nav-item[data-nav=overview]').click();
+ record('메인 요약에 선택한 차량·동행 문의처 반영',(await page.locator('.readiness-strip').textContent()).includes('애월콜') && (await page.locator('.readiness-strip').textContent()).includes('아름동행'));
+ await page.locator('.nav-item[data-nav=plan]').click();
+ await page.locator('#patient-date').fill('2026-11-13');await page.locator('#patient-form button').click();
+ proof.supportRecheck=await status('taxi')==='needs_recheck' && await status('companion')==='needs_recheck';
+ record('방문일 변경은 두 지원의 과거 응답 무효화',proof.supportRecheck);
+ await page.locator('#support-wheelchair').check();await page.locator('#support-requirements-form button[type=submit]').click();
+ const options=page.locator('#visit-support-taxi details.support-options');
+ if(await options.getAttribute('open')===null)await options.locator(':scope > summary').click();
+ record('휠체어 조건은 특별교통 문의 경로 우선',await page.locator('[data-support-select][data-support-kind=taxi]').first().getAttribute('data-support-select')==='jeju-accessible-transport');
+ await page.locator('[data-support-select=jeju-accessible-transport]').click();await page.locator('[data-support-prepare=taxi]').click();
+ await respond('taxi','available');
+ record('가능 응답만으로 휠체어·회원자격 미확인 제거하지 않음',(await page.locator('.support-open-items').textContent()).includes('휠체어') && (await page.locator('.support-open-items').textContent()).includes('회원등록'));
+ await page.locator('[data-support-prepare=taxi]').click();await page.locator('#support-wheelchair-confirmed').check();await page.locator('#support-eligibility-confirmed').check();await respond('taxi','available');
+ record('조건 확인도 실제 배차가 아닌 합성 응답으로 보존',await status('taxi')==='available_demo' && (await page.locator('#visit-support-taxi .support-response').textContent()).includes('합성'));
+ await captureAtTop(page,'support-desktop');
+}
 try {
  const page=await browser.newPage({viewport:{width:1440,height:900},deviceScaleFactor:1});watch(page);
  await page.goto(base,{waitUntil:'networkidle'});
  record('사례 제목과 다음 행동',((await page.locator('#service-role').textContent()).includes('김정희')) && await primaryInViewport(page));
+ record('병원·자료·택시·동행 상태가 첫 화면에 표시',await page.locator('.readiness-item').count()===4 && await page.locator('.readiness-strip').evaluate(e=>e.getBoundingClientRect().bottom<=innerHeight));
  record('생성한 이미지 로고 로드',await page.locator('.brand img').evaluate(e=>e.complete && e.naturalWidth>0 && e.src.endsWith('/assets/jeju-mark-v1.png')));
  record('제목용 한국어 폰트 로드',await page.evaluate(async()=>{await document.fonts.ready;return [...document.fonts].some(font=>font.family.replaceAll('"','')==='MaruBuri' && font.status==='loaded');}));
  proof.desktop.noOverflow=await overflow(page);record('PC 가로 넘침 없음',proof.desktop.noOverflow);
@@ -83,11 +128,12 @@ try {
  record('동행 미배정 2회 재계산',(await page.locator('.cost-result').textContent()).includes('2회'));
  record('갱신 후 지도 인스턴스 보존',await page.evaluate(()=>window.__qaMap===document.getElementById('care-map')));
  record('미확인 비용 유지',(await page.locator('.unknown-costs').textContent()).includes('미확인'));
+ await supportScenario(page,selectedName);
  record('모든 텍스트 입력에 레이블',await page.evaluate(()=>[...document.querySelectorAll('input:not([type=checkbox]),textarea,select')].every(e=>e.labels?.length)));
  const download=page.waitForEvent('download');await page.locator('.topbar [data-report]').click();
  const reportDownload=await download;
  const report=await readFile(await reportDownload.path(),'utf8');
- record('출처 보고서 내려받기',reportDownload.suggestedFilename().includes('보고서') && report.includes(selectedName) && report.includes('859') && report.includes('시연'));
+ record('출처 보고서 내려받기',reportDownload.suggestedFilename().includes('보고서') && report.includes(selectedName) && report.includes('859') && report.includes('시연') && report.includes('이번 방문의 이동·동행 문의') && report.includes('327'));
  await page.locator('.nav-item[data-nav=data]').click();
  await page.locator('.hospital-import-more summary').click();
  const importCsv='사업장명,도로명주소,진료과목,영업상태명,데이터갱신일시,데이터수집일시\n가상 가져오기 의원,제주특별자치도 제주시 가상로 1,가정의학과,정상,2026-01-01,2026-01-02';
@@ -114,6 +160,10 @@ try {
  await mobile.waitForFunction(()=>window.scrollY===0);
  await mobile.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
  await mobile.screenshot({path:resolve(root,shots+'/calls-mobile.png'),fullPage:true});
+ await mobile.locator('.nav-item[data-nav=plan]').click();
+ await mobile.locator('[data-support-select][data-support-kind=taxi]').first().click();await mobile.locator('[data-support-prepare=taxi]').click();
+ record('모바일 이동 문의 초안과 지원 패널 넘침 없음',await mobile.locator('#support-inquiry-taxi').isVisible() && await overflow(mobile));
+ await captureAtTop(mobile,'support-mobile');
  record('실행 JS 오류 없음',errors.length===0,errors.join('; '));
  if(checks.every(check=>check.status==='pass') && errors.length===0) proof.result='pass';
 } catch(error) {errors.push(error.message);record('브라우저 시나리오 완료',false,error.message);}
