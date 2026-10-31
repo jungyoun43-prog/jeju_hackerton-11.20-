@@ -39,6 +39,8 @@
 .journey-summary-next>span{flex-shrink:0;color:var(--muted);font-size:14px}
 .journey-summary-next>strong{font-weight:500;font-size:14px;min-width:0}
 .journey-summary-flow{grid-column:1/-1;color:var(--muted);font-size:14px;line-height:1.75;margin-top:5px}
+.greeting .welcome-copy{display:none}
+@media(max-width:1350px){.message.greeting{display:none}.conversation-scroll:has(.message.greeting) .care-journey-summary{margin-bottom:0}}
 .care-journey-dialog{width:min(820px,calc(100vw - 48px))}
 .journey-section{font-size:14px;line-height:1.85;min-width:0}
 .journey-section+.journey-section{margin-top:30px}
