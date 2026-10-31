@@ -64,6 +64,16 @@ test('이용조건을 제공하지 않으면 미확인으로 남기며 빈 결�
   assert.deepEqual(filterHospitals([]), []);
 });
 
+test('등록 진료과 내과를 고르면 한방내과·심장내과만 등록한 기관을 섞지 않는다', () => {
+  const records = normalizeHospitals([
+    { companyName: '가상 내과', medicalSubject: '내과', openStatus: '정상' },
+    { companyName: '가상 한의원', medicalSubject: '한방내과', openStatus: '정상' },
+    { companyName: '가상 전문의원', medicalSubject: '심장내과', openStatus: '정상' },
+  ], metadata);
+  assert.deepEqual(filterHospitals(records, { department: ' 내과 ' }).map(row => row.companyName), ['가상 내과']);
+  assert.deepEqual(filterHospitals(records, { department: '한방내과' }).map(row => row.companyName), ['가상 한의원']);
+});
+
 test('지원하지 않는 입력은 명시적으로 거부한다', () => {
   for (const rows of [null, {}, 'rows', [null], [true], [[1, 2], [3, 4]]]) assert.throws(() => normalizeHospitals(rows), /자료|행|항목/);
   assert.throws(() => normalizeHospitals([], null), /출처/);

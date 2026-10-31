@@ -1,4 +1,4 @@
-/** 제주데이터허브 병·의원 정보(859) 필드용 변환기. 실제 데이터 접근·권한은 별도다. */
+/** 제주데이터허브 병·의원 정보(859)의 공개 등록 필드 정규화. */
 const FIELDS = {
   companyName: ['companyName', '사업장명'], addressDoro: ['addressDoro', '도로명주소'],
   addressJibun: ['addressJibun', '지번주소'], medicalSubject: ['medicalSubject', '진료과목'],
@@ -60,6 +60,6 @@ export function filterHospitals(records, { department = '', area = '' } = {}) {
   const queryDepartment = department.trim().toLocaleLowerCase('ko-KR');
   const queryArea = area.trim().toLocaleLowerCase('ko-KR');
   return records.filter(record => !/폐업|휴업|취소|말소/.test(record.openStatus)
-    && (!queryDepartment || record.departments.some(item => item.toLocaleLowerCase('ko-KR').includes(queryDepartment)))
+    && (!queryDepartment || record.departments.some(item => item.trim().toLocaleLowerCase('ko-KR') === queryDepartment))
     && (!queryArea || record.address.toLocaleLowerCase('ko-KR').includes(queryArea)));
 }
