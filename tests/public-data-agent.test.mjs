@@ -26,12 +26,23 @@ test('분석의 현재 지역 후보는 기존 문의 초안 도구에 실제로
  const execute=createToolDispatcher();
  const result=await execute({name:'analyze_public_data',input:{analysis:'support_candidates',supportKind:'taxi'},state});
  const action=result.data.preparationActions.find(action=>action.tool?.name==='prepare_inquiries');assert.ok(action);
- const prepared=await execute({name:action.tool.name,input:action.tool.input,state,userMessage:'현재 사례의 애월 어머니 이동 문의 초안을 준비해줘.'});
+ const prepared=await execute({name:action.tool.name,input:action.tool.input,state,userMessage:'애월콜로 어머니 이동 문의 초안을 준비해줘.'});
  assert.equal(prepared.state.visitSupport.taxi.provider.id,action.tool.input.providerId);
  assert.equal(prepared.state.visitSupport.taxi.status,'prepared');
  assert.ok(prepared.data.publicDataEvidence.datasetRefs.length);
  assert.equal(prepared.data.publicDataEvidence.preparationActions,undefined);
  assert.equal(prepared.data.callPlan.actualCallPlaced,false);
+});
+
+test('공공데이터 조회 뒤 일반 문의 준비는 요청의 선호 택시를 유지한다',async()=>{
+ const state=createDemoCase(),execute=createToolDispatcher();
+ const data=await execute({name:'analyze_public_data',input:{analysis:'support_candidates',supportKind:'taxi'},state});
+ const preferred=data.data.candidates.find(item=>item.id!==data.data.preparationActions[0].tool.input.providerId);
+ assert.ok(preferred,'동일 지역의 다른 공개 택시 문의처가 필요합니다.');
+ const prepared=await execute({name:'prepare_inquiries',input:{kind:'taxi'},state,preferences:{taxiProviderId:preferred.id,wheelchair:false,companionNeeded:true},userMessage:'어머니의 이동 문의 초안을 준비해줘.'});
+ assert.equal(prepared.state.visitSupport.taxi.provider.id,preferred.id);
+ assert.equal(prepared.state.visitSupport.taxi.status,'prepared');
+ assert.ok(prepared.data.publicDataEvidence);
 });
 
 test('다른 지역을 알아보는 질문은 해당 지역 후보만 읽고 현재 사례의 문의를 만들지 않는다',async()=>{

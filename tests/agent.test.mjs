@@ -645,7 +645,7 @@ test('자연형 상황을 알아도 일반 요청·설명만 요청·부정한 �
   ];
   for(const [scenarioId,context] of contexts) {
     const name=scenarioId.startsWith('call_')?'run_call_recovery_demo':'run_journey_demo';
-    for(const userMessage of [`${context} 상황에서 남은 준비를 정리해줘.`,`${context} 상황의 합성 시연이 무엇인지 설명해줘.`,`${context} 상황을 시연하지 말아줘.`,`${context} 상황의 합성 시연을 보여주지 마.`,`${context} 상황의 합성 시연을 실행하면 안 돼.`]) {
+    for(const userMessage of [`${context} 상황에서 남은 준비를 정리해줘.`,`${context} 상황의 합성 시연이 무엇인지 설명해줘.`,`${context} 상황을 시연하지 말아줘.`,`${context} 상황의 합성 시연을 보여주지 마.`,`${context} 상황의 합성 시연을 실행하면 안 돼.`,`${context} 상황의 합성 시연을 보여줘도 안 돼.`,`${context} 상황의 합성 시연을 보여줘선 안 돼.`,`${context} 상황의 합성 시연을 실행해도 안 돼.`,`${context} 상황을 시연해도 안 돼.`]) {
       const state=createDemoCase(),before=structuredClone(state);
       await assert.rejects(dispatch({name,input:{scenarioId},state,userMessage}),e=>e.code==='EXPLICIT_DEMO_REQUIRED',userMessage);assert.deepEqual(state,before);
     }
