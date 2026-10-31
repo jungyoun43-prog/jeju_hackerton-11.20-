@@ -53,3 +53,100 @@ test('링크 라벨·속성을 이스케이프하고 CRLF 줄바꿈을 표시한
   assert.match(html,/&lt;img&gt;/);
   assert.match(html,/<br>다음 줄<\/p><p><strong>확인 필요<\/strong><\/p>/);
 });
+
+test('비교 표는 열 머리글·본문과 구분선의 왼쪽·가운데·오른쪽 정렬을 갖는다',()=>{
+  const html=formatMessage('| **지역** | 시설 수 | 출처 |\n| :--- | ---: | :---: |\n| 제주시 | 12 | [공개 자료](https://example.org/data?a=1&b=2) |\n| 서귀포시 | 7 | 확인 필요 |');
+  assert.match(html,/<div class="message-table-scroll" role="region" aria-label="[^"]+" tabindex="0"><table aria-label="대화 표"><thead><tr>/);
+  assert.match(html,/<th scope="col" class="message-table-align-left"><strong>지역<\/strong><\/th>/);
+  assert.match(html,/<th scope="col" class="message-table-align-right">시설 수<\/th>/);
+  assert.match(html,/<th scope="col" class="message-table-align-center">출처<\/th>/);
+  assert.match(html,/<tbody><tr><td class="message-table-align-left">제주시<\/td>/);
+  assert.match(html,/<td class="message-table-align-right">12<\/td>/);
+  assert.match(html,/<a href="https:\/\/example.org\/data\?a=1&amp;b=2" target="_blank" rel="noopener noreferrer">공개 자료<\/a>/);
+  assert.equal((html.match(/<tr>/g)||[]).length,3);
+  assert.ok(html.endsWith('</tbody></table></div>'));
+});
+
+test('바깥 pipe 없이도 표를 읽고 escaped pipe와 역슬래시 짝수·홀수 경계를 구분한다',()=>{
+  const html=formatMessage(String.raw`기관 | 표시
+--- | ---
+동부\|서부 | 한 셀
+두 개\\ | 경계
+세 개\\\|유지 | 한 셀`);
+  assert.match(html,/<td class="message-table-align-left">동부\|서부<\/td>/);
+  assert.ok(html.includes('<td class="message-table-align-left">두 개\\\\</td>'));
+  assert.ok(html.includes('<td class="message-table-align-left">세 개\\\\|유지</td>'));
+  assert.equal((html.match(/<td /g)||[]).length,6);
+});
+
+test('표 전후 문단·제목·목록과 다음 표를 잃지 않는다',()=>{
+  const html=formatMessage('분모와 자료 시점이 다릅니다.\n지역 | 시설 수\n--- | ---:\n제주시 | 12\n서귀포시 | 7\n실시간 수용 여부는 미확인입니다.\n## 다음 확인\n- 기관에 문의\n\n| 항목 | 상태 |\n| --- | --- |\n| 예약 | 미확정 |\n\n끝 문단');
+  assert.ok(html.startsWith('<p>분모와 자료 시점이 다릅니다.</p><p class="message-table-hint">'));
+  assert.match(html,/<\/table><\/div><p>실시간 수용 여부는 미확인입니다\.<\/p><h4>다음 확인<\/h4><ul><li>기관에 문의<\/li><\/ul>/);
+  assert.equal((html.match(/<table /g)||[]).length,2);
+  assert.ok(html.endsWith('</table></div><p>끝 문단</p>'));
+});
+
+test('표 안의 HTML·강조·링크에도 같은 이스케이프와 HTTPS 제한을 적용한다',()=>{
+  const html=formatMessage('| <img src=x onerror=alert(1)> | 출처 |\n| --- | --- |\n| **</td><svg onload=alert(2)>** | [<script>](https://example.org/data) |\n| & " \' | [실행](javascript:alert%281%29) |\n| 원문 | [자료](data:text/html,x) [인증](https://user:secret@example.org/) [HTTP](http://example.org/) |');
+  assert.doesNotMatch(html,/<(?:img|svg|script)\b|href="(?:javascript|data|http):|href="https:\/\/user:/i);
+  assert.match(html,/&lt;img src=x onerror=alert\(1\)&gt;/);
+  assert.match(html,/<strong>&lt;\/td&gt;&lt;svg onload=alert\(2\)&gt;<\/strong>/);
+  assert.match(html,/<a [^>]+>&lt;script&gt;<\/a>/);
+  assert.match(html,/&amp; &quot; &#39;/);
+  assert.equal((html.match(/<a /g)||[]).length,1);
+});
+
+test('깨진 표는 부족하거나 남는 셀을 버리지 않고 원문으로 표시한다',()=>{
+  const cases=[
+    '지역 | 기관\n--- | ---\n제주시 | 1 | 초과\n서귀포시 | 2',
+    '| 지역 | 기관 |\n| --- | --- |\n| 빠진 셀 |',
+    '지역 | 기관\n-- | ---\n제주시 | 1',
+    '지역 | 기관\n--- | --- | ---\n제주시 | 1',
+    '지역 \\| 기관\n--- | ---\n제주시 | 1',
+    '| | |\n| --- | --- |\n| 자료 | 1 |',
+    '    지역 | 기관\n    --- | ---\n    제주시 | 1',
+  ];
+  for(const input of cases) {
+    const html=formatMessage(input+'\n\n마지막 문장');
+    assert.doesNotMatch(html,/<table\b/);
+    assert.equal(html,'<p>'+input.split('\n').join('<br>')+'</p><p>마지막 문장</p>');
+  }
+});
+
+test('8열·본문 40행까지 표시하며 더 큰 표도 모든 입력을 남긴다',()=>{
+  const table=(columns,rows)=>[
+    '| '+Array.from({length:columns},(_,col)=>`열${col}`).join(' | ')+' |',
+    '| '+Array(columns).fill('---').join(' | ')+' |',
+    ...Array.from({length:rows},(_,row)=>'| '+Array.from({length:columns},(_,col)=>`자료${row}-${col}`).join(' | ')+' |'),
+  ].join('\n');
+  const boundary=formatMessage(table(8,40));
+  assert.equal((boundary.match(/<th /g)||[]).length,8);
+  assert.equal((boundary.match(/<td /g)||[]).length,320);
+  for(const input of [table(9,2),table(2,41)]) {
+    const html=formatMessage(input+'\n\n마지막 문장');
+    assert.doesNotMatch(html,/<table\b/);
+    assert.equal(html,'<p>'+input.split('\n').join('<br>')+'</p><p>마지막 문장</p>');
+  }
+  const markers='항목 | 값\n--- | ---\n'+Array(41).fill('--- | ---').join('\n');
+  assert.equal(formatMessage(markers),'<p>'+markers.split('\n').join('<br>')+'</p>');
+});
+
+test('한 열·빈 셀과 머리글만 있는 표를 보존하고 코드 문법은 원문으로 남긴다',()=>{
+  const html=formatMessage('| 항목 |\n| --- |\n| `원문` |\n\n| 항목 | 값 |\n| --- | --- |\n|  | 미상 |\n\n| 머리글 |\n| --- |');
+  assert.equal((html.match(/<table /g)||[]).length,3);
+  assert.match(html,/<td class="message-table-align-left">`원문`<\/td>/);
+  assert.match(html,/<td class="message-table-align-left"><\/td><td class="message-table-align-left">미상<\/td>/);
+  assert.ok(html.endsWith('</thead><tbody></tbody></table></div>'));
+});
+
+test('깨진 pipe 입력도 종료하고 목록 안의 들여쓴 표는 기존 목록 텍스트로 남긴다',()=>{
+  for(const input of ['|','||','| --- |','--- | ---','| :--: | --- |','| \\|']) {
+    const html=formatMessage(input+'\n다음 문장');
+    assert.doesNotMatch(html,/<table\b/);
+    assert.ok(html.endsWith('<br>다음 문장</p>'));
+  }
+  const html=formatMessage('- 문의 자료\n  지역 | 기관\n  --- | ---\n  제주시 | 1\n\n번호 | 항목\n--- | ---\n1 | 후속 확인');
+  assert.ok(html.startsWith('<ul><li>문의 자료<br>지역 | 기관<br>--- | ---<br>제주시 | 1</li></ul>'));
+  assert.equal((html.match(/<table /g)||[]).length,1);
+});

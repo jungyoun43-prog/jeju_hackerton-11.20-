@@ -27,6 +27,18 @@
 .skip-link{display:inline-flex;align-items:center;min-height:44px}.read-only-status strong,.next-confirmation li strong,.connector-facts dd{font-size:14px}.text-button{font-size:14px}
 .tool-record-heading{flex-wrap:wrap}
 
+/* 답변 표만 가로로 이동하며 대화·입력·방문 패널의 폭은 유지한다. */
+.message-table-hint{font-size:14px;line-height:1.7;color:var(--muted);margin-top:14px}
+.message-body .message-table-scroll{max-width:100%;overflow-x:auto;overscroll-behavior-inline:contain;margin:6px 0 18px;scrollbar-color:#a4b9aa #edf4ef;scrollbar-width:thin}
+.message-table-scroll:focus-visible{outline:2px solid var(--secondary);outline-offset:3px}
+.message-table-scroll table{width:100%;min-width:32rem;border-collapse:collapse;font-size:inherit;line-height:1.75;font-variant-numeric:tabular-nums}
+.message-table-scroll th,.message-table-scroll td{min-width:6ch;max-width:28ch;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top;overflow-wrap:anywhere}
+.message-table-scroll th{font-weight:650;background:var(--soft);border-bottom-color:#bdcebf}
+.message-table-scroll .message-table-align-left{text-align:left}
+.message-table-scroll .message-table-align-center{text-align:center}
+.message-table-scroll .message-table-align-right{text-align:right}
+.message-table-scroll a{max-width:100%}
+
 /* 진료 여정은 대화의 현재 상태와 다음 행동으로 시작하고, 근거는 읽기 전용 창에서 확인한다. */
 .care-journey-summary{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:3px 12px;margin-bottom:23px;padding-bottom:16px;border-bottom:1px solid var(--line);font-size:14px;line-height:1.75}
 .journey-summary-state{display:flex;align-items:baseline;flex-wrap:wrap;gap:3px 10px;min-width:0;padding-top:8px}
