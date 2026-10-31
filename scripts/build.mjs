@@ -1,0 +1,12 @@
+import { cp, mkdir, rm, access } from 'node:fs/promises';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+await access(resolve(root, 'app/index.html'));
+await access(resolve(root, 'node_modules/leaflet/dist/leaflet.js'));
+await rm(resolve(root, 'dist'), {recursive:true, force:true});
+await mkdir(resolve(root, 'dist'), {recursive:true});
+await cp(resolve(root, 'app'), resolve(root, 'dist'), {recursive:true});
+await cp(resolve(root, 'node_modules/leaflet/dist'), resolve(root, 'dist/vendor/leaflet'), {recursive:true});
+await cp(resolve(root, 'node_modules/leaflet/LICENSE'), resolve(root, 'dist/vendor/leaflet/LICENSE.txt'));
+console.log('정적 빌드 완료: dist/ (Leaflet 및 라이선스 포함)');

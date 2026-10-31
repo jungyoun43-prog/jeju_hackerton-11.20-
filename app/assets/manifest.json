@@ -1,0 +1,28 @@
+{
+  "assets": [
+    {
+      "file": "jeju-coast.png",
+      "type": "generated_illustration",
+      "createdAt": "2026-10-31",
+      "tool": "ChatGPT built-in Imagegen / GPT Image family",
+      "modelId": "not exposed by tool",
+      "usage": "초안 보관·스타일 참고, 현재 화면에서는 사용하지 않음",
+      "referenceImages": [],
+      "prompt": "Use case: illustration-story. Asset type: panoramic landscape banner for Korean family healthcare coordination app in Jeju. Wide 3:1 composition. Beautiful restrained editorial gouache illustration with subtle paper texture: Jeju coastal road alongside turquoise sea, basalt black stone walls and grassy hills in foreground, small white island houses, hazy Hallasan mountain silhouette and warm ivory sky, a tangerine tree branch with a few oranges at lower right. Adult sophisticated Korean editorial feel, warm reassuring daylight, pale cream/sea glass green/deep teal/charcoal and small orange accents. Left third quiet pale ivory sky with very little visual detail, HTML text will overlay it; coastline and rich detail occupy right two thirds. No text, no lettering, no logos, no people, no medical equipment, no user interface screenshot. No glossy 3D or cartoon mascot. This asset will become a wide cropped header on a calm healthcare workspace.",
+      "notes": "실제 특정 해안이나 경로를 촬영·측량한 자료가 아니다. 도구의 원본 PNG를 그대로 복사했다. 원본 계정에 적용되는 생성 서비스 이용조건을 최종 제출 시 함께 확인한다."
+    },
+    {
+      "file": "jeju-care-v2.png",
+      "type": "generated_illustration",
+      "createdAt": "2026-10-31",
+      "tool": "ChatGPT built-in Imagegen / GPT Image family",
+      "modelId": "not exposed by tool",
+      "usage": "보호자 워크스페이스의 사람·협진 연결 중심 배너",
+      "referenceImages": [
+        "jeju-coast.png"
+      ],
+      "prompt": "Edit the provided Jeju landscape illustration into a human-centered banner for a Korean family healthcare coordination app. The original image is a style/color reference: preserve its sophisticated editorial gouache, subtle paper texture, warm ivory, sea glass green, teal, charcoal basalt and small tangerine-orange palette. Change the main story: caring for an elderly parent at a distance and connecting her local doctor to a remote specialist. Very wide 3:1 banner. Keep the left 30% quiet pale ivory and low detail for HTML heading overlay. Across the center and right, create two softly linked, clearly different spaces in one graceful composition: in the center, an older Korean mother, around 70, in a soft tangerine cardigan sits comfortably in a bright small Jeju clinic with a Korean local physician in a white coat beside her, attentive and speaking with her in person. A modest computer monitor on the doctor's desk clearly shows the portrait of a second specialist connected by video, no words on screen. On the far right, the mother's adult Korean daughter in her 30s is in her own city apartment at a distance, gently attentive while looking at her smartphone with a small appointment/checklist icon and her mother's small contact portrait, no lettering. Separate the daughter's space with a window or architectural framing, not a hospital desk. Show a restrained warm curved connection line between the family and doctors, expressing coordination and reassurance. Jeju sea, low basalt wall, a small tangerine branch and hazy mountain remain only subtle background cues through the clinic window, not the dominant subject. Clear focal hierarchy: mother and local doctor first, daughter second, remote specialist third. Warm natural light, calm adult human expressions, editorial adult illustration rather than cute mascot. Anatomically coherent hands, normal realistic devices. No patient suffering, no emergency equipment, no giant floating UI, no heart icons, no medical diagnosis text, absolutely no text or lettering anywhere, no logos, no watermarks. Maintain open breathing room. This is a new version, preserve the original separately.",
+      "notes": "제주 어머니와 현지 의료진, 화면 속 도외 전문의, 떨어져 사는 자녀의 조율을 표현한 생성 일러스트. 실제 환자나 특정 의료기관의 사진·참여 증거가 아니다. v1 원본도 보존한다."
+    }
+  ]
+}

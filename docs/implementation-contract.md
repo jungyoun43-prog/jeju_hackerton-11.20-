@@ -13,9 +13,9 @@
 
 ## 프런트엔드 계약
 
-브라우저 ES modules. `app/app.js`에서 `./domain.js`를 import한다. Leaflet의 JS·CSS는 `/vendor/leaflet/leaflet.js`, `/vendor/leaflet/leaflet.css`에서 제공한다. 생성 이미지의 최종 공개 경로는 `/assets/jeju-coast.webp`다. 이미지가 도착하기 전에도 단색 표면으로 정상 동작해야 한다.
+브라우저 ES modules. `app/app.js`에서 `./domain.js`를 import한다. Leaflet의 JS·CSS는 `/vendor/leaflet/leaflet.js`, `/vendor/leaflet/leaflet.css`에서 제공한다. 생성 이미지의 최종 공개 경로는 `/assets/jeju-care-v2.png`다. 초안 `/assets/jeju-coast.png`는 보존·참조용이다.
 
-`GET /api/config`는 `{ "mode": "simulation", "googleMapsEmbedKey": "", "tileUrl": "https://tile.openstreetmap.org/{z}/{x}/{y}.png" }`를 반환한다. 지도는 Leaflet/OSM을 기본으로 사용하고 Google Maps 외부 위치/길찾기 링크를 제공한다. 키가 있을 때만 선택적으로 공식 Maps Embed를 사용할 수 있다. 병원과 집의 초기 마커는 합성 지점임을 표시한다. 실제 환자 주소는 외부 전송하지 않는다.
+`GET /api/config`는 `{ "mode": "simulation", "tileUrl": "https://tile.openstreetmap.org/{z}/{x}/{y}.png" }`를 반환한다. 지도는 Leaflet/OSM을 사용하고 키 없이 Google Maps 외부 위치/길찾기 링크를 제공한다. Google Maps Embed는 현재 미구현이다. 병원과 집의 초기 마커는 합성 지점임을 표시한다. 실제 환자 주소는 외부 전송하지 않는다.
 
 ## 도메인 exports
 

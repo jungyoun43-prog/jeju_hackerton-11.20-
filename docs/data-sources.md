@@ -145,7 +145,7 @@ insane-search의 `weak_ok`는 본문 검토의 출발점으로 취급했다. 제
 | Google Maps Embed | [공식 설정 문서](https://developers.google.com/maps/documentation/embed/get-api-key)는 과거 검토 참고 | 현재 미구현·향후 검토. 키 설정이나 앱 내부 임베드를 지원한다고 설명하지 않음. 현재 환경변수는 `HOST`, `PORT`, `MAP_TILE_URL`뿐 |
 | 초기 지도 마커 | 애월 인근·제주 시내의 합성 지점 | 실제 환자 주소·협진 참여 병원·공공데이터 좌표가 아님. 지도에 합성 표시 |
 | 환자·문서·통화·회신 | 자체 시연용 합성 fixture | 실제 개인정보·의료행위 수행 증거가 아님. 합성 출처를 결과물까지 유지 |
-| 진료 연결 배너 v2 | 내장 Imagegen으로 부모님·현지 의사·멀리 사는 자녀·영상 전문의를 잇는 일러스트 생성·전환 진행. 화면용 경로 `app/assets/jeju-care-v2.png`. 기존 풍경 v1 `app/assets/jeju-coast.png`는 보존·참조용 | v2 생성 완료는 아직 미확인. 도구의 상세 모델 ID는 공개되지 않아 추정 기재하지 않음. 정확 프롬프트·사용 도구·최종 파일은 `app/assets/manifest.json` 기준. UI 표시·패키지 포함 검증은 별도 |
+| 진료 연결 배너 v2 | 내장 Imagegen으로 부모님·현지 의사·멀리 사는 자녀·영상 전문의를 잇는 일러스트 생성·적용 완료. 화면용 경로 `app/assets/jeju-care-v2.png`. 기존 풍경 v1은 보존·참조용 | PC·모바일 표시와 ZIP 포함 확인. 도구의 상세 모델 ID는 공개되지 않아 추정 기재하지 않음. 정확 프롬프트·사용 도구·최종 파일은 `app/assets/manifest.json` 기준. 적용 계정의 생성 서비스 이용조건은 최종 제출 때 확인 |
 | Impeccable | [원본](https://github.com/pbakaus/impeccable), revision `b7a89176e4e87422b40f98adabceb051dbb5448b` | 개발 시 디자인 지침으로 사용. 자동 context 로더 권한 실패 후 프로젝트 문맥·Operate/craft 지침을 직접 적용. 사용자 화면의 런타임 AI 모델이 아님 |
 | Awesome Design Skills · Refined | [원본 스킬](https://github.com/bergside/awesome-design-skills/blob/f631a09b4fcc0166f2e2c1a8c81906ef680c57e8/skills/refined/SKILL.md) | MIT 표기 확인. 토큰·간격·상태·접근성 지침 참고. 예시 팔레트·영문 글꼴을 그대로 복제하지 않음 |
 | Sites·Imagegen·Codex | 로컬 웹 구현·생성 이미지·코드/문서 작성 보조 | 개발 도구 사용과 제품 런타임 기능을 구분. 숨겨진 모델 버전·사용량을 추정하지 않음 |

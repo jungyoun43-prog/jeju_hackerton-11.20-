@@ -1,0 +1,44 @@
+{
+  "baseCommit": "e1e7e44",
+  "updatedAt": "2026-10-31T11:02:12.234400+00:00",
+  "tasks": {
+    "ui": {
+      "phase": "verified",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-ui",
+      "note": "통합·자동 검사·PC/모바일 검토 완료; 실제 연동 미완료 항목은 제출 추적표 참고",
+      "integrationCommits": [
+        "dd3794eea2afe4c3d2de41cdbc9d5780510c8509",
+        "08caf4695c7dcca0c52ffeb9efe023ae54307dc0",
+        "a3a7b76cab97f6a9c712b833f4aa11b900b985bd"
+      ]
+    },
+    "workflow": {
+      "phase": "verified",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-workflow",
+      "note": "통합·자동 검사·PC/모바일 검토 완료; 실제 연동 미완료 항목은 제출 추적표 참고",
+      "integrationCommits": [
+        "02567c0c53fc84b7cac82c668d5b17911066c0bb"
+      ]
+    },
+    "docs": {
+      "phase": "verified",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-docs",
+      "note": "통합·자동 검사·PC/모바일 검토 완료; 실제 연동 미완료 항목은 제출 추적표 참고",
+      "integrationCommits": [
+        "c311ef5e75ba9de81e13363d2a80f794d6f5255f",
+        "683062cebb1ff4c62a5429eed57f7b933fb922e4"
+      ]
+    }
+  },
+  "review": {
+    "phase": "ship",
+    "role": "읽기 전용 독립 통합·디자인 검토",
+    "findings": [
+      "중복 의료진 회신 버튼",
+      "미구현 Google Embed 안내",
+      "비밀값 스캔 확장자 범위",
+      "작업별 롤백 커밋 검증"
+    ],
+    "resolution": "독립 검토가 코드·캡처·소스 지문과 22개 브라우저 결과를 대조하고 주요 발견 수정 확인. 합성 MVP 검토 범위에서 ship."
+  }
+}
