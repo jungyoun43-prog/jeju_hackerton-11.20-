@@ -21,8 +21,10 @@ export function preparationBoardMarkup(planContent) {
     <div id="preparation-board" class="preparation-board" aria-label="진료 준비 내역과 답변"><details id="preparation-details" class="preparation-details"><summary><span>준비 내역</span><span>확인한 사실·남은 일·출처</span>${icon('chevron')}</summary><p class="preparation-note">기호는 자료와 문의 준비 상태예요. 실제 진료·예약·배차 확정은 아닙니다.</p>${preparationStages.map(section).join('')}</details>${section(PREPARATION_STAGES.find(stage=>stage.id==='plan'))}</div>`;
 }
 
+const renderedMarkup=new WeakMap();
 function replaceMarkup(node,markup) {
-  if(node && node.innerHTML!==markup)node.innerHTML=markup;
+  // SVG의 브라우저 직렬화 차이로 같은 출처 링크를 다시 만들지 않는다.
+  if(node && renderedMarkup.get(node)!==markup){node.innerHTML=markup;renderedMarkup.set(node,markup);}
 }
 
 function sourceMarkup(source) {
@@ -72,7 +74,10 @@ export function renderPreparationBoard(board,{selectedStageId='records',unreadAn
     pane.querySelector('[data-stage-log]').hidden=stage.id==='plan' && count===0;
     pane.querySelector('[data-stage-log-label]').textContent=`처리 기록 ${count}건`;
     const events=stage.events.map(event=>`<li data-tool-status="${escape(event.status)}"><strong>${escape(event.label)}</strong><span>${event.isSimulation?'합성 · ':''}${({completed:'결과 있음',needs_input:'확인 필요',not_connected:'미연결',error:'추가 확인 필요'})[event.status]||'상태 확인'}</span>${event.detail?`<p>${escape(event.detail)}</p>`:''}${event.source?sourceMarkup({url:event.source,label:'처리 근거'}):''}</li>`);
-    events.push(...liveEvents.map(event=>`<li class="stage-live-event" data-progress-sequence="${event.sequence}"><p>${escape(progressActivity(event))}</p></li>`));
-    replaceMarkup(pane.querySelector('[data-stage-events]'),count?`<ol>${events.join('')}</ol>`:'<p class="stage-log-empty">이 요청의 도구 실행 기록이 아직 없습니다.</p>');
+    const eventHost=pane.querySelector('[data-stage-events]');
+    replaceMarkup(eventHost,'<ol data-stage-confirmed-events></ol><ol data-stage-live-events></ol><p class="stage-log-empty">이 요청의 도구 실행 기록이 아직 없습니다.</p>');
+    replaceMarkup(eventHost.querySelector('[data-stage-confirmed-events]'),events.join(''));
+    replaceMarkup(eventHost.querySelector('[data-stage-live-events]'),liveEvents.map(event=>`<li class="stage-live-event" data-progress-sequence="${event.sequence}"><p>${escape(progressActivity(event))}</p></li>`).join(''));
+    eventHost.querySelector('.stage-log-empty').hidden=count>0;
   }
 }
