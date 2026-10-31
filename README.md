@@ -7,7 +7,7 @@
 
 **[제주 진료 나침반 데모](https://d1mfksxrj025bx.cloudfront.net)** · [GitHub 배포 실행 기록](https://github.com/jungyoun43-prog/jeju_hackerton-11.20-/actions/workflows/deploy-aws.yml)
 
-서울 리전의 비공개 S3와 CloudFront HTTPS로 데모를 공개합니다. 배포 흐름은 `main` push → 재사용 CI 검사·빌드 → 같은 artifact → GitHub production OIDC 역할 → 게시·캐시 무효화 → 공개 revision 확인입니다. AWS 장기 키를 GitHub Secrets에 저장하지 않습니다. 첫 CI는 검사·빌드 후 OIDC 인증에서 실패했고, 신뢰 정책을 수정했습니다. 최신 UI·데이터의 자동 배포 성공 여부는 Actions 실행과 공개 revision을 함께 확인합니다.
+서울 리전의 비공개 S3와 CloudFront HTTPS로 데모를 공개합니다. 배포 흐름은 `main` push → 재사용 CI 검사·빌드 → 같은 artifact → GitHub production OIDC 역할 → 게시·캐시 무효화 → 공개 revision 확인입니다. AWS 장기 키를 GitHub Secrets에 저장하지 않습니다. [실제 자동 배포 41198341223](https://github.com/jungyoun43-prog/jeju_hackerton-11.20-/actions/runs/41198341223)이 성공했고 공개 revision과 검사한 커밋의 일치를 확인했습니다. 공개 사이트에서도 PC·모바일 브라우저 검사 33개가 통과했습니다.
 
 배포 구조·변수·수동 재게시·롤백은 [AWS 배포 매뉴얼](docs/deployment.md)을 따릅니다. 인프라 코드는 [CloudFormation 템플릿](infra/aws-static-site.yaml)에 있습니다. 서비스의 실제 전화·LLM·의료기관 연동 상태는 아래 MVP 설명과 같습니다.
 
@@ -143,7 +143,7 @@ node scripts/datahub-profile.mjs --fetch
 
 보호자 UI·지도·결정적 상태 엔진·기관 데이터 정규화·공개 후보 13곳·집계 분석·검사·로컬 실행 코드를 구현했습니다. 준비 단계 도우미와 합성 의료진 응답은 실제 모델 추론·임상 판단과 다릅니다. 공개 표본을 넘어 전체 제주 기관을 조회하거나 실시간 수용 여부를 확인하지는 않습니다.
 
-화면은 큰 홍보 배너와 반복 카드 대신 사례 제목·현재 병목·다음 행동·담당자 중심으로 재설계했습니다. 의사·가족 일러스트는 사용자 피드백으로 제거했고, Imagegen으로 만든 현무암·연결 모티브의 투명 PNG 로고 `app/assets/jeju-mark-v1.png`를 사용합니다. 정확한 프롬프트는 자산 명세에 기록합니다. 최종 화면·브라우저·배포 검증은 [결과 기록](docs/implementation-results.md)에 갱신합니다.
+화면은 큰 홍보 배너와 반복 카드 대신 사례 제목·현재 병목·다음 행동·담당자 중심으로 재설계했습니다. 의사·가족 일러스트는 사용자 피드백으로 제거했고, Imagegen으로 만든 현무암·연결 모티브의 투명 PNG 로고 `app/assets/jeju-mark-v1.png`를 사용합니다. 정확한 프롬프트는 자산 명세에 기록합니다. 58개 단위 검사·33개 공개 사이트 브라우저 검사·19개 자동 규칙·새 ZIP 설치와 실행 결과는 [검증 기록](docs/implementation-results.md)에 정리했습니다.
 
 - 첫 시연 질환·치료 단계·합성 기록과 협진 참여 의료진.
 - 전체 운영 API 확장 여부와 사례별 근거 문헌·급여 항목.

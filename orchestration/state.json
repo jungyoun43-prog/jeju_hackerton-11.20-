@@ -1,6 +1,6 @@
 {
   "baseCommit": "e1e7e44",
-  "updatedAt": "2026-10-31T11:47:07.476044+00:00",
+  "updatedAt": "2026-10-31T11:49:51.331338+00:00",
   "tasks": {
     "ui": {
       "phase": "verified",
@@ -67,13 +67,13 @@
       "note": "데이터 기능 통합; 사용자가 시각 결과를 거부해 editorial-ui에서 대체"
     },
     "editorial-ui": {
-      "phase": "integrated",
+      "phase": "verified",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-editorial-ui",
       "integrationCommits": [
         "8ccba6d",
         "c2c572e"
       ],
-      "note": "의사 일러스트 제거·이미지 로고·12–14px 설명·대비 수정. 브라우저33개 통과, 최종 독립 화면 검토 중"
+      "note": "인물 이미지 제거·생성 로고·본문 크기/대비 수정, 공개 사이트 브라우저33개·최신7개 캡처 독립 ship 검토 완료"
     },
     "docs-sync": {
       "phase": "verified",
@@ -85,7 +85,7 @@
     }
   },
   "review": {
-    "phase": "fix_verification",
+    "phase": "ship",
     "role": "새 시각 결과의 독립 검토",
     "findings": [
       "사용자 요청으로 의사 일러스트 제거",
@@ -93,17 +93,19 @@
       "과거 업로드 선행 조건 안내",
       "선택 기관 캡처의 스크롤 아티팩트"
     ],
-    "resolution": "앞의 세 수정은 독립 검토 resolved, 마지막 긴 기관명·문서 top 캡처 증거 보완 중"
+    "resolution": "의사 이미지 제거·크기/대비·공개 후보 안내·긴 기관명 캡처 수정 resolved. 최신7개 캡처와 동일 실행 지문을 전체 검토해 UI 범위 ship. 별도 문서 대조도 완료."
   },
   "awsDeployment": {
-    "phase": "trust_updated_ci_pending",
+    "phase": "verified",
     "region": "ap-northeast-2",
     "profile": "jeju-deploy",
     "githubAuthenticated": true,
     "liveUrl": "https://d1mfksxrj025bx.cloudfront.net",
     "authenticated": true,
     "stackStatus": "UPDATE_COMPLETE",
-    "ciWorkflow": "configured",
-    "evidence": "orchestration/runs/aws-deployment.json"
+    "ciWorkflow": "passed",
+    "evidence": "orchestration/runs/aws-deployment.json",
+    "ciRun": "https://github.com/jungyoun43-prog/jeju_hackerton-11.20-/actions/runs/41198341223",
+    "verifiedRevision": "60ad28fb0ad6a160d73a4690e51b3111746cde49"
   }
 }
