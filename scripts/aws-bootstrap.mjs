@@ -11,12 +11,46 @@ const fail=message=>{throw new Error(message);};
 export function bootstrapSettings(env=process.env,args=process.argv.slice(2),root=projectRoot) {
   if(args.some(arg=>!['--apply','--status','--help'].includes(arg))) fail('사용법: node scripts/aws-bootstrap.mjs [--apply | --status]');
   if(args.includes('--apply')&&args.includes('--status')) fail('--apply와 --status를 함께 사용할 수 없습니다.');
-  const settings={mode:args.includes('--help')?'help':args.includes('--status')?'status':args.includes('--apply')?'apply':'plan',region:env.AWS_REGION||env.AWS_DEFAULT_REGION||'ap-northeast-2',stackName:env.AWS_STACK_NAME||'jeju-care-compass-demo',projectName:env.PROJECT_NAME||application,repository:env.GITHUB_REPOSITORY||'',templatePath:resolve(root,'infra/aws-static-site.yaml')};
+  const settings={mode:args.includes('--help')?'help':args.includes('--status')?'status':args.includes('--apply')?'apply':'plan',region:env.AWS_REGION||env.AWS_DEFAULT_REGION||'ap-northeast-2',stackName:env.AWS_STACK_NAME||'jeju-care-compass-demo',projectName:env.PROJECT_NAME||application,repository:env.GITHUB_REPOSITORY||'',oidcSubject:env.GITHUB_OIDC_SUBJECT||'',templatePath:resolve(root,'infra/aws-static-site.yaml')};
   if(!/^[a-z]{2}(?:-[a-z0-9]+)+-\d$/.test(settings.region)) fail('AWS_REGION 형식을 확인하세요. 기본은 ap-northeast-2입니다.');
   if(!/^[A-Za-z][A-Za-z0-9-]{0,127}$/.test(settings.stackName)) fail('AWS_STACK_NAME은 영문자로 시작하는 128자 이내 이름이어야 합니다.');
   if(!/^[a-z][a-z0-9-]{2,29}$/.test(settings.projectName)) fail('PROJECT_NAME은 영문 소문자로 시작하는 3~30자여야 합니다.');
   if(!['status','help'].includes(settings.mode)&&!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(settings.repository)) fail('GITHUB_REPOSITORY를 owner/repo 형식으로 지정하세요.');
+  if(settings.oidcSubject&&!['status','help'].includes(settings.mode)) settings.oidcSubject=validateOidcSubject(settings.oidcSubject,settings.repository);
   return settings;
+}
+
+export function validateOidcSubject(value,repository) {
+  if(typeof value!=='string'||value.length>512) fail('GITHUB_OIDC_SUBJECT는 정확한 production 환경 subject여야 합니다.');
+  const subject=value.trim();
+  const match=/^repo:([A-Za-z0-9_.-]+)(?:@([1-9][0-9]*))?\/([A-Za-z0-9_.-]+)(?:@([1-9][0-9]*))?:environment:production$/.exec(subject);
+  if(!match||Boolean(match[2])!==Boolean(match[4])||`${match[1]}/${match[3]}`!==repository) fail('GITHUB_OIDC_SUBJECT는 지정 저장소의 정확한 production subject만 허용합니다. 다른 저장소·와일드카드·일부 ID만 있는 값은 거부합니다.');
+  return subject;
+}
+
+export function githubMetadataRunner(env=process.env,root=projectRoot) {
+  return repository=>{
+    const result=spawnSync(env.GH_CLI||'gh',['api',`repos/${repository}/actions/oidc/customization/sub`],{cwd:root,env,encoding:'utf8',timeout:15000,maxBuffer:1024*1024});
+    if(result.error||result.status!==0) fail('GitHub OIDC subject 설정을 조회하지 못했습니다. 인증된 gh CLI를 사용하거나 GITHUB_OIDC_SUBJECT를 명시하세요.');
+    return result.stdout;
+  };
+}
+
+export function selectGitHubOidcSubject({repository,explicitSubject='',stack,github}) {
+  if(explicitSubject) return validateOidcSubject(explicitSubject,repository);
+  const previous=stack?.Parameters?.find(parameter=>parameter.ParameterKey==='GitHubOidcSubject')?.ParameterValue;
+  if(previous) return validateOidcSubject(previous,repository);
+  const metadata=parse(github(repository));
+  if(metadata.use_default!==true) fail('사용자 정의 GitHub OIDC subject는 추측하지 않습니다. GITHUB_OIDC_SUBJECT를 명시하세요.');
+  if(metadata.sub_claim_prefix) {
+    const subject=validateOidcSubject(`${metadata.sub_claim_prefix}:environment:production`,repository);
+    const immutable=subject.includes('@');
+    if((metadata.use_immutable_subject===true&&!immutable)||(metadata.use_immutable_subject===false&&immutable)) fail('GitHub immutable subject 설정과 prefix가 일치하지 않습니다. GITHUB_OIDC_SUBJECT를 확인하세요.');
+    return subject;
+  }
+  if(metadata.use_immutable_subject===true) fail('GitHub immutable subject의 정확한 prefix를 확인할 수 없습니다. GITHUB_OIDC_SUBJECT를 명시하세요.');
+  // 구형 default 응답에는 prefix/immutable 필드가 없다. 그 경우에만 문서화된 legacy 형식을 쓴다.
+  return validateOidcSubject(`repo:${repository}:environment:production`,repository);
 }
 
 export function awsRunner(env=process.env,region='ap-northeast-2',root=projectRoot) {
@@ -48,7 +82,7 @@ export function selectOidcProvider(run,identity,stack) {
   catch(error) {if(/NoSuchEntity/.test(error.message)) return '';throw error;}
 }
 
-export async function runBootstrap({env=process.env,args=process.argv.slice(2),root=projectRoot,run,log=console.log}={}) {
+export async function runBootstrap({env=process.env,args=process.argv.slice(2),root=projectRoot,run,github,log=console.log}={}) {
   const settings=bootstrapSettings(env,args,root);
   if(settings.mode==='help') return {help:'GITHUB_REPOSITORY=owner/repo AWS_PROFILE=jeju-deploy node scripts/aws-bootstrap.mjs [--apply | --status]. 기본은 계획만 출력합니다.'};
   const template=JSON.parse(await readFile(settings.templatePath,'utf8'));
@@ -67,8 +101,9 @@ export async function runBootstrap({env=process.env,args=process.argv.slice(2),r
   if(stack?.StackStatus==='ROLLBACK_COMPLETE') fail('생성 실패로 ROLLBACK_COMPLETE 상태입니다. 이벤트를 확인하고 전용 stack을 정리하거나 다른 stack 이름으로 재시도하세요. 보존된 버킷은 자동 삭제하지 않습니다.');
   const identity=parse(run(['sts','get-caller-identity']));
   const existingProvider=selectOidcProvider(run,identity,stack);
+  const oidcSubject=selectGitHubOidcSubject({repository:settings.repository,explicitSubject:settings.oidcSubject,stack,github:github||githubMetadataRunner(env,root)});
   run(['cloudformation','validate-template','--template-body',`file://${settings.templatePath}`]);
-  const parameters=[{ParameterKey:'ProjectName',ParameterValue:settings.projectName},{ParameterKey:'GitHubRepository',ParameterValue:settings.repository},{ParameterKey:'ExistingGitHubOidcProviderArn',ParameterValue:existingProvider}];
+  const parameters=[{ParameterKey:'ProjectName',ParameterValue:settings.projectName},{ParameterKey:'GitHubRepository',ParameterValue:settings.repository},{ParameterKey:'ExistingGitHubOidcProviderArn',ParameterValue:existingProvider},{ParameterKey:'GitHubOidcSubject',ParameterValue:oidcSubject}];
   const operation=stack?'update-stack':'create-stack';
   const command=['cloudformation',operation,'--stack-name',settings.stackName,'--template-body',`file://${settings.templatePath}`,'--parameters',JSON.stringify(parameters),'--capabilities','CAPABILITY_IAM','--tags',`Key=Application,Value=${application}`,`Key=Project,Value=${settings.projectName}`];
   log(`${settings.stackName}: 템플릿 검증 완료, ${operation} 제출`);

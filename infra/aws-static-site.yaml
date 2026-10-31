@@ -6,9 +6,10 @@
     "Sources": [
       "https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-resource-iam-oidcprovider.html",
       "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-s3.html",
-      "https://docs.github.com/en/actions/how-tos/secure-your-work/security-harden-deployments/oidc-in-aws"
+      "https://docs.github.com/en/actions/how-tos/secure-your-work/security-harden-deployments/oidc-in-aws",
+      "https://github.com/aws-actions/configure-aws-credentials#oidc-configuration"
     ],
-    "Verification": "Official source bodies read through insane-search. Structural tests are local; actual AWS validation and resource creation require authenticated execution.",
+    "Verification": "Official source bodies read through insane-search. Immutable subject behavior confirmed with authenticated repository customization/sub API on 2026-10-31. Account validation and actual deployment remain separate root operations.",
     "AWSToolsMetrics": {
       "AWSAgentToolkit": "aws-cloudformation@3"
     },
@@ -42,6 +43,12 @@
       "Type": "String",
       "Default": "",
       "AllowedPattern": "^$|arn:[a-z0-9-]+:iam::[0-9]{12}:oidc-provider/token[.]actions[.]githubusercontent[.]com"
+    },
+    "GitHubOidcSubject": {
+      "Type": "String",
+      "Default": "",
+      "AllowedPattern": "^$|repo:([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+|[A-Za-z0-9_.-]+@[1-9][0-9]*/[A-Za-z0-9_.-]+@[1-9][0-9]*):environment:production",
+      "Description": "Exact production subject from repository OIDC settings; empty preserves legacy name-only template behavior"
     }
   },
   "Conditions": {
@@ -51,6 +58,18 @@
           "Ref": "ExistingGitHubOidcProviderArn"
         },
         ""
+      ]
+    },
+    "HasGitHubOidcSubject": {
+      "Fn::Not": [
+        {
+          "Fn::Equals": [
+            {
+              "Ref": "GitHubOidcSubject"
+            },
+            ""
+          ]
+        }
       ]
     }
   },
@@ -410,7 +429,15 @@
                 "StringEquals": {
                   "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
                   "token.actions.githubusercontent.com:sub": {
-                    "Fn::Sub": "repo:${GitHubRepository}:environment:production"
+                    "Fn::If": [
+                      "HasGitHubOidcSubject",
+                      {
+                        "Ref": "GitHubOidcSubject"
+                      },
+                      {
+                        "Fn::Sub": "repo:${GitHubRepository}:environment:production"
+                      }
+                    ]
                   }
                 }
               }
@@ -479,9 +506,9 @@
       },
       "Metadata": {
         "com.aws.cloudformation.Context": {
-          "why": "Allow protected production environment to publish this site without long-lived keys",
+          "why": "Trust exact repository production subject, including immutable owner/repository IDs when GitHub enables them; retain legacy template compatibility without widening trust",
           "must": [
-            "Exact repository/environment and audience trust",
+            "Exact discovered or explicitly supplied repository production subject and sts audience; no wildcard; do not disable immutable IDs",
             "Dedicated bucket and distribution resources only",
             "No IAM or infrastructure mutation permissions"
           ],

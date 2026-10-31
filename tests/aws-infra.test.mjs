@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile, mkdtemp, mkdir, writeFile, symlink, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { bootstrapSettings, runBootstrap, selectOidcProvider } from '../scripts/aws-bootstrap.mjs';
+import { bootstrapSettings, runBootstrap, selectOidcProvider, validateOidcSubject, selectGitHubOidcSubject } from '../scripts/aws-bootstrap.mjs';
 import { createPublishPlan, runPublish } from '../scripts/aws-publish.mjs';
 
 const template=JSON.parse(await readFile(new URL('../infra/aws-static-site.yaml',import.meta.url),'utf8'));
@@ -41,7 +41,8 @@ test('배포 역할은 정확한 production subject·audience와 해당 사이�
   const role=template.Resources.DeployRole.Properties;
   const condition=role.AssumeRolePolicyDocument.Statement[0].Condition.StringEquals;
   assert.equal(condition['token.actions.githubusercontent.com:aud'],'sts.amazonaws.com');
-  assert.deepEqual(condition['token.actions.githubusercontent.com:sub'],{'Fn::Sub':'repo:${GitHubRepository}:environment:production'});
+  assert.deepEqual(condition['token.actions.githubusercontent.com:sub'],{'Fn::If':['HasGitHubOidcSubject',{Ref:'GitHubOidcSubject'},{'Fn::Sub':'repo:${GitHubRepository}:environment:production'}]});
+  assert.equal(template.Parameters.GitHubOidcSubject.Default,'');
   for(const policy of role.Policies) for(const s of policy.PolicyDocument.Statement) {
     assert.notEqual(s.Resource,'*');assert.ok(s.Action.every(action=>!action.startsWith('iam:')&&!action.startsWith('cloudformation:')&&!action.endsWith(':*')));
   }
@@ -58,7 +59,7 @@ test('템플릿에는 스킬 marker·리소스 의도와 불변 제약이 있고
 });
 
 test('bootstrap 기본 계획은 AWS에 연결하지 않고 잘못된 대상·모드는 거부한다',async()=>{
-  const result=await runBootstrap({env,args:[],run:()=>{throw new Error('호출하면 안 됨');},log:()=>{}});
+  const result=await runBootstrap({env,args:[],run:()=>{throw new Error('AWS 호출하면 안 됨');},github:()=>{throw new Error('GH 호출하면 안 됨');},log:()=>{}});
   assert.equal(result.applied,false);assert.equal(result.mode,'plan');
   assert.throws(()=>bootstrapSettings({},[]),/GITHUB_REPOSITORY/);
   assert.throws(()=>bootstrapSettings(env,['--apply','--status']),/함께/);
@@ -85,12 +86,60 @@ test('apply는 검증 후 새 작업을 제출하고 장시간 waiter를 실행�
     if(args[1]==='create-stack')return JSON.stringify({StackId:'test-stack-id'});
     return '{}';
   };
-  const result=await runBootstrap({env,args:['--apply'],run,log:()=>{}});
+  const result=await runBootstrap({env,args:['--apply'],run,github:()=>JSON.stringify({use_default:true}),log:()=>{}});
   assert.equal(result.status,'REQUEST_SUBMITTED');assert.equal(result.applied,true);
   const create=calls.find(args=>args[1]==='create-stack');assert.ok(create);
   assert.ok(calls.findIndex(args=>args[1]==='validate-template')<calls.indexOf(create));
   assert.equal(JSON.parse(create[create.indexOf('--parameters')+1])[2].ParameterValue,'');
+  assert.equal(JSON.parse(create[create.indexOf('--parameters')+1])[3].ParameterValue,'repo:example/jeju-demo:environment:production');
   assert.ok(calls.every(args=>!args.includes('wait')&&!args.includes('delete-stack')));
+});
+
+test('새 immutable subject는 API의 owner/repository ID prefix를 그대로 사용한다',()=>{
+  const prefix='repo:example@123/jeju-demo@456';
+  const subject=selectGitHubOidcSubject({repository:env.GITHUB_REPOSITORY,github:repository=>{
+    assert.equal(repository,env.GITHUB_REPOSITORY);
+    return {use_default:true,use_immutable_subject:true,sub_claim_prefix:prefix};
+  }});
+  assert.equal(subject,`${prefix}:environment:production`);
+  assert.throws(()=>selectGitHubOidcSubject({repository:env.GITHUB_REPOSITORY,github:()=>({use_default:true,use_immutable_subject:true})}),/prefix/);
+});
+
+test('subject 명시 override가 이전 파라미터보다 우선하고 미지정 재실행은 보존한다',()=>{
+  const previous='repo:example@123/jeju-demo@456:environment:production';
+  const explicit='repo:example@123/jeju-demo@789:environment:production';
+  const stack={Parameters:[{ParameterKey:'GitHubOidcSubject',ParameterValue:previous}]};
+  const github=()=>{throw new Error('조회하면 안 됨');};
+  assert.equal(selectGitHubOidcSubject({repository:env.GITHUB_REPOSITORY,explicitSubject:explicit,stack,github}),explicit);
+  assert.equal(selectGitHubOidcSubject({repository:env.GITHUB_REPOSITORY,stack,github}),previous);
+});
+
+test('다른 저장소·와일드카드·일부 immutable ID·다른 환경 subject를 거부한다',()=>{
+  for(const subject of ['repo:other/jeju-demo:environment:production','repo:example/other:environment:production','repo:example/*:environment:production','repo:example@123/jeju-demo:environment:production','repo:example/jeju-demo:environment:staging']) assert.throws(()=>validateOidcSubject(subject,env.GITHUB_REPOSITORY),/정확한 production/);
+  assert.throws(()=>bootstrapSettings({...env,GITHUB_OIDC_SUBJECT:'repo:other/jeju-demo:environment:production'},['--apply']),/정확한 production/);
+});
+
+test('legacy default는 호환하지만 커스텀 subject와 조회 실패는 추측하지 않는다',()=>{
+  assert.equal(selectGitHubOidcSubject({repository:env.GITHUB_REPOSITORY,github:()=>({use_default:true})}),'repo:example/jeju-demo:environment:production');
+  assert.throws(()=>selectGitHubOidcSubject({repository:env.GITHUB_REPOSITORY,github:()=>({use_default:false})}),/명시/);
+  assert.throws(()=>selectGitHubOidcSubject({repository:env.GITHUB_REPOSITORY,github:()=>{throw new Error('gh unavailable; set GITHUB_OIDC_SUBJECT');}}),/GITHUB_OIDC_SUBJECT/);
+});
+
+test('기존 stack subject override는 provider 조건을 보존하고 역할 갱신 요청에 정확히 전달된다',async()=>{
+  const calls=[];const subject='repo:example@123/jeju-demo@456:environment:production';
+  const stack={Tags:[ownerTag],StackStatus:'CREATE_COMPLETE',Parameters:[{ParameterKey:'ExistingGitHubOidcProviderArn',ParameterValue:''}]};
+  const run=args=>{
+    calls.push(args);
+    if(args[1]==='describe-stacks')return {Stacks:[stack]};
+    if(args[0]==='sts')return {Account:'111122223333',Arn:'arn:aws:iam::111122223333:role/test-only'};
+    return {};
+  };
+  const result=await runBootstrap({env:{...env,GITHUB_OIDC_SUBJECT:subject},args:['--apply'],run,github:()=>{throw new Error('명시 subject는 GH 조회 불필요');},log:()=>{}});
+  assert.equal(result.operation,'update-stack');
+  const update=calls.find(args=>args[1]==='update-stack');const parameters=JSON.parse(update[update.indexOf('--parameters')+1]);
+  assert.equal(parameters.find(p=>p.ParameterKey==='GitHubOidcSubject').ParameterValue,subject);
+  assert.equal(parameters.find(p=>p.ParameterKey==='ExistingGitHubOidcProviderArn').ParameterValue,'');
+  assert.ok(calls.every(args=>args[0]!=='iam'));
 });
 
 test('기존 다른 앱 stack이나 읽기 권한 오류는 생성·갱신으로 우회하지 않는다',async()=>{
