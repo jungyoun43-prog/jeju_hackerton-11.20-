@@ -196,16 +196,162 @@ test('모델의 알 수 없는 도구·부적절한 인자는 error 결과로 �
   assert.deepEqual(body.events.map(item => item.status),['error','error']);
 });
 
-test('루프·tool 개수·반복 id 한도를 넘기면 draft 상태를 commit하지 않는다',async () => {
+test('도구 없는 최종 요약의 추가 호출·반복 id는 실행과 draft commit을 막는다',async () => {
   for (const [config,outputs,code] of [
-    [{maxRounds:1},[use(call('update_visit',{date:'2026-11-20'}))],'LOOP_LIMIT'],
-    [{maxTools:1},[use(call('update_visit',{date:'2026-11-20'},'one'),call('get_case',{},'two'))],'TOOL_LIMIT'],
+    [{maxRounds:1},[use(call('update_visit',{date:'2026-11-20'}))],'INVALID_MODEL_RESPONSE'],
     [{},[use(call('get_case')),use(call('get_case'))],'REPEATED_TOOL_ID'],
   ]) {
     const store = createMemorySessionStore(),service = createAgentService({store,provider:scripted(outputs),config});
     const result = await post(service); assert.equal(json(result).error.code,code);
     assert.equal(store.inspect()[0].turns,0); assert.equal(store.inspect()[0].state.patient.nextVisit,'2026-11-12');
   }
+});
+
+test('도구 개수 한도 뒤에는 추가 실행 없이 이미 준비한 상태를 최종 답과 함께 저장한다',async () => {
+  const provider = scripted([
+    use(call('update_visit',{appointmentTime:'10:00'},'one'),call('get_case',{},'two'),call('request_records',{source:'demo'},'three')),
+    input => {
+      assert.equal(input.toolChoice,'none');
+      const results = input.messages.at(-1).content.map(item => item.toolResult);
+      assert.deepEqual(results.map(item => item.status),['success','success','error']);
+      assert.equal(results[2].content[0].json.error.code,'TOOL_LIMIT');
+      assert.equal(results[0].content[0].json.runtime.toolsRemaining,0);
+      return done('방문 시각과 현재 상태를 확인했습니다. 자료 정리는 아직 실행 전입니다.');
+    },
+  ]);
+  const store = createMemorySessionStore(),service = createAgentService({provider,store,config:{maxTools:2}});
+  const result = await post(service),body = json(result);
+  assert.equal(result.statusCode,200);
+  assert.equal(body.caseState.visitSupport.requirements.appointmentTime,'10:00');
+  assert.equal(body.caseState.documents.find(item => item.id === 'report').status,'missing');
+  assert.ok(body.events.some(item => item.tool === 'request_records' && item.status === 'needs_input'));
+  assert.equal(body.needsInput,true);
+  assert.equal(store.inspect()[0].turns,1);
+  assert.equal(provider.calls.length,2);
+});
+
+test('새 세션 기본 설정은 실제 택시 초안 선택에 쓰고 동의·자유 텍스트를 저장하지 않는다',async () => {
+  const preferences = {taxiProviderId:'taxi327-6',wheelchair:false,companionNeeded:false};
+  const provider = scripted([
+    input => {
+      const context = JSON.parse(input.messages[0].content[0].text);
+      assert.deepEqual(context.carePreferences,preferences);
+      assert.equal(context.preferencesApplied,true);
+      assert.equal(input.system.includes('taxi327-6'),false);
+      return use(call('get_case',{},'case'));
+    },
+    input => {
+      const facts = input.messages.at(-1).content[0].toolResult.content[0].json;
+      assert.equal(facts.requirements.companionNeeded,false);
+      return use(call('prepare_inquiries',{kind:'taxi'},'taxi'));
+    },
+    done('5.16콜에 보낼 문의 초안을 준비했습니다. 실제 배차는 확인 전입니다.'),
+  ]);
+  const store = createMemorySessionStore(),service = createAgentService({provider,store});
+  const result = await post(service,req({preferences,applyPreferences:false})),body = json(result);
+  assert.equal(result.statusCode,200);
+  assert.equal(body.caseState.visitSupport.taxi.provider.id,'taxi327-6');
+  assert.equal(body.caseState.visitSupport.taxi.provider.name,'5.16콜');
+  assert.equal(body.caseState.visitSupport.taxi.status,'prepared');
+  assert.match(body.caseState.visitSupport.taxi.inquiry,/5\.16콜/);
+  assert.equal(body.caseState.visitSupport.requirements.companionNeeded,false);
+  assert.deepEqual(body.caseState.permissions,{inquiry:true,share:false});
+  assert.equal(Object.hasOwn(store.inspect()[0],'preferences'),false);
+  assert.equal(Object.hasOwn(body.caseState,'preferences'),false);
+  assert.ok(body.events.some(item => item.tool === 'apply_care_preferences'));
+});
+
+test('기존 세션 조건은 applyPreferences 전까지 유지하고 이번 메시지의 update_visit이 기본값보다 우선한다',async () => {
+  const preferences = {taxiProviderId:'auto',wheelchair:true,companionNeeded:false};
+  const changed = {...preferences,wheelchair:false,companionNeeded:true};
+  const provider = scripted([
+    done('기본 이동 조건을 확인했습니다.'),
+    input => {assert.equal(JSON.parse(input.messages[0].content[0].text).preferencesApplied,false); return use(call('get_case',{},'old-case'));},
+    input => {assert.equal(input.messages.at(-1).content[0].toolResult.content[0].json.requirements.wheelchair,true); return done('이번 사례의 휠체어 조건을 유지했습니다.');},
+    use(call('get_case',{},'applied-case')),
+    input => {assert.equal(input.messages.at(-1).content[0].toolResult.content[0].json.requirements.wheelchair,false); return use(call('update_visit',{wheelchair:true,companionNeeded:false},'explicit-override'));},
+    done('이번 요청의 휠체어와 동행 조건으로 바꿨습니다.'),
+  ]);
+  const store = createMemorySessionStore(),service = createAgentService({provider,store});
+  const first = json(await post(service,req({preferences})));
+  const second = json(await post(service,req({sessionId:first.sessionId,requestId:'request-pref-0002',preferences:changed,applyPreferences:false})));
+  assert.equal(second.caseState.visitSupport.requirements.wheelchair,true);
+  assert.equal(second.caseState.visitSupport.requirements.companionNeeded,false);
+  const third = json(await post(service,req({sessionId:first.sessionId,requestId:'request-pref-0003',message:'이번에는 휠체어가 필요하고 동행은 필요 없어요.',preferences:changed,applyPreferences:true})));
+  assert.equal(third.caseState.visitSupport.requirements.wheelchair,true);
+  assert.equal(third.caseState.visitSupport.requirements.companionNeeded,false);
+  assert.deepEqual(third.caseState.permissions,{inquiry:true,share:false});
+});
+
+test('이동 기본값 변경은 이전 합성 가능 응답을 재확인으로 돌리고 문의 위임을 새로 부여하지 않는다',async () => {
+  const store = createMemorySessionStore(),dispatch = createToolDispatcher();
+  const session = await store.loadOrCreate();
+  for (const [name,input] of [['prepare_inquiries',{kind:'taxi'}],['request_support_contact',{kind:'taxi'}]]) session.state = (await dispatch({name,input,state:session.state})).state;
+  assert.equal(session.state.visitSupport.taxi.status,'available_demo');
+  session.state.permissions.inquiry = false;
+  await store.save(session);
+  const provider = scripted([
+    use(call('get_case',{},'case')),
+    input => {
+      const facts = input.messages.at(-1).content[0].toolResult.content[0].json;
+      assert.equal(facts.visitSupport.taxi.status,'needs_recheck');
+      assert.equal(facts.permissions.inquiry,false);
+      return use(call('request_support_contact',{kind:'taxi'},'contact'));
+    },
+    input => {
+      assert.equal(input.messages.at(-1).content[0].toolResult.content[0].json.error.code,'PERMISSION_REQUIRED');
+      return done('휠체어 조건을 반영했고 기존 응답은 재확인이 필요합니다. 전화 문의 위임은 해제된 상태입니다.');
+    },
+  ]);
+  const result = await post(createAgentService({provider,store}),req({sessionId:session.sessionId,preferences:{taxiProviderId:'auto',wheelchair:true,companionNeeded:true},applyPreferences:true}));
+  assert.equal(result.statusCode,200);
+  const {caseState} = json(result);
+  assert.equal(caseState.visitSupport.taxi.status,'needs_recheck');
+  assert.equal(caseState.visitSupport.taxi.response,'');
+  assert.deepEqual(caseState.permissions,{inquiry:false,share:false});
+});
+
+test('지역 밖 선호는 대체 이유를 알리고 휠체어 조건에서는 일반 선호보다 이동지원 문의를 우선한다',async () => {
+  for (const [preferences,expectedId,noticeCode] of [
+    [{taxiProviderId:'taxi327-33',wheelchair:false,companionNeeded:true},'taxi327-14','PREFERENCE_AREA_MISMATCH'],
+    [{taxiProviderId:'taxi327-6',wheelchair:true,companionNeeded:true},'jeju-accessible-transport','WHEELCHAIR_SUPPORT_FIRST'],
+  ]) {
+    const provider = scripted([
+      use(call('get_case',{},'case')),
+      use(call('prepare_inquiries',{kind:'taxi'},'taxi')),
+      input => {
+        const result = input.messages.at(-1).content[0].toolResult.content[0].json;
+        assert.equal(result.provider.id,expectedId);
+        assert.equal(result.preferenceNotice.code,noticeCode);
+        assert.equal(result.actualCallPlaced,false);
+        return done(result.preferenceNotice.message);
+      },
+    ]);
+    const result = await post(createAgentService({provider}),req({preferences})),body = json(result);
+    assert.equal(result.statusCode,200);
+    assert.equal(body.caseState.visitSupport.taxi.provider.id,expectedId);
+    assert.equal(body.caseState.visitSupport.taxi.status,'prepared');
+    assert.equal(body.caseState.visitSupport.taxi.wheelchairConfirmed,false);
+    assert.equal(body.caseState.visitSupport.taxi.eligibilityConfirmed,false);
+    assert.ok(body.events.some(item => item.label === '선호 택시 적용 조건 확인' && item.status === 'needs_input'));
+  }
+});
+
+test('선호 설정의 알 수 없는 항목·ID·권한·적용 플래그는 모델 호출 전에 거절한다',async () => {
+  const defaults = {taxiProviderId:'auto',wheelchair:false,companionNeeded:true};
+  const provider = scripted([]),service = createAgentService({provider});
+  for (const extra of [
+    {preferences:{...defaults,taxiProviderId:'taxi327-999'}},
+    {preferences:{...defaults,taxiProviderId:'care254-1'}},
+    {preferences:{...defaults,wheelchair:'true'}},
+    {preferences:{...defaults,share:true}},
+    {preferences:null},{preferences:{}},{preferences:defaults,applyPreferences:'true'},{applyPreferences:true},
+  ]) {
+    const result = await post(service,req(extra));
+    assert.equal(result.statusCode,400);
+    assert.equal(json(result).error.code,'INVALID_PREFERENCES');
+  }
+  assert.equal(provider.calls.length,0);
 });
 
 test('마감시간을 지키지 않는 provider도 timeout으로 중단하고 원문을 남기지 않는다',async () => {

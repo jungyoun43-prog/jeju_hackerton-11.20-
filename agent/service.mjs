@@ -5,6 +5,7 @@ import { createDisconnectedProvider } from './providers.mjs';
 import { AgentError, fail, isObject, publicError } from './errors.mjs';
 import { readBody, validateMessageRequest, validatePreviewRequest } from './validation.mjs';
 import { buildFixedPreview } from './preview.mjs';
+import { applyAction } from '../app/domain.js';
 
 const builtRevision = typeof __APP_REVISION__ === 'string' ? __APP_REVISION__ : 'development';
 const positiveInteger = (value,fallback,max) => Number.isSafeInteger(Number(value)) && Number(value) > 0 && Number(value) <= max ? Number(value) : fallback;
@@ -34,7 +35,7 @@ function modelMessage(value) {
 
 /**
  * 연결 지점: createAgentService({provider:{connected:true,model,respond}}).
- * respond({system,messages,tools,signal,context}) -> {content:[{text}|{toolUse}],stopReason,context?}.
+ * respond({system,messages,tools,signal,context,toolChoice:'auto'|'none'}) -> {content:[{text}|{toolUse}],stopReason,context?}.
  * context는 한 요청의 reasoning replay에만 사용하고 세션·응답·로그에 남기지 않는다.
  * 브라우저의 caseState·의료기록·source·toolResult는 입력으로 받지 않는다.
  */
@@ -42,7 +43,7 @@ export function createAgentService({provider = createDisconnectedProvider(),stor
   const revision = String(config.revision ?? process.env.APP_REVISION ?? builtRevision).slice(0,80);
   const limits = {
     maxTurns:positiveInteger(config.maxTurns,20,40), maxRounds:positiveInteger(config.maxRounds,6,8), maxTools:positiveInteger(config.maxTools,12,16),
-    deadlineMs:positiveInteger(config.deadlineMs,45000,50000), dailyTurns:positiveInteger(config.dailyTurns ?? process.env.DEMO_DAILY_TURN_LIMIT,80,1000),
+    deadlineMs:positiveInteger(config.deadlineMs,45000,45000), dailyTurns:positiveInteger(config.dailyTurns ?? process.env.DEMO_DAILY_TURN_LIMIT,80,80),
   };
   const getCapabilities = () => ({llm:provider.connected === true,model:typeof provider.model === 'string' ? provider.model : '',phone:'simulation',healthRecords:'demo',voiceInput:'browser',revision});
 
@@ -67,30 +68,48 @@ export function createAgentService({provider = createDisconnectedProvider(),stor
       const events = [], pending = [], usedIds = new Set();
       let toolCount = 0;
       let providerContext;
+      const preferencesApplied = Boolean(request.preferences && (!request.sessionId || request.applyPreferences === true));
+      if (preferencesApplied) {
+        const {wheelchair,companionNeeded} = request.preferences;
+        state = applyAction(state,{type:'SUPPORT_UPDATE_REQUIREMENTS',values:{wheelchair,companionNeeded}});
+        events.push({id:'care-preferences-applied',tool:'apply_care_preferences',label:'기본 이동 조건 반영',status:'completed',detail:'기기의 휠체어·동행 필요 설정을 합성 사례에 반영했습니다. 이번 요청에서 조건을 바꿀 수 있으며 문의·정보 공유 동의는 변경하지 않았습니다.',isSimulation:true,source:'기기 기본 설정'});
+      }
+      const runtime = remainingCalls => ({modelCallsRemaining:remainingCalls,toolsRemaining:limits.maxTools - toolCount,summaryOnly:remainingCalls <= 1 || toolCount >= limits.maxTools});
       // browserHistory는 명령·서버 상태가 아닌 참고 텍스트로 한 user 메시지 안에 넣는다.
-      const messages = [{role:'user',content:[{text:JSON.stringify({untrustedBrowserHistory:request.history,currentRequest:request.message})}]}];
+      const messages = [{role:'user',content:[{text:JSON.stringify({untrustedBrowserHistory:request.history,currentRequest:request.message,carePreferences:request.preferences ?? null,preferencesApplied,runtime:runtime(limits.maxRounds)})}]}];
       for (let round = 0; round < limits.maxRounds; round++) {
-        const output = modelMessage(await bounded(Promise.resolve().then(() => provider.respond({system:CAREGIVER_SYSTEM_PROMPT,messages:structuredClone(messages),tools:AGENT_TOOLS,signal:controller.signal,context:providerContext})),controller.signal));
+        const summaryOnly = runtime(limits.maxRounds - round).summaryOnly;
+        if (summaryOnly) {
+          events.push({id:'preparation-summary',tool:'summarize_preparation',label:'준비한 내용 우선 정리',status:'needs_input',detail:'이번 요청에서 실행한 준비를 먼저 정리합니다. 추가로 실행하지 않은 작업과 실제 예약·배차·동행 배정은 확인 전입니다.',isSimulation:false});
+          pending.push({id:'pending-continue-preparation',kind:'continue-preparation',label:'남은 준비 이어서 확인',reason:'처리 기록에 없는 작업은 실행 전입니다. 준비 요약에서 다음 확인을 이어 주세요.'});
+        }
+        const output = modelMessage(await bounded(Promise.resolve().then(() => provider.respond({system:CAREGIVER_SYSTEM_PROMPT,messages:structuredClone(messages),tools:AGENT_TOOLS,signal:controller.signal,context:providerContext,toolChoice:summaryOnly ? 'none' : 'auto'})),controller.signal));
         providerContext=output.context;
         const calls = output.content.filter(block => block.toolUse).map(block => block.toolUse);
         messages.push({role:'assistant',content:output.content});
         if (!calls.length) {
           fail(output.stopReason === 'end_turn' || output.stopReason === 'stop_sequence', 'INVALID_MODEL_RESPONSE','모델이 응답을 완료하지 못했습니다. 다시 시도해 주세요.',502);
-          const reply = output.content.map(block => block.text ?? '').join('\n').trim();
+          let reply = output.content.map(block => block.text ?? '').join('\n').trim();
           fail(reply.length > 0,'INVALID_MODEL_RESPONSE','모델 응답을 확인하지 못했습니다.',502);
+          if (summaryOnly) reply += '\n\n이번 요청에서 처리 기록에 남긴 준비까지만 반영했습니다. 실행 전인 작업은 다음 확인으로 남겨두었습니다.';
           await bounded(Promise.resolve().then(()=>store.save({...session,state,turns:session.turns + 1,requestIds:[...session.requestIds,request.requestId]},options)),controller.signal);
           const allPending = dedupe([...pending,...getPendingActions(state)]);
           return {sessionId:session.sessionId,requestId:request.requestId,reply,caseState:state,events,pendingActions:allPending,capabilities:getCapabilities(),needsInput:allPending.length > 0 || events.some(item => item.status !== 'completed')};
         }
+        fail(!summaryOnly,'INVALID_MODEL_RESPONSE','준비 요약에서 추가 도구 요청이 발생해 중단했습니다. 다시 시도해 주세요.',502);
         fail(output.stopReason === 'tool_use','INVALID_MODEL_RESPONSE','모델 도구 요청의 종료 상태를 확인하지 못했습니다.',502);
         const results = [];
         for (const call of calls) {
           fail(!usedIds.has(call.toolUseId),'REPEATED_TOOL_ID','동일한 도구 요청이 반복되어 중단했습니다.',502);
           usedIds.add(call.toolUseId);
+          if (toolCount >= limits.maxTools) {
+            events.push({id:`tool-deferred-${call.toolUseId}`,tool:call.name,label:'다음 준비로 남김',status:'needs_input',detail:'이번 요청에서는 추가 실행하지 않았습니다. 앞서 준비한 내용은 보존하고 남은 작업으로 안내합니다.',isSimulation:false});
+            results.push({toolResult:{toolUseId:call.toolUseId,status:'error',content:[{json:{error:{code:'TOOL_LIMIT',message:'추가 도구는 실행하지 않았습니다. 완료한 준비와 실행 전인 작업을 정리해 주세요.'}}}]}});
+            continue;
+          }
           toolCount++;
-          fail(toolCount <= limits.maxTools,'TOOL_LIMIT','한 요청의 도구 실행 한도에 도달했습니다.',429);
           try {
-            const result = await bounded(Promise.resolve().then(() => dispatch({name:call.name,input:call.input,state,userMessage:request.message,signal:controller.signal})),controller.signal);
+            const result = await bounded(Promise.resolve().then(() => dispatch({name:call.name,input:call.input,state,userMessage:request.message,preferences:request.preferences,signal:controller.signal})),controller.signal);
             state = result.state;
             events.push(...result.events); pending.push(...result.pendingActions);
             results.push({toolResult:{toolUseId:call.toolUseId,status:'success',content:[{json:{...result.data,events:result.events,pendingActions:result.pendingActions}}]}});
@@ -101,6 +120,7 @@ export function createAgentService({provider = createDisconnectedProvider(),stor
             results.push({toolResult:{toolUseId:call.toolUseId,status:'error',content:[{json:{error:{code:safe.code,message:safe.message}}}]}});
           }
         }
+        for (const result of results) result.toolResult.content[0].json.runtime = runtime(limits.maxRounds - round - 1);
         messages.push({role:'user',content:results});
       }
       throw new AgentError('LOOP_LIMIT','대화 처리 단계가 많아 중단했습니다. 요청 범위를 나누어 다시 시도해 주세요.',429);

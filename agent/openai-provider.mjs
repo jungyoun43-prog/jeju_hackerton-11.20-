@@ -157,12 +157,13 @@ export function createOpenAIProvider({apiKey,model = 'gpt-6.1-sol',reasoningEffo
   const contexts = new WeakMap();
   return {
     get connected() { return available; }, model,
-    async respond({system,messages,tools,signal,context} = {}) {
+    async respond({system,messages,tools,signal,context,toolChoice = 'auto'} = {}) {
       if (!available) throw disconnected();
       let timer;
       const deadline = new AbortController();
       try {
         if (typeof system !== 'string' || system.length > 20000) throw configurationError();
+        if (!['auto','none'].includes(toolChoice)) throw configurationError();
         validateMessages(messages);
         const validatedTools = validateTools(tools);
         let previous;
@@ -171,7 +172,8 @@ export function createOpenAIProvider({apiKey,model = 'gpt-6.1-sol',reasoningEffo
           if (previous.systemHash !== digest(system) || previous.toolsHash !== digest(validatedTools.mapped)) throw contextError();
         }
         const input = previous ? [...previous.input,...continuationInput(messages,previous)] : initialInput(messages);
-        const body = serialize({model,instructions:system,input,tools:validatedTools.mapped,reasoning:{effort:reasoningEffort},max_output_tokens:maxOutputTokens,store:false,include:['reasoning.encrypted_content'],parallel_tool_calls:true});
+        // 정의를 유지한 tool_choice:none은 기존 toolsHash·reasoning replay를 보존한다.
+        const body = serialize({model,instructions:system,input,tools:validatedTools.mapped,tool_choice:toolChoice,reasoning:{effort:reasoningEffort},max_output_tokens:maxOutputTokens,store:false,include:['reasoning.encrypted_content'],parallel_tool_calls:true});
         timer = setTimeout(() => deadline.abort(),timeoutMs);
         const combined = AbortSignal.any([deadline.signal,...(signal ? [signal] : [])]);
         if (combined.aborted) throw timeoutError();
@@ -182,6 +184,7 @@ export function createOpenAIProvider({apiKey,model = 'gpt-6.1-sol',reasoningEffo
         if (response.status < 200 || response.status >= 300) { cancelBody(response); throw new AgentError('MODEL_UNAVAILABLE','모델 API 응답을 받지 못했습니다. 잠시 후 다시 시도해 주세요.',503); }
         const raw = await readBoundedJson(response,combined);
         const normalized = normalizeOutput(raw,validatedTools.names,previous?.callIds ?? new Map());
+        if (toolChoice === 'none' && normalized.pendingIds.size) throw invalid();
         const nextContext = Object.freeze({cursor:messages.length + 1});
         const nextInput = [...input,...raw.output];
         serialize(nextInput);

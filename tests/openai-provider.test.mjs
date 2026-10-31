@@ -37,6 +37,7 @@ test('기본 Sol Responses 설정은 선택 모델·키를 사용하고 자동 �
   assert.equal(options.headers.authorization,`Bearer ${FAKE_KEY}`); assert.equal(options.headers['content-type'],'application/json');
   assert.equal(options.redirect,'error'); assert.equal(options.credentials,'omit'); assert.equal(options.cache,'no-store');
   assert.equal(body.model,'gpt-6.1-sol'); assert.equal(body.store,false); assert.equal(body.parallel_tool_calls,true);
+  assert.equal(body.tool_choice,'auto');
   assert.equal(body.max_output_tokens,4096); assert.deepEqual(body.reasoning,{effort:'low'});
   assert.deepEqual(body.include,['reasoning.encrypted_content']); assert.equal(Object.hasOwn(body,'temperature'),false);
   assert.equal(Object.hasOwn(body,'previous_response_id'),false); assert.equal(Object.hasOwn(body,'conversation'),false);
@@ -97,6 +98,32 @@ test('3번째 round에도 모든 reasoning과 원래 call_id를 유지하며 정
   assert.deepEqual(replay.slice(1,3),items1); assert.deepEqual(replay.slice(4,6),items2);
   assert.equal(replay.at(-1).call_id,'second-call');
   assert.equal(replay.filter(item => item.type === 'reasoning').length,2);
+});
+
+test('마지막 tool_choice:none은 같은 도구 정의와 encrypted reasoning·결과 replay를 유지한다',async () => {
+  const items = [reasoningItem(),functionItem()];
+  const {provider,calls} = scripted([jsonResponse(completed(items)),textResponse('확인한 합성 준비만 정리합니다. 실제 예약은 하지 않았습니다.')]);
+  const first = await provider.respond(request());
+  const final = await provider.respond(request({messages:appendResults(request().messages,first),context:first.context,toolChoice:'none'}));
+  assert.equal(final.stopReason,'end_turn');
+  assert.equal(calls[1].body.tool_choice,'none');
+  assert.deepEqual(calls[1].body.tools,calls[0].body.tools);
+  assert.deepEqual(calls[1].body.input.slice(1,3),items);
+  assert.equal(calls[1].body.input.at(-1).type,'function_call_output');
+  assert.equal(calls[1].body.input.at(-1).call_id,'call_fixture');
+  assert.equal(JSON.stringify(final).includes('PRIVATE_FIXTURE'),false);
+});
+
+test('도구 없는 새 요청도 처리하고 금지된 최종 tool call·잘못된 toolChoice는 거절한다',async () => {
+  const plain = scripted([textResponse('합성 준비 요약')]);
+  await plain.provider.respond(request({tools:[],toolChoice:'none'}));
+  assert.deepEqual(plain.calls[0].body.tools,[]);
+  assert.equal(plain.calls[0].body.tool_choice,'none');
+  const forbidden = scripted([jsonResponse(completed([functionItem()]))]);
+  await assert.rejects(forbidden.provider.respond(request({toolChoice:'none'})),safeCode('INVALID_MODEL_RESPONSE'));
+  const invalid = scripted([]);
+  await assert.rejects(invalid.provider.respond(request({toolChoice:'required'})),safeCode('MODEL_CONFIGURATION_INVALID'));
+  assert.equal(invalid.calls.length,0);
 });
 
 test('provider 전역에 대화 상태를 재사용하지 않고 새 turn에는 새 input만 보낸다',async () => {

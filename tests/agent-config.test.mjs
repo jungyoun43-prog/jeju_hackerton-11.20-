@@ -75,6 +75,50 @@ test('실제 서비스 loop가 Responses tool call과 reasoning을 이어주고 
   assert.equal(JSON.stringify(requests[2].input).includes(reasoning),false);
 });
 
+test('8개 정상 순차 준비 계획도 8번째 호출을 도구 없는 요약으로 예약해 완료한 상태를 보존한다',async()=>{
+  const plan = [
+    ['get_case',{}],['update_visit',{appointmentTime:'10:00'}],
+    ['search_hospital_contacts',{name:'제주우리병원'}],['select_hospital_contact',{hospitalId:'hospital-4'}],
+    ['request_records',{source:'demo'}],['prepare_inquiries',{kind:'taxi'}],
+    ['prepare_inquiries',{kind:'companion'}],['request_support_contact',{kind:'taxi'}],
+  ];
+  const requests = [],store = createMemorySessionStore(),reasoning = 'fixture-private-bounded-reasoning';
+  const service = createRuntimeAgent({env:{OPENAI_API_KEY:apiKey},store,fetchImpl:async(_url,options) => {
+    const body = JSON.parse(options.body); requests.push(body);
+    assert.equal(body.store,false);
+    if (body.tool_choice === 'none') {
+      assert.equal(requests.length,8);
+      assert.equal(body.input.filter(item => item.type === 'function_call_output').length,7);
+      const last = JSON.parse(body.input.at(-1).output).content[0].json;
+      assert.equal(last.runtime.summaryOnly,true);
+      assert.equal(last.runtime.modelCallsRemaining,1);
+      assert.ok(JSON.stringify(body.input).includes(reasoning));
+      return Response.json(textResponse('합성 자료와 택시·동행 문의 초안을 준비했습니다. 전화 문의 시연과 실제 예약·배차는 진행하지 않았습니다.'));
+    }
+    const [name,input] = plan[requests.length - 1];
+    return Response.json({status:'completed',output:[
+      {id:`rs_${requests.length}`,type:'reasoning',summary:[],encrypted_content:reasoning},
+      {id:`fc_${requests.length}`,type:'function_call',call_id:`bounded_${requests.length}`,name,arguments:JSON.stringify(input),status:'completed'},
+    ]});
+  }});
+  const result = await post(service,{message:'제주우리병원 진료 자료와 택시·동행 준비를 부탁해요.',requestId}),body = JSON.parse(result.body);
+  assert.equal(result.statusCode,200);
+  assert.equal(requests.length,8);
+  assert.equal(body.caseState.selectedHospital.companyName,'제주우리병원');
+  assert.equal(body.caseState.documents.find(item => item.id === 'report').status,'ready');
+  assert.equal(body.caseState.visitSupport.taxi.status,'prepared');
+  assert.equal(body.caseState.visitSupport.companion.status,'prepared');
+  assert.equal(body.events.filter(item => item.status === 'completed').length,7);
+  assert.equal(body.events.some(item => item.tool === 'request_support_contact'),false);
+  assert.ok(body.pendingActions.some(item => item.kind === 'continue-preparation'));
+  assert.match(body.reply,/실행 전인 작업/);
+  assert.equal(body.needsInput,true);
+  assert.equal(store.inspect()[0].turns,1);
+  assert.deepEqual(store.inspect()[0].requestIds,[requestId]);
+  assert.equal(JSON.stringify(store.inspect()).includes(reasoning),false);
+  assert.equal(result.body.includes(reasoning),false);
+});
+
 test('Node env-file 부팅에서 키 한 줄만으로 API가 구성되고 실제 네트워크 없이 응답한다',async t=>{
   const directory=await mkdtemp(resolve(tmpdir(),'jeju-env-entry-'));
   t.after(()=>rm(directory,{recursive:true,force:true}));
