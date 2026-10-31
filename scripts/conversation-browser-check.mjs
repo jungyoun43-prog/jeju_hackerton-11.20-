@@ -9,6 +9,7 @@ import { getVisitSupportSummary } from '../app/visit-support.js';
 import supportData from '../app/data/visit-support-providers.json' with {type:'json'};
 
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
+const servedRoot=process.env.QA_SERVED_SOURCE_ROOT?resolve(process.env.QA_SERVED_SOURCE_ROOT):root;
 const require=createRequire(import.meta.url);
 let chromium;
 try {({chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright'));}
@@ -16,7 +17,7 @@ catch {throw new Error('선택 QA 도구 Playwright가 필요합니다. README�
 const base=new URL(process.env.BASE_URL||'http://127.0.0.1:4173');
 // 이 검사는 실제 503/고정 preview와 주입 응답을 함께 쓴다. 공개 유료 서버에서는 실행하지 않는다.
 if(!['localhost','127.0.0.1','[::1]'].includes(base.hostname) || !['http:','https:'].includes(base.protocol) || base.username || base.password)throw new Error('BASE_URL은 키를 끈 localhost QA 서버여야 합니다.');
-const directory='.impeccable/review';
+const directory='.impeccable/review/reading/conversation';
 const storageKey='jeju-care-preferences-v1';
 const fixtureSessionId='q'.repeat(43);
 const configuredCaps={llm:true,model:'gpt-6.1-sol',phone:'simulation',healthRecords:'demo',voiceInput:'browser'};
@@ -25,9 +26,8 @@ await mkdir(resolve(root,'orchestration/runs'),{recursive:true});
 const browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH||undefined,args:['--no-sandbox','--disable-dev-shm-usage']});
 const checks=[],errors=[];
 const record=(name,ok,detail='')=>{checks.push({name,status:ok?'pass':'fail',detail});console.log(`${ok?'PASS':'FAIL'} ${name}${detail?' · '+detail:''}`);};
-const proof={result:'fail',checkedAt:new Date().toISOString(),url:base.href,sourceHash:await runtimeFingerprint(root),checks,errors,apiLive:false,modelInvoked:false,phoneInvoked:false,healthRecordsQueried:false,microphone:'permission-denied, transcript-review and delayed-abort fixtures only',fixedPreview:false,normalInputDisconnected:false,desktop:{width:1440,noOverflow:false},mobile:{width:390,noOverflow:false},fixtureCoverage:{preferences:false,markdown:false,recovery:false,voiceReview:false,voiceCancellation:false,exampleDrafts:false,cancellation:false,contactPlan:false,shortViewport:false},shortViewport:[],sourceHashScope:'invoking checkout; rerun after integration when server source differs'};
+const proof={result:'fail',checkedAt:new Date().toISOString(),url:base.href,sourceHash:await runtimeFingerprint(servedRoot),invokingSourceHash:await runtimeFingerprint(root),checks,errors,apiLive:false,modelInvoked:false,phoneInvoked:false,healthRecordsQueried:false,microphone:'permission-denied, transcript-review and delayed-abort fixtures only',fixedPreview:false,normalInputDisconnected:false,desktop:{width:1440,noOverflow:false},mobile:{width:390,noOverflow:false},fixtureCoverage:{preferences:false,markdown:false,recovery:false,voiceReview:false,voiceCancellation:false,exampleDrafts:false,cancellation:false,contactPlan:false,shortViewport:false},shortViewport:[],runtimeAssets:[],sourceHashScope:process.env.QA_SERVED_SOURCE_ROOT?'explicit QA_SERVED_SOURCE_ROOT; served UI assets compared below':'invoking checkout; served UI assets compared below'};
 const overflow=page=>page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth);
-const visibleInViewport=locator=>locator.evaluate(node=>{const r=node.getBoundingClientRect(),s=getComputedStyle(node);return s.display!=='none' && s.visibility!=='hidden' && r.width>0 && r.height>0 && r.top>=0 && r.bottom<=innerHeight;});
 const json=request=>JSON.parse(request.postData());
 const hashMatches=request=>request.headers()['x-amz-content-sha256']===createHash('sha256').update(request.postDataBuffer()).digest('hex');
 const snapshotStorage=page=>page.evaluate(()=>Object.fromEntries(Object.entries(localStorage)));
@@ -80,8 +80,7 @@ async function open(width,height,{configured=false,voice,storageSeed,onPost}={})
   return {page,context,requests,networkRequests};
 }
 async function readPlan(page) {
-  const navigation=page.locator('#stage-navigation');
-  if(await navigation.isVisible())await navigation.locator('[data-open-stage="plan"]').click();
+  await page.locator('[data-stage-id="plan"] #conversation-scroll').waitFor({state:'visible'});
 }
 async function openVisitSummary(page) {
   for(const id of ['visit-summary','case-summary']) {
@@ -124,7 +123,7 @@ function fixtureResponse(request,state,reply='합성 준비 상태를 확인했�
 }
 async function disclosure(page) {
   const node=page.locator('#composer-disclosure');
-  return await visibleInViewport(node) && /가상/.test(await node.innerText()) && /실제.*(?:연락|발신).*예약/.test(await node.innerText());
+  return (await reachable(node)).reachable && /가상/.test(await node.innerText()) && /실제.*(?:연락|발신).*예약/.test(await node.innerText());
 }
 async function backgroundLoaded(page) {
   return page.evaluate(async()=>{
@@ -241,15 +240,22 @@ try {
   record('API 응답 캐시 금지',capResponse.headers.get('cache-control')==='no-store');
   if(!keyless)throw new Error('실제 모델이 연결됐거나 keyless 상태를 확인하지 못해 POST 검사를 중단합니다.');
   proof.apiLive=true;
+  for(const path of ['conversation.js','conversation.css','preparation-board-view.js','preparation-stages.js']) {
+    const response=await fetch(new URL('/'+path,base),{redirect:'error',signal:AbortSignal.timeout(8000)});
+    const expected=await readFile(resolve(servedRoot,'app',path));
+    const hash=value=>createHash('sha256').update(value).digest('hex');
+    proof.runtimeAssets.push({path,matching:response.status===200 && hash(await response.text())===hash(expected),sourceHash:hash(expected)});
+  }
+  record('실제 제공 UI 자산은 명시한 runtime source와 동일',proof.runtimeAssets.every(item=>item.matching));
   for(const [width,height,label] of [[1440,900,'desktop'],[390,844,'mobile']])await scenario(`${width}px 실제 API 시나리오`,async()=>{
     const {page,context,requests,networkRequests}=await open(width,height);
     try {
       proof[label].noOverflow=await overflow(page);
       proof[label].screenshot=await screenshot(page,`initial-${label}`);
-      record(`${width}px 가로 넘침과 첫 화면 입력`,proof[label].noOverflow && await visibleInViewport(page.locator('#request-input')) && await visibleInViewport(page.locator('#send-request')));
+      record(`${width}px 가로 넘침과 문서 흐름의 입력 접근`,proof[label].noOverflow && (await reachable(page.locator('#request-input'))).reachable && (await reachable(page.locator('#send-request'))).reachable);
       const stageNames=await page.locator('#stage-navigation').textContent();
-      record(`${width}px 네 작업창과 병원·자료·이동·동행 읽기 요약`,await page.locator('#preparation-board [data-stage-id]').count()===4 && await page.locator('[data-case-status]').count()===4 && ['자료','병원','이동'].every(term=>stageNames.includes(term)));
-      record(`${width}px 로고·자가 호스팅 한국어 폰트·제주 배경, 인물사진 비노출`,await page.locator('.brand img').first().evaluate(e=>e.complete && e.naturalWidth>0) && await backgroundLoaded(page) && await page.locator('.welcome-photo').count()===0 && await page.evaluate(()=>['Pretendard','MaruBuri'].every(name=>[...document.fonts].some(font=>font.family.replaceAll('"','')===name && font.status==='loaded'))));
+      record(`${width}px 상시 답변 본문과 병원·자료·이동·동행 읽기 요약`,await page.locator('#preparation-board [data-stage-id]').count()===4 && await page.locator('#stage-navigation [data-open-stage]').count()===3 && await page.locator('[data-stage-id="plan"]').isVisible() && await page.locator('#preparation-details').evaluate(node=>node instanceof HTMLDetailsElement && !node.open) && await page.locator('[data-case-status]').count()===4 && ['자료','병원','이동'].every(term=>stageNames.includes(term)));
+      record(`${width}px 로고·자가 호스팅 Pretendard·제주 배경, 인물사진 비노출`,await page.locator('.brand img').first().evaluate(e=>e.complete && e.naturalWidth>0) && await backgroundLoaded(page) && await page.locator('.welcome-photo').count()===0 && await page.evaluate(()=>getComputedStyle(document.body).fontFamily.includes('Pretendard') && [...document.fonts].some(font=>font.family.replaceAll('"','')==='Pretendard' && font.status==='loaded')));
       record(`${width}px 설정은 선택이며 준비 대화에 필수 수동 폼 없음`,await page.locator('#conversation-form select,#conversation-form input[type=checkbox]').count()===0 && await page.locator('#preferences-form [required]').count()===0 && await page.locator('#preferences-form select').count()===1);
       record(`${width}px 입력 가까이 실제 연락·예약 한계 표시`,await disclosure(page));
       const input=page.locator('#request-input');
@@ -303,7 +309,7 @@ try {
       record(`${width}px 실제 공개 주소 지도 링크`,await mapLink.count()===1 && new URL(await mapLink.getAttribute('href')).searchParams.get('query').includes(payload.caseState.selectedHospital.address));
       await screenshot(page,`preview-${label}`);
       await readPlan(page);
-      await page.locator('#conversation-scroll').evaluate(e=>e.scrollTop=e.scrollHeight);await screenshot(page,`tools-${label}`);
+      await page.locator('.tool-records').scrollIntoViewIfNeeded();await screenshot(page,`tools-${label}`);
       const downloadPromise=page.waitForEvent('download');await page.locator('#save-report').click();
       const download=await downloadPromise,report=await readFile(await download.path(),'utf8');
       record(`${width}px 보고서 시연·데이터 출처`,download.suggestedFilename().endsWith('.md') && /고정 시나리오/.test(report) && ['859','327','애월콜'].every(term=>report.includes(term)));
@@ -358,7 +364,7 @@ try {
       const answer=page.locator('.message.assistant:not(.greeting) .message-body').last();
       record(`${width}px Markdown 제목·목록·강조와 안전한 링크 표시`,await answer.locator('h3').count()===1 && await answer.locator('ul ul').count()===1 && await answer.locator('strong').count()>0 && !(await answer.innerText()).includes('# 준비한 내용') && !(await answer.innerText()).includes('**택시') && await answer.locator('a').evaluateAll(links=>links.length===1 && links.every(a=>a.protocol==='https:' && a.target==='_blank' && a.rel.includes('noopener'))));
       record(`${width}px 모델 HTML·javascript 링크는 실행하지 않음`,await answer.locator('img,script,iframe,a[href^="javascript:"]').count()===0 && await page.evaluate(()=>window.__qaXss===undefined));
-      record(`${width}px 새 답변은 처음부터 읽고 도구 기록은 접어 둠`,await answer.locator('h3').evaluate(node=>{const a=node.getBoundingClientRect(),b=document.querySelector('#conversation-scroll').getBoundingClientRect();return a.top>=b.top && a.bottom<=b.bottom;}) && await page.locator('.tool-records').evaluateAll(nodes=>nodes.every(node=>!node.open)));
+      record(`${width}px 새 답변의 시작은 문서에 표시하고 도구 기록은 접어 둠`,(await reachable(answer.locator('h3'))).reachable && await page.locator('#conversation-scroll').evaluate(node=>getComputedStyle(node).overflowY==='visible' && node.scrollHeight<=node.clientHeight+2) && await page.locator('.tool-records').evaluateAll(nodes=>nodes.every(node=>!node.open)));
       const summary=getVisitSupportSummary(state);
       await openVisitSummary(page);
       record(`${width}px fixture caseState와 방문 요약의 실제 상태 일치`,(await page.locator('[data-case-status="택시 이동"]').innerText()).includes(summary.taxi.label) && (await page.locator('[data-case-status="택시 이동"]').innerText()).includes(summary.taxi.providerName) && (await page.locator('[data-case-status="병원 동행"]').innerText()).includes(summary.companion.label));
@@ -423,7 +429,7 @@ try {
   for(const [width,height] of [[360,780],[390,844],[768,1024]])await scenario(`${width}px 모바일 설정`,async()=>{
     const {page,context,requests}=await open(width,height);
     try {
-      record(`${width}px 추가 반응형 가로 넘침·입력·실제 처리 한계`,await overflow(page) && await visibleInViewport(page.locator('#send-request')) && await disclosure(page));
+      record(`${width}px 추가 반응형 가로 넘침·문서 입력·실제 처리 한계`,await overflow(page) && (await reachable(page.locator('#send-request'))).reachable && await disclosure(page));
       await page.locator('#open-care-menu').focus();await page.keyboard.press('Enter');
       record(`${width}px 설정 서랍은 이름·focus·배경 비활성 제공`,await page.locator('#care-rail').getAttribute('role')==='dialog' && await page.locator('#care-rail').getAttribute('aria-modal')==='true' && await page.evaluate(()=>document.activeElement.id==='close-care-menu' && document.querySelector('#workspace-shell').inert));
       const targets=page.locator('#open-care-menu,#close-care-menu,#pref-taxi,.preference-toggle,#nav-preparation,#nav-preferences');
@@ -515,8 +521,8 @@ try {
     const controls=['#request-input','#send-request','#composer-disclosure','.privacy-note'];
     try {
       await readPlan(page);
-      const initial=await accessSet(page,controls),conversation=await page.locator('#conversation-scroll').evaluate(node=>({height:node.clientHeight,scrollable:/auto|scroll/.test(getComputedStyle(node).overflowY) || getComputedStyle(node).overflowY==='visible' && document.scrollingElement.scrollHeight>innerHeight}));
-      record(`${width}x500 첫 화면은 아래 fold와 실제 clip을 구분해 입력·고지 접근`,await overflow(page) && Object.values(initial).every(value=>value.reachable) && conversation.height>=80 && conversation.scrollable,JSON.stringify(initial));
+      const initial=await accessSet(page,controls),conversation=await page.locator('#conversation-scroll').evaluate(node=>({height:node.clientHeight,documentFlow:getComputedStyle(node).overflowY==='visible' && node.scrollHeight<=node.clientHeight+2 && document.scrollingElement.scrollHeight>innerHeight}));
+      record(`${width}x500 첫 화면은 문서 스크롤로 입력·고지 접근`,await overflow(page) && Object.values(initial).every(value=>value.reachable) && conversation.documentFlow,JSON.stringify(initial));
       const input=page.locator('#request-input'),multiline=Array.from({length:12},(_,index)=>`${index+1}번째 요청 내용: 진료 자료와 이동을 확인해 주세요.`).join('\n');
       await input.fill(multiline);await input.press('Control+End');
       const multiple=await accessSet(page,controls),textarea=await input.evaluate(node=>({lines:node.value.split('\n').length,lastLine:node.scrollTop+node.clientHeight>=node.scrollHeight-3,scrollable:/auto|scroll/.test(getComputedStyle(node).overflowY)}));
@@ -524,7 +530,7 @@ try {
       await send(page,multiline);
       const answer='.message.assistant:not(.greeting) .message-body';
       const longAnswer=await accessSet(page,[`${answer} h3`,`${answer} p:last-child`,...controls]);
-      record(`${width}x500 긴 답변은 시작과 마지막까지 읽고 다시 입력 가능`,requests.length===1 && Object.values(longAnswer).every(value=>value.reachable) && await overflow(page),JSON.stringify(longAnswer));
+      record(`${width}x500 긴 답변은 문서로 시작과 마지막까지 읽고 다시 입력 가능`,requests.length===1 && Object.values(longAnswer).every(value=>value.reachable) && await page.locator('#conversation-scroll').evaluate(node=>getComputedStyle(node).overflowY==='visible' && node.scrollHeight<=node.clientHeight+2 && node.scrollTop===0) && await overflow(page),JSON.stringify(longAnswer));
       const before=await page.locator(answer).last().evaluate(node=>parseFloat(getComputedStyle(node).fontSize));
       // CSS zoom은 화면 전체를 축소·확대하므로 쓰지 않고 실제 텍스트의 계산 크기를 2배로 바꾼다.
       await page.evaluate(()=>{
@@ -623,6 +629,8 @@ try {
       proof.fixtureCoverage.contactPlan=true;
     } finally {await context.close();}
   });
+  proof.finalSourceHash=await runtimeFingerprint(servedRoot);
+  record('검사 중 runtime source 변경 없음',proof.finalSourceHash===proof.sourceHash);
   record('브라우저 실행 오류 없음',errors.length===0,errors.join('; '));
   if(checks.every(c=>c.status==='pass') && errors.length===0)proof.result='pass';
 } catch(error) {errors.push(error.message);record('대화 브라우저 시나리오 완료',false,error.message);}

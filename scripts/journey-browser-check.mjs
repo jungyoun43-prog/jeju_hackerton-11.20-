@@ -1,14 +1,15 @@
 import { createRequire } from 'node:module';
 import { createHash } from 'node:crypto';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile, readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runtimeFingerprint } from '../orchestration/checks.mjs';
 
 // 실제 localhost keyless preview만 검사한다. 일반 요청·공급자 응답 fixture는 쓰지 않는다.
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
+const servedRoot=process.env.QA_SERVED_SOURCE_ROOT?resolve(process.env.QA_SERVED_SOURCE_ROOT):root;
 const require=createRequire(import.meta.url);
-const directory='.impeccable/review/journey';
+const directory='.impeccable/review/reading/journey';
 const scenarioIds=['missing_record','jeju_unavailable','time_changed'];
 const recoveryScenarioIds=['call_no_answer','call_ai_declined','call_identity_required','call_documents_or_schedule'];
 const allowedScenarioIds=[...scenarioIds,...recoveryScenarioIds];
@@ -20,7 +21,7 @@ const proof={
   desktop:{width:1440,noOverflow:false,screenshot:null},mobile:{width:390,noOverflow:false,screenshot:null},
   scenarios:[],recoveryScenarios:[],recoveryCoverage:{desktop:false,mobile:false},screenshots:[],shortViewport:[],
   scope:{localhostKeylessOnly:true,fixtures:false,modelInvoked:false,phone:false,externalRecords:false,normalAgentPostAttempts:0,previewRequests:0,retryGate:'고정 preview 상태·표시만 확인하며 시간/횟수 초과 gate는 별도 단위 검사 범위'},
-  sourceHashScope:'invoking checkout; rerun after integration when server source differs',
+  runtimeAssets:[],sourceHashScope:process.env.QA_SERVED_SOURCE_ROOT?'explicit QA_SERVED_SOURCE_ROOT; served UI assets compared below':'invoking checkout; served UI assets compared below',
 };
 let base,browser;
 const normalized=value=>String(value??'').replace(/\s+/g,' ').trim();
@@ -137,8 +138,7 @@ async function clickWithConfirm(page,locator,accept) {
 }
 
 async function readPlan(page) {
-  const navigation=page.locator('#stage-navigation');
-  if(await navigation.isVisible())await navigation.locator('[data-open-stage="plan"]').click();
+  await page.locator('[data-stage-id="plan"] #conversation-scroll').waitFor({state:'visible'});
 }
 
 async function runPreview(page,button,id,posts,prefix) {
@@ -155,7 +155,7 @@ async function runPreview(page,button,id,posts,prefix) {
   if(!actual)throw new Error('실제 preview 응답 계약이 맞지 않습니다.');
   await readPlan(page);
   const answer=page.locator('[data-stage-id="plan"] #conversation-scroll .message.assistant:not(.greeting)').last();
-  record(`${prefix} 미리보기 답변은 네 번째 작업창에서 읽음`,await answer.isVisible() && includes(await answer.innerText(),data.reply));
+  record(`${prefix} 미리보기 답변은 상시 본문에서 문서 스크롤로 읽음`,await answer.isVisible() && includes(await answer.innerText(),data.reply) && await page.locator('#conversation-scroll').evaluate(node=>!node.closest('#preparation-details') && getComputedStyle(node).overflowY==='visible' && node.scrollHeight<=node.clientHeight+2));
   const summary=await page.evaluate(async state=>(await import('/care-journey.js')).getCareJourneySummary(state),data.caseState);
   return {preview,data,summary};
 }
@@ -385,7 +385,8 @@ async function verifyShortViewport(page,width,prefix) {
 try {
   await mkdir(resolve(root,directory),{recursive:true});
   await mkdir(resolve(root,'orchestration/runs'),{recursive:true});
-  proof.sourceHash=await runtimeFingerprint(root);
+  proof.sourceHash=await runtimeFingerprint(servedRoot);
+  proof.invokingSourceHash=await runtimeFingerprint(root);
   base=new URL(process.env.BASE_URL||'http://127.0.0.1:4173');
   if(!['localhost','127.0.0.1','[::1]'].includes(base.hostname) || !['http:','https:'].includes(base.protocol) || base.username || base.password || base.pathname!=='/' || base.search || base.hash)throw new Error('BASE_URL은 키를 끈 localhost QA 서버의 루트 주소여야 합니다.');
   proof.url=base.href;
@@ -395,6 +396,13 @@ try {
   record('실제 localhost API의 모델 미연결·전화/개인기록 합성 경계',keyless && response.headers.get('cache-control')==='no-store');
   if(!keyless)throw new Error('keyless 상태를 확인하지 못해 preview 검사를 시작하지 않습니다.');
   proof.apiLive=true;
+  for(const path of ['conversation.js','conversation.css','preparation-board-view.js','preparation-stages.js']) {
+    const response=await fetch(new URL('/'+path,base),{redirect:'error',signal:AbortSignal.timeout(8000)});
+    const expected=await readFile(resolve(servedRoot,'app',path));
+    const hash=value=>createHash('sha256').update(value).digest('hex');
+    proof.runtimeAssets.push({path,matching:response.status===200 && hash(await response.text())===hash(expected),sourceHash:hash(expected)});
+  }
+  record('실제 제공 UI 자산은 명시한 runtime source와 동일',proof.runtimeAssets.every(item=>item.matching));
   const moduleResponse=await fetch(new URL('/care-journey.js',base),{redirect:'error',signal:AbortSignal.timeout(8000)});
   const moduleReady=moduleResponse.status===200 && /(?:text|application)\/javascript/.test(moduleResponse.headers.get('content-type')??'');
   record('진료연결 공유 요약 모듈을 실제 서버에서 제공',moduleReady,`HTTP ${moduleResponse.status}`);
@@ -466,6 +474,8 @@ try {
   record('추가 복구 preview4개를 PC·모바일에서 모두 완료',proof.recoveryScenarios.length===8 && Object.values(proof.recoveryCoverage).every(Boolean));
   const expectedRequests=viewports.length*allowedScenarioIds.length;
   record(`전체 일반 POST /api/agent 시도0·preview${expectedRequests}건만 허용`,proof.scope.normalAgentPostAttempts===0 && allPosts.length===expectedRequests && allPosts.every(post=>post.method==='POST' && post.path==='/api/agent/preview'));
+  proof.finalSourceHash=await runtimeFingerprint(servedRoot);
+  record('검사 중 runtime source 변경 없음',proof.finalSourceHash===proof.sourceHash);
   record('브라우저 실행 오류 없음',errors.length===0,errors.join('; '));
   if(checks.every(check=>check.status==='pass') && errors.length===0)proof.result='pass';
 } catch(error) {
