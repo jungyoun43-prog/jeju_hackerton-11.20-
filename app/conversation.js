@@ -203,7 +203,7 @@ function journeyEvidenceMarkup(items=[]) {
 }
 
 function callHandoffsMarkup(handoffs=[]) {
-  const reasonLabels={no_answer:'무응답',unreachable:'연결되지 않음',ai_declined:'AI 응대 거절',identity_required:'환자 본인 확인 필요',missing_documents:'필요 서류 부족',no_slots:'요청 일정 예약 불가',not_participating:'이번 요청 접수 미참여',answered:'응답 확인 · 합성'};
+  const reasonLabels={no_answer:'무응답',unreachable:'연결되지 않음',ai_declined:'AI 응대 거절',identity_required:'환자 본인 확인 필요',recipient_changed:'문의처 변경 · 새 범위 확인',missing_documents:'필요 서류 부족',no_slots:'요청 일정 예약 불가',not_participating:'이번 요청 접수 미참여',answered:'응답 확인 · 합성'};
   const statusLabels={policy_required:'재시도 정책 미설정',retry_allowed:'허용 범위 내 합성 재시도 가능',retry_exhausted:'허용 횟수 도달 · 인계 필요',retry_expired:'허용 시간 종료 · 인계 필요',handed_off:'자동 반복 문의 중단 · 사람 인계',blocked:'선행 작업 필요 · 문의 중단',waiting_user:'보호자 허용 범위 확인',followup_required:'이전 실패 후 남은 일 확인'};
   const list=items=>`<ul class="journey-list">${items.map(item=>`<li>${escape(item)}</li>`).join('')}</ul>`;
   return handoffs.map(item=>{
