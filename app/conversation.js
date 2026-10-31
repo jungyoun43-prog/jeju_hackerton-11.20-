@@ -5,14 +5,13 @@ import { DEFAULT_CARE_PREFERENCES, normalizeCarePreferences, getTaxiPreferenceOp
 import { formatMessage } from './message-format.js';
 import { buildCallPlan, CALL_TARGETS } from './call-policy.js';
 import { getCareJourneySummary, JOURNEY_SCENARIOS, CALL_RECOVERY_SCENARIOS } from './care-journey.js';
-import { PREPARATION_STAGE_IDS, getPreparationBoard } from './preparation-stages.js';
+import { PREPARATION_STAGE_IDS, getPreparationBoard, normalizePreparationProgress } from './preparation-stages.js';
 import { preparationBoardMarkup, renderPreparationBoard } from './preparation-board-view.js';
 
 const API = '/api/agent';
 const MAX_MESSAGE = 1600;
 const MAX_HISTORY = 8;
 const MAX_HISTORY_TEXT = 2000;
-const PROGRESS_TOOLS=new Set(['apply_care_preferences','get_case','update_visit','request_records','search_hospital_contacts','select_hospital_contact','request_hospital_contact','find_support','prepare_inquiries','request_support_contact','update_call_retry_policy','prepare_review','get_care_journey','build_report','summarize_preparation','search_public_data','analyze_public_data','run_journey_demo','run_call_recovery_demo']);
 const PREFERENCES_STORAGE_KEY = 'jeju-care-preferences-v1';
 const mobileRail = window.matchMedia('(max-width:1050px)');
 const mobileBoard = window.matchMedia('(max-width:900px)');
@@ -615,21 +614,6 @@ function makeProgressToken() {
   return btoa(String.fromCharCode(...bytes)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
 }
 
-function normalizeProgress(value) {
-  const stageStatuses=['waiting','running','observed','needs_input','failed'];
-  const eventStatuses=['started','completed','needs_input','failed'];
-  const toolAllowed=tool=>tool===null || PROGRESS_TOOLS.has(tool);
-  const keys=(item,names)=>item && typeof item==='object' && !Array.isArray(item) && Object.keys(item).length===names.length && names.every(name=>Object.hasOwn(item,name));
-  if(!keys(value,['version','status','sequence','updatedAt','currentStage','stages','events']) || value.version!==1 || !['running','completed','failed'].includes(value.status) || !Number.isSafeInteger(value.sequence) || value.sequence<0 || value.sequence>128 || typeof value.updatedAt!=='string' || value.updatedAt.length>40 || !Number.isFinite(Date.parse(value.updatedAt)) || ![null,...PREPARATION_STAGE_IDS].includes(value.currentStage) || !Array.isArray(value.stages) || value.stages.length!==4 || new Set(value.stages.map(stage=>stage?.id)).size!==4 || !Array.isArray(value.events) || value.events.length>32)return null;
-  if(value.stages.some(stage=>!keys(stage,['id','status','lastTool']) || !PREPARATION_STAGE_IDS.includes(stage.id) || !stageStatuses.includes(stage.status) || !toolAllowed(stage.lastTool)))return null;
-  let sequence=-1;
-  for(const event of value.events) {
-    if(!keys(event,['sequence','stage','tool','status']) || !Number.isSafeInteger(event.sequence) || event.sequence<=sequence || event.sequence>value.sequence || !PREPARATION_STAGE_IDS.includes(event.stage) || !eventStatuses.includes(event.status) || !toolAllowed(event.tool))return null;
-    sequence=event.sequence;
-  }
-  return {version:1,status:value.status,sequence:value.sequence,updatedAt:value.updatedAt,currentStage:value.currentStage,stages:value.stages.map(stage=>({id:stage.id,status:stage.status,lastTool:stage.lastTool})),events:value.events.map(event=>({sequence:event.sequence,stage:event.stage,tool:event.tool,status:event.status}))};
-}
-
 function stopProgress(request) {
   if(!request)return;
   request.progressStopped=true;clearTimeout(request.progressTimer);
@@ -656,7 +640,7 @@ function startProgress(request) {
       const raw=await response.json();
       if(!current())return;
       if(raw?.available===true) {
-        const progress=normalizeProgress(raw.progress);
+        const progress=normalizePreparationProgress(raw.progress);
         if(!progress)throw new Error('PROGRESS_UNAVAILABLE');
         if(!request.progress || progress.sequence>request.progress.sequence) {
           request.progress=progress;renderBoard();
@@ -794,11 +778,13 @@ function startVoice() {
   const recognition=new SpeechRecognition();activeRecognition=recognition;
   recognition.lang='ko-KR';recognition.interimResults=true;recognition.continuous=false;recognition.maxAlternatives=1;
   recognition.onstart=()=>{
+    if(activeRecognition!==recognition || recognitionCancelled)return;
     const button=document.getElementById('voice-request');button.classList.add('listening');button.setAttribute('aria-pressed','true');button.setAttribute('aria-label','음성 입력 중지');button.innerHTML=stopIcon+'<span>듣기 중지</span>';
     voiceMessage('듣고 있어요. 말이 끝나면 내용을 확인하고 보내 주세요.');
     resizeInput();
   };
   recognition.onresult=event=>{
+    if(activeRecognition!==recognition || recognitionCancelled)return;
     let interim='';
     for(let index=event.resultIndex;index<event.results.length;index++) {
       const transcript=event.results[index][0]?.transcript || '';
@@ -807,11 +793,12 @@ function startVoice() {
     const value=[voiceBase,finalTranscript,interim].filter(Boolean).join(' ').slice(0,MAX_MESSAGE);
     document.getElementById('request-input').value=value;resizeInput();
   };
-  recognition.onspeechend=()=>recognition.stop();
+  recognition.onspeechend=()=>{if(activeRecognition===recognition && !recognitionCancelled)recognition.stop();};
   recognition.onerror=event=>{
+    if(activeRecognition!==recognition || recognitionCancelled)return;
     recognitionFailed=true;
     const errors={'not-allowed':'마이크 권한이 허용되지 않았어요. 텍스트로 요청할 수 있습니다.','service-not-allowed':'이 브라우저에서 음성 서비스를 사용할 수 없어요. 텍스트로 요청해 주세요.','no-speech':'음성을 인식하지 못했어요. 다시 말하거나 텍스트로 요청해 주세요.','audio-capture':'마이크를 찾지 못했어요. 기기 설정을 확인하거나 텍스트로 요청해 주세요.',network:'음성 인식에 연결하지 못했어요. 텍스트로 요청해 주세요.','language-not-supported':'한국어 음성 인식을 사용할 수 없어요. 텍스트로 요청해 주세요.'};
-    if(!recognitionCancelled)voiceMessage(errors[event.error] || '음성 입력을 마치지 못했어요. 텍스트로 요청할 수 있습니다.',true);
+    voiceMessage(errors[event.error] || '음성 입력을 마치지 못했어요. 텍스트로 요청할 수 있습니다.',true);
   };
   recognition.onend=()=>{
     if(activeRecognition!==recognition)return;

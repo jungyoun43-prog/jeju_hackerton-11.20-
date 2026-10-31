@@ -25,7 +25,7 @@ await mkdir(resolve(root,'orchestration/runs'),{recursive:true});
 const browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH||undefined,args:['--no-sandbox','--disable-dev-shm-usage']});
 const checks=[],errors=[];
 const record=(name,ok,detail='')=>{checks.push({name,status:ok?'pass':'fail',detail});console.log(`${ok?'PASS':'FAIL'} ${name}${detail?' · '+detail:''}`);};
-const proof={result:'fail',checkedAt:new Date().toISOString(),url:base.href,sourceHash:await runtimeFingerprint(root),checks,errors,apiLive:false,modelInvoked:false,phoneInvoked:false,healthRecordsQueried:false,microphone:'permission-denied and transcript-review fixtures only',fixedPreview:false,normalInputDisconnected:false,desktop:{width:1440,noOverflow:false},mobile:{width:390,noOverflow:false},fixtureCoverage:{preferences:false,markdown:false,recovery:false,voiceReview:false,exampleDrafts:false,cancellation:false,contactPlan:false,shortViewport:false},shortViewport:[],sourceHashScope:'invoking checkout; rerun after integration when server source differs'};
+const proof={result:'fail',checkedAt:new Date().toISOString(),url:base.href,sourceHash:await runtimeFingerprint(root),checks,errors,apiLive:false,modelInvoked:false,phoneInvoked:false,healthRecordsQueried:false,microphone:'permission-denied, transcript-review and delayed-abort fixtures only',fixedPreview:false,normalInputDisconnected:false,desktop:{width:1440,noOverflow:false},mobile:{width:390,noOverflow:false},fixtureCoverage:{preferences:false,markdown:false,recovery:false,voiceReview:false,voiceCancellation:false,exampleDrafts:false,cancellation:false,contactPlan:false,shortViewport:false},shortViewport:[],sourceHashScope:'invoking checkout; rerun after integration when server source differs'};
 const overflow=page=>page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth);
 const visibleInViewport=locator=>locator.evaluate(node=>{const r=node.getBoundingClientRect(),s=getComputedStyle(node);return s.display!=='none' && s.visibility!=='hidden' && r.width>0 && r.height>0 && r.top>=0 && r.bottom<=innerHeight;});
 const json=request=>JSON.parse(request.postData());
@@ -57,13 +57,14 @@ async function open(width,height,{configured=false,voice,storageSeed,onPost}={})
   if(storageSeed!==undefined)await page.addInitScript(({key,value})=>localStorage.setItem(key,value),{key:storageKey,value:storageSeed});
   if(voice)await page.addInitScript(mode=>{
     window.SpeechRecognition=class {
+      constructor(){this.stopCalls=0;if(mode==='delayed')(window.__qaSpeech ||= []).push(this);}
       start(){
         this.onstart?.();
         if(mode==='denied')queueMicrotask(()=>{this.onerror?.({error:'not-allowed'});this.onend?.();});
         else window.__qaFinishSpeech=()=>{const result=[{transcript:'11월 12일 어머니 이동을 준비해 주세요.'}];result.isFinal=true;this.onresult?.({resultIndex:0,results:[result]});this.onend?.();};
       }
-      stop(){this.onend?.();}
-      abort(){this.onend?.();}
+      stop(){this.stopCalls++;this.onend?.();}
+      abort(){if(mode!=='delayed')this.onend?.();}
     };
   },voice);
   if(configured)await page.route('**/api/agent/capabilities',route=>route.fulfill({json:configured===true?configuredCaps:configured}));
@@ -449,6 +450,41 @@ try {
       record('음성 인식 fixture는 검토 가능한 초안으로 남고 자동 전송하지 않음',requests.length===0 && /확인|고친/.test(await page.locator('#voice-help').textContent()) && await page.locator('#send-request').isEnabled());
       await send(page,'11월 20일 어머니 이동을 준비해 주세요.');
       record('인식 내용을 수정한 뒤 보내야 요청됨',requests.length===1 && json(requests[0]).message==='11월 20일 어머니 이동을 준비해 주세요.' && hashMatches(requests[0]),'실제 음성 서비스·모델 호출 아님');proof.fixtureCoverage.voiceReview=true;
+    } finally {await context.close();}
+  });
+  await scenario('음성 취소·새 대화 뒤 늦은 이벤트 fixture',async()=>{
+    const {page,context,requests}=await open(390,844,{voice:'delayed',configured:true,onPost:request=>({body:fixtureResponse(request,createDemoCase())})});
+    try {
+      const input=page.locator('#request-input'),voice=page.locator('#voice-request');
+      const original='취소할 음성의 기존 초안',draft='새 대화에서 직접 작성한 초안';
+      await input.fill(original);await voice.click();await voice.click();
+      const cancelledHelp=await page.locator('#voice-help').textContent();
+      await page.evaluate(()=>new Promise(resolve=>setTimeout(()=>{
+        const old=window.__qaSpeech[0],result=[{transcript:'취소한 음성의 늦은 결과'}];result.isFinal=true;
+        old.onstart?.();old.onresult?.({resultIndex:0,results:[result]});old.onerror?.({error:'network'});old.onspeechend?.();old.onend?.();resolve();
+      },0)));
+      record('음성 대기 중지는 늦은 start·result·error·speechend에도 기존 초안·중지 안내 유지',await input.inputValue()===original && await page.locator('#voice-help').textContent()===cancelledHelp && await voice.getAttribute('aria-pressed')==='false' && await page.evaluate(()=>window.__qaSpeech[0].stopCalls===0) && requests.length===0,'지연 abort 브라우저 fixture · 실제 마이크 서비스 아님');
+      await voice.click();
+      const reset=await confirmAction(page,'#new-conversation');
+      await input.fill(draft);
+      const resetHelp=await page.locator('#voice-help').textContent();
+      await page.evaluate(()=>new Promise(resolve=>setTimeout(()=>{
+        const old=window.__qaSpeech[1],result=[{transcript:'새 대화 이전의 늦은 전사'}];result.isFinal=true;
+        old.onstart?.();old.onresult?.({resultIndex:0,results:[result]});resolve();
+      },0)));
+      record('새 대화 뒤 옛 음성 start·result는 새 초안·버튼·전송 가능 상태를 바꾸지 않음',reset.confirmed && await input.inputValue()===draft && await page.locator('#voice-help').textContent()===resetHelp && await voice.getAttribute('aria-pressed')==='false' && await page.locator('#send-request').isEnabled() && requests.length===0);
+      await voice.click();
+      const activeHelp=await page.locator('#voice-help').textContent();
+      await page.evaluate(()=>new Promise(resolve=>setTimeout(()=>{
+        const old=window.__qaSpeech[1];old.onerror?.({error:'network'});old.onspeechend?.();old.onend?.();resolve();
+      },0)));
+      record('새 음성 시작 뒤 옛 error·speechend·end는 현재 음성을 끝내거나 실패로 바꾸지 않음',await input.inputValue()===draft && await voice.getAttribute('aria-pressed')==='true' && await page.locator('#send-request').isDisabled() && await page.locator('#voice-help').textContent()===activeHelp && await page.evaluate(()=>window.__qaSpeech[1].stopCalls===0) && requests.length===0);
+      await page.evaluate(()=>window.__qaFinishSpeech());
+      const reviewed=draft+' 11월 12일 어머니 이동을 준비해 주세요.';
+      record('늦은 오류 뒤에도 현재 음성은 새 초안에만 이어지고 검토 후 전송 가능',await input.inputValue()===reviewed && await page.locator('#send-request').isEnabled() && /확인|고친/.test(await page.locator('#voice-help').textContent()) && requests.length===0);
+      await send(page,reviewed);
+      record('취소·새 대화 뒤 음성 fixture는 확인한 새 요청 한 건만 전송',requests.length===1 && json(requests[0]).message===reviewed && hashMatches(requests[0]),'실제 음성 서비스·모델 호출 아님');
+      proof.fixtureCoverage.voiceCancellation=true;
     } finally {await context.close();}
   });
   for(const [width,height] of [[1440,900],[390,844]])await scenario(`${width}px 예시 초안 fixture`,async()=>{
