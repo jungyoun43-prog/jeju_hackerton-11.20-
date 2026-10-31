@@ -298,6 +298,21 @@
       "integrationCommits": [
         "0eac1f7"
       ]
+    },
+    "board-ui": {
+      "phase": "assigned",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-board-ui",
+      "note": "네 작업창 계약에 따른 분리 구현. 실제 진행·합성 전화·임상/예약 경계를 보존하고 root가 통합한다."
+    },
+    "board-progress": {
+      "phase": "assigned",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-board-progress",
+      "note": "네 작업창 계약에 따른 분리 구현. 실제 진행·합성 전화·임상/예약 경계를 보존하고 root가 통합한다."
+    },
+    "board-qa": {
+      "phase": "assigned",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-board-qa",
+      "note": "네 작업창 계약에 따른 분리 구현. 실제 진행·합성 전화·임상/예약 경계를 보존하고 root가 통합한다."
     }
   },
   "review": {
