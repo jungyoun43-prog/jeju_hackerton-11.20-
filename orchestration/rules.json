@@ -343,6 +343,50 @@
       "allow": [
         "scripts/conversation-browser-check.mjs"
       ]
+    },
+    {
+      "id": "journey-backend",
+      "branch": "feature/care-journey",
+      "baseCommit": "b40b34b",
+      "allow": [
+        "app/care-journey.js",
+        "app/domain.js",
+        "app/visit-support.js",
+        "app/call-policy.js",
+        "agent/tools.mjs",
+        "agent/preview.mjs",
+        "agent/service.mjs",
+        "agent/validation.mjs",
+        "agent/store.mjs",
+        "agent/dynamodb-store.mjs",
+        "prompts/caregiver-system.mjs",
+        "tests/care-journey.test.mjs",
+        "tests/domain.test.mjs",
+        "tests/visit-support.test.mjs",
+        "tests/call-policy.test.mjs",
+        "tests/agent.test.mjs",
+        "tests/server.test.mjs",
+        "tests/dynamodb-store.test.mjs"
+      ]
+    },
+    {
+      "id": "journey-ui",
+      "branch": "feature/care-journey-ui",
+      "baseCommit": "b40b34b",
+      "allow": [
+        "app/conversation.js",
+        "app/conversation.css",
+        "DESIGN.md",
+        ".impeccable/design.json"
+      ]
+    },
+    {
+      "id": "journey-qa",
+      "branch": "test/care-journey-browser",
+      "baseCommit": "b40b34b",
+      "allow": [
+        "scripts/journey-browser-check.mjs"
+      ]
     }
   ],
   "rules": [
