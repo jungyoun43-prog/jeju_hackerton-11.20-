@@ -69,6 +69,17 @@ await check('public-data-boundary','provenance',async()=>{
  requireThat(candidates.records.every(row=>row.source?.isSynthetic===false && row.source?.scope==='public-preview' && row.inquiryStatus==='unverified'),'실제 등록 사실과 미확인 수용 상태를 보존해야 합니다.');
  return '실제 공개 미리보기20행 집계·등록후보13곳·출처·현재 수용 미확인 범위 확인';
 });
+await check('visit-support-data-boundary','provenance',async()=>{
+ const {validateSupportRegistry,getSupportCandidates}=await import('../app/support-data.js');
+ const registry=validateSupportRegistry(JSON.parse(await readFile(resolve(root,'app/data/visit-support-providers.json'),'utf8')));
+ requireThat(registry.datasets.find(d=>d.id==='327')?.rowCount===34,'최신 연결 원출처의 콜택시34행이 필요합니다.');
+ requireThat(registry.datasets.find(d=>d.id==='327')?.asOf==='2026-03-19','택시2020미리보기를2026자료로 표시하지 않습니다.');
+ requireThat(registry.datasets.find(d=>d.id==='254')?.rowCount===19,'과거 돌봄 등록 문의처19행을 구분합니다.');
+ requireThat(getSupportCandidates(registry,{kind:'taxi',area:'제주시 애월읍'})[0]?.name==='애월콜','출발 지역이 실제 후보를 바꿔야 합니다.');
+ requireThat(getSupportCandidates(registry,{kind:'taxi',area:'제주시 애월읍',wheelchair:true})[0]?.serviceType==='accessible_transport','휠체어 요청은 별도 차량·자격 문의 경로로 이어져야 합니다.');
+ requireThat(registry.providers.filter(p=>p.source.scope==='official-service-page').length===2,'공식 서비스2건을 허브 자료와 구분합니다.');
+ return '허브계보3종·택시최신34/돌봄과거19/공식보완2·지역/휠체어 분기 확인 (실제 배차·동행 가능 확인 아님)';
+});
 await check('secret-pattern-scan','privacy',async()=>{
  const findings=await scanProject(root);
  requireThat(findings.length===0,`민감정보 패턴 감지 파일: ${findings.join(', ')}`);

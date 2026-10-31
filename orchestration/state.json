@@ -1,6 +1,6 @@
 {
   "baseCommit": "e1e7e44",
-  "updatedAt": "2026-10-31T11:49:51.331338+00:00",
+  "updatedAt": "2026-10-31T12:01:49.234241+00:00",
   "tasks": {
     "ui": {
       "phase": "verified",
@@ -67,13 +67,13 @@
       "note": "데이터 기능 통합; 사용자가 시각 결과를 거부해 editorial-ui에서 대체"
     },
     "editorial-ui": {
-      "phase": "verified",
+      "phase": "superseded",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-editorial-ui",
       "integrationCommits": [
         "8ccba6d",
         "c2c572e"
       ],
-      "note": "인물 이미지 제거·생성 로고·본문 크기/대비 수정, 공개 사이트 브라우저33개·최신7개 캡처 독립 ship 검토 완료"
+      "note": "해당 버전 기능/캡처 검증은 완료했으나 사용자가 메인 정보밀도 부족을 지적해 visit-ui에서 대체"
     },
     "docs-sync": {
       "phase": "verified",
@@ -82,18 +82,34 @@
         "88286ea"
       ],
       "note": "README·PRD v0.4·사용법·실제 공개 후보13개·데이터시점·폰트/로고 명세 동기화"
+    },
+    "visit-ui": {
+      "phase": "in_progress",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-visit-ui",
+      "integrationCommits": [],
+      "note": "이번 방문·병원·자료·택시·동행 상태가 첫 화면에서 읽히도록 압축"
+    },
+    "visit-workflow": {
+      "phase": "in_progress",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-visit-workflow",
+      "integrationCommits": [],
+      "note": "문의 초안→합성 응답→조건 변경 재확인, 지역·휠체어·자격 미확인 게이트"
+    },
+    "visit-docs": {
+      "phase": "in_progress",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-visit-docs",
+      "integrationCommits": [],
+      "note": "허브계보3종과 공식보완2건·진료1건 지원과 반복 예산의 차이를 명세"
     }
   },
   "review": {
-    "phase": "ship",
-    "role": "새 시각 결과의 독립 검토",
+    "phase": "pending",
+    "role": "방문 준비·이동·동행 통합과 메인 시각 검토",
     "findings": [
-      "사용자 요청으로 의사 일러스트 제거",
-      "작은 글씨와 낮은 보조 글자 대비",
-      "과거 업로드 선행 조건 안내",
-      "선택 기관 캡처의 스크롤 아티팩트"
+      "메인에서 준비 상태가 한눈에 보이지 않음",
+      "현재 한 종 병원 목록 조회의 데이터 활용이 얕음"
     ],
-    "resolution": "의사 이미지 제거·크기/대비·공개 후보 안내·긴 기관명 캡처 수정 resolved. 최신7개 캡처와 동일 실행 지문을 전체 검토해 UI 범위 ship. 별도 문서 대조도 완료."
+    "resolution": "새 기능·메인 첫 화면을 독립 검토하고 이전 UI ship을 재사용하지 않는다."
   },
   "awsDeployment": {
     "phase": "verified",

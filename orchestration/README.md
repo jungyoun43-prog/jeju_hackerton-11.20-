@@ -3,7 +3,7 @@
 ## 규칙
 
 1. UI·Workflow·문서를 각각 별도 Git worktree와 브랜치에서 작업한다.
-2. 파일 소유권과 공통 인터페이스는 [초기 계약](../docs/implementation-contract.md)과 [현재 재설계 계약](../docs/editorial-ui-contract.md), 기계 판정 대상은 [rules.json](rules.json)을 따른다.
+2. 파일 소유권과 공통 인터페이스는 [초기 계약](../docs/implementation-contract.md), [시각 체계 계약](../docs/editorial-ui-contract.md), [현재 방문 지원 계약](../docs/visit-support-contract.md), 기계 판정 대상은 [rules.json](rules.json)을 따른다.
 3. 각 담당자는 다른 작업자의 파일을 수정하지 않는다. 의존성 변경·인터페이스 변경은 통합 담당자에게 먼저 알린다.
 4. 외부 조사에는 insane-search를 사용하고 URL·확인일을 남긴다. 시연과 실제 운영 상태를 구분한다.
 5. 완료 시 변경 파일·검사 명령·결과·미완료 항목을 전달하고 자기 브랜치에 커밋한다. 통합 담당자는 커밋 단위로 반영한다.

@@ -113,6 +113,48 @@
         "docs/implementation-results.md",
         "docs/data-sources.md"
       ]
+    },
+    {
+      "id": "visit-ui",
+      "branch": "feature/visit-dashboard",
+      "baseCommit": "ea8f33b",
+      "allow": [
+        "app/app.js",
+        "app/styles.css",
+        "app/index.html",
+        "app/icons.js",
+        "app/map.js",
+        "DESIGN.md",
+        ".impeccable/design.json"
+      ]
+    },
+    {
+      "id": "visit-workflow",
+      "branch": "feature/visit-support-workflow",
+      "baseCommit": "ea8f33b",
+      "allow": [
+        "app/visit-support.js",
+        "app/domain.js",
+        "tests/visit-support.test.mjs",
+        "tests/domain.test.mjs"
+      ]
+    },
+    {
+      "id": "visit-docs",
+      "branch": "docs/visit-support",
+      "baseCommit": "84df1ac",
+      "allow": [
+        "README.md",
+        "AGENTS.md",
+        "PRODUCT.md",
+        "THIRD_PARTY.md",
+        "docs/prd.md",
+        "docs/agent-pipeline.md",
+        "docs/data-sources.md",
+        "docs/user-manual.md",
+        "docs/implementation-results.md",
+        "docs/submission-checklist.md"
+      ]
     }
   ],
   "rules": [
