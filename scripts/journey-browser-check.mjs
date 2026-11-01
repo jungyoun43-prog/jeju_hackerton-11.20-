@@ -9,7 +9,7 @@ import { runtimeFingerprint } from '../orchestration/checks.mjs';
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const servedRoot=process.env.QA_SERVED_SOURCE_ROOT?resolve(process.env.QA_SERVED_SOURCE_ROOT):root;
 const require=createRequire(import.meta.url);
-const directory='.impeccable/review/chat-rail/journey';
+const directory='.impeccable/review/chat-rail/guided-visit/journey';
 const scenarioIds=['missing_record','jeju_unavailable','time_changed'];
 const recoveryScenarioIds=['call_no_answer','call_ai_declined','call_identity_required','call_documents_or_schedule'];
 const allowedScenarioIds=[...scenarioIds,...recoveryScenarioIds];
@@ -45,13 +45,17 @@ async function showView(page,view) {
   if(await tab.isVisible() && await tab.getAttribute('aria-selected')!=='true')await tab.click();
 }
 async function reveal(locator) {
-  const page=locator.page(),view=await locator.evaluate(node=>node.closest('#preparation-rail')?'preparation':node.closest('#chat-workspace')?'chat':null);
+  const page=locator.page(),{view,stage}=await locator.evaluate(node=>({view:node.closest('#preparation-rail')?'preparation':node.closest('#chat-workspace')?'chat':null,stage:node.closest('#preparation-board>[data-stage-id]')?.dataset.stageId}));
   const target=await locator.elementHandle();
   if(!await page.locator('dialog[open]').count())for(const id of ['request-examples','composer-help']) {
     const popup=page.locator('#'+id);
     if(await popup.evaluate((node,target)=>node.open && !node.contains(target),target))await popup.locator(':scope>summary').click();
   }
-  if(view)await showView(page,view);
+  if(stage && await locator.evaluate(node=>node.closest('[data-stage-id]').hidden)) {
+    await showView(page,'preparation');
+    await page.locator('#stage-navigation>button[data-open-stage="'+stage+'"]').click();
+    await showView(page,'chat');
+  } else if(view)await showView(page,view);
   for(const details of await locator.locator('xpath=ancestor::details').all())if(!await details.evaluate((node,target)=>node.open || node.querySelector(':scope>summary')?.contains(target),target))await details.locator(':scope>summary').click();
 }
 async function workspaceEvidence(page) {
@@ -59,8 +63,8 @@ async function workspaceEvidence(page) {
     const chat=document.getElementById('chat-workspace'),rail=document.getElementById('preparation-rail'),input=document.getElementById('request-input'),form=document.getElementById('conversation-form'),composer=document.getElementById('chat-composer'),compact=matchMedia('(max-width:900px), (max-height:650px)').matches,layout=document.querySelector('.conversation-layout');
     const bounds=node=>{const r=node.getBoundingClientRect();return {top:r.top,bottom:r.bottom,left:r.left,right:r.right,width:r.width,height:r.height};},inside=node=>{const r=bounds(node);return r.width>0 && r.height>0 && r.top>=-1 && r.bottom<=innerHeight+1 && r.left>=-1 && r.right<=innerWidth+1;};
     const regions=[document.getElementById('conversation-scroll'),rail].map(node=>({id:node.id,...bounds(node),clientHeight:node.clientHeight,scrollHeight:node.scrollHeight,scrollTop:node.scrollTop,overflowY:getComputedStyle(node).overflowY,fontSize:parseFloat(getComputedStyle(node.querySelector('.message-body')||node).fontSize),active:!node.closest('[hidden],[inert]')}));
-    const cards=[...document.querySelectorAll('#preparation-board>[data-stage-id]')],tabs=[...document.querySelectorAll('[role="tab"][id^="workspace-tab-"]')],active=layout.dataset.activeView==='preparation'?rail:chat,inactive=active===chat?rail:chat;
-    return {viewportFit:document.documentElement.scrollWidth<=innerWidth+1 && document.documentElement.scrollHeight<=innerHeight+1 && document.body.scrollHeight<=innerHeight+1 && scrollY===0 && inside(document.querySelector('.app-shell')),sharedComposer:document.querySelectorAll('#request-input,#conversation-form,#chat-composer').length===3 && composer.contains(form) && form.contains(input) && !composer.closest('[hidden],[inert]') && [input,document.getElementById('send-request')].every(inside),scrollRegions:regions.every(region=>/auto|scroll/.test(region.overflowY) && (!region.active || region.clientHeight>=Math.max(44,region.fontSize*1.2))) && cards.length===4 && cards.every(node=>! /auto|scroll|hidden|clip/.test(getComputedStyle(node).overflowY) && node.scrollHeight<=node.clientHeight+2),compactPanels:compact?chat.getAttribute('role')==='tabpanel' && rail.getAttribute('role')==='tabpanel' && tabs.length===2 && tabs.every(node=>node.getAttribute('aria-controls')===(node.id==='workspace-tab-chat'?'chat-workspace':'preparation-rail')) && tabs.filter(node=>node.getAttribute('aria-selected')==='true').length===1 && active.hidden===false && !active.inert && inactive.hidden && inactive.inert && !inactive.contains(document.activeElement) && tabs.every(node=>node.tabIndex===(node.getAttribute('aria-selected')==='true'?0:-1)):!chat.hidden && !rail.hidden && !chat.inert && !rail.inert,regions,compact,activeView:layout.dataset.activeView,composer:bounds(composer),body:{width:document.documentElement.scrollWidth,height:document.documentElement.scrollHeight}};
+    const cards=[...document.querySelectorAll('#preparation-board>[data-stage-id]')],selected=cards.filter(node=>!node.hidden&&!node.inert),navigation=[...document.querySelectorAll('#stage-navigation>button[data-open-stage]')],tabs=[...document.querySelectorAll('[role="tab"][id^="workspace-tab-"]')],active=layout.dataset.activeView==='preparation'?rail:chat,inactive=active===chat?rail:chat;
+    return {viewportFit:document.documentElement.scrollWidth<=innerWidth+1 && document.documentElement.scrollHeight<=innerHeight+1 && document.body.scrollHeight<=innerHeight+1 && scrollY===0 && inside(document.querySelector('.app-shell')),sharedComposer:document.querySelectorAll('#request-input,#conversation-form,#chat-composer').length===3 && composer.contains(form) && form.contains(input) && !composer.closest('[hidden],[inert]') && [input,document.getElementById('send-request')].every(inside),scrollRegions:regions.every(region=>/auto|scroll/.test(region.overflowY) && (!region.active || region.clientHeight>=Math.max(44,region.fontSize*1.2))) && cards.length===4 && selected.length===1 && cards.every(node=>! /auto|scroll|hidden|clip/.test(getComputedStyle(node).overflowY) && (node.hidden?node.inert:node.scrollHeight<=node.clientHeight+2)) && navigation.length===4,compactPanels:compact?chat.getAttribute('role')==='tabpanel' && rail.getAttribute('role')==='tabpanel' && tabs.length===2 && tabs.every(node=>node.getAttribute('aria-controls')===(node.id==='workspace-tab-chat'?'chat-workspace':'preparation-rail')) && tabs.filter(node=>node.getAttribute('aria-selected')==='true').length===1 && active.hidden===false && !active.inert && inactive.hidden && inactive.inert && !inactive.contains(document.activeElement) && tabs.every(node=>node.tabIndex===(node.getAttribute('aria-selected')==='true'?0:-1)):!chat.hidden && !rail.hidden && !chat.inert && !rail.inert,regions,compact,activeView:layout.dataset.activeView,selectedStage:selected[0]?.dataset.stageId,currentStage:document.getElementById('preparation-board').dataset.currentStage,navigationCount:navigation.length,composer:bounds(composer),body:{width:document.documentElement.scrollWidth,height:document.documentElement.scrollHeight}};
   });
 }
 async function scenario(name,run) {
@@ -176,6 +180,8 @@ async function verifyMainContinuation(page,summary,posts,prefix) {
 
 async function readConversation(page) {
   await showView(page,'chat');
+  const history=page.locator('#conversation-history');
+  if(!await history.evaluate(node=>node.open))await history.locator(':scope>summary').click();
   await page.locator('.chat-workspace #conversation-scroll').waitFor({state:'visible'});
 }
 
@@ -193,7 +199,9 @@ async function runPreview(page,button,id,posts,prefix) {
   if(!actual)throw new Error('실제 preview 응답 계약이 맞지 않습니다.');
   await readConversation(page);
   const answer=page.locator('.chat-workspace #conversation-scroll .message.assistant:not(.greeting)');
-  record(`${prefix} 미리보기 전체 답변1개는 중앙 scroller에서 읽고 오른쪽 계획과 분리`,await answer.count()===1 && await answer.isVisible() && includes(await answer.innerText(),data.reply) && await page.locator('#conversation-scroll').evaluate(node=>node.closest('.chat-workspace')!==null && !node.closest('#preparation-board') && /auto|scroll/.test(getComputedStyle(node).overflowY) && node.clientHeight>0) && await page.locator('#preparation-board .message,#preparation-board #message-list').count()===0 && !includes(await page.locator('[data-stage-id="plan"]').innerText(),data.reply));
+  record(`${prefix} 미리보기 원문 답변1개는 중앙 보조 기록에서 읽고 단계 본문과 분리`,await answer.count()===1 && await answer.isVisible() && includes(await answer.innerText(),data.reply) && await page.locator('#conversation-scroll').evaluate(node=>node.closest('.chat-workspace')!==null && !node.closest('#preparation-board') && /auto|scroll/.test(getComputedStyle(node).overflowY) && node.clientHeight>0) && await page.locator('#preparation-board .message,#preparation-board #message-list').count()===0 && !includes(await page.locator('[data-stage-id="plan"]').textContent(),data.reply));
+  const workflow=await page.evaluate(async state=>(await import('/preparation-workflow.js')).getPreparationWorkflow(state),data.caseState);
+  record(`${prefix} 실제 상태의 현재 업무·기관 대기·남은 일과 준비 미완료 보존`,workflow.visitReady===false && await page.locator('#preparation-board').getAttribute('data-current-stage')===workflow.currentStageId && await page.locator('#stage-navigation>button[data-open-stage]').evaluateAll((nodes,stages)=>nodes.length===4 && stages.every(stage=>nodes.some(node=>node.dataset.openStage===stage.id&&node.dataset.workflowStatus===stage.status)),workflow.stages));
   const summary=await page.evaluate(async state=>(await import('/care-journey.js')).getCareJourneySummary(state),data.caseState);
   return {preview,data,summary};
 }
@@ -435,7 +443,7 @@ try {
   record('실제 localhost API의 모델 미연결·전화/개인기록 합성 경계',keyless && response.headers.get('cache-control')==='no-store');
   if(!keyless)throw new Error('keyless 상태를 확인하지 못해 preview 검사를 시작하지 않습니다.');
   proof.apiLive=true;
-  for(const path of ['conversation.js','conversation.css','preparation-board-view.js','preparation-stages.js','icons.js']) {
+  for(const path of ['conversation.js','conversation.css','preparation-board-view.js','preparation-stages.js','preparation-workflow.js','icons.js']) {
     const response=await fetch(new URL('/'+path,base),{redirect:'error',signal:AbortSignal.timeout(8000)});
     const expected=await readFile(resolve(servedRoot,'app',path));
     const hash=value=>createHash('sha256').update(value).digest('hex');

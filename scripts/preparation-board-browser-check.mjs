@@ -4,13 +4,13 @@ import {mkdir,readFile,writeFile} from 'node:fs/promises';
 import {dirname,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {runtimeFingerprint} from '../orchestration/checks.mjs';
-import {createDemoCase} from '../app/domain.js';
+import {createDemoCase,applyAction} from '../app/domain.js';
 
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const servedRoot=process.env.QA_SERVED_SOURCE_ROOT?resolve(process.env.QA_SERVED_SOURCE_ROOT):root;
 const base=new URL(process.env.BASE_URL||'http://127.0.0.1:4173');
 if(!['localhost','127.0.0.1','[::1]'].includes(base.hostname) || !['http:','https:'].includes(base.protocol) || base.username || base.password || base.pathname!=='/' || base.search || base.hash)throw new Error('BASE_URL은 키를 끈 localhost QA 서버의 루트 주소여야 합니다.');
-const directory='.impeccable/review/chat-rail/board',checks=[],errors=[];
+const directory='.impeccable/review/chat-rail/guided-visit/board',checks=[],errors=[];
 const ids=['records','hospitals','support','plan'];
 const viewports=[[1800,1125],[1440,900],[1152,720],[960,600],[720,450],[1060,900],[390,844],[390,500],[320,500],[768,512]];
 const caps={llm:true,model:'gpt-6.1-sol',phone:'simulation',healthRecords:'demo',voiceInput:'browser',progress:'poll'};
@@ -19,7 +19,7 @@ const proof={
   result:'fail',checkedAt:new Date().toISOString(),url:base.href,sourceHash:await runtimeFingerprint(servedRoot),
   apiLive:false,modelInvoked:false,phoneInvoked:false,healthRecordsQueried:false,apiProgress:{unregistered:null,invalid:null},
   invokingSourceHash:await runtimeFingerprint(root),sourceHashScope:process.env.QA_SERVED_SOURCE_ROOT?'explicit QA_SERVED_SOURCE_ROOT; served UI assets compared below':'invoking checkout; served UI assets compared below',
-  checks,errors,screenshots:[],viewports:[],runtimeAssets:[],progressScenarios:[],motionScenarios:[],workspaceScenarios:[],viewportScope:'가용 CSS 크기80~200%대응 공간과 텍스트200%; 실제 브라우저 zoom·기기·가상 키보드는 미검증',
+  checks,errors,screenshots:[],viewports:[],runtimeAssets:[],progressScenarios:[],guidedScenarios:[],motionScenarios:[],workspaceScenarios:[],viewportScope:'가용 CSS 크기80~200%대응 공간과 텍스트200%; 실제 브라우저 zoom·기기·가상 키보드는 미검증',
   scope:{localhostKeylessOnly:true,modelInvoked:false,phoneInvoked:false,healthRecordsQueried:false,unmockedNormalPostAttempts:0,blockedPostAttempts:0,actualProgressReads:0,actualPreviewRequests:0,fixtureMainRequests:0,fixtureProgressReads:0,microphone:'not exercised; conversation browser fixtures cover transcript review',progress:'fixed safe DTO/browser fetch fixtures; actual keyless endpoint read only'},
 };
 const hash=value=>createHash('sha256').update(value).digest('hex');
@@ -32,13 +32,17 @@ async function showView(page,view) {
   if(await tab.isVisible() && await tab.getAttribute('aria-selected')!=='true')await tab.click();
 }
 async function reveal(locator) {
-  const page=locator.page(),view=await locator.evaluate(node=>node.closest('#preparation-rail')?'preparation':node.closest('#chat-workspace')?'chat':null);
+  const page=locator.page(),{view,stage}=await locator.evaluate(node=>({view:node.closest('#preparation-rail')?'preparation':node.closest('#chat-workspace')?'chat':null,stage:node.closest('#preparation-board>[data-stage-id]')?.dataset.stageId}));
   const target=await locator.elementHandle();
   if(!await page.locator('dialog[open]').count())for(const id of ['request-examples','composer-help']) {
     const popup=page.locator('#'+id);
     if(await popup.evaluate((node,target)=>node.open && !node.contains(target),target))await popup.locator(':scope>summary').click();
   }
-  if(view)await showView(page,view);
+  if(stage && await locator.evaluate(node=>node.closest('[data-stage-id]').hidden)) {
+    await showView(page,'preparation');
+    await page.locator('#stage-navigation>button[data-open-stage="'+stage+'"]').click();
+    await showView(page,'chat');
+  } else if(view)await showView(page,view);
   for(const details of await locator.locator('xpath=ancestor::details').all())if(!await details.evaluate((node,target)=>node.open || node.querySelector(':scope>summary')?.contains(target),target))await details.locator(':scope>summary').click();
 }
 async function workspaceEvidence(page) {
@@ -46,8 +50,8 @@ async function workspaceEvidence(page) {
     const chat=document.getElementById('chat-workspace'),rail=document.getElementById('preparation-rail'),input=document.getElementById('request-input'),form=document.getElementById('conversation-form'),composer=document.getElementById('chat-composer'),compact=matchMedia('(max-width:900px), (max-height:650px)').matches,layout=document.querySelector('.conversation-layout');
     const bounds=node=>{const r=node.getBoundingClientRect();return {top:r.top,bottom:r.bottom,left:r.left,right:r.right,width:r.width,height:r.height};},inside=node=>{const r=bounds(node);return r.width>0 && r.height>0 && r.top>=-1 && r.bottom<=innerHeight+1 && r.left>=-1 && r.right<=innerWidth+1;};
     const regions=[document.getElementById('conversation-scroll'),rail].map(node=>({id:node.id,...bounds(node),clientHeight:node.clientHeight,scrollHeight:node.scrollHeight,scrollTop:node.scrollTop,overflowY:getComputedStyle(node).overflowY,fontSize:parseFloat(getComputedStyle(node.querySelector('.message-body')||node).fontSize),active:!node.closest('[hidden],[inert]')}));
-    const cards=[...document.querySelectorAll('#preparation-board>[data-stage-id]')],tabs=[...document.querySelectorAll('[role="tab"][id^="workspace-tab-"]')],active=layout.dataset.activeView==='preparation'?rail:chat,inactive=active===chat?rail:chat;
-    return {viewportFit:document.documentElement.scrollWidth<=innerWidth+1 && document.documentElement.scrollHeight<=innerHeight+1 && document.body.scrollHeight<=innerHeight+1 && scrollY===0 && inside(document.querySelector('.app-shell')),sharedComposer:document.querySelectorAll('#request-input,#conversation-form,#chat-composer').length===3 && composer.contains(form) && form.contains(input) && !composer.closest('[hidden],[inert]') && [input,document.getElementById('send-request')].every(inside),scrollRegions:regions.every(region=>/auto|scroll/.test(region.overflowY) && (!region.active || region.clientHeight>=Math.max(44,region.fontSize*1.2))) && cards.length===4 && cards.every(node=>! /auto|scroll|hidden|clip/.test(getComputedStyle(node).overflowY) && node.scrollHeight<=node.clientHeight+2),compactPanels:compact?chat.getAttribute('role')==='tabpanel' && rail.getAttribute('role')==='tabpanel' && tabs.length===2 && tabs.every(node=>node.getAttribute('aria-controls')===(node.id==='workspace-tab-chat'?'chat-workspace':'preparation-rail')) && tabs.filter(node=>node.getAttribute('aria-selected')==='true').length===1 && active.hidden===false && !active.inert && inactive.hidden && inactive.inert && !inactive.contains(document.activeElement) && tabs.every(node=>node.tabIndex===(node.getAttribute('aria-selected')==='true'?0:-1)):!chat.hidden && !rail.hidden && !chat.inert && !rail.inert,regions,compact,activeView:layout.dataset.activeView,composer:bounds(composer),body:{width:document.documentElement.scrollWidth,height:document.documentElement.scrollHeight}};
+    const cards=[...document.querySelectorAll('#preparation-board>[data-stage-id]')],selected=cards.filter(node=>!node.hidden&&!node.inert),navigation=[...document.querySelectorAll('#stage-navigation>button[data-open-stage]')],tabs=[...document.querySelectorAll('[role="tab"][id^="workspace-tab-"]')],active=layout.dataset.activeView==='preparation'?rail:chat,inactive=active===chat?rail:chat;
+    return {viewportFit:document.documentElement.scrollWidth<=innerWidth+1 && document.documentElement.scrollHeight<=innerHeight+1 && document.body.scrollHeight<=innerHeight+1 && scrollY===0 && inside(document.querySelector('.app-shell')),sharedComposer:document.querySelectorAll('#request-input,#conversation-form,#chat-composer').length===3 && composer.contains(form) && form.contains(input) && !composer.closest('[hidden],[inert]') && [input,document.getElementById('send-request')].every(inside),scrollRegions:regions.every(region=>/auto|scroll/.test(region.overflowY) && (!region.active || region.clientHeight>=Math.max(44,region.fontSize*1.2))) && cards.length===4 && selected.length===1 && cards.every(node=>! /auto|scroll|hidden|clip/.test(getComputedStyle(node).overflowY) && (node.hidden?node.inert:node.scrollHeight<=node.clientHeight+2)) && navigation.length===4,compactPanels:compact?chat.getAttribute('role')==='tabpanel' && rail.getAttribute('role')==='tabpanel' && tabs.length===2 && tabs.every(node=>node.getAttribute('aria-controls')===(node.id==='workspace-tab-chat'?'chat-workspace':'preparation-rail')) && tabs.filter(node=>node.getAttribute('aria-selected')==='true').length===1 && active.hidden===false && !active.inert && inactive.hidden && inactive.inert && !inactive.contains(document.activeElement) && tabs.every(node=>node.tabIndex===(node.getAttribute('aria-selected')==='true'?0:-1)):!chat.hidden && !rail.hidden && !chat.inert && !rail.inert,regions,compact,activeView:layout.dataset.activeView,selectedStage:selected[0]?.dataset.stageId,currentStage:document.getElementById('preparation-board').dataset.currentStage,navigationCount:navigation.length,composer:bounds(composer),body:{width:document.documentElement.scrollWidth,height:document.documentElement.scrollHeight}};
   });
 }
 async function scenario(name,run) {
@@ -61,8 +65,22 @@ async function shot(page,name) {
 }
 async function readStage(page,id) {
   await showView(page,'preparation');
+  await page.locator('#stage-navigation>button[data-open-stage="'+id+'"]').click();
+  await showView(page,'chat');
   const details=page.locator('[data-stage-id="'+id+'"] [data-stage-details]');
   if(!await details.evaluate(node=>node.open))await details.locator(':scope>summary').click();
+}
+async function readConversation(page) {
+  await showView(page,'chat');
+  const history=page.locator('#conversation-history');
+  if(!await history.evaluate(node=>node.open))await history.locator(':scope>summary').click();
+}
+async function guidedEvidence(page,state) {
+  return page.evaluate(async state=>{
+    const {getPreparationWorkflow}=await import('/preparation-workflow.js'),workflow=getPreparationWorkflow(state),board=document.getElementById('preparation-board'),current=document.getElementById('current-preparation-task');
+    const rows=[...document.querySelectorAll('#stage-navigation>button[data-open-stage]')],panes=[...board.querySelectorAll(':scope>[data-stage-id]')];
+    return {currentStage:board.dataset.currentStage===workflow.currentStageId,task:current.dataset.currentStage===workflow.currentStageId && current.dataset.taskId===(workflow.currentTask?.id||'') && current.dataset.taskActor===(workflow.currentTask?.actor||'') && current.dataset.taskStatus===(workflow.currentTask?.status||''),stages:rows.length===4&&workflow.stages.every(stage=>rows.some(row=>row.dataset.openStage===stage.id && row.dataset.workflowStatus===stage.status && row.dataset.current===String(stage.id===workflow.currentStageId))),oneSelected:panes.length===4&&panes.filter(node=>!node.hidden&&!node.inert).length===1&&panes.every(node=>node.hidden===node.inert)&&rows.filter(node=>node.getAttribute('aria-pressed')==='true').length===1&&rows.find(node=>node.getAttribute('aria-pressed')==='true')?.dataset.openStage===board.dataset.selectedStage,visitNotReady:workflow.visitReady===false,workflow};
+  },state);
 }
 async function stageText(page,id) {
   await readStage(page,id);
@@ -75,8 +93,8 @@ async function allStatus(page) {
   return Promise.all(ids.map(id=>statusOf(page,id)));
 }
 async function liveSummary(page,id) {
-  const pane=page.locator('[data-stage-id="'+id+'"]'),activity=pane.locator('[data-stage-live]');
-  return await pane.getAttribute('data-live')==='true' && await activity.isVisible() && /확인 중|진행/.test(await activity.innerText()) && await page.locator('#cancel-request').isVisible() && await page.locator('#board-activity').evaluate(node=>!node.hidden && Boolean(node.textContent.trim()) && Boolean(node.closest('#composer-help')));
+  const pane=page.locator('[data-stage-id="'+id+'"]'),activity=pane.locator('[data-stage-live]'),navigation=page.locator('#stage-navigation>button[data-open-stage="'+id+'"]');
+  return await pane.getAttribute('data-live')==='true' && await navigation.getAttribute('data-live')==='true' && /확인 중|진행/.test(await activity.textContent()) && await page.locator('#cancel-request').isVisible() && await page.locator('#board-activity').evaluate(node=>!node.hidden && Boolean(node.textContent.trim()) && Boolean(node.closest('#composer-help')));
 }
 async function readingPosition(page) {
   return page.evaluate(()=>{
@@ -90,7 +108,6 @@ const samePosition=(before,after)=>JSON.stringify(before.open)===JSON.stringify(
 async function checkSignals(page,state,{responseCount=0,events=[]}={}) {
   return page.evaluate(async({state,responseCount,events})=>{
     const board=(await import('/preparation-stages.js')).getPreparationBoard(state,{responseCount,events});
-    const labels={available:/결과 있음/,attention:/추가 확인|다시 확인|재확인/,blocked:/실패\s*·\s*인계/,waiting:/확인 전|문의 전/,not_needed:/필요 없음/};
     const shapeMatches=(node,signal)=>{
       const mark=node?.querySelector('.signal-mark[data-signal="'+signal+'"]');
       if(!mark || mark.getAttribute('aria-hidden')!=='true')return false;
@@ -101,12 +118,12 @@ async function checkSignals(page,state,{responseCount=0,events=[]}={}) {
     };
     return board.stages.every(stage=>{
       const section=document.querySelector('[data-stage-id="'+stage.id+'"]'),status=section?.querySelector('[data-stage-status]');
-      const label=stage.id==='plan' && stage.signal==='available'?/답변 있음/:stage.id==='plan' && stage.signal==='waiting'?/답변 전/:labels[stage.signal];
-      return section?.dataset.signal===stage.signal && status?.dataset.signal===stage.signal && label?.test(status.textContent) && shapeMatches(status,stage.signal);
+      const navigation=document.querySelector('#stage-navigation>button[data-open-stage="'+stage.id+'"]');
+      return section?.dataset.signal===stage.signal && status?.dataset.signal===stage.signal && status.dataset.stageStatus===stage.status && status.textContent.includes(stage.label) && navigation?.dataset.workflowStatus===stage.status && navigation.dataset.signal===stage.signal && shapeMatches(status,stage.signal);
     });
   },{state,responseCount,events});
 }
-async function contrast(page,selector='.stage-status,.stage-status .signal-mark,#composer-disclosure,#composer-boundary,.privacy-note,.message-body') {
+async function contrast(page,selector='.stage-status,.stage-status .signal-mark,#stage-navigation .signal-mark,#composer-disclosure,#composer-boundary,.privacy-note,.message-body') {
   return page.locator(selector).evaluateAll(nodes=>{
     const rgba=value=>(value.match(/[\d.]+/g)||[]).map(Number);
     const luminance=color=>color.slice(0,3).map(value=>{value/=255;return value<=.04045?value/12.92:((value+.055)/1.055)**2.4;}).reduce((sum,value,index)=>sum+value*[.2126,.7152,.0722][index],0);
@@ -309,7 +326,7 @@ try {
   record('실제 localhost 서버는 모델 미연결·전화/개인기록 합성 경계',keyless && preflight.headers.get('cache-control')==='no-store');
   if(!keyless)throw new Error('keyless 상태를 확인하지 못해 브라우저 POST 검사를 시작하지 않습니다.');
   proof.apiLive=true;
-  for(const path of ['conversation.js','conversation.css','preparation-board-view.js','preparation-stages.js','icons.js']) {
+  for(const path of ['conversation.js','conversation.css','preparation-board-view.js','preparation-stages.js','preparation-workflow.js','icons.js']) {
     const served=await fetch(new URL('/'+path,base),{redirect:'error',signal:AbortSignal.timeout(8000)});
     const expected=await readFile(resolve(servedRoot,'app',path));
     const matching=served.status===200 && hash(await served.text())===hash(expected);
@@ -332,93 +349,136 @@ try {
   for(const [width,height] of viewports)await scenario(width+'x'+height+' 첫 화면·구조',async()=>{
     const {page,context,actualPosts}=await open(width,height);
     try {
-      const initialWorkspace=await workspaceEvidence(page),compact=initialWorkspace.compact,inputNode=await page.locator('#request-input').elementHandle();
+      const initialWorkspace=await workspaceEvidence(page),compact=initialWorkspace.compact,inputNode=await page.locator('#request-input').elementHandle(),initialGuided=await guidedEvidence(page,createDemoCase());
       await showView(page,'preparation');
-      const panes=page.locator('#preparation-board>[data-stage-id]');
-      const structure=await panes.evaluateAll(nodes=>nodes.map(node=>({id:node.dataset.stageId,visible:node.checkVisibility(),x:node.getBoundingClientRect().x,y:node.getBoundingClientRect().y,width:node.getBoundingClientRect().width,height:node.getBoundingClientRect().height})));
-      const visible=structure.filter(item=>item.visible && item.width>0 && item.height>0);
-      const same=(a,b)=>Math.abs(a-b)<=1;
-      const ordered=structure.map(item=>item.id).join(',')===ids.join(',') && visible.length===4 && await panes.evaluateAll(nodes=>nodes.every(node=>node.parentElement.id==='preparation-board')) && await page.locator('#preparation-details').count()===0;
+      const panes=page.locator('#preparation-board>[data-stage-id]'),navigation=page.locator('#stage-navigation>button[data-open-stage]');
+      const structure=await navigation.evaluateAll(nodes=>nodes.map(node=>({id:node.dataset.openStage,visible:node.checkVisibility(),x:node.getBoundingClientRect().x,y:node.getBoundingClientRect().y,width:node.getBoundingClientRect().width,height:node.getBoundingClientRect().height})));
+      const same=(a,b)=>Math.abs(a-b)<=1,ordered=structure.map(item=>item.id).join(',')===ids.join(',') && structure.every(item=>item.visible && item.width>=44 && item.height>=44);
       const placement=await page.evaluate(()=>{
-        const bounds=selector=>{const node=document.querySelector(selector),r=node?.getBoundingClientRect();return r?{x:r.x,y:r.y,right:r.right,bottom:r.bottom,width:r.width,height:r.height}:null;};
-        return {chat:bounds('.chat-workspace'),rail:bounds('.preparation-rail'),board:bounds('#preparation-board')};
+        const bounds=selector=>{const r=document.querySelector(selector)?.getBoundingClientRect();return r?{x:r.x,y:r.y,right:r.right,bottom:r.bottom,width:r.width,height:r.height}:null;};
+        return {chat:bounds('.chat-workspace'),rail:bounds('.preparation-rail'),navigation:bounds('#stage-navigation')};
       });
       const vertical=ordered && structure.every((item,index)=>same(item.x,structure[0].x) && same(item.width,structure[0].width) && (index===0 || item.y>=structure[index-1].y+structure[index-1].height));
-      const {chat,rail,board}=placement;
-      const positioned=chat && rail && board && board.x>=rail.x-1 && board.right<=rail.right+1 && (!compact?
-        rail.x>=chat.right && same(chat.y,rail.y) && rail.width>=280 && rail.width<=340 && chat.width>rail.width:
-        rail.x>=-1 && rail.right<=width+1 && rail.y>=0 && rail.bottom<=height+1);
-      const layout=vertical && positioned?(!compact?'chat-right-rail':'tabbed-workspace'):null;
-      const geometry=layout===(!compact?'chat-right-rail':'tabbed-workspace');
-      record(width+'x'+height+' 실제 좌표는 '+(!compact?'중앙 채팅 오른쪽':'준비 탭 안')+' 준비 네 칸 한 열',geometry,JSON.stringify({layout,placement,structure}));
+      const {chat,rail,navigation:nav}=placement,positioned=chat && rail && nav && nav.x>=rail.x-1 && nav.right<=rail.right+1 && (!compact?rail.x>=chat.right && same(chat.y,rail.y) && rail.width>=240 && rail.width<=340 && chat.width>rail.width:rail.x>=-1 && rail.right<=width+1 && rail.y>=0 && rail.bottom<=height+1);
+      const layout=vertical&&positioned?(!compact?'task-right-navigation':'tabbed-workspace'):null,geometry=layout===(!compact?'task-right-navigation':'tabbed-workspace');
+      record(width+'x'+height+' 실제 좌표는 중앙 현재 할 일과 네 단계 탐색',geometry,JSON.stringify({layout,placement,structure}));
       const chatLayout=await page.evaluate(()=>{
-        const chat=document.getElementById('chat-workspace'),rail=document.getElementById('preparation-rail'),board=document.getElementById('preparation-board'),conversation=document.getElementById('conversation-scroll'),messages=document.getElementById('message-list'),examples=document.getElementById('request-examples'),form=document.getElementById('conversation-form'),composer=document.getElementById('chat-composer');
-        return Boolean(chat && rail && chat.parentElement===rail.parentElement && chat.parentElement.matches('.conversation-layout') && rail.contains(board) && chat.contains(conversation) && conversation.contains(messages) && !board.contains(messages) && composer.parentElement===chat.parentElement && composer.contains(form) && composer.contains(examples) && !chat.contains(form) && !rail.contains(form) && document.querySelector('.workspace-tools #expand-answer') && document.querySelectorAll('#message-list,#conversation-scroll,#conversation-form,#request-input').length===4 && !rail.querySelector('.message,#conversation-form,#request-input') && rail.contains(document.getElementById('visit-summary')) && !document.querySelector('.chat-identity,.chat-role,#conversation-title'));
+        const chat=document.getElementById('chat-workspace'),rail=document.getElementById('preparation-rail'),board=document.getElementById('preparation-board'),conversation=document.getElementById('conversation-scroll'),messages=document.getElementById('message-list'),history=document.getElementById('conversation-history'),current=document.getElementById('current-preparation-task'),examples=document.getElementById('request-examples'),form=document.getElementById('conversation-form'),composer=document.getElementById('chat-composer');
+        return Boolean(chat && rail && chat.parentElement===rail.parentElement && chat.parentElement.matches('.conversation-layout') && rail.contains(document.getElementById('stage-navigation')) && conversation.contains(board) && conversation.contains(current) && conversation.contains(history) && history instanceof HTMLDetailsElement && history.contains(messages) && !board.contains(messages) && composer.parentElement===chat.parentElement && composer.contains(form) && composer.contains(examples) && !chat.contains(form) && !rail.contains(form) && document.querySelector('.workspace-tools #expand-answer') && document.querySelectorAll('#message-list,#conversation-scroll,#conversation-form,#request-input,#current-preparation-task,#conversation-history').length===6 && !rail.querySelector('.message,#conversation-form,#request-input,[data-stage-id]') && rail.contains(document.getElementById('visit-summary')) && !document.querySelector('.chat-identity,.chat-role,#conversation-title'));
       });
-      record(width+'x'+height+' 중앙 대화·준비 패널과 단일 하단 입력·도구·접힌 예시 DOM 분리',chatLayout && await page.locator('#visit-summary').evaluate(node=>node instanceof HTMLDetailsElement && !node.open));
-      const statuses=await allStatus(page);
-      record(width+'x'+height+' 초기 자료 미확인과 병원·이동·답변 대기',statuses[0]==='needs_input' && statuses.slice(1).every(status=>status==='waiting') && await page.locator('[data-stage-summary]').count()===4 && await page.locator('[data-stage-events]').count()===4 && actualPosts.length===0);
-      const initialSignalSummary=await page.locator('#stage-navigation').count()===0 && await page.locator('#preparation-board>.stage-pane>.stage-pane-header .signal-mark').count()===4 && await checkSignals(page,createDemoCase());
+      record(width+'x'+height+' 중앙 단일 단계·보조 대화 기록·오른쪽 탐색·공통 입력 DOM',chatLayout && await page.locator('#visit-summary').evaluate(node=>node instanceof HTMLDetailsElement && !node.open));
+      record(width+'x'+height+' 초기 현재 할 일·단계 상태는 업무 projection과 일치',initialGuided.currentStage && initialGuided.task && initialGuided.stages && initialGuided.oneSelected && initialGuided.visitNotReady && actualPosts.length===0,JSON.stringify(initialGuided));
+      const initialSignalSummary=await navigation.count()===4 && await page.locator('#preparation-board>.stage-pane>.stage-pane-header .signal-mark').count()===4 && await checkSignals(page,createDemoCase());
       const initialComposer=await page.locator('#request-input,#send-request').evaluateAll(nodes=>nodes.map(node=>{const r=node.getBoundingClientRect();return {id:node.id,top:r.top,bottom:r.bottom,inViewport:r.top>=0 && r.bottom<=innerHeight && r.width>0 && r.height>0};}));
-      const composerAccess={input:await accessible(page.locator('#request-input')),send:await accessible(page.locator('#send-request'))};
-      const composerReachable=Object.values(composerAccess).every(item=>item.reachable);
-      const compactSummary=await page.locator('#request-examples,#composer-help').evaluateAll(nodes=>nodes.length===2 && nodes.every(node=>node instanceof HTMLDetailsElement && !node.open)) && await page.locator('#preparation-board [data-stage-details]').evaluateAll(nodes=>nodes.length===4 && nodes.every(node=>node instanceof HTMLDetailsElement && !node.open)) && await page.locator('[data-stage-preview]').evaluateAll(nodes=>nodes.length===4 && nodes.every(node=>node.checkVisibility())) && await page.locator('[data-stage-log]:visible').count()===0;
+      const composerAccess={input:await accessible(page.locator('#request-input')),send:await accessible(page.locator('#send-request'))},composerReachable=Object.values(composerAccess).every(item=>item.reachable);
+      const compactSummary=await page.locator('#request-examples,#composer-help,#conversation-history').evaluateAll(nodes=>nodes.length===3 && nodes.every(node=>node instanceof HTMLDetailsElement && !node.open)) && await page.locator('#preparation-board [data-stage-details]').evaluateAll(nodes=>nodes.length===4 && nodes.every(node=>node instanceof HTMLDetailsElement)) && await panes.evaluateAll(nodes=>nodes.filter(node=>!node.hidden&&!node.inert).length===1) && await page.locator('[data-stage-log]:visible').count()===0;
       const categoryIcons=await page.evaluate(async()=>{
         const {icon}=await import('/icons.js'),expected={records:'folder',hospitals:'hospital',support:'car',plan:'calendar'};
         return document.querySelectorAll('#preparation-board .stage-topic-icon').length===4 && Object.entries(expected).every(([id,name])=>{
           const header=document.querySelector('[data-stage-id="'+id+'"]>.stage-pane-header'),svg=header?.querySelector('h2>svg.stage-topic-icon'),template=document.createElement('template');template.innerHTML=icon(name);
-          const bounds=svg?.getBoundingClientRect();
-          return header?.querySelectorAll('.stage-topic-icon').length===1 && svg?.getAttribute('aria-hidden')==='true' && svg.innerHTML===template.content.firstElementChild.innerHTML && bounds.width>0 && bounds.height>0;
+          return header?.querySelectorAll('.stage-topic-icon').length===1 && svg?.getAttribute('aria-hidden')==='true' && svg.innerHTML===template.content.firstElementChild.innerHTML;
         });
       });
       record(width+'x'+height+' 공통 입력·보내기는 현재 작업공간 안에서 접근',composerReachable,JSON.stringify({initialComposer,composerAccess}));
-      record(width+'x'+height+' 네 칸 상세는 접고 핵심 요약·상태를 모두 표시',compactSummary);
+      record(width+'x'+height+' 단계 본문은 한 개만 열고 원문 기록은 보조 details로 보존',compactSummary);
       record(width+'x'+height+' 네 제목은 folder·hospital·car·calendar SVG를 사용',categoryIcons);
       record(width+'x'+height+' 네 헤더의 기호·뜻은 실제 준비 상태와 일치',initialSignalSummary);
       const path=await shot(page,width+'x'+height+'-initial');
       const fullNotice=await accessible(page.locator('#composer-boundary')),noticeColors=await contrast(page,'#composer-disclosure,#composer-boundary');
       record(width+'x'+height+' 가로 넘침·읽기 글자·짧은 고지와 펼친 전체 경계·입력 설명',await noOverflow(page) && await page.locator('#request-input').evaluate(node=>parseFloat(getComputedStyle(node).fontSize)>=16 && node.getAttribute('aria-describedby').split(/\s+/).includes('composer-boundary')) && fullNotice.reachable && await page.locator('#composer-boundary').evaluate(node=>parseFloat(getComputedStyle(node).fontSize)>=14) && /시연.*실행.*없음/.test(await page.locator('#composer-disclosure').innerText()) && /가상.*실제.*(?:연락|발신).*예약.*없음/.test(await page.locator('#composer-boundary').innerText()) && noticeColors.length===2 && noticeColors.every(item=>item.ratio>=4.5),JSON.stringify({fullNotice,noticeColors}));
-      const controls=page.locator('[data-stage-details]>summary,#visit-summary>summary,#expand-answer,#voice-request,#preview-button,#send-request');
+      await showView(page,'chat');
+      const controls=page.locator('#stage-navigation>button,[data-stage-details]>summary,#visit-summary>summary,#expand-answer,#voice-request,#preview-button,#send-request,#conversation-history>summary,#return-to-current-task');
       record(width+'x'+height+' 주요 조작44px·감소 모션',await controls.evaluateAll(nodes=>nodes.filter(node=>node.checkVisibility()).every(node=>{const r=node.getBoundingClientRect();return r.width>=44 && r.height>=44;})) && await panes.evaluateAll(nodes=>nodes.every(node=>getComputedStyle(node).transitionDuration.split(',').every(value=>parseFloat(value)===0))));
-      const closedRail=await page.locator('#preparation-rail').evaluate(node=>({clientHeight:node.clientHeight,scrollHeight:node.scrollHeight}));
-      const draft='칸을 이동해도 보존할 요청';await page.locator('#request-input').fill(draft);
+      const draft='단계를 이동해도 보존할 요청';await page.locator('#request-input').fill(draft);
       let keyboard=true;const keyboardDetails=[];
       for(const id of ids) {
+        await showView(page,'preparation');const button=page.locator('#stage-navigation>button[data-open-stage="'+id+'"]');await button.focus();await page.keyboard.press('Enter');await showView(page,'chat');
         const details=page.locator('[data-stage-id="'+id+'"] [data-stage-details]'),summary=details.locator(':scope>summary');
-        await reveal(summary);await summary.focus();await page.keyboard.press('Enter');
-        const item={id,open:await details.evaluate(node=>node.open),panes:await panes.evaluateAll(nodes=>nodes.every(node=>node.checkVisibility())),focused:await summary.evaluate(node=>document.activeElement===node)};keyboardDetails.push(item);keyboard &&=item.open && item.panes && item.focused;
+        if(await details.evaluate(node=>node.open))await summary.click();await reveal(summary);await summary.focus();await page.keyboard.press('Enter');
+        const item={id,open:await details.evaluate(node=>node.open),onePane:await panes.evaluateAll(nodes=>nodes.filter(node=>!node.hidden&&!node.inert).length===1),focused:await summary.evaluate(node=>document.activeElement===node),hiddenInert:await panes.evaluateAll(nodes=>nodes.every(node=>node.hidden===node.inert))};keyboardDetails.push(item);keyboard &&=item.open && item.onePane && item.focused && item.hiddenInert;
       }
-      record(width+'x'+height+' native 상세는 키보드로 펼치고 네 칸·초안 유지·POST0',keyboard && await page.locator('#request-input').inputValue()===draft && actualPosts.length===0,JSON.stringify(keyboardDetails));
+      record(width+'x'+height+' 탐색·native 상세는 키보드 접근·한 본문·초안 유지·POST0',keyboard && await page.locator('#request-input').inputValue()===draft && actualPosts.length===0,JSON.stringify(keyboardDetails));
       const completeGaps=await page.evaluate(async()=>{
         const state=(await import('/domain.js')).createDemoCase(),board=(await import('/preparation-stages.js')).getPreparationBoard(state);
         return board.stages.every(stage=>document.querySelector('[data-stage-id="'+stage.id+'"] [data-stage-gaps]').querySelectorAll('li').length===stage.gapCount);
       });
-      record(width+'x'+height+' 펼친 전체 누락 목록은 실제 건수와 일치·문의처 중복 없음',completeGaps && !/문의처 선택 전 · 문의처 선택 전/.test(await page.locator('#preparation-board').innerText()));
-      for(const id of ['visit-summary','case-summary']) {
-        const details=page.locator('#'+id);
-        if(!await details.evaluate(node=>node.open))await details.locator(':scope>summary').click();
-      }
-      const reading=await workspaceEvidence(page),expandedRail=reading.regions.find(item=>item.id==='preparation-rail'),railReading=reading.viewportFit && reading.scrollRegions && expandedRail.scrollHeight>closedRail.scrollHeight+20 && await panes.evaluateAll(nodes=>nodes.every(node=>node.checkVisibility()));
-      record(width+'x'+height+' 펼친 자료·병원·이동·방문 상세는 같은 rail 스크롤에서 읽음',railReading,JSON.stringify({closedRail,reading}));
-      const colors=await contrast(page);
+      record(width+'x'+height+' 펼친 전체 누락 목록은 실제 건수와 일치·문의처 중복 없음',completeGaps && !/문의처 선택 전 · 문의처 선택 전/.test(await page.locator('#preparation-board').textContent()));
+      const colors=[];for(const id of ids){await readStage(page,id);colors.push(...await contrast(page));}
       record(width+'x'+height+' 기호3:1·설명/본문/중요 고지4.5:1 대비',colors.length>0 && colors.every(item=>item.ratio>=item.minimum),JSON.stringify(colors));
-      await shot(page,width+'x'+height+'-expanded');
-      await page.locator('#visit-summary>summary').click();
-      record(width+'x'+height+' 방문 상세를 접어도 네 칸·답변·요청은 남음',!await page.locator('#visit-summary').evaluate(node=>node.open) && await panes.evaluateAll(nodes=>nodes.every(node=>node.checkVisibility())) && await page.locator('#request-input').inputValue()===draft);
+      await showView(page,'preparation');
+      const closedRail=await page.locator('#preparation-rail').evaluate(node=>({clientHeight:node.clientHeight,scrollHeight:node.scrollHeight}));
+      for(const id of ['visit-summary','case-summary']) {const details=page.locator('#'+id);if(!await details.evaluate(node=>node.open))await details.locator(':scope>summary').click();}
+      const visitEnd=await accessible(page.locator('#case-content').locator('a,button,p').last()),reading=await workspaceEvidence(page),expandedRail=reading.regions.find(item=>item.id==='preparation-rail'),railReading=reading.viewportFit && reading.scrollRegions && visitEnd.reachable && expandedRail.scrollHeight>closedRail.scrollHeight;
+      record(width+'x'+height+' 방문 상세는 오른쪽 공유 스크롤에서 끝까지 읽음',railReading,JSON.stringify({closedRail,reading,visitEnd}));
+      await shot(page,width+'x'+height+'-expanded');await page.locator('#visit-summary>summary').click();
       const draftBeforeSwitch=await page.locator('#request-input').inputValue(),railTop=await page.locator('#preparation-rail').evaluate(node=>node.scrollTop);
       await showView(page,'chat');await showView(page,'preparation');
       const sameComposer=await inputNode.evaluate(node=>node===document.getElementById('request-input')) && await page.locator('#request-input').inputValue()===draftBeforeSwitch && Math.abs(await page.locator('#preparation-rail').evaluate(node=>node.scrollTop)-railTop)<=2;
       let inactiveKeyboard=true;
-      if(compact) {
-        const blocked=await page.locator('#conversation-scroll').evaluate(node=>{node.focus({preventScroll:true});return !node.contains(document.activeElement);});
-        await page.locator('#workspace-tab-preparation').focus();
-        for(let step=0;step<10;step++){await page.keyboard.press('Tab');inactiveKeyboard &&=await page.locator('#chat-workspace').evaluate(node=>!node.contains(document.activeElement));}
-        inactiveKeyboard &&=blocked;
-      }
-      const namedTabs=!compact || await page.getByRole('tab',{name:'대화',exact:true}).count()===1 && await page.getByRole('tab',{name:'준비 현황',exact:true}).count()===1;
+      if(compact) {const blocked=await page.locator('#conversation-scroll').evaluate(node=>{node.focus({preventScroll:true});return !node.contains(document.activeElement);});await page.locator('#workspace-tab-preparation').focus();for(let step=0;step<10;step++){await page.keyboard.press('Tab');inactiveKeyboard &&=await page.locator('#chat-workspace').evaluate(node=>!node.contains(document.activeElement));}inactiveKeyboard &&=blocked;}
+      const namedTabs=!compact || await page.getByRole('tab',{name:'할 일',exact:true}).count()===1 && await page.getByRole('tab',{name:'준비 단계',exact:true}).count()===1;
       const finalWorkspace=await workspaceEvidence(page),viewportFit=initialWorkspace.viewportFit && finalWorkspace.viewportFit,sharedComposer=initialWorkspace.sharedComposer && finalWorkspace.sharedComposer && sameComposer,scrollRegions=initialWorkspace.scrollRegions && finalWorkspace.scrollRegions && railReading,compactPanels=initialWorkspace.compactPanels && finalWorkspace.compactPanels && inactiveKeyboard && namedTabs;
       record(width+'x'+height+' 100dvh·실제 스크롤·같은 입력·비활성 탭 키보드 제외',viewportFit && sharedComposer && scrollRegions && compactPanels,JSON.stringify({initialWorkspace,finalWorkspace,sameComposer,inactiveKeyboard}));
-      proof.viewports.push({width,height,geometry,layout,chatLayout,categoryIcons,viewportFit,sharedComposer,scrollRegions,compactPanels,initialSignalSummary,composerReachable,compactSummary,initialComposer,noOverflow:await noOverflow(page),screenshot:path,metrics:{initialWorkspace,finalWorkspace}});
+      proof.viewports.push({width,height,geometry,layout,chatLayout,guidedLayout:chatLayout&&initialGuided.oneSelected,categoryIcons,viewportFit,sharedComposer,scrollRegions,compactPanels,initialSignalSummary,composerReachable,compactSummary,initialComposer,noOverflow:await noOverflow(page),screenshot:path,metrics:{initialWorkspace,finalWorkspace}});
+    } finally {await context.close();}
+  });
+
+  for(const width of [1440,390])await scenario(width+'px 최초 의뢰·현재 업무·단계 선택·기관 대기',async()=>{
+    const {page,context,actualPosts}=await open(width,844,{fixture:true});
+    try {
+      const input=page.locator('#request-input'),draft='이미 작성한 보호자 요청';
+      await input.fill(draft);
+      record(width+'px 최초 화면은 자유 입력을 받고 숨은 업무를 실행하지 않음',await page.locator('#current-task-draft').isHidden() && (await calls(page)).length===0 && await input.isEditable());
+      const missing=structuredClone(createDemoCase());missing.patient.nextVisit='';
+      const natural='어머니 제주 진료의 자료와 병원·이동 준비를 이어서 도와주세요. 방문 날짜는 아직 모르겠습니다.';
+      const first=await begin(page,natural),body=JSON.parse(first.body);
+      const naturalRequest=body.message===natural && body.guidedPreparation===true && !Object.hasOwn(body,'caseState') && !Object.hasOwn(body,'permissions') && (await calls(page,'/api/agent')).length===1 && actualPosts.length===0;
+      record(width+'px 최초 자연어 의뢰는 수동 단계 입력 없이 guided 요청 한 건',naturalRequest);
+      await finish(page,first,missing,'합성 응답: 방문 날짜만 확인한 뒤 독립적인 준비를 이어갑니다.');
+      const question=await guidedEvidence(page,missing),task=question.workflow.currentTask;
+      const caregiverQuestionOnly=question.currentStage && question.task && question.stages && question.oneSelected && task?.actor==='caregiver' && task.status==='needs_input' && Boolean(task.question) && await page.locator('#current-task-question').isVisible() && normalize(await page.locator('#current-task-question').textContent())===normalize(task.question) && await page.locator('#current-task-choices>button[data-workflow-choice]').count()===task.choices.length && missing.patient.nextVisit==='' && question.visitNotReady;
+      record(width+'px 보호자 핵심 질문만 노출·모르는 날짜나 권한을 생성하지 않음',caregiverQuestionOnly);
+      const inputNode=await input.elementHandle(),panes=await page.locator('#preparation-board>[data-stage-id]').elementHandles(),stageDraft='기관 대기를 보면서 작성한 다음 요청';await input.fill(stageDraft);
+      const beforeCalls=(await calls(page)).length,actualCurrent=question.workflow.currentStageId,selection=[];
+      for(const id of ids) {
+        await readStage(page,id);const evidence=await guidedEvidence(page,missing);
+        const sameDom=await Promise.all(panes.map(node=>node.evaluate(node=>node===document.querySelector('#preparation-board>[data-stage-id="'+node.dataset.stageId+'"]'))));
+        const sample={id,selected:(await workspaceEvidence(page)).selectedStage===id,currentUnchanged:evidence.currentStage && await page.locator('#preparation-board').getAttribute('data-current-stage')===actualCurrent,oneStage:evidence.oneSelected,sameDom:sameDom.every(Boolean),draftPreserved:await inputNode.evaluate((node,text)=>node===document.getElementById('request-input')&&node.value===text,stageDraft)};selection.push(sample);
+      }
+      const readOnlyNavigation=selection.every(sample=>sample.selected&&sample.currentUnchanged&&sample.oneStage&&sample.sameDom&&sample.draftPreserved)&&(await calls(page)).length===beforeCalls&&actualPosts.length===0;
+      record(width+'px 읽는 단계와 실제 다음 업무는 분리·같은 DOM/초안·추가 POST0',readOnlyNavigation,JSON.stringify(selection));
+      await reveal(page.locator('#return-to-current-task'));await page.locator('#return-to-current-task').click();
+      record(width+'px 현재 업무로 복귀도 업무 상태·초안·POST 수를 보존',(await workspaceEvidence(page)).selectedStage===actualCurrent && await input.inputValue()===stageDraft && (await calls(page)).length===beforeCalls);
+      await readConversation(page);
+      const historyAnswer=page.locator('#message-list>.message.assistant:not(.greeting)').last(),historyAccess=await accessible(historyAnswer);
+      const historyOriginal=historyAccess.reachable && /방문 날짜만 확인/.test(await historyAnswer.innerText()) && await page.locator('#conversation-history').evaluate(node=>node instanceof HTMLDetailsElement && node.open) && await page.locator('#expand-answer').isEnabled() && (await calls(page)).length===beforeCalls;
+      record(width+'px 보조 대화 기록은 원문 답변·처리 기록·넓게 읽기를 보존',historyOriginal);
+      const readiness=await page.evaluate(async state=>{
+        const {getPreparationBoard}=await import('/preparation-stages.js'),before=getPreparationBoard(state,{responseCount:0}),after=getPreparationBoard(state,{responseCount:7}),progress={version:1,status:'completed',sequence:4,updatedAt:'2026-11-01T12:00:00.000Z',currentStage:'plan',stages:['records','hospitals','support','plan'].map(id=>({id,status:'observed',lastTool:null})),events:[]},observed=getPreparationBoard(state,{responseCount:7,pending:true,progress});
+        const status=board=>board.stages.map(stage=>({id:stage.id,status:stage.status,signal:stage.signal})),same=JSON.stringify(status(before))===JSON.stringify(status(after))&&JSON.stringify(status(before))===JSON.stringify(status(observed));
+        return {same,responseCountOnlyChangesHistory:before.hasResponse===false&&after.hasResponse===true,visitNotReady:before.workflow.visitReady===false&&after.workflow.visitReady===false&&observed.workflow.visitReady===false};
+      },missing);
+      record(width+'px 답변 수·관측 완료는 업무 readiness를 바꾸지 않음',Object.values(readiness).every(Boolean),JSON.stringify(readiness));
+      let waiting=applyAction(createDemoCase(),{type:'SUPPORT_UPDATE_REQUIREMENTS',values:{appointmentTime:'10:00',transportNeeded:false,companionNeeded:false}});
+      for(const target of ['mainland','jeju'])waiting=applyAction(waiting,{type:'RECORD_CALL',target,outcome:'documents'});
+      const second=await begin(page,'방문은 2026년 11월 12일 오전 10시입니다. 이동과 동행은 가족이 맡습니다. 기관에서 받아야 하는 자료와 다음 일을 정리해 주세요.',1);
+      await finish(page,second,waiting,'합성 응답: 미확보 판독문과 의료진 진찰 기록은 기관 확인 대기로 남겼습니다. 이동·동행은 이번 조건에서 필요 없습니다.');
+      const external=await guidedEvidence(page,waiting),externalTask=external.workflow.currentTask,externalStage=external.workflow.stages.find(stage=>stage.id==='records');
+      const institutionWaitingPreserved=external.currentStage&&external.task&&external.stages&&external.visitNotReady&&externalStage.status==='waiting_external'&&['institution','clinician'].includes(externalTask.actor)&&await page.locator('#current-task-question').isHidden()&&waiting.documents.find(doc=>doc.id==='report').status==='missing'&&waiting.documents.find(doc=>doc.id==='exam').status==='not_performed';
+      record(width+'px 기관/의료진 대기는 보호자 질문을 반복하지 않고 미확보 자료 보존',institutionWaitingPreserved);
+      const notNeededPreserved=external.workflow.stages.find(stage=>stage.id==='support').status==='not_needed' && await statusOf(page,'support')==='not_needed' && external.visitNotReady && (await calls(page,'/api/agent')).length===2 && actualPosts.length===0;
+      record(width+'px 필요 없는 이동·동행은 해당 없음·방문 준비 완료는 false',notNeededPreserved);
+      const safe=applyAction(waiting,{type:'SUPPORT_UPDATE_REQUIREMENTS',values:{transportNeeded:true,companionNeeded:true}}),third=await begin(page,'가족 이동 대신 공개 문의처로 이동·동행 문의 초안을 준비해 주세요.',2);
+      await finish(page,third,safe,'합성 응답: 공개 문의처로 이동·동행 초안을 준비할 수 있으며 실제 발신은 하지 않았습니다.');
+      const followup=await guidedEvidence(page,safe),requestDraft=followup.workflow.currentTask?.requestDraft;let draftOnly=false;
+      if(requestDraft) {
+        const button=page.locator('#current-task-draft');await reveal(button);await input.fill(draft);
+        page.once('dialog',dialog=>dialog.dismiss());await button.click();const cancelled=await input.inputValue()===draft && (await calls(page,'/api/agent')).length===3;
+        page.once('dialog',dialog=>dialog.accept());await button.click();draftOnly=cancelled && normalize(await input.inputValue())===normalize(requestDraft.trim().slice(0,1600)) && (await calls(page,'/api/agent')).length===3 && actualPosts.length===0;
+      }
+      record(width+'px 현재 업무의 후속 버튼은 보이는 초안만 제안·교체 취소·추가 POST0',draftOnly);
+      proof.guidedScenarios.push({id:'current-task-flow',width,naturalRequest,caregiverQuestionOnly,currentAndSelectedSeparated:readOnlyNavigation,readOnlyNavigation,historyOriginal,responseCountIndependent:readiness.same,observedIndependent:readiness.same,institutionWaitingPreserved,notNeededPreserved,visitNotReady:external.visitNotReady,draftOnly,normalPostAttempts:actualPosts.length});
+      await shot(page,width+'-guided-workflow');
     } finally {await context.close();}
   });
 
@@ -429,7 +489,7 @@ try {
       const body=JSON.parse(call.body),first=await advancePoll(page,0);
       const pendingControls=await page.locator('#request-input,#cancel-request').evaluateAll(nodes=>nodes.map(node=>{const r=node.getBoundingClientRect();return {id:node.id,inViewport:r.top>=0 && r.bottom<=innerHeight && r.height>0};}));
       record('새 요청 대기는 입력·중지를 화면 밖으로 자동 이동하지 않음',pendingControls.every(item=>item.inViewport),JSON.stringify(pendingControls));
-      record('일반 요청은 안전한256bit 토큰과 JSON SHA256',/^[A-Za-z0-9_-]{43}$/.test(body.progressToken) && !call.hasSearch && call.headers['x-amz-content-sha256']===hash(call.body));
+      record('일반 요청은 guided 범위·안전한256bit 토큰과 JSON SHA256',body.guidedPreparation===true && /^[A-Za-z0-9_-]{43}$/.test(body.progressToken) && !call.hasSearch && call.headers['x-amz-content-sha256']===hash(call.body));
       const readBody=JSON.parse(first.body);
       record('진행 조회는 토큰 한 필드·POST 본문 해시·원문 미포함',Object.keys(readBody).join(',')==='progressToken' && !first.hasSearch && readBody.progressToken===body.progressToken && first.headers['x-amz-content-sha256']===hash(first.body) && !first.body.includes(body.message));
       await page.clock.runFor(5500);
@@ -444,7 +504,7 @@ try {
       const hospitalActivity=await page.locator('[data-stage-id="hospitals"] [data-stage-live]').textContent();
       record('실제 형식 진행의 병원 도구 시작은 병원 칸과 요약에 표시',/병원|문의/.test(hospitalActivity) && /확인 중|진행/.test(hospitalActivity) && await liveSummary(page,'hospitals'));
       const updatedClosedPosition=await readingPosition(page);
-      record('진행 갱신은 네 칸 표시·focus·문서 읽기 위치를 바꾸지 않음',samePosition(closedPosition,updatedClosedPosition) && await page.locator('#preparation-board>[data-stage-id]').evaluateAll(nodes=>nodes.every(node=>node.checkVisibility())),JSON.stringify({before:closedPosition,after:updatedClosedPosition}));
+      record('진행 갱신은 선택한 한 단계·focus·문서 읽기 위치를 바꾸지 않음',samePosition(closedPosition,updatedClosedPosition) && await page.locator('#preparation-board>[data-stage-id]').evaluateAll(nodes=>nodes.length===4 && nodes.filter(node=>!node.hidden&&!node.inert).length===1 && nodes.every(node=>node.hidden===node.inert)),JSON.stringify({before:closedPosition,after:updatedClosedPosition}));
       const third=await advancePoll(page,2);
       await release(page,third,progress('records',2));
       record('sequence가 뒤로 간 진행은 병원 상태를 되돌리지 않음',normalize(await page.locator('[data-stage-id="hospitals"] [data-stage-live]').textContent())===normalize(hospitalActivity));
@@ -460,14 +520,14 @@ try {
       const completedPoll=await advancePoll(page,4);
       await release(page,completedPoll,progress('plan',10,{status:'completed',eventStatus:'completed'}));
       await page.clock.runFor(5500);
-      record('도구 진행 completed만으로 답변·진료 준비 완료를 만들지 않음',await page.locator('#conversation-form').getAttribute('aria-busy')==='true' && await page.locator('.message.assistant:not(.greeting)').count()===0 && await statusOf(page,'plan')==='waiting' && (await calls(page,'/api/agent/progress')).length===5);
+      record('도구 진행 completed만으로 답변·진료 준비 완료를 만들지 않음',await page.locator('#conversation-form').getAttribute('aria-busy')==='true' && await page.locator('.message.assistant:not(.greeting)').count()===0 && JSON.stringify(await allStatus(page))===JSON.stringify(before) && (await calls(page,'/api/agent/progress')).length===5);
       const currentReads=await calls(page,'/api/agent/progress');
       record('진행 읽기는2.5초 이상 간격·동시에 한 개',currentReads.every((item,index)=>index===0 || item.at-currentReads[index-1].at>=2500));
       record('진행 조회는 기존 일반 요청1건만 유지하며 모델 요청을 추가하지 않음',(await calls(page,'/api/agent')).length===1 && actualPosts.length===0);
       await finish(page,call,createDemoCase(),'진행을 본 뒤 도착한 합성 최종 답변입니다.');
       const completedReads=(await calls(page,'/api/agent/progress')).length;
       await page.clock.runFor(9000);
-      record('최종 응답 후 진행 조회 중단·대화 답변 유지',await page.locator('.message.assistant:not(.greeting)').count()===1 && (await page.locator('#message-list').innerText()).includes('진행을 본 뒤') && (await calls(page,'/api/agent/progress')).length===completedReads && actualPosts.length===0);
+      record('최종 응답 후 진행 조회 중단·대화 답변 유지',await page.locator('.message.assistant:not(.greeting)').count()===1 && (await page.locator('#message-list').textContent()).includes('진행을 본 뒤') && (await calls(page,'/api/agent/progress')).length===completedReads && actualPosts.length===0);
       proof.progressScenarios.push({id:'ordered-progress',mainRequests:1,progressReads:completedReads,minIntervalMs:Math.min(...currentReads.slice(1).map((item,index)=>item.at-currentReads[index].at)),rawTokensStored:false});
       await shot(page,'desktop-progress-final');
     } finally {await context.close();}
@@ -487,14 +547,15 @@ try {
       const openPosition=await readingPosition(page);
       await release(page,secondPoll,progress('support',8));
       const updatedOpenPosition=await readingPosition(page);
-      record('모바일 진행은 펼침·focus·문서 읽기 위치를 보존하며 다른 내역을 숨기지 않음',samePosition(openPosition,updatedOpenPosition) && await page.locator('#preparation-board>[data-stage-id]').evaluateAll(nodes=>nodes.every(node=>node.checkVisibility())) && await page.locator('[data-stage-id="records"]').isVisible() && await page.locator('[data-stage-id="support"]').isVisible() && await page.locator('[data-stage-id="plan"]').isVisible(),JSON.stringify({before:openPosition,after:updatedOpenPosition}));
+      record('모바일 진행은 선택한 자료와 펼침·focus·읽기 위치·네 탐색 행을 보존',samePosition(openPosition,updatedOpenPosition) && (await workspaceEvidence(page)).selectedStage==='records' && await page.locator('#stage-navigation>button[data-open-stage]').count()===4,JSON.stringify({before:openPosition,after:updatedOpenPosition}));
       const supportActivity=normalize(await page.locator('[data-stage-id="support"] [data-stage-events]').textContent());
       await release(page,firstPoll,progress('hospitals',100));
       await release(page,firstMain,response(firstMain,createDemoCase(),'이전 토큰의 늦은 답변은 보이면 안 됩니다.'));
-      record('이전 토큰의 늦은 진행·main 성공은 새 요청을 덮지 않음',normalize(await page.locator('[data-stage-id="support"] [data-stage-events]').textContent())===supportActivity && await page.locator('#conversation-form').getAttribute('aria-busy')==='true' && !(await page.locator('#message-list').innerText()).includes('이전 토큰의 늦은 답변'));
+      record('이전 토큰의 늦은 진행·main 성공은 새 요청을 덮지 않음',normalize(await page.locator('[data-stage-id="support"] [data-stage-events]').textContent())===supportActivity && await page.locator('#conversation-form').getAttribute('aria-busy')==='true' && !(await page.locator('#message-list').textContent()).includes('이전 토큰의 늦은 답변'));
       await finish(page,secondMain,createDemoCase(),'새 문의의 합성 최종 답변입니다.');
-      record('최종 답변도 자료·병원·이동·답변 네 칸을 함께 유지',await page.locator('#preparation-board>[data-stage-id]').evaluateAll(nodes=>nodes.every(node=>node.checkVisibility())) && await page.locator('[data-stage-id="records"]').isVisible() && await page.locator('[data-stage-id="plan"]').isVisible());
-      record('중앙 답변 본문에서 새 답변과 취소 이력을 함께 읽음',(await page.locator('.chat-workspace #message-list').innerText()).includes('새 문의의 합성 최종 답변') && /중지/.test(await page.locator('.chat-workspace .request-error').first().innerText()) && await page.locator('.message.user').count()===2 && await page.locator('#preparation-board .message,#preparation-board .request-error').count()===0);
+      record('최종 답변도 단일 단계 본문과 네 단계 탐색을 유지',(await guidedEvidence(page,createDemoCase())).oneSelected && await page.locator('#stage-navigation>button[data-open-stage]').count()===4);
+      await readConversation(page);
+      record('중앙 보조 기록에서 새 답변과 취소 이력을 함께 읽음',(await page.locator('.chat-workspace #message-list').textContent()).includes('새 문의의 합성 최종 답변') && /중지/.test(await page.locator('.chat-workspace .request-error').first().innerText()) && await page.locator('.message.user').count()===2 && await page.locator('#preparation-board .message,#preparation-board .request-error').count()===0);
       const oldCount=(await calls(page,'/api/agent/progress')).length;await page.clock.runFor(9000);
       record('취소·최종응답 뒤 유휴 진행 POST가 늘지 않음',(await calls(page,'/api/agent/progress')).length===oldCount);
       proof.progressScenarios.push({id:'cancel-old-token-mobile',mainRequests:2,progressReads:oldCount,rawTokensStored:false});
@@ -525,11 +586,11 @@ try {
       const poll=await advancePoll(page,0);
       await page.locator('#cancel-request').click();await flush(page);
       page.once('dialog',dialog=>dialog.accept());await page.locator('#new-conversation').click();await flush(page);
-      record('진행을 중지하고 새 대화하면 초안·이력·상태 초기화',await page.locator('#request-input').inputValue()==='' && await page.locator('.message').count()===1 && (await allStatus(page)).slice(1).every(status=>status==='waiting'));
+      record('진행을 중지하고 새 대화하면 초안·이력·상태 초기화',await page.locator('#request-input').inputValue()==='' && await page.locator('.message').count()===1 && JSON.stringify(await allStatus(page))===JSON.stringify(await page.evaluate(async()=>{const state=(await import('/domain.js')).createDemoCase();return (await import('/preparation-stages.js')).getPreparationBoard(state).stages.map(stage=>stage.status);} )));
       await release(page,poll,progress('support',120));
       await release(page,call,response(call,createDemoCase(),'새 대화 뒤 섞이면 안 되는 이전 답변'));
       await page.clock.runFor(9000);
-      record('새 대화는 이전 토큰의 늦은 진행·답변·추가 조회를 차단',await page.locator('.message').count()===1 && !(await page.locator('#message-list').innerText()).includes('섞이면 안 되는') && (await allStatus(page)).slice(1).every(status=>status==='waiting') && (await calls(page,'/api/agent/progress')).length===1);
+      record('새 대화는 이전 토큰의 늦은 진행·답변·추가 조회를 차단',await page.locator('.message').count()===1 && !(await page.locator('#message-list').textContent()).includes('섞이면 안 되는') && JSON.stringify(await allStatus(page))===JSON.stringify(await page.evaluate(async()=>{const state=(await import('/domain.js')).createDemoCase();return (await import('/preparation-stages.js')).getPreparationBoard(state).stages.map(stage=>stage.status);} )) && (await calls(page,'/api/agent/progress')).length===1);
       proof.progressScenarios.push({id:'new-conversation-old-token',mainRequests:1,progressReads:1,rawTokensStored:false});
     } finally {await context.close();}
   });
@@ -561,10 +622,10 @@ try {
       record(mode+' 진행 조회는 최대26번·동시 중복 없음',total<=26 && (mode!=='cap' || total>=24 && total===count),String(total)+'회');
       if(await page.locator('#conversation-form').getAttribute('aria-busy')==='true') {
         await finish(page,call,createDemoCase(),'진행 연결과 무관하게 받은 합성 답변입니다.');
-        record(mode+' 진행 실패가 원래 최종 답변을 막지 않음',(await page.locator('#message-list').innerText()).includes('진행 연결과 무관하게'));
+        record(mode+' 진행 실패가 원래 최종 답변을 막지 않음',(await page.locator('#message-list').textContent()).includes('진행 연결과 무관하게'));
       } else {
         await release(page,call,response(call,createDemoCase(),'화면 시간 초과 후 늦은 답변'));
-        record(mode+' 화면 대기 종료 뒤 늦은 결과는 안전하게 무시',!(await page.locator('#message-list').innerText()).includes('화면 시간 초과 후 늦은 답변') && await page.locator('#request-input').inputValue()===JSON.parse(call.body).message);
+        record(mode+' 화면 대기 종료 뒤 늦은 결과는 안전하게 무시',!(await page.locator('#message-list').textContent()).includes('화면 시간 초과 후 늦은 답변') && await page.locator('#request-input').inputValue()===JSON.parse(call.body).message);
       }
       proof.progressScenarios.push({id:mode,mainRequests:1,progressReads:total,rawTokensStored:false});
     } finally {await context.close();}
@@ -578,7 +639,7 @@ try {
       const reads=await calls(page,'/api/agent/progress');
       record('progress 미지정 capabilities는 poll·토큰 생성을 요구하지 않음',reads.length===0 && !Object.hasOwn(JSON.parse(call.body),'progressToken'));
       await finish(page,call,createDemoCase(),'기존 연결의 합성 답변입니다.');
-      record('기존 응답 경로는 정상 유지',(await page.locator('#message-list').innerText()).includes('기존 연결의 합성 답변'));
+      record('기존 응답 경로는 정상 유지',(await page.locator('#message-list').textContent()).includes('기존 연결의 합성 답변'));
     } finally {await context.close();}
   });
 
@@ -596,7 +657,7 @@ try {
         window.__qaPlanScrollCalls=[];
         for(const [target,names] of [[Element.prototype,['scrollIntoView','scrollIntoViewIfNeeded','scrollTo','scrollBy']],[window,['scrollTo','scrollBy']]])for(const name of names) {
           const original=target[name];
-          if(typeof original==='function')target[name]=function(...args){if(this?.id!=='preparation-rail' || !['scrollTo','scrollBy'].includes(name))window.__qaPlanScrollCalls.push(name);return original.apply(this,args);};
+          if(typeof original==='function')target[name]=function(...args){if(!['preparation-rail','conversation-scroll'].includes(this?.id) || !['scrollTo','scrollBy'].includes(name))window.__qaPlanScrollCalls.push(name);return original.apply(this,args);};
         }
       });
       const snapshot=()=>readingNode.evaluate(node=>{const r=node.getBoundingClientRect();return {connected:node.isConnected,active:document.activeElement===node,open:node.parentElement.open,top:r.top,left:r.left,scrollCalls:window.__qaPlanScrollCalls.length};});
@@ -607,7 +668,7 @@ try {
       const unreadNotice=await notice.isVisible();
       record(width+'px 네 번째 준비 상세를 읽는 중에도 자동 이동 없이 focus·위치·펼침과 새 답변 알림 유지',readingPreserved && unreadNotice && await page.locator('.chat-workspace #message-list .message.assistant:not(.greeting)').count()===2 && await page.locator('#preparation-board .message').count()===0,JSON.stringify({before,after,unreadNotice}));
       await shot(page,width+'-plan-reading-new-answer');
-      await notice.locator('[data-open-stage="plan"]').click();await flush(page);
+      await notice.locator('button').click();await flush(page);
       const answer=page.locator('.chat-workspace #message-list .message.assistant:not(.greeting)').last();
       record(width+'px 새 답변 알림을 선택하면 중앙 답변 시작으로 이동·추가 POST 없음',!await notice.isVisible() && await answer.locator('h3').evaluate(node=>{const r=node.getBoundingClientRect();return node.checkVisibility({visibilityProperty:true}) && r.width>0 && r.height>0 && r.top>=0 && r.bottom<=innerHeight;}) && (await calls(page,'/api/agent')).length===2 && actualPosts.length===0);
       proof.progressScenarios.push({id:'plan-reading-new-answer-'+width,mainRequests:2,progressReads:(await calls(page,'/api/agent/progress')).length,readingPreserved,unreadNotice,rawTokensStored:false});
@@ -623,8 +684,9 @@ try {
       const call=await begin(page,'표를 포함한 긴 합성 답변을 읽겠습니다.');
       await finish(page,call,createDemoCase(),reply);
       const answer=page.locator('.chat-workspace #message-list .message.assistant:not(.greeting) .message-body');
+      await readConversation(page);await answer.locator('h3').first().scrollIntoViewIfNeeded();
       record(width+'x'+height+' 긴 전체 답변은 중앙1개이고 오른쪽 계획은 요약·facts·기록만 표시',await answer.count()===1 && await page.locator('#preparation-board .message,#preparation-board #message-list').count()===0 && await page.locator('[data-stage-id="plan"] [data-stage-summary],[data-stage-id="plan"] [data-stage-facts],[data-stage-id="plan"] [data-stage-events]').count()===3 && !/긴 기관별 준비 답변|확인 24\.|마지막 확인:/.test(await page.locator('.preparation-rail').innerText()));
-      record(width+'x'+height+' 새 답변의 시작은 별도 창 선택 없이 페이지에 표시',await answer.locator('h3').first().evaluate(node=>{const rect=node.getBoundingClientRect();return node.checkVisibility({visibilityProperty:true}) && rect.width>0 && rect.height>0 && rect.top>=0 && rect.bottom<=innerHeight;}));
+      record(width+'x'+height+' 보조 기록을 펼치면 새 답변 시작에 접근',await answer.locator('h3').first().evaluate(node=>{const rect=node.getBoundingClientRect();return node.checkVisibility({visibilityProperty:true}) && rect.width>0 && rect.height>0 && rect.top>=0 && rect.bottom<=innerHeight;}));
       const start=await accessible(answer.locator('h3').first()),startY=await page.locator('#conversation-scroll').evaluate(node=>node.scrollTop);
       const end=await accessible(answer.locator('p').last()),endY=await page.locator('#conversation-scroll').evaluate(node=>node.scrollTop),reading=await workspaceEvidence(page);
       const afterReply=await page.locator('.chat-workspace').evaluate(node=>({chatHeight:node.clientHeight,planHeight:document.querySelector('[data-stage-id="plan"]').clientHeight,answerHeight:node.querySelector('.message.assistant:not(.greeting) .message-body').clientHeight,documentHeight:document.scrollingElement.scrollHeight}));
@@ -700,6 +762,7 @@ try {
         const log=page.locator('[data-stage-id="'+id+'"] [data-stage-log]');
         if(!await log.evaluate(node=>node.open))await log.locator(':scope>summary').click();
       }
+      await readStage(page,'hospitals');
       const link=await page.locator('[data-stage-id="hospitals"] [data-stage-events] [data-tool-status="completed"] a[href^="https://"]').first().elementHandle();
       if(!link)throw new Error('실제 preview의 확정 처리 기록에 공개 출처 링크가 없습니다.');
       await link.scrollIntoViewIfNeeded();await link.focus();
@@ -707,7 +770,7 @@ try {
         window.__qaSourceScrollCalls=[];
         for(const [target,names] of [[Element.prototype,['scrollIntoView','scrollIntoViewIfNeeded','scrollTo','scrollBy']],[window,['scrollTo','scrollBy']]])for(const name of names) {
           const original=target[name];
-          if(typeof original==='function')target[name]=function(...args){if(this?.id!=='preparation-rail' || !['scrollTo','scrollBy'].includes(name))window.__qaSourceScrollCalls.push(name);return original.apply(this,args);};
+          if(typeof original==='function')target[name]=function(...args){if(!['preparation-rail','conversation-scroll'].includes(this?.id) || !['scrollTo','scrollBy'].includes(name))window.__qaSourceScrollCalls.push(name);return original.apply(this,args);};
         }
       });
       const snapshot=()=>link.evaluate(node=>{const rect=node.getBoundingClientRect();return {connected:node.isConnected,active:document.activeElement===node,stage:node.closest('[data-stage-id]')?.dataset.stageId,top:rect.top,left:rect.left,documentY:scrollY,scrollCalls:window.__qaSourceScrollCalls.length};});
@@ -724,7 +787,7 @@ try {
       }
       await shot(page,width+'-static-source-live');
       await finish(page,second,previewEvidence.caseState,'출처를 읽은 뒤 받은 합성 최종 답변입니다.');
-      record(width+'px 출처 focus 회귀는 일반 실제 POST 없이 기존 답변 경로 유지',actualPosts.length===0 && (await calls(page,'/api/agent')).length===2 && (await page.locator('#message-list').innerText()).includes('출처를 읽은 뒤'));
+      record(width+'px 출처 focus 회귀는 일반 실제 POST 없이 기존 답변 경로 유지',actualPosts.length===0 && (await calls(page,'/api/agent')).length===2 && (await page.locator('#message-list').textContent()).includes('출처를 읽은 뒤'));
       proof.progressScenarios.push({id:'static-source-focus-'+width,mainRequests:(await calls(page,'/api/agent')).length,progressReads:(await calls(page,'/api/agent/progress')).length-previousProgressReads,sourceIdentityAndFocus:focusPreserved,rawTokensStored:false});
     } finally {await context.close();}
   });
@@ -745,7 +808,7 @@ try {
       await source.scrollIntoViewIfNeeded();await source.focus();
       await source.evaluate(node=>{window.__qaResizeSource=node;});
       const snapshot=()=>source.evaluate(node=>{
-        const rail=document.getElementById('preparation-rail'),r=node.getBoundingClientRect(),f=rail.getBoundingClientRect();
+        const rail=document.getElementById('conversation-scroll'),r=node.getBoundingClientRect(),f=rail.getBoundingClientRect();
         const frame={top:f.top+rail.clientTop,bottom:f.top+rail.clientTop+rail.clientHeight,left:f.left+rail.clientLeft,right:f.left+rail.clientLeft+rail.clientWidth};
         return {sameNode:node===window.__qaResizeSource && node.isConnected,focused:document.activeElement===node,details:node.closest('[data-stage-details]').open,log:node.closest('[data-stage-log]').open,scrollTop:rail.scrollTop,active:document.querySelector('.conversation-layout').dataset.activeView,top:r.top,bottom:r.bottom,left:r.left,right:r.right,height:r.height,frame,href:node.href,text:node.textContent,visible:node.checkVisibility() && !node.closest('[hidden],[inert]') && r.top>=Math.max(0,frame.top)-2 && r.bottom<=Math.min(innerHeight,frame.bottom)+2 && r.left>=Math.max(0,frame.left)-2 && r.right<=Math.min(innerWidth,frame.right)+2,viewport:{width:innerWidth,height:innerHeight}};
       });
@@ -764,7 +827,7 @@ try {
         const beforeCapture=await settled();await shot(page,'resize-continuity-'+width);const position=await settled(),workspace=await workspaceEvidence(page),sameComposer=await input.evaluate(node=>node===document.getElementById('request-input')) && await page.locator('#request-input').inputValue()===draft;
         const expectedTop=Math.min(Math.max(before.top,Math.max(0,position.frame.top)+8),Math.min(height,position.frame.bottom)-8-position.height);
         const roundTrip=width===before.viewport.width && height===before.viewport.height;
-        const readingStable=[beforeCapture,position].every(item=>item.viewport.width===width && item.viewport.height===height && item.sameNode && item.focused && item.details && item.log && item.visible && item.href===before.href && item.text===before.text && Math.abs(item.top-expectedTop)<=2) && (!workspace.compact || position.active==='preparation') && (!roundTrip || Math.abs(position.scrollTop-before.scrollTop)<=2 && Math.abs(position.left-before.left)<=1);
+        const readingStable=[beforeCapture,position].every(item=>item.viewport.width===width && item.viewport.height===height && item.sameNode && item.focused && item.details && item.log && item.visible && item.href===before.href && item.text===before.text && Math.abs(item.top-expectedTop)<=2) && (!workspace.compact || position.active==='chat') && (!roundTrip || Math.abs(position.scrollTop-before.scrollTop)<=2 && Math.abs(position.left-before.left)<=1);
         samples.push({width,height,beforeCapture,position,expectedTop,roundTrip,workspace,sameComposer,readingStable});
         record(width+'x'+height+' 같은 context 전환은 출처·focus·열림·rail 읽기·초안 보존',readingStable && sameComposer && workspace.viewportFit && workspace.sharedComposer && workspace.scrollRegions && workspace.compactPanels && actualPosts.length===0,JSON.stringify({before,...samples.at(-1)}));
         proof.workspaceScenarios.push({id:'resize-continuity',width,height,...workspace,sharedComposer:workspace.sharedComposer && sameComposer,readingStable,sourceReading:{before,beforeCapture,after:position,expectedTop,roundTrip}});
@@ -823,7 +886,7 @@ try {
       const toolbarColors=await contrast(page,toolbarSelector);
       const focus=(await contrast(page,'#preview-button'))[0];
       const keyboardFocus=await previewButton.evaluate(node=>node.matches(':focus-visible') && ['rgb(168, 77, 22)','rgb(40, 92, 67)'].includes(getComputedStyle(node).outlineColor)) && focus?.outlineVisible && focus.outlineRatio>=3;
-      await reveal(example);await reveal(summary);
+      await reveal(example);await reveal(summary);if(await details.evaluate(node=>node.open))await summary.click();
       const closedSummary=await feedback(summary),closedIcon=await feedback(summary.locator(':scope>.icon'));
       await reveal(example);await example.hover();await nativeFinished(example);
       const exampleHover=await feedback(example),exampleIcon=await feedback(example.locator(':scope>.icon'));
@@ -853,6 +916,7 @@ try {
       const userSoft=await page.locator('#message-list>.message.user>.message-body').evaluate(node=>getComputedStyle(node).backgroundColor=== 'rgb(237, 246, 239)');
       await release(page,first,{...response(first,previewEvidence.caseState,previewEvidence.reply),events:previewEvidence.events,pendingActions:previewEvidence.pendingActions});
       await page.waitForFunction(()=>document.querySelector('#conversation-form').getAttribute('aria-busy')==='false');
+      await readConversation(page);
       const motionEvents=()=>page.evaluate(()=>window.__boardMotion);
       let observedAt=performance.now();
       await nativeUntil(motionEvents,events=>reduce?performance.now()-observedAt>=300:events.some(event=>event.type==='animationend' && event.replyIndex===0));
@@ -867,8 +931,10 @@ try {
         await page.keyboard.press('Escape');await page.locator('#answer-dialog').waitFor({state:'hidden'});
       }
       await nativeFinished(page.locator('.workspace-tools'));
-      const conversationColors=await contrast(page),nextDraftContrast=await contrast(page,'#next-request-draft');await showView(page,'preparation');await nativeFinished(page.locator('.workspace-tools'));
-      const statusColors=await contrast(page),toolbarAfter=await contrast(page,toolbarSelector+',#next-request-draft');
+      const conversationColors=await contrast(page),nextDraftContrast=await contrast(page,'#next-request-draft');
+      const statusColors=[];for(const stage of ids){await readStage(page,stage);statusColors.push(...await contrast(page));}
+      await showView(page,'preparation');statusColors.push(...await contrast(page));await readConversation(page);await nativeFinished(page.locator('.workspace-tools'));
+      const toolbarAfter=await contrast(page,toolbarSelector+',#next-request-draft');
       const preservedSignals={available:'rgb(38, 113, 73)',attention:'rgb(135, 86, 23)',blocked:'rgb(163, 61, 52)'};
       const signalPreserved=Object.entries(preservedSignals).every(([signal,color])=>statusColors.some(item=>item.signal===signal && item.color===color));
       const nextDraft=await feedback(page.locator('#next-request-draft'));
@@ -889,13 +955,11 @@ try {
       await page.waitForFunction(()=>document.querySelector('#conversation-form').getAttribute('aria-busy')==='false');
       const readingSamples=[];observedAt=performance.now();
       const compact=(await workspaceEvidence(page)).compact;
-      await nativeUntil(async()=>{readingSamples.push(await snapshot());return motionEvents();},events=>reduce || compact?performance.now()-observedAt>=300:events.filter(event=>event.type==='animationend').length>=2);
+      await nativeUntil(async()=>{readingSamples.push(await snapshot());return motionEvents();},()=>performance.now()-observedAt>=300);
       const after=await snapshot();readingSamples.push(after);
       evidence.readingStable=before.connected && before.focused && before.open && before.unmoved && readingSamples.every(item=>item.connected && item.focused && item.open && item.unmoved && Math.abs(item.top-before.top)<=2 && Math.abs(item.left-before.left)<=1);
-      if(compact) {
-        const waiting=await motionEvents();readerQuiet &&=waiting.length===afterFirst.length;
-        await page.locator('#answer-ready-notice [data-open-stage="plan"]').click();await flush(page);
-      }
+      const waiting=await motionEvents();readerQuiet &&=waiting.length===afterFirst.length;
+      await page.locator('#answer-ready-notice>button').click();await flush(page);
       observedAt=performance.now();
       const finalEvents=await nativeUntil(motionEvents,events=>reduce?performance.now()-observedAt>=280:events.filter(event=>event.type==='animationend').length>=2);
       await nativeFinished(page.locator('#message-list>.message.assistant:last-child>.message-meta'));
@@ -918,18 +982,19 @@ try {
       const {result,data}=await preview(page,id);
       record(id+'는 실제 고정 preview·LLM/실발신 없음',result.status()===200 && data.isPreview===true && data.capabilities.llm===false && data.events.length>0 && actualPosts.length===1 && actualPosts[0].path==='/api/agent/preview');
       const records=await stageText(page,'records'),hospitals=await stageText(page,'hospitals'),support=await stageText(page,'support'),plan=await stageText(page,'plan');
-      record(id+' 자료·병원·이동·방문 계획은 같은 caseState를 읽고 전체 답변은 중앙1개',/자료|판독|진찰/.test(records) && /병원|접수/.test(hospitals) && /이동|동행/.test(support) && !normalize(plan).includes(normalize(data.reply)) && normalize(await page.locator('.chat-workspace #message-list').innerText()).includes(normalize(data.reply)) && await page.locator('.chat-workspace .message.assistant:not(.greeting)').count()===1 && await page.locator('#preparation-board .message,#preparation-board #conversation-scroll').count()===0);
+      record(id+' 자료·병원·이동·방문 계획은 같은 caseState를 읽고 전체 답변은 중앙1개',/자료|판독|진찰/.test(records) && /병원|접수/.test(hospitals) && /이동|동행/.test(support) && !normalize(plan).includes(normalize(data.reply)) && normalize(await page.locator('.chat-workspace #message-list').textContent()).includes(normalize(data.reply)) && await page.locator('.chat-workspace .message.assistant:not(.greeting)').count()===1 && await page.locator('#preparation-board .message,#preparation-board #conversation-scroll').count()===0);
       record(id+' 기호·설명은 actual caseState의 준비 projection과 일치',await checkSignals(page,data.caseState,{responseCount:1,events:data.events}));
-      const colors=await contrast(page);
+      const colors=[];for(const stage of ids){await readStage(page,stage);colors.push(...await contrast(page));}
+      await showView(page,'preparation');colors.push(...await contrast(page));
       record(id+' 준비 기호·설명·본문·고지 대비 유지',colors.length>0 && colors.every(item=>item.ratio>=item.minimum),JSON.stringify(colors));
-      if(id==='aewol-parent-visit')record('○·△·×는 세 가지 다른 상태색과 뜻을 함께 제공',new Set(['available','attention','blocked'].map(signal=>colors.find(item=>item.signal===signal)?.color)).size===3 && ['available','attention','blocked'].every(signal=>colors.some(item=>item.signal===signal)) && /실제 진료.*예약.*배차.*확정.*아닙니다/.test(await page.locator('.preparation-note').innerText()));
-      if(id==='aewol-parent-visit')record('기본 preview의 병원·공개 택시·동행 실패는 올바른 창에 표시',hospitals.includes(data.caseState.patient.localHospital) && support.includes('애월콜') && /연락|인계|확인/.test(support) && await statusOf(page,'support')==='needs_input' && /진료 수락.*미확인/.test(hospitals));
+      if(id==='aewol-parent-visit')record('○·△·×는 세 가지 다른 상태색과 뜻을 함께 제공',new Set(['available','attention','blocked'].map(signal=>colors.find(item=>item.signal===signal)?.color)).size===3 && ['available','attention','blocked'].every(signal=>colors.some(item=>item.signal===signal)) && /실제 진료.*예약.*배차.*미확정/.test(await page.locator('.preparation-boundary').innerText()));
+      if(id==='aewol-parent-visit')record('기본 preview의 병원·공개 택시·동행 실패는 올바른 창에 표시',hospitals.includes(data.caseState.patient.localHospital) && support.includes('애월콜') && /연락|인계|확인/.test(support) && await statusOf(page,'support')==='handoff' && /진료 수락.*미확인/.test(hospitals));
       if(id==='time_changed')record('진료 시각 변경은 휠체어 이동·동행 재확인',await statusOf(page,'support')==='needs_recheck' && ['휠체어','10:00','14:00'].every(term=>(records+' '+support).includes(term)) && /재확인/.test(support) && ['taxi','companion'].every(kind=>data.caseState.visitSupport[kind].status==='needs_recheck'));
       if(id==='call_ai_declined') {
         const journey=await page.evaluate(async state=>(await import('/care-journey.js')).getCareJourneySummary(state),data.caseState);
         const handoff=journey.handoffs.find(item=>item.reason==='ai_declined');
-        record('AI 응대 거절은 이동 창의 보호자 인계·자동 반복 중단',await statusOf(page,'support')==='needs_input' && ['AI','거절','보호자'].every(term=>support.includes(term)) && /자동 반복 문의를 중단/.test(support) && handoff?.owner==='보호자' && handoff.status==='handed_off' && handoff.stopAutomatic===true && normalize(support).includes(normalize(handoff.detail)));
-        await showView(page,'chat');
+        record('AI 응대 거절은 이동 창의 보호자 인계·자동 반복 중단',await statusOf(page,'support')==='handoff' && ['AI','거절','보호자'].every(term=>support.includes(term)) && /자동 반복 문의를 중단/.test(support) && handoff?.owner==='보호자' && handoff.status==='handed_off' && handoff.stopAutomatic===true && normalize(support).includes(normalize(handoff.detail)));
+        await readConversation(page);
         const answerNode=page.locator('.chat-workspace #message-list .message.assistant:not(.greeting) .message-body'),answer=normalize(await answerNode.innerText()),fullBoundary=await accessible(page.locator('#composer-boundary')),disclosure=normalize(await page.locator('#composer-boundary').innerText());
         const activeView=await page.locator('.conversation-layout').getAttribute('data-active-view'),terms=Object.fromEntries(['개인 기록 조회','전화','예약','배차','환자 수락'].map(term=>[term,answer.includes(term)]));
         const boundaryChecks={chatSelected:activeView==='chat',centralRendered:await answerNode.evaluate(node=>node.checkVisibility({visibilityProperty:true})),answerMatches:answer===normalize(data.reply),termsPresent:Object.values(terms).every(Boolean),executionNotPerformed:/실제.*수행하지 않았습니다/.test(answer),fullBoundaryReachable:fullBoundary.reachable,guideOpen:await page.locator('#composer-help').evaluate(node=>node.open),describedBoundary:await page.locator('#request-input').evaluate(node=>node.getAttribute('aria-describedby').split(/\s+/).includes('composer-boundary')),syntheticNotice:/가상 사례/.test(disclosure),contactReservationNotPerformed:/실제.*연락.*예약.*없음/.test(disclosure),handoffCallFalse:handoff?.actualCallPlaced===false,...Object.fromEntries(['actualCallPlaced','reservationConfirmed','clinicalAcceptanceConfirmed','externalRecordsConnected'].map(key=>[key+'False',journey.boundary[key]===false]))};
@@ -947,12 +1012,12 @@ try {
   record('검사 중 runtime source 변경 없음',proof.finalSourceHash===proof.sourceHash);
   record('브라우저 실행 오류 없음',errors.length===0,errors.join('; '));
   if(checks.every(check=>check.status==='pass') && errors.length===0)proof.result='pass';
-} catch(error) {errors.push(error.message);record('중앙 채팅·오른쪽 준비 현황 브라우저 검사 완료',false,error.message);}
+} catch(error) {errors.push(error.message);record('현재 할 일·오른쪽 단계 안내 브라우저 검사 완료',false,error.message);}
 finally {
   try {await browser?.close();} catch(error) {errors.push(error.message);proof.result='fail';}
   await mkdir(resolve(root,'orchestration/runs'),{recursive:true});
   await writeFile(resolve(root,'orchestration/runs/preparation-board-browser.json'),JSON.stringify(proof,null,2)+'\n');
-  console.log('중앙 채팅·오른쪽 준비 현황 브라우저 검증: '+checks.filter(check=>check.status==='pass').length+'/'+checks.length+' · 실제 LLM/전화/개인기록 조회 없음');
+  console.log('현재 할 일·오른쪽 단계 안내 브라우저 검증: '+checks.filter(check=>check.status==='pass').length+'/'+checks.length+' · 실제 LLM/전화/개인기록 조회 없음');
   if(proof.result!=='pass')process.exitCode=1;
 }
 

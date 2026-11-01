@@ -17,7 +17,7 @@ catch {throw new Error('선택 QA 도구 Playwright가 필요합니다. README�
 const base=new URL(process.env.BASE_URL||'http://127.0.0.1:4173');
 // 이 검사는 실제 503/고정 preview와 주입 응답을 함께 쓴다. 공개 유료 서버에서는 실행하지 않는다.
 if(!['localhost','127.0.0.1','[::1]'].includes(base.hostname) || !['http:','https:'].includes(base.protocol) || base.username || base.password)throw new Error('BASE_URL은 키를 끈 localhost QA 서버여야 합니다.');
-const directory='.impeccable/review/chat-rail/conversation';
+const directory='.impeccable/review/chat-rail/guided-visit/conversation';
 const storageKey='jeju-care-preferences-v1';
 const fixtureSessionId='q'.repeat(43);
 const configuredCaps={llm:true,model:'gpt-6.1-sol',phone:'simulation',healthRecords:'demo',voiceInput:'browser'};
@@ -45,13 +45,17 @@ async function showView(page,view) {
   if(await tab.isVisible() && await tab.getAttribute('aria-selected')!=='true')await tab.click();
 }
 async function reveal(locator) {
-  const page=locator.page(),view=await locator.evaluate(node=>node.closest('#preparation-rail')?'preparation':node.closest('#chat-workspace')?'chat':null);
+  const page=locator.page(),{view,stage}=await locator.evaluate(node=>({view:node.closest('#preparation-rail')?'preparation':node.closest('#chat-workspace')?'chat':null,stage:node.closest('#preparation-board>[data-stage-id]')?.dataset.stageId}));
   const target=await locator.elementHandle();
   if(!await page.locator('dialog[open]').count())for(const id of ['request-examples','composer-help']) {
     const popup=page.locator('#'+id);
     if(await popup.evaluate((node,target)=>node.open && !node.contains(target),target))await popup.locator(':scope>summary').click();
   }
-  if(view)await showView(page,view);
+  if(stage && await locator.evaluate(node=>node.closest('[data-stage-id]').hidden)) {
+    await showView(page,'preparation');
+    await page.locator('#stage-navigation>button[data-open-stage="'+stage+'"]').click();
+    await showView(page,'chat');
+  } else if(view)await showView(page,view);
   for(const details of await locator.locator('xpath=ancestor::details').all())if(!await details.evaluate((node,target)=>node.open || node.querySelector(':scope>summary')?.contains(target),target))await details.locator(':scope>summary').click();
 }
 async function workspaceEvidence(page) {
@@ -59,8 +63,8 @@ async function workspaceEvidence(page) {
     const chat=document.getElementById('chat-workspace'),rail=document.getElementById('preparation-rail'),input=document.getElementById('request-input'),form=document.getElementById('conversation-form'),composer=document.getElementById('chat-composer'),compact=matchMedia('(max-width:900px), (max-height:650px)').matches,layout=document.querySelector('.conversation-layout');
     const bounds=node=>{const r=node.getBoundingClientRect();return {top:r.top,bottom:r.bottom,left:r.left,right:r.right,width:r.width,height:r.height};},inside=node=>{const r=bounds(node);return r.width>0 && r.height>0 && r.top>=-1 && r.bottom<=innerHeight+1 && r.left>=-1 && r.right<=innerWidth+1;};
     const regions=[document.getElementById('conversation-scroll'),rail].map(node=>({id:node.id,...bounds(node),clientHeight:node.clientHeight,scrollHeight:node.scrollHeight,scrollTop:node.scrollTop,overflowY:getComputedStyle(node).overflowY,fontSize:parseFloat(getComputedStyle(node.querySelector('.message-body')||node).fontSize),active:!node.closest('[hidden],[inert]')}));
-    const cards=[...document.querySelectorAll('#preparation-board>[data-stage-id]')],tabs=[...document.querySelectorAll('[role="tab"][id^="workspace-tab-"]')],active=layout.dataset.activeView==='preparation'?rail:chat,inactive=active===chat?rail:chat;
-    return {viewportFit:document.documentElement.scrollWidth<=innerWidth+1 && document.documentElement.scrollHeight<=innerHeight+1 && document.body.scrollHeight<=innerHeight+1 && scrollY===0 && inside(document.querySelector('.app-shell')),sharedComposer:document.querySelectorAll('#request-input,#conversation-form,#chat-composer').length===3 && composer.contains(form) && form.contains(input) && !composer.closest('[hidden],[inert]') && [input,document.getElementById('send-request')].every(inside),scrollRegions:regions.every(region=>/auto|scroll/.test(region.overflowY) && (!region.active || region.clientHeight>=Math.max(44,region.fontSize*1.2))) && cards.length===4 && cards.every(node=>! /auto|scroll|hidden|clip/.test(getComputedStyle(node).overflowY) && node.scrollHeight<=node.clientHeight+2),compactPanels:compact?chat.getAttribute('role')==='tabpanel' && rail.getAttribute('role')==='tabpanel' && tabs.length===2 && tabs.every(node=>node.getAttribute('aria-controls')===(node.id==='workspace-tab-chat'?'chat-workspace':'preparation-rail')) && tabs.filter(node=>node.getAttribute('aria-selected')==='true').length===1 && active.hidden===false && !active.inert && inactive.hidden && inactive.inert && !inactive.contains(document.activeElement) && tabs.every(node=>node.tabIndex===(node.getAttribute('aria-selected')==='true'?0:-1)):!chat.hidden && !rail.hidden && !chat.inert && !rail.inert,regions,compact,activeView:layout.dataset.activeView,composer:bounds(composer),body:{width:document.documentElement.scrollWidth,height:document.documentElement.scrollHeight}};
+    const cards=[...document.querySelectorAll('#preparation-board>[data-stage-id]')],selected=cards.filter(node=>!node.hidden&&!node.inert),navigation=[...document.querySelectorAll('#stage-navigation>button[data-open-stage]')],tabs=[...document.querySelectorAll('[role="tab"][id^="workspace-tab-"]')],active=layout.dataset.activeView==='preparation'?rail:chat,inactive=active===chat?rail:chat;
+    return {viewportFit:document.documentElement.scrollWidth<=innerWidth+1 && document.documentElement.scrollHeight<=innerHeight+1 && document.body.scrollHeight<=innerHeight+1 && scrollY===0 && inside(document.querySelector('.app-shell')),sharedComposer:document.querySelectorAll('#request-input,#conversation-form,#chat-composer').length===3 && composer.contains(form) && form.contains(input) && !composer.closest('[hidden],[inert]') && [input,document.getElementById('send-request')].every(inside),scrollRegions:regions.every(region=>/auto|scroll/.test(region.overflowY) && (!region.active || region.clientHeight>=Math.max(44,region.fontSize*1.2))) && cards.length===4 && selected.length===1 && cards.every(node=>! /auto|scroll|hidden|clip/.test(getComputedStyle(node).overflowY) && (node.hidden?node.inert:node.scrollHeight<=node.clientHeight+2)) && navigation.length===4,compactPanels:compact?chat.getAttribute('role')==='tabpanel' && rail.getAttribute('role')==='tabpanel' && tabs.length===2 && tabs.every(node=>node.getAttribute('aria-controls')===(node.id==='workspace-tab-chat'?'chat-workspace':'preparation-rail')) && tabs.filter(node=>node.getAttribute('aria-selected')==='true').length===1 && active.hidden===false && !active.inert && inactive.hidden && inactive.inert && !inactive.contains(document.activeElement) && tabs.every(node=>node.tabIndex===(node.getAttribute('aria-selected')==='true'?0:-1)):!chat.hidden && !rail.hidden && !chat.inert && !rail.inert,regions,compact,activeView:layout.dataset.activeView,selectedStage:selected[0]?.dataset.stageId,currentStage:document.getElementById('preparation-board').dataset.currentStage,navigationCount:navigation.length,composer:bounds(composer),body:{width:document.documentElement.scrollWidth,height:document.documentElement.scrollHeight}};
   });
 }
 async function scenario(name,run) {
@@ -108,6 +112,8 @@ async function open(width,height,{configured=false,voice,storageSeed,onPost}={})
 }
 async function readConversation(page) {
   await showView(page,'chat');
+  const history=page.locator('#conversation-history');
+  if(!await history.evaluate(node=>node.open))await history.locator(':scope>summary').click();
   await page.locator('.chat-workspace #conversation-scroll').waitFor({state:'visible'});
 }
 async function openVisitSummary(page) {
@@ -270,7 +276,7 @@ try {
   record('API 응답 캐시 금지',capResponse.headers.get('cache-control')==='no-store');
   if(!keyless)throw new Error('실제 모델이 연결됐거나 keyless 상태를 확인하지 못해 POST 검사를 중단합니다.');
   proof.apiLive=true;
-  for(const path of ['conversation.js','conversation.css','preparation-board-view.js','preparation-stages.js','icons.js']) {
+  for(const path of ['conversation.js','conversation.css','preparation-board-view.js','preparation-stages.js','preparation-workflow.js','icons.js']) {
     const response=await fetch(new URL('/'+path,base),{redirect:'error',signal:AbortSignal.timeout(8000)});
     const expected=await readFile(resolve(servedRoot,'app',path));
     const hash=value=>createHash('sha256').update(value).digest('hex');
@@ -288,11 +294,11 @@ try {
       record(`${width}px 앱 넘침 없이 하단 공통 입력·보내기에 접근`,proof[label].noOverflow && Object.values(composerAccess).every(item=>item.reachable),JSON.stringify({initialComposer,composerAccess}));
       proof[label].chatLayout=await page.evaluate(()=>{
         const chat=document.getElementById('chat-workspace'),rail=document.getElementById('preparation-rail'),board=document.getElementById('preparation-board'),conversation=document.getElementById('conversation-scroll'),messages=document.getElementById('message-list'),composer=document.getElementById('chat-composer'),form=document.getElementById('conversation-form');
-        return Boolean(chat && rail && chat.parentElement===rail.parentElement && chat.parentElement.matches('.conversation-layout') && rail.contains(board) && chat.contains(conversation) && conversation.contains(messages) && !board.contains(messages) && composer.parentElement===chat.parentElement && composer.contains(form) && !chat.contains(form) && !rail.contains(form) && document.querySelector('.workspace-tools #expand-answer') && document.querySelectorAll('#message-list,#conversation-scroll,#conversation-form,#request-input').length===4 && !board.querySelector('.message,#conversation-form') && !document.querySelector('.chat-identity,.chat-role,#conversation-title'));
+        return Boolean(chat && rail && chat.parentElement===rail.parentElement && chat.parentElement.matches('.conversation-layout') && rail.contains(document.getElementById('stage-navigation')) && chat.contains(conversation) && conversation.contains(board) && conversation.contains(document.getElementById('current-preparation-task')) && conversation.contains(messages) && document.getElementById('conversation-history') instanceof HTMLDetailsElement && document.getElementById('conversation-history').contains(messages) && !board.contains(messages) && composer.parentElement===chat.parentElement && composer.contains(form) && !chat.contains(form) && !rail.contains(form) && document.querySelector('.workspace-tools #expand-answer') && document.querySelectorAll('#message-list,#conversation-scroll,#conversation-form,#request-input').length===4 && !board.querySelector('.message,#conversation-form') && !document.querySelector('.chat-identity,.chat-role,#conversation-title'));
       });
-      record(`${width}px 중앙 대화·준비 패널과 하단 단일 입력·공통 도구 분리`,proof[label].chatLayout);
+      record(`${width}px 중앙 단일 업무·보조 대화 기록·단계 안내와 공통 입력 분리`,proof[label].chatLayout);
       await showView(page,'preparation');
-      record(`${width}px 네 작업칸·기호·제목 아이콘은 한 번씩 보이고 모든 상세는 접힘`,await page.locator('#preparation-board>[data-stage-id]').evaluateAll(nodes=>nodes.length===4 && nodes.every(node=>node.checkVisibility())) && await page.locator('#stage-navigation').count()===0 && await page.locator('#preparation-board>.stage-pane>.stage-pane-header .signal-mark').count()===4 && await page.locator('#preparation-board>.stage-pane>.stage-pane-header .stage-topic-icon').count()===4 && await page.locator('[data-stage-details]').evaluateAll(nodes=>nodes.length===4 && nodes.every(node=>node instanceof HTMLDetailsElement && !node.open)) && await page.locator('[data-stage-id="plan"]').isVisible() && await page.locator('#preparation-details').count()===0 && await page.locator('[data-case-status]').count()===4);
+      record(`${width}px 네 단계 탐색·단일 본문·hidden/inert·보조 기록 DOM 유지`,await page.locator('#preparation-board>[data-stage-id]').evaluateAll(nodes=>nodes.length===4 && nodes.filter(node=>!node.hidden&&!node.inert).length===1 && nodes.every(node=>node.hidden===node.inert)) && await page.locator('#stage-navigation>button[data-open-stage]').count()===4 && await page.locator('#preparation-board>.stage-pane>.stage-pane-header .signal-mark').count()===4 && await page.locator('#preparation-board>.stage-pane>.stage-pane-header .stage-topic-icon').count()===4 && await page.locator('[data-stage-details]').evaluateAll(nodes=>nodes.length===4 && nodes.every(node=>node instanceof HTMLDetailsElement)) && await page.locator('#conversation-history').evaluate(node=>node instanceof HTMLDetailsElement && !node.open) && await page.locator('#preparation-details').count()===0 && await page.locator('[data-case-status]').count()===4);
       await readConversation(page);
       record(`${width}px 로고·자가 호스팅 Pretendard·제주 배경, 인물사진 비노출`,await page.locator('.brand img').first().evaluate(e=>e.complete && e.naturalWidth>0) && await backgroundLoaded(page) && await page.locator('.welcome-photo').count()===0 && await page.evaluate(()=>getComputedStyle(document.body).fontFamily.includes('Pretendard') && [...document.fonts].some(font=>font.family.replaceAll('"','')==='Pretendard' && font.status==='loaded')));
       record(`${width}px 설정은 선택이며 준비 대화에 필수 수동 폼 없음`,await page.locator('#conversation-form select,#conversation-form input[type=checkbox]').count()===0 && await page.locator('#preferences-form [required]').count()===0 && await page.locator('#preferences-form select').count()===1);
@@ -317,7 +323,7 @@ try {
       proof.normalInputDisconnected ||= disconnected;if(disconnected)proof.keylessDisconnectedInitialCheckCount++;
       record(`${width}px 자유 입력은 실제 503·입력 보존·가짜 응답 없음`,disconnected && await input.inputValue()==='모델 연결 전 자유 입력입니다.' && await page.locator('.message.assistant:not(.greeting)').count()===0 && await page.locator('.message.user').count()===1 && await page.locator('.tool-record').count()===0);
       const first=requests.at(-1);
-      record(`${width}px 동일 JSON UTF-8 SHA256`,hashMatches(first));
+      record(`${width}px guided 준비 범위와 동일 JSON UTF-8 SHA256`,json(first).guidedPreparation===true && hashMatches(first));
       const retryResponse=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/agent' && r.request().method()==='POST');
       await page.locator('[data-retry]').click();await retryResponse;
       await page.waitForFunction(()=>document.querySelector('[data-retry]') && document.querySelector('#conversation-form').getAttribute('aria-busy')==='false');

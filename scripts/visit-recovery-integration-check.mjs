@@ -7,7 +7,7 @@ import {fileURLToPath,pathToFileURL} from 'node:url';
 import {execFileSync} from 'node:child_process';
 
 const root=resolve(process.env.QA_SERVED_SOURCE_ROOT||resolve(dirname(fileURLToPath(import.meta.url)),'..'));
-const directory='.impeccable/review/chat-rail/reliable-visit/integration',tokenKey='hondi-visit-token-v1';
+const directory='.impeccable/review/chat-rail/guided-visit/integration',tokenKey='hondi-visit-token-v1';
 const firstText='합성 방문을 2026년 11월 19일 오후 2시로 바꾸고 남은 준비를 알려 주세요.';
 const nextText='합성 방문을 2026년 11월 26일 오전 11시로 바꾸고 남은 준비를 알려 주세요.';
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
@@ -15,7 +15,7 @@ const revision=()=>{try{return execFileSync('git',['rev-parse','HEAD'],{cwd:root
 const {runtimeFingerprint}=await import(pathToFileURL(resolve(root,'orchestration/checks.mjs')));
 const {createAgentService}=await import(pathToFileURL(resolve(root,'agent/service.mjs')));
 const {createMemorySessionStore}=await import(pathToFileURL(resolve(root,'agent/store.mjs')));
-const proof={checkedAt:new Date().toISOString(),result:'fail',revision:revision(),sourceHash:await runtimeFingerprint(root),checks:[],errors:[],viewports:[],staticFiles:[],actualHttpPostCounts:{agent:0,resume:0,progress:0,preview:0},fixtureProviderRespondCalls:0,fixtureLogicalTurns:0,modelInvoked:false,realModelCalls:0,realAwsCalls:0,phoneInvoked:false,healthRecordsQueried:false,externalHttpAttempts:0,runtimeErrors:0,
+const proof={checkedAt:new Date().toISOString(),result:'fail',revision:revision(),sourceHash:await runtimeFingerprint(root),checks:[],errors:[],guidedScenarios:[],viewports:[],staticFiles:[],actualHttpPostCounts:{agent:0,resume:0,progress:0,preview:0},fixtureProviderRespondCalls:0,fixtureLogicalTurns:0,modelInvoked:false,realModelCalls:0,realAwsCalls:0,phoneInvoked:false,healthRecordsQueried:false,externalHttpAttempts:0,runtimeErrors:0,
   scope:'Actual owned localhost HTTP server, current service/store/dispatcher and static UI. Only the provider is a fixed fixture. The first completed HTTP response is truncated by the server; no local API route is fulfilled or response fixture injected. No real model, AWS durability, phone or personal records. Request bodies and identifiers remain in memory and are excluded from proof and captures.'};
 let phase='setup',browser;
 function record(name,pass,detail={}){
@@ -78,6 +78,16 @@ async function fixtureServer(){
   return {base:`http://127.0.0.1:${server.address().port}`,counts,memory,first:()=>firstBody,async close(){firstBody=undefined;await new Promise(done=>{server.close(done);server.closeAllConnections();});}};
 }
 
+async function readHistory(page) {
+  if(await page.locator('#workspace-tab-chat').isVisible())await page.locator('#workspace-tab-chat').click();
+  const history=page.locator('#conversation-history');if(!await history.evaluate(node=>node.open))await history.locator(':scope>summary').click();
+}
+async function projectionEvidence(page,state) {
+  return page.evaluate(async state=>{
+    const workflow=(await import('/preparation-workflow.js')).getPreparationWorkflow(state),board=document.getElementById('preparation-board'),current=document.getElementById('current-preparation-task'),rows=[...document.querySelectorAll('#stage-navigation>button[data-open-stage]')],panes=[...board.querySelectorAll(':scope>[data-stage-id]')];
+    return {currentStage:board.dataset.currentStage===workflow.currentStageId,currentTask:current.dataset.taskId===(workflow.currentTask?.id||'') && current.dataset.taskActor===(workflow.currentTask?.actor||'') && current.dataset.taskStatus===(workflow.currentTask?.status||''),stages:rows.length===4 && workflow.stages.every(stage=>rows.some(node=>node.dataset.openStage===stage.id && node.dataset.workflowStatus===stage.status)),oneStage:panes.length===4 && panes.filter(node=>!node.hidden&&!node.inert).length===1 && panes.every(node=>node.hidden===node.inert),visitNotReady:workflow.visitReady===false};
+  },state);
+}
 async function layout(page){
   return page.evaluate(()=>{
     const q=id=>document.getElementById(id),bounds=node=>{const r=node.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height};};
@@ -113,11 +123,13 @@ try{
       await submit(page,firstText);await page.locator('.message.user.failed').waitFor();
       const first=fixture.first(),storage=await page.evaluate(()=>Object.fromEntries(Object.entries(sessionStorage))),recorded=fixture.memory.inspect()[0];
       record(`${width}px 완료 후 HTTP 응답만 유실되고 입력은 복원`,fixture.counts.truncated===1 && fixture.counts.agent===1 && recorded?.state.patient.nextVisit==='2026-11-19' && recorded?.state.visitSupport.requirements.appointmentTime==='14:00' && await page.locator('#request-input').inputValue()===firstText && await page.locator('#request-problem-notice').isVisible());
-      record(`${width}px 첫 요청 전 방문 토큰만 저장`,typeof first?.visitToken==='string' && /^[A-Za-z0-9_-]{43}$/.test(first.visitToken) && first.sessionId===undefined && Object.keys(storage).join()===tokenKey && storage[tokenKey]===first.visitToken && !JSON.stringify(storage).includes(firstText));
+      record(`${width}px 첫 요청 전 방문 토큰만 저장`,first?.guidedPreparation===true && typeof first?.visitToken==='string' && /^[A-Za-z0-9_-]{43}$/.test(first.visitToken) && first.sessionId===undefined && Object.keys(storage).join()===tokenKey && storage[tokenKey]===first.visitToken && !JSON.stringify(storage).includes(firstText));
       record(`${width}px 첫 논리 요청의 fixture 2회·budget 1회`,fixture.counts.logicalTurns===1 && fixture.counts.providerRespond===2 && fixture.counts.consumeTurn===1);
       await page.reload({waitUntil:'networkidle'});await page.waitForFunction(()=>document.getElementById('visit-recovery-notice')?.textContent.includes('마지막으로 확인된'));await page.waitForFunction(()=>document.getElementById('resume-visit')?.getAttribute('aria-busy')==='false');
       const keptToken=await page.evaluate(key=>sessionStorage.getItem(key),tokenKey);
       record(`${width}px 새로고침은 같은 방문의 실제 읽기만 수행`,keptToken===first.visitToken && fixture.counts.agent===1 && fixture.counts.resume===1 && fixture.counts.providerRespond===2 && fixture.counts.consumeTurn===1);
+      const projection=await projectionEvidence(page,recorded.state);record(`${width}px 실제 읽기 복구는 저장 상태로 현재 업무를 다시 계산`,Object.values(projection).every(Boolean) && fixture.counts.agent===1 && fixture.counts.consumeTurn===1,projection);proof.guidedScenarios.push({id:'actual-resume-projection',width,...projection,automaticPostAbsent:fixture.counts.agent===1});
+      await readHistory(page);
       record(`${width}px 대화 원문 재생 없이 확인 상태·남은 일 복원`,await page.locator('.message.user,.message.assistant:not(.greeting)').count()===0 && await page.locator('#request-input').inputValue()==='' && /원문.*보관하지/.test(await page.locator('#visit-recovery-notice').textContent()) && await page.locator('#care-journey-summary').isVisible() && (await page.locator('#care-journey-next').textContent()).trim().length>0 && fit(await layout(page)));
       const input=await page.locator('#request-input').elementHandle(),draft='다음 요청 초안';await input.fill(draft);await prep(page);await page.locator('#resume-visit').scrollIntoViewIfNeeded();
       const dateVisible=await page.locator('#case-content .visit-date').innerText();
@@ -132,15 +144,17 @@ try{
       record(`${width}px 최초 body 그대로 재시도는 저장 상태만 재표시`,repeated.status===200 && repeated.data.sessionId===restored.sessionId && repeated.data.caseState.patient.nextVisit==='2026-11-19' && repeated.data.pendingActions.length>0 && /이미 처리/.test(repeated.data.reply) && sameExecution(prior,fixture.counts),{progressWriteAttempts:fixture.counts.writeProgress-prior.writeProgress});
       const beforeConflict={...fixture.counts},conflict=await apiPost(fixture.base,{...first,message:nextText});
       record(`${width}px 같은 ID 다른 본문은 실제 HTTP409·재실행 없음`,conflict.status===409 && conflict.data.error?.code==='REQUEST_CONFLICT' && sameExecution(beforeConflict,fixture.counts),{progressWriteAttempts:fixture.counts.writeProgress-beforeConflict.writeProgress});
+      const beforeGuidedConflict={...fixture.counts},guidedConflict=await apiPost(fixture.base,{...first,guidedPreparation:false});
+      record(`${width}px 같은 ID의 guided 범위 변경도 HTTP409·재실행 없음`,guidedConflict.status===409 && guidedConflict.data.error?.code==='REQUEST_CONFLICT' && sameExecution(beforeGuidedConflict,fixture.counts),{progressWriteAttempts:fixture.counts.writeProgress-beforeGuidedConflict.writeProgress});
       await submit(page,nextText);await page.locator('.message.assistant:not(.greeting)').waitFor();await prep(page);
       const changed=await page.locator('#case-content .visit-date').innerText(),nextStorage=await page.evaluate(key=>sessionStorage.getItem(key),tokenKey),finalState=fixture.memory.inspect()[0];
       record(`${width}px 다음 새 요청은 같은 방문의 날짜·시각 변경`,/11월 26일/.test(changed) && /11:00/.test(changed) && nextStorage===first.visitToken && finalState.sessionId===recorded.sessionId && finalState.turns===2 && fixture.counts.logicalTurns===2 && fixture.counts.providerRespond===4 && fixture.counts.consumeTurn===2 && await page.locator('.message.user.failed').count()===0 && fit(await layout(page)));
       record(`${width}px 최종 화면도 식별자 비노출·정상 공통 입력`,await privateValuesAbsent(page,protectedValues) && await page.locator('#request-input').inputValue()==='' && await page.locator('#send-request').isDisabled());
       const finalCapture=await capture(page,`changed-${width}x${height}`),assets=await Promise.all(assetChecks);
-      record(`${width}px 실제 브라우저 JS/CSS 바이트가 현재 root 소스와 동일`,assets.length>0 && assets.every(asset=>asset.matches) && ['conversation.js','conversation.css','preparation-stages.js','preparation-board-view.js'].every(file=>assets.some(asset=>asset.file===file)));
+      record(`${width}px 실제 브라우저 JS/CSS 바이트가 현재 root 소스와 동일`,assets.length>0 && assets.every(asset=>asset.matches) && ['conversation.js','conversation.css','preparation-stages.js','preparation-workflow.js','preparation-board-view.js'].every(file=>assets.some(asset=>asset.file===file)));
       record(`${width}px 모든 실제 POST의 payload hash 일치·서버 오류 없음`,fixture.counts.requestHashesValid && fixture.counts.serverErrors===0 && fixture.counts.preview===0);
       proof.staticFiles.push(...assets);
-      proof.viewports.push({width,height,...await layout(page),completedResponseLost:true,sameTokenRestored:true,transcriptNotReplayed:true,actualResumeReadOnly:true,firstRequestReplayedWithoutEffects:true,bodyConflictRejected:true,nextRequestChangedVisit:true,draftPreserved:true,identifiersAbsent:true,fixtureProviderRespondCalls:fixture.counts.providerRespond,fixtureLogicalTurns:fixture.counts.logicalTurns,budgetConsumptions:fixture.counts.consumeTurn,actualHttpPosts:{agent:fixture.counts.agent,resume:fixture.counts.resume,progress:fixture.counts.progress,preview:fixture.counts.preview},screenshots:[recoveryCapture,preparationCapture,finalCapture]});
+      proof.viewports.push({width,height,...await layout(page),completedResponseLost:true,sameTokenRestored:true,transcriptNotReplayed:true,actualResumeReadOnly:true,firstRequestReplayedWithoutEffects:true,bodyConflictRejected:true,nextRequestChangedVisit:true,draftPreserved:true,identifiersAbsent:true,guidedProjection:Object.values(projection).every(Boolean),fixtureProviderRespondCalls:fixture.counts.providerRespond,fixtureLogicalTurns:fixture.counts.logicalTurns,budgetConsumptions:fixture.counts.consumeTurn,actualHttpPosts:{agent:fixture.counts.agent,resume:fixture.counts.resume,progress:fixture.counts.progress,preview:fixture.counts.preview},screenshots:[recoveryCapture,preparationCapture,finalCapture]});
     }finally{
       proof.fixtureProviderRespondCalls+=fixture.counts.providerRespond;proof.fixtureLogicalTurns+=fixture.counts.logicalTurns;
       try{if(context)await context.close();}finally{await fixture.close();}

@@ -14,9 +14,9 @@ const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE||'
 const browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH||undefined,args:['--no-sandbox','--disable-dev-shm-usage']});
 const tokenKey='hondi-visit-token-v1',token='v'.repeat(43),sessionId='q'.repeat(43);
 const caps={llm:true,model:'gpt-6.1-sol',phone:'simulation',healthRecords:'demo',voiceInput:'browser',progress:'unavailable',visitRecovery:'token'};
-const directory='.impeccable/review/chat-rail/reliable-visit/ui';
+const directory='.impeccable/review/chat-rail/guided-visit/recovery';
 await mkdir(resolve(root,directory),{recursive:true});await mkdir(resolve(root,'orchestration/runs'),{recursive:true});
-const checks=[],errors=[],proof={checkedAt:new Date().toISOString(),result:'fail',sourceHash:await runtimeFingerprint(servedRoot),checks,errors,viewports:[],fixturePosts:{agent:0,resume:0,preview:0},actualFixedPreviews:0,unmockedModelPosts:0,modelInvoked:false,phoneInvoked:false,recordsQueried:false,scope:'Actual local static assets; normal and recovery HTTP response fixtures. Successful fixed preview is a real keyless local endpoint; the preview-failure case is a separate fixture. No real model, database durability, phone, microphone or physical-device evidence.'};
+const checks=[],errors=[],proof={checkedAt:new Date().toISOString(),result:'fail',sourceHash:await runtimeFingerprint(servedRoot),checks,errors,guidedScenarios:[],viewports:[],fixturePosts:{agent:0,resume:0,preview:0},actualFixedPreviews:0,unmockedModelPosts:0,modelInvoked:false,phoneInvoked:false,recordsQueried:false,scope:'Actual local static assets; normal and recovery HTTP response fixtures. Successful fixed preview is a real keyless local endpoint; the preview-failure case is a separate fixture. No real model, database durability, phone, microphone or physical-device evidence.'};
 const record=(name,pass,detail='')=>{checks.push({name,status:pass?'pass':'fail',detail});console.log(`${pass?'PASS':'FAIL'} ${name}${detail?' · '+detail:''}`);};
 let state=applyAction(createDemoCase(),{type:'UPDATE_PATIENT',values:{nextVisit:'2026-11-19'}});
 state=applyAction(state,{type:'SUPPORT_UPDATE_REQUIREMENTS',values:{wheelchair:true,companionNeeded:true}});
@@ -63,20 +63,32 @@ const snapshot=page=>page.evaluate(()=>{
   return {viewportFit:document.documentElement.scrollWidth<=innerWidth+1 && document.documentElement.scrollHeight<=innerHeight+1 && scrollY===0 && fits(composer),sharedComposer:document.querySelectorAll('#request-input,#conversation-form,#chat-composer').length===3 && fits(input) && fits(send) && bounds(send).width>=44 && bounds(send).height>=44,scrollRegions:/auto|scroll/.test(getComputedStyle(scroller).overflowY) && scroller.clientHeight>=Math.max(44,parseFloat(getComputedStyle(scroller).fontSize)*1.2),compactPanels:compact?!active.hidden && !active.inert && (view==='preparation'?chat:rail).hidden:!chat.hidden&&!rail.hidden,readingHeight:scroller.clientHeight,input:bounds(input),send:bounds(send),compact,view};
 });
 const fit=data=>['viewportFit','sharedComposer','scrollRegions','compactPanels'].every(key=>data[key]);
+async function readHistory(page) {
+  if(await page.locator('#workspace-tab-chat').isVisible())await page.locator('#workspace-tab-chat').click();
+  const history=page.locator('#conversation-history');if(!await history.evaluate(node=>node.open))await history.locator(':scope>summary').click();
+}
+async function projectionEvidence(page,state) {
+  return page.evaluate(async state=>{
+    const workflow=(await import('/preparation-workflow.js')).getPreparationWorkflow(state),board=document.getElementById('preparation-board'),current=document.getElementById('current-preparation-task'),rows=[...document.querySelectorAll('#stage-navigation>button[data-open-stage]')],panes=[...board.querySelectorAll(':scope>[data-stage-id]')];
+    return {currentStage:board.dataset.currentStage===workflow.currentStageId,currentTask:current.dataset.taskId===(workflow.currentTask?.id||'') && current.dataset.taskActor===(workflow.currentTask?.actor||'') && current.dataset.taskStatus===(workflow.currentTask?.status||''),stages:rows.length===4 && workflow.stages.every(stage=>rows.some(node=>node.dataset.openStage===stage.id && node.dataset.workflowStatus===stage.status)),oneStage:panes.length===4 && panes.filter(node=>!node.hidden&&!node.inert).length===1 && panes.every(node=>node.hidden===node.inert),visitNotReady:workflow.visitReady===false};
+  },state);
+}
 async function openDetails(page){if(await page.locator('#workspace-tab-preparation').isVisible())await page.locator('#workspace-tab-preparation').click();if(!await page.locator('#visit-summary').evaluate(node=>node.open))await page.locator('#visit-summary>summary').click();await page.locator('#resume-visit').scrollIntoViewIfNeeded();}
 try{
   const response=await fetch(new URL('/api/agent/capabilities',base));const actual=await response.json();
   if(!response.ok || actual.llm!==false || actual.phone==='connected' || actual.healthRecords==='connected')throw new Error('실제 서버가 keyless 합성 상태가 아니어서 검사를 중단합니다.');
-  for(const file of ['conversation.js','conversation.css']){const response=await fetch(new URL('/'+file,base));record(`실제 ${file}는 검사 소스와 동일`,response.ok && Buffer.compare(Buffer.from(await response.arrayBuffer()),await readFile(resolve(servedRoot,'app',file)))===0);}
+  for(const file of ['conversation.js','conversation.css','preparation-board-view.js','preparation-stages.js','preparation-workflow.js']){const response=await fetch(new URL('/'+file,base));record(`실제 ${file}는 검사 소스와 동일`,response.ok && Buffer.compare(Buffer.from(await response.arrayBuffer()),await readFile(resolve(servedRoot,'app',file)))===0);}
   for(const [width,height] of [[1440,900],[390,500]])await scenario(`${width}px 첫 응답 유실→새로고침`,async()=>{
     const {page,context,messages,resumes}=await open(width,height,{onMessage:(request,count)=>count===1?{abort:true}:{body:reply(request)},onResume:()=>({body:recovery('completed',state,JSON.parse(messages[0].postData()).requestId)})});
     try{
       await submit(page,'11월19일 어머니의 휠체어 이동을 준비해 주세요.');await page.locator('.message.user.failed').waitFor();
       const first=JSON.parse(messages[0].postData()),saved=await storage(page);
-      record(`${width}px 첫 전송 전에 토큰만 저장`,/^[A-Za-z0-9_-]{43}$/.test(first.visitToken) && Object.keys(saved).join()===tokenKey && saved[tokenKey]===first.visitToken && !JSON.stringify(saved).includes(first.message));
+      record(`${width}px 첫 전송 전에 토큰만 저장·guided 의뢰 범위 명시`,first.guidedPreparation===true && /^[A-Za-z0-9_-]{43}$/.test(first.visitToken) && Object.keys(saved).join()===tokenKey && saved[tokenKey]===first.visitToken && !JSON.stringify(saved).includes(first.message));
       await page.reload({waitUntil:'networkidle'});await page.waitForFunction(()=>document.getElementById('visit-recovery-notice').textContent.includes('마지막으로 확인된'));
       record(`${width}px 복구는 같은 토큰의 읽기1건·모델 재전송 없음`,messages.length===1 && resumes.length===1 && JSON.parse(resumes[0].postData()).visitToken===first.visitToken && Object.keys(JSON.parse(resumes[0].postData())).join()==='visitToken');
+      await readHistory(page);
       record(`${width}px 이전 대화 답변을 만들지 않고 확인된 상태·남은 일만 복원`,await page.locator('.message.user,.message.assistant:not(.greeting)').count()===0 && /11월 19일/.test(await page.locator('#case-content').textContent()) && (await page.locator('#care-journey-summary').isVisible()) && /원문.*보관하지/.test(await page.locator('#visit-recovery-notice').textContent()));
+      const projection=await projectionEvidence(page,state);record(`${width}px 읽기 복구는 저장된 상태의 현재 할 일·단계를 재계산`,Object.values(projection).every(Boolean) && messages.length===1 && resumes.length===1,JSON.stringify(projection));proof.guidedScenarios.push({id:'resume-projection',width,...projection,automaticPostAbsent:messages.length===1});
       record(`${width}px 복구로 모델 설정을 덮지 않음`,await page.locator('#connection-state').textContent()==='대화 연결 설정됨' && await page.locator('#request-input').inputValue()==='' && !(await page.locator('body').textContent()).includes(first.visitToken));
       await page.locator('#expand-answer').click();record(`${width}px 복구 뒤 넓게 읽기는 빈 답변 대신 원래 복구 설명`,/마지막으로 확인된/.test(await page.locator('#answer-read-view').textContent()) && await page.locator('#answer-read-view .message').count()===0);await page.locator('#close-answer').click();
       await submit(page,'진료 자료도 확인해 주세요.');const second=JSON.parse(messages[1].postData());
@@ -88,11 +100,12 @@ try{
     const held=deferred(),{page,context,resumes}=await open(1440,900,{seed:token,onResume:(_,count)=>count===1?{body:recovery()}:held.promise});
     try{
       await page.waitForFunction(()=>document.getElementById('visit-recovery-notice').textContent.includes('마지막으로 확인된'));await page.locator('#request-input').fill('확인하는 동안 유지할 초안');await openDetails(page);await page.locator('#resume-visit').click();
+      await page.locator('#stage-navigation>button[data-open-stage="support"]').click();if(await page.locator('#workspace-tab-chat').isVisible())await page.locator('#workspace-tab-chat').click();
       const details=page.locator('[data-stage-id="support"] [data-stage-details]');if(!await details.evaluate(node=>node.open))await details.locator(':scope>summary').click();
       const source=page.locator('[data-stage-id="support"] [data-stage-sources] a').first();await source.scrollIntoViewIfNeeded();await source.focus();
-      const before=await source.evaluate(node=>{window.__recoverySource=node;return {top:node.getBoundingClientRect().top,scroll:document.getElementById('preparation-rail').scrollTop};});
+      const before=await source.evaluate(node=>{window.__recoverySource=node;return {top:node.getBoundingClientRect().top,scroll:document.getElementById('conversation-scroll').scrollTop};});
       held.release({body:recovery()});await page.waitForFunction(()=>document.getElementById('resume-visit').getAttribute('aria-busy')==='false');
-      const after=await source.evaluate(node=>({same:node===window.__recoverySource,connected:node.isConnected,focused:document.activeElement===node,top:node.getBoundingClientRect().top,scroll:document.getElementById('preparation-rail').scrollTop}));
+      const after=await source.evaluate(node=>({same:node===window.__recoverySource,connected:node.isConnected,focused:document.activeElement===node,top:node.getBoundingClientRect().top,scroll:document.getElementById('conversation-scroll').scrollTop}));
       record('같은 상태의 수동 복구는 출처 DOM·focus·펼침·읽기 위치 유지',resumes.length===2 && after.same && after.connected && after.focused && Math.abs(after.top-before.top)<=2 && Math.abs(after.scroll-before.scroll)<=2 && await details.evaluate(node=>node.open),JSON.stringify({before,after}));
       record('수동 복구는 입력 초안 유지',await page.locator('#request-input').inputValue()==='확인하는 동안 유지할 초안');
     }finally{held.release({body:recovery()});await context.close();}
@@ -150,12 +163,12 @@ try{
   for(const [width,height] of [[1800,1125],[1440,900],[1152,720],[960,600],[720,450],[1060,900],[390,844],[390,500],[320,500],[768,512]])await scenario(`${width}x${height} 복구 작업 공간`,async()=>{
     const {page,context}=await open(width,height,{seed:token});
     try{
-      await page.waitForFunction(()=>document.getElementById('visit-recovery-notice').textContent.includes('마지막으로 확인된'));const initial=await snapshot(page);record(`${width}x${height} 복구 안내도 한 화면·공통 입력`,fit(initial),JSON.stringify(initial));
+      await page.waitForFunction(()=>document.getElementById('visit-recovery-notice').textContent.includes('마지막으로 확인된'));const initial=await snapshot(page),projection=await projectionEvidence(page,state);record(`${width}x${height} 복구 안내도 한 화면·공통 입력·상태 기반 업무`,fit(initial) && Object.values(projection).every(Boolean),JSON.stringify(initial));
       const input=page.locator('#request-input'),draft=Array.from({length:12},(_,i)=>`${i+1}번째 방문 준비 요청입니다.`).join('\n');await input.fill(draft);await input.press('Control+End');
       await openDetails(page);const sameInput=await input.elementHandle();record(`${width}x${height} 준비 패널에서도 같은 초안·44px 읽기 확인`,fit(await snapshot(page)) && await sameInput.evaluate(node=>node===document.getElementById('request-input') && node.value.split('\n').length===12));
       if(await page.locator('#workspace-tab-chat').isVisible())await page.locator('#workspace-tab-chat').click();
       if([720,390,320].includes(width) && height<=500){await page.evaluate(()=>{const nodes=[document.body,...document.body.querySelectorAll('*')].filter(n=>n instanceof HTMLElement && !['SCRIPT','STYLE'].includes(n.tagName));const sizes=nodes.map(n=>parseFloat(getComputedStyle(n).fontSize));nodes.forEach((n,i)=>{if(sizes[i]>0)n.style.fontSize=`${sizes[i]*2}px`;});});await input.press('Control+End');record(`${width}x${height} 복구 뒤 실제32px 글자와12줄 입력 도달`,fit(await snapshot(page)) && await input.evaluate(node=>parseFloat(getComputedStyle(node).fontSize)>=32 && node.selectionEnd===node.value.length && node.scrollHeight-node.scrollTop-node.clientHeight<=Math.max(3,(parseFloat(getComputedStyle(node).lineHeight)-parseFloat(getComputedStyle(node).fontSize))/2)));}
-      const path=`${directory}/recovery-${width}x${height}.png`;await page.screenshot({path:resolve(root,path)});proof.viewports.push({width,height,...initial,screenshot:path});
+      const path=`${directory}/recovery-${width}x${height}.png`;await page.screenshot({path:resolve(root,path)});proof.viewports.push({width,height,...initial,guidedProjection:Object.values(projection).every(Boolean),screenshot:path});
     }finally{await context.close();}
   });
   proof.finalSourceHash=await runtimeFingerprint(servedRoot);record('검사 중 실행 소스 변경 없음',proof.finalSourceHash===proof.sourceHash);record('브라우저 실행 오류 없음',errors.length===0);
