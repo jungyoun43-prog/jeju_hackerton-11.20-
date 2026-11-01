@@ -26,7 +26,7 @@ await mkdir(resolve(root,'orchestration/runs'),{recursive:true});
 const browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH||undefined,args:['--no-sandbox','--disable-dev-shm-usage']});
 const checks=[],errors=[];
 const record=(name,ok,detail='')=>{checks.push({name,status:ok?'pass':'fail',detail});console.log(`${ok?'PASS':'FAIL'} ${name}${detail?' · '+detail:''}`);};
-const proof={result:'fail',checkedAt:new Date().toISOString(),url:base.href,sourceHash:await runtimeFingerprint(servedRoot),invokingSourceHash:await runtimeFingerprint(root),checks,errors,apiLive:false,modelInvoked:false,phoneInvoked:false,healthRecordsQueried:false,microphone:'permission-denied, transcript-review and delayed-abort fixtures only',fixedPreview:false,normalInputDisconnected:false,keylessDisconnectedInitialCheckCount:0,actualHttpPostCounts:{agent:0,preview:0},desktop:{width:1440,height:900,noOverflow:false},mobile:{width:390,height:844,noOverflow:false},fixtureCoverage:{preferences:false,markdown:false,recovery:false,voiceReview:false,voiceCancellation:false,exampleDrafts:false,cancellation:false,contactPlan:false,shortViewport:false},shortViewport:[],runtimeAssets:[],sourceHashScope:process.env.QA_SERVED_SOURCE_ROOT?'explicit QA_SERVED_SOURCE_ROOT; served UI assets compared below':'invoking checkout; served UI assets compared below'};
+const proof={result:'fail',checkedAt:new Date().toISOString(),url:base.href,sourceHash:await runtimeFingerprint(servedRoot),invokingSourceHash:await runtimeFingerprint(root),checks,errors,apiLive:false,modelInvoked:false,phoneInvoked:false,healthRecordsQueried:false,microphone:'permission-denied, transcript-review and delayed-abort fixtures only',fixedPreview:false,normalInputDisconnected:false,keylessDisconnectedInitialCheckCount:0,actualHttpPostCounts:{agent:0,preview:0},desktop:{width:1440,height:900,noOverflow:false},mobile:{width:390,height:844,noOverflow:false},lastAnswerRecovery:[],fixtureCoverage:{lastAnswerRecovery:false,preferences:false,markdown:false,recovery:false,voiceReview:false,voiceCancellation:false,exampleDrafts:false,cancellation:false,contactPlan:false,shortViewport:false},shortViewport:[],runtimeAssets:[],sourceHashScope:process.env.QA_SERVED_SOURCE_ROOT?'explicit QA_SERVED_SOURCE_ROOT; served UI assets compared below':'invoking checkout; served UI assets compared below'};
 const overflow=page=>page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1 && document.documentElement.scrollHeight<=innerHeight+1 && scrollY===0);
 const json=request=>JSON.parse(request.postData());
 const hashMatches=request=>request.headers()['x-amz-content-sha256']===createHash('sha256').update(request.postDataBuffer()).digest('hex');
@@ -640,6 +640,27 @@ try {
       proof.fixtureCoverage.cancellation=true;
     } finally {await context.close();}
   });
+  for(const width of [1440,390])for(const ending of ['failure','cancel'])await scenario(`${width}px ${ending} 뒤 최근 답변 접근`,async()=>{
+    let count=0;
+    const previous='# 이전에 성공한 합성 답변\n\n이미 확인한 준비와 기관·의료진에게 남은 일을 안내합니다. 실제 발신·예약·배차는 하지 않았습니다.';
+    const {page,context,requests}=await open(width,500,{configured:true,onPost:request=>++count===1?{body:fixtureResponse(request,createDemoCase(),previous)}:{status:503,body:{error:{code:'SESSION_STORE_UNAVAILABLE'}}}});
+    try {
+      await send(page,'이전에 확인한 준비를 알려 주세요.');
+      const answer=await page.locator('#message-list>.message.assistant:not(.greeting)').last().elementHandle();
+      if(ending==='failure')await send(page,'연결 실패로 답변을 받지 못할 다음 요청');
+      else {await deferAgentFetch(page);await page.locator('#request-input').fill('화면 대기를 중지할 다음 요청');await page.locator('#send-request').click();await deferredCall(page,0);await page.locator('#cancel-request').click();await page.waitForFunction(()=>document.getElementById('conversation-form').getAttribute('aria-busy')==='false');await releaseDeferred(page,0,null,{errorName:'AbortError'});}
+      const last=page.locator('#message-list>.message').last(),input=page.locator('#request-input'),draft=await input.inputValue(),before=requests.length;
+      const history=page.locator('#conversation-history');if(await history.evaluate(node=>node.open))await history.locator(':scope>summary').click();
+      const button=page.locator('#current-task-answer'),access=await reachable(button);await button.click();
+      await page.waitForFunction(()=>document.activeElement?.matches('#message-list>.message.assistant:not(.greeting)'));
+      const preserved=await answer.evaluate(node=>node.isConnected && document.activeElement===node && node.textContent.includes('이전에 성공한 합성 답변') && !node.classList.contains('failed'));
+      const reachesPreviousAnswer=access.reachable && preserved && await history.evaluate(node=>node.open) && await last.evaluate(node=>node.matches('.message.user.failed')) && await page.locator('#message-list>.message.assistant:not(.greeting)').count()===1 && await input.inputValue()===draft && requests.length===before;
+      record(`${width}px ${ending} 뒤 최근 답변은 실패한 사용자 글을 건너뛰고 마지막 성공 답변·초안 보존`,reachesPreviousAnswer,'응답 fixture·실제 모델 호출 없음');
+      proof.lastAnswerRecovery.push({width,ending,reachesPreviousAnswer,noExtraPost:requests.length===before,draftPreserved:await input.inputValue()===draft});
+      proof.fixtureCoverage.lastAnswerRecovery ||= reachesPreviousAnswer;
+    } finally {await context.close();}
+  });
+
   for(const [width,height] of [[1440,900],[390,500]])await scenario(`${width}px 전화·협진 계획 fixture`,async()=>{
     let state=preparedState({taxiProviderId:'auto',wheelchair:true,companionNeeded:true});
     for(const target of ['mainland','jeju'])state=applyAction(state,{type:'RECORD_CALL',target,outcome:'documents'});
