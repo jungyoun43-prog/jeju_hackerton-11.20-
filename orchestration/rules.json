@@ -615,6 +615,27 @@
       "allow": [
         "scripts/preparation-board-browser-check.mjs"
       ]
+    },
+    {
+      "id": "viewport-ui",
+      "branch": "design/viewport-workspace",
+      "baseCommit": "e983bfcdad248b2dc6151ae7d817064184ea629a",
+      "allow": [
+        "app/conversation.js",
+        "app/conversation.css",
+        "app/preparation-board-view.js",
+        "app/icons.js"
+      ]
+    },
+    {
+      "id": "viewport-qa",
+      "branch": "test/viewport-workspace",
+      "baseCommit": "e983bfcdad248b2dc6151ae7d817064184ea629a",
+      "allow": [
+        "scripts/conversation-browser-check.mjs",
+        "scripts/journey-browser-check.mjs",
+        "scripts/preparation-board-browser-check.mjs"
+      ]
     }
   ],
   "rules": [

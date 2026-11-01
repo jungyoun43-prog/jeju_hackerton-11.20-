@@ -1,6 +1,6 @@
 {
   "baseCommit": "e1e7e44",
-  "updatedAt": "2026-11-01T06:28:20.149607+00:00",
+  "updatedAt": "2026-11-01T06:40:32.998789+00:00",
   "tasks": {
     "ui": {
       "phase": "verified",
@@ -461,6 +461,18 @@
         "4d4c6aa"
       ],
       "note": "상단 단언1파일14추가/8삭제, helper/schema/기존보호 유지. c4a44c75 targeted29/29→root전체249/249·4조합 all true·errors[]/일반POST0. 첫143중단은원인미상·로그보존/성공인용X. 직접node/소유TTY재실행 종료0·clean."
+    },
+    "viewport-ui": {
+      "phase": "implementing",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261101-viewport-ui",
+      "integrationCommits": [],
+      "note": "소개블록제거·100dvh작업공간·일정padding/공통입력·responsive전환. 구현과검사소유권분리, 실제Agent/데이터·위임경계유지."
+    },
+    "viewport-qa": {
+      "phase": "implementing",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261101-viewport-qa",
+      "integrationCommits": [],
+      "note": "소개블록제거·100dvh작업공간·일정padding/공통입력·responsive전환. 구현과검사소유권분리, 실제Agent/데이터·위임경계유지."
     }
   },
   "review": {
