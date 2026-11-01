@@ -21,6 +21,19 @@ test('기존 dispatcher에서 두 지역을 집계해도 개인 기록·방문 �
  for(const name of ['search_public_data','analyze_public_data'])assert.equal(AGENT_TOOLS.find(tool=>tool.name===name).readOnly,true);
 });
 
+test('공공보건 행정 문의의 검색→코드 조회는35행 출처를 사용하고 병원/지원 상태를 변경하지 않는다',async()=>{
+ const state=createDemoCase(),before=JSON.stringify(state),execute=createToolDispatcher();
+ const found=await execute({name:'search_public_data',input:{purpose:'hospital',query:'보건지소',limit:5},state});
+ assert.equal(found.data.results.find(item=>item.id==='hub:1304').coverage.rowCount,35);
+ const result=await execute({name:'analyze_public_data',input:{analysis:'public_health_contacts',area:'조천읍'},state});
+ assert.equal(result.data.candidates[0].name,'조천 보건지소');assert.equal(result.data.candidates[0].phone,'064-728-1516');
+ assert.equal(result.data.datasetRefs[0].sourceUrl,'https://www.data.go.kr/data/15056141/fileData.do');
+ assert.equal(result.state,state);assert.equal(JSON.stringify(state),before);
+ assert.deepEqual(result.pendingActions,[]);assert.deepEqual(result.data.preparationActions,[]);
+ assert.equal(result.data.actualCallPlaced,false);assert.equal(result.data.caseMutation,false);
+ assert.match(result.data.candidates[0].questions[0],/조천읍.*담당/);
+});
+
 test('분석의 현재 지역 후보는 기존 문의 초안 도구에 실제로 연결된다',async()=>{
  const state=applyAction(createDemoCase(),{type:'SUPPORT_UPDATE_REQUIREMENTS',values:{appointmentTime:'10:00'}});
  const execute=createToolDispatcher();

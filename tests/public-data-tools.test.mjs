@@ -44,9 +44,28 @@ test('직접 실행도 형식·길이·분석별 필수/허용 인자를 검사�
     {analysis:'facility_compare',areas:['제주시',' 제주시 ']}, {analysis:'facility_compare',areas:['','서귀포시']}, {analysis:'facility_compare',areas:['  ','서귀포시']}, {analysis:'facility_compare',areas:[1,2]},
     {analysis:'facility_compare',areas:['제주시','서귀포시'],area:'애월읍'}, {analysis:'support_candidates',supportKind:'hospital'}, {analysis:'support_candidates',supportKind:'taxi',wheelchair:'yes'},
     {analysis:'support_candidates',supportKind:'taxi',area:' '}, {analysis:'support_candidates',supportKind:'taxi',areas:['제주시','서귀포시']}, {analysis:'travel_time',wheelchair:true}, {analysis:'travel_time',supportKind:'taxi'}, {analysis:'travel_time',url:'https://evil.test'}];
+  analysisInvalid.push({analysis:'public_health_contacts',wheelchair:true},{analysis:'public_health_contacts',supportKind:'taxi'},{analysis:'public_health_contacts',areas:['제주시','서귀포시']});
   for (const input of analysisInvalid) assert.throws(() => execute({name:'analyze_public_data',input,state:{}}),argumentError);
   assert.throws(() => execute({name:'run_sql',input:{},state:{}}),error => error.code === 'UNKNOWN_TOOL');
   assert.equal(calls,0);
+});
+
+test('공공보건기관 조회도 정확한 공식 출처·관할 질문만 반환하고 개인기록·준비 상태를 쓰지 않는다', () => {
+  const state=createDemoCase();state.patient.name='PRIVATE_HEALTH_PATIENT';state.documents[0].content='PRIVATE_HEALTH_RECORD';
+  freeze(state);const before=JSON.stringify(state);
+  const result=executePublicDataTool({name:'analyze_public_data',input:{analysis:'public_health_contacts'},state});
+  assert.strictEqual(result.state,state);assert.equal(JSON.stringify(state),before);
+  assert.equal(result.data.candidates[0].name,'애월보건지소');
+  assert.equal(result.data.candidates[0].phone,'064-728-1514');
+  assert.equal(result.events[0].source,'https://www.data.go.kr/data/15056141/fileData.do');
+  assert.match(result.events[0].label,/행정·관할/);assert.equal(result.events[0].isSimulation,false);
+  assert.deepEqual(result.pendingActions,[]);assert.deepEqual(result.data.preparationActions,[]);
+  for(const flag of ['actualCallPlaced','reservationConfirmed','clinicalAcceptanceConfirmed','caseMutation']) assert.equal(result.data[flag],false);
+  assert.equal(JSON.stringify(result.data).includes('PRIVATE_HEALTH_'),false);
+  for(const candidate of result.data.candidates){assert.ok(sources.has(candidate.source.url));assert.ok(sources.has(candidate.source.hubUrl));assert.match(candidate.questions.join(' '),/병원.*가정하지 않/);}
+  const south=executePublicDataTool({name:'analyze_public_data',input:{analysis:'public_health_contacts',area:'서귀포시'},state});
+  assert.equal(south.data.status,'unavailable');assert.equal(south.data.metrics[0].value,null);assert.equal(south.events[0].status,'needs_input');
+  assert.match(south.events[0].detail,/제주시.*범위/);assert.doesNotMatch(south.events[0].detail,/원자료가 없어/);
 });
 
 test('분석 context는 행정지역·휠체어·공개 목적기관명만 복사하고 환자명·개인 기록은 읽지 않는다',() => {

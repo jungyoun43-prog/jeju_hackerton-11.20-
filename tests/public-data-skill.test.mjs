@@ -10,20 +10,20 @@ import {getSupportCandidates} from '../app/support-data.js';
 
 const exec = promisify(execFile);
 const root = new URL('../', import.meta.url);
-const [catalog, hospitals, registry] = await Promise.all(['public-data-catalog.json', 'hospital-candidates.json', 'visit-support-providers.json'].map(async file => JSON.parse(await readFile(new URL(`../app/data/${file}`, import.meta.url), 'utf8'))));
+const [catalog, hospitals, registry, publicHealth] = await Promise.all(['public-data-catalog.json', 'hospital-candidates.json', 'visit-support-providers.json', 'public-health-contacts.json'].map(async file => JSON.parse(await readFile(new URL(`../app/data/${file}`, import.meta.url), 'utf8'))));
 const context = {area: '제주시 애월읍', wheelchair: true, hospitalName: '합성 목적기관'};
 const realFlagsFalse = value => {
   for (const key of ['actualCallPlaced', 'reservationConfirmed', 'clinicalAcceptanceConfirmed', 'caseMutation']) assert.equal(value[key], false, key);
 };
 
-test('카탈로그1,329개 색인과 정제 snapshot5개를 구분하고 감사 CSV 재색인을 재현한다', async () => {
+test('카탈로그1,329개 색인과 정제 snapshot6개를 구분하고 감사 CSV 재색인을 재현한다', async () => {
   assert.equal(catalog.records.filter(row => row.sourceSystem === 'hub').length, 1259);
   assert.equal(catalog.records.filter(row => row.sourceSystem === 'center').length, 70);
   assert.equal(catalog.records.filter(row => row.sourceSystem === 'official').length, 2);
   assert.equal(new Set(catalog.records.map(row => row.id)).size, 1331);
   const result = searchPublicDataCatalog({purpose: 'hospital'});
   assert.equal(result.indexedMetadataCount, 1329);
-  assert.deepEqual(result.usableSnapshotIds.sort(), ['hub:859', 'hub:327', 'hub:254', 'official:areum-escort', 'official:jeju-accessible-transport'].sort());
+  assert.deepEqual(result.usableSnapshotIds.sort(), ['hub:859', 'hub:327', 'hub:254', 'hub:1304', 'official:areum-escort', 'official:jeju-accessible-transport'].sort());
   const checked = await exec(process.execPath, ['scripts/public-data-catalog.mjs', '--check'], {cwd: root});
   assert.match(checked.stdout, /오프라인 색인 일치.*1329/);
   assert.match(checked.stdout, /API·원자료 갱신 없음/);
@@ -59,6 +59,58 @@ test('최신 파일 확인·목록수정일을 원자료 보유·기준일·행�
   assert.equal(taxi.coverage.asOf, '2026-03-19');
   assert.equal(taxi.coverage.rowCount, 34);
   assert.equal(taxi.sourceUrl, 'https://www.data.go.kr/data/15056321/fileData.do');
+});
+
+test('1304만 최신 연결 파일 snapshot으로 표시하고 카탈로그와 기존 후보 수는 유지한다', () => {
+  const found = searchPublicDataCatalog({purpose: 'hospital', query: '보건지소'});
+  const ref = found.results.find(row => row.id === 'hub:1304');
+  assert.ok(ref); assert.equal(found.indexedMetadataCount, 1329);
+  assert.equal(ref.availability, 'snapshot'); assert.equal(ref.coverage.rowCount, 35);
+  assert.equal(ref.coverage.asOf, '2026-03-23'); assert.equal(ref.coverage.collectedAt, publicHealth.retrievedAt);
+  assert.equal(ref.sourceUrl, 'https://www.data.go.kr/data/15056141/fileData.do');
+  assert.equal(ref.hubUrl, 'https://jejudatahub.net/data/view/data/1304');
+  assert.ok(ref.columns.includes('관할구역') && ref.columns.includes('전화번호'));
+  assert.ok(found.suggestedAnalysis.includes('public_health_contacts'));
+  assert.equal(hospitals.records.length, 13); assert.equal(registry.providers.length, 55);
+});
+
+test('공공보건 문의는 지역에 따라 후보·질문을 바꾸며 소재지와 담당 확인을 구분한다', () => {
+  const before = structuredClone(context);
+  const aewol = analyzePublicData({analysis: 'public_health_contacts'}, context);
+  const jocheon = analyzePublicData({analysis: 'public_health_contacts', area: '조천읍'}, context);
+  assert.equal(aewol.inputs.area, '제주시 애월읍');
+  assert.equal(aewol.candidates[0].name, '애월보건지소');
+  assert.equal(aewol.candidates[0].phone, '064-728-1514');
+  assert.equal(aewol.metrics[0].value, 9);
+  assert.deepEqual(aewol.metrics[0].matchCounts, {registered_jurisdiction: 1, registered_address: 7, city_contact: 1});
+  assert.equal(jocheon.candidates[0].name, '조천 보건지소');
+  assert.equal(jocheon.candidates[0].phone, '064-728-1516');
+  assert.match(aewol.candidates[0].questions[0], /애월읍.*등록 관할.*애월읍 일원/);
+  assert.match(jocheon.candidates[0].questions[0], /조천읍.*등록 관할.*조천읍 일원/);
+  assert.equal(aewol.candidates[0].availabilityVerified, false);
+  assert.ok(aewol.candidates.length <= 5);
+  assert.ok(aewol.candidates.some(row => row.matchLevel === 'registered_address'));
+  assert.match(aewol.limitations.join(' '), /소재지.*실제 담당지역/);
+  const nohyung = analyzePublicData({analysis: 'public_health_contacts', area: '노형동'});
+  assert.match(nohyung.candidates[0].questions[1], /건강생활지원 프로그램/);
+  for (const value of [aewol, jocheon, nohyung]) {
+    assert.deepEqual(value.preparationActions, []);
+    assert.ok(value.candidates.every(row => row.source.datasetId === '1304'));
+    realFlagsFalse(value);
+  }
+  assert.match(jocheon.missingData.join(' '), /사례.*변경하지 않았/);
+  assert.deepEqual(context, before);
+});
+
+test('제주시 파일에서 서귀포·지역 미상을0개 기관으로 설명하지 않는다', () => {
+  for (const input of [{analysis: 'public_health_contacts', area: '서귀포시'}, {analysis: 'public_health_contacts'}]) {
+    const result = analyzePublicData(input);
+    assert.equal(result.status, 'unavailable');
+    assert.deepEqual(result.candidates, []); assert.deepEqual(result.preparationActions, []);
+    assert.equal(result.metrics[0].value, null); assert.equal(result.metrics[0].sourceRows, 35);
+    assert.ok(result.missingData.length > 0); realFlagsFalse(result);
+  }
+  for (const extra of [{wheelchair: true}, {supportKind: 'taxi'}, {areas: ['애월', '조천']}, {url: 'https://evil.test'}]) assert.throws(() => analyzePublicData({analysis: 'public_health_contacts', ...extra}));
 });
 
 test('반환 출처는 canonical HTTPS 허용목록이며 임의 source URL을 생성하지 않는다', () => {
@@ -155,7 +207,9 @@ async function fixtureModule({hospitalData = hospitals, supportData = registry})
   const fixture = source.replace(/^import catalog .*;$/m, `const catalog = ${JSON.stringify(miniCatalog)};`)
     .replace(/^import hospitalSnapshot .*;$/m, `const hospitalSnapshot = ${JSON.stringify(hospitalData)};`)
     .replace(/^import supportRegistry .*;$/m, `const supportRegistry = ${JSON.stringify(supportData)};`)
-    .replace("'./support-data.js'", JSON.stringify(new URL('../app/support-data.js', import.meta.url).href));
+    .replace(/^import publicHealthSnapshot .*;$/m, `const publicHealthSnapshot = ${JSON.stringify(publicHealth)};`)
+    .replace("'./support-data.js'", JSON.stringify(new URL('../app/support-data.js', import.meta.url).href))
+    .replace("'./public-health-data.js'", JSON.stringify(new URL('../app/public-health-data.js', import.meta.url).href));
   return import(`data:text/javascript;base64,${Buffer.from(fixture).toString('base64')}`);
 }
 
@@ -284,8 +338,9 @@ test('조회 CLI는 키·네트워크 없이 공개 API와 같은 계산을 재�
     ['analyze', '--analysis', 'facility_compare', '--areas', '애월,서귀포'],
     ['analyze', '--analysis', 'support_candidates', '--area', '제주시 애월읍', '--wheelchair', 'true'],
     ['analyze', '--analysis', 'travel_time', '--area', '제주시 애월읍'],
+    ['analyze', '--analysis', 'public_health_contacts', '--area', '제주시 애월읍'],
   ];
-  const expected = [searchPublicDataCatalog({purpose: 'hospital', query: '병원', limit: 3}), analyzePublicData({analysis: 'facility_compare', areas: ['제주시', '서귀포시']}), analyzePublicData({analysis: 'facility_compare', areas: ['애월', '서귀포']}), analyzePublicData({analysis: 'support_candidates', area: '제주시 애월읍', wheelchair: true}), analyzePublicData({analysis: 'travel_time', area: '제주시 애월읍'})];
+  const expected = [searchPublicDataCatalog({purpose: 'hospital', query: '병원', limit: 3}), analyzePublicData({analysis: 'facility_compare', areas: ['제주시', '서귀포시']}), analyzePublicData({analysis: 'facility_compare', areas: ['애월', '서귀포']}), analyzePublicData({analysis: 'support_candidates', area: '제주시 애월읍', wheelchair: true}), analyzePublicData({analysis: 'travel_time', area: '제주시 애월읍'}), analyzePublicData({analysis: 'public_health_contacts', area: '제주시 애월읍'})];
   for (let index = 0; index < commands.length; index++) {
     const {stdout} = await exec(process.execPath, ['scripts/public-data-query.mjs', ...commands[index]], {cwd: root, env: {PATH: process.env.PATH, OPENAI_API_KEY: '', HTTP_PROXY: 'http://127.0.0.1:1', HTTPS_PROXY: 'http://127.0.0.1:1'}});
     assert.deepEqual(JSON.parse(stdout), expected[index]);

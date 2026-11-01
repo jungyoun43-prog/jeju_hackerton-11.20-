@@ -1,12 +1,15 @@
 import catalog from './data/public-data-catalog.json' with {type: 'json'};
 import hospitalSnapshot from './data/hospital-candidates.json' with {type: 'json'};
 import supportRegistry from './data/visit-support-providers.json' with {type: 'json'};
+import publicHealthSnapshot from './data/public-health-contacts.json' with {type: 'json'};
 import {getSupportCandidates} from './support-data.js';
+import {PUBLIC_HEALTH_COLUMNS, getPublicHealthContacts, validatePublicHealthSnapshot} from './public-health-data.js';
 
 const PURPOSES = ['hospital', 'taxi', 'companion', 'travel'];
-const ANALYSES = ['facility_compare', 'support_candidates', 'travel_time'];
-const SNAPSHOT_IDS = ['hub:859', 'hub:327', 'hub:254', 'official:areum-escort', 'official:jeju-accessible-transport'];
+const ANALYSES = ['facility_compare', 'support_candidates', 'travel_time', 'public_health_contacts'];
+const SNAPSHOT_IDS = ['hub:859', 'hub:327', 'hub:254', 'hub:1304', 'official:areum-escort', 'official:jeju-accessible-transport'];
 const SNAPSHOTS = new Set(SNAPSHOT_IDS);
+const publicHealth = validatePublicHealthSnapshot(publicHealthSnapshot);
 const sourceById = new Map(catalog.records.map(record => [record.id, record]));
 const clone = value => structuredClone(value);
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -16,7 +19,7 @@ const normalizeText = value => String(value ?? '').trim().replace(/\s+/g, ' ').t
 const flags = () => ({actualCallPlaced: false, reservationConfirmed: false, clinicalAcceptanceConfirmed: false, caseMutation: false});
 const BASE_LIMITATIONS = [
   '공개 등록정보·공식 안내의 읽기 전용 조회이며 현재 수용·차량·동행인력·예약·임상 적합성 확인이 아닙니다.',
-  '카탈로그 수는 원자료 접근·계산 가능한 자료 수가 아닙니다. 새 원자료와 운영 API를 연결하지 않았습니다.',
+  '카탈로그 수는 원자료 접근·계산 가능한 자료 수가 아닙니다. 실제 보유 snapshot과 미접근 자료·운영 API를 구분합니다.',
 ];
 const NORTH = ['애월읍', '한림읍', '한경면', '구좌읍', '조천읍', '우도면', '추자면', '일도1동', '일도2동', '이도1동', '이도2동', '삼도1동', '삼도2동', '용담1동', '용담2동', '건입동', '화북동', '삼양동', '봉개동', '아라동', '오라동', '연동', '노형동', '외도동', '이호동', '도두동'];
 const SOUTH = ['대정읍', '남원읍', '성산읍', '안덕면', '표선면', '송산동', '정방동', '중앙동', '천지동', '효돈동', '영천동', '동홍동', '서홍동', '대륜동', '대천동', '중문동', '예래동'];
@@ -53,6 +56,10 @@ function operationalContext(context) {
 }
 
 function snapshotCoverage(id) {
+  if (id === 'hub:1304') return {
+    kind: publicHealth.dataset.scope, label: '연결 원출처 공개 CSV 35행의 제주시 공공보건 등록 문의처; 현재 운영·진료·담당 확인 아님',
+    asOf: publicHealth.dataset.asOf, collectedAt: publicHealth.retrievedAt, rowCount: publicHealth.records.length, complete: false,
+  };
   if (id === 'hub:859') return {
     kind: 'public-preview',
     label: `공개 ${hospitalSnapshot.totalPreviewRows}행 중 정상 등록 ${hospitalSnapshot.records.length}행; 원자료 수집 ${(hospitalSnapshot.time?.collectedAt || []).join(', ') || '미상'}; 행별 갱신 ${hospitalSnapshot.time?.earliestRowUpdate || '미상'} ~ ${hospitalSnapshot.time?.latestRowUpdate || '미상'}`,
@@ -72,16 +79,17 @@ function datasetRef(recordOrId) {
   const center = record.sourceSystem === 'center';
   const columns = record.id === 'hub:859' ? ['사업장명', '도로명주소', '지번주소', '진료과목', '영업상태명', '데이터갱신일시', '데이터수집일시']
     : record.id === 'hub:327' ? ['지역별', '호출(콜)택시명', '전화번호', '데이터기준일자']
-      : record.id === 'hub:254' ? ['구분', '읍면동', '기관명', '소재지', '전화번호', '데이터기준일자'] : record.columns;
-  const availabilityReason = snapshot ? (record.id === 'hub:859' ? `정제된 공개 표본 정상 등록 ${hospitalSnapshot.records.length}개 보유; 전체 운영 자료 아님` : '기등록 정제 문의처·공식 안내 보유; 실제 제공 여부는 미확인')
+      : record.id === 'hub:254' ? ['구분', '읍면동', '기관명', '소재지', '전화번호', '데이터기준일자'] : record.id === 'hub:1304' ? PUBLIC_HEALTH_COLUMNS : record.columns;
+  const availabilityReason = snapshot ? (record.id === 'hub:859' ? `정제된 공개 표본 정상 등록 ${hospitalSnapshot.records.length}개 보유; 전체 운영 자료 아님` : record.id === 'hub:1304' ? `연결 원출처 ${publicHealth.dataset.asOf} 기준 ${publicHealth.records.length}개 최소 기관 사실 보유; 공공보건 행정·관할 문의용` : '기등록 정제 문의처·공식 안내 보유; 실제 제공 여부는 미확인')
     : center ? '항목 명세를 확인했으나 센터 원자료는 미접근이며 현재 정제 저장소에 미탑재'
       : `${record.latestLinkedFileChecked ? '감사에서 연결 최신 파일을 확인했으나 ' : record.detailChecked ? '상세를 확인했으나 ' : '목록만 색인했으며 '}원자료는 현재 정제 저장소에 미탑재${record.metadataUpdated ? `; 목록 수정일 ${record.metadataUpdated}는 원자료 기준일이 아님` : ''}`;
   return {
     id: record.id, title: record.title, folder: record.folder, tags: [...record.tags], sourceSystem: record.sourceSystem,
-    sourceUrl: record.id === 'hub:327' ? canonicalUrl(supportRegistry.datasets.find(row => row.id === '327').sourceUrl) : canonicalUrl(record.sourceUrl),
+    sourceUrl: record.id === 'hub:327' ? canonicalUrl(supportRegistry.datasets.find(row => row.id === '327').sourceUrl) : record.id === 'hub:1304' ? publicHealth.dataset.sourceUrl : canonicalUrl(record.sourceUrl),
+    ...(record.id === 'hub:1304' ? {hubUrl: publicHealth.dataset.hubUrl} : {}),
     availability: snapshot ? 'snapshot' : 'metadata_only', availabilityReason, columns: [...columns],
     coverage: snapshot ? snapshotCoverage(record.id) : {kind: 'metadata_only', label: center ? '센터 데이터 항목 명세; 원자료 행·기준일 미확인' : '허브 목록 메타데이터; 원자료 행·기준일 미확인', asOf: null, collectedAt: catalog.auditedAt, rowCount: null, complete: false},
-    usableFor: !snapshot ? ['필요 자료·항목 탐색'] : record.id === 'hub:859' ? ['등록기관 문의 후보', '주소 기준 표본 비교'] : record.id === 'hub:254' ? ['돌봄 등록 문의처', '주소 기준 표본 비교'] : ['이동·병원동행 문의 준비'],
+    usableFor: !snapshot ? ['필요 자료·항목 탐색'] : record.id === 'hub:859' ? ['등록기관 문의 후보', '주소 기준 표본 비교'] : record.id === 'hub:254' ? ['돌봄 등록 문의처', '주소 기준 표본 비교'] : record.id === 'hub:1304' ? ['공공보건 행정·관할 확인 문의처', '등록 관할과 소재지의 구분'] : ['이동·병원동행 문의 준비'],
     notUsableFor: !snapshot ? ['행 집계·평균·소요시간 계산', '예약·배차·임상 판단'] : ['현재 수용·인력·차량·예약 확정', '제주 전체 시설 밀도·인구당 비교·질적 우열·임상 판단'],
   };
 }
@@ -89,6 +97,7 @@ function datasetRef(recordOrId) {
 export const PUBLIC_DATA_SOURCE_URLS = Object.freeze([...new Set([
   ...catalog.records.map(record => canonicalUrl(record.sourceUrl)),
   ...supportRegistry.datasets.flatMap(record => [canonicalUrl(record.sourceUrl), canonicalUrl(record.hubUrl)]),
+  publicHealth.dataset.sourceUrl, publicHealth.dataset.hubUrl,
   canonicalUrl('https://jejudatahub.net/center/data'),
 ])]);
 
@@ -124,7 +133,7 @@ export function searchPublicDataCatalog(input = {}) {
   return {
     version: 1, purpose, query, indexedMetadataCount: catalog.indexedMetadataCount, usableSnapshotIds: [...SNAPSHOT_IDS], results,
     limitations: [...catalog.limitations, ...BASE_LIMITATIONS],
-    suggestedAnalysis: purpose === 'hospital' ? ['facility_compare'] : purpose === 'travel' ? ['travel_time'] : ['support_candidates'],
+    suggestedAnalysis: purpose === 'hospital' ? ['facility_compare', ...(results.some(row => row.id === 'hub:1304') ? ['public_health_contacts'] : [])] : purpose === 'travel' ? ['travel_time'] : ['support_candidates'],
   };
 }
 
@@ -243,6 +252,34 @@ export function analyzePublicData(input, context = {}) {
   const area = input.area === undefined ? ctx.area : areaOf(input.area, true);
   const operating = {...ctx, area};
   const differentDeparture = Boolean(ctx.area && area && ctx.area !== area);
+  if (analysis === 'public_health_contacts') {
+    const contacts = getPublicHealthContacts(publicHealth, area);
+    const data = baseAnalysis(analysis, {area}, '공공보건 행정·관할 확인 문의처', '2026-03-23 제주시 공공보건기관 등록 CSV; 실제 진료·협진·담당·운영 응대 확인 아님');
+    data.datasetRefs = ['hub:1304'].map(datasetRef);
+    const outsideCoverage = !area || area.startsWith('서귀포시');
+    if (outsideCoverage) data.status = 'unavailable';
+    data.metrics = [{key: 'registeredContactCount', value: outsideCoverage ? null : contacts.length, returned: Math.min(contacts.length, 5), sourceRows: publicHealth.dataset.sourceRows,
+      matchCounts: outsideCoverage ? null : Object.fromEntries(['registered_jurisdiction', 'registered_address', 'city_contact'].map(level => [level, contacts.filter(contact => contact.matchLevel === level).length])),
+      unit: '등록 문의처', label: '관할 문구·소재지·제주시 일원 등록의 문의 후보 수; 실제 담당/가용 기관 수 아님', ...publicHealth.quality}];
+    data.candidates = contacts.slice(0, 5).map(contact => ({
+      ...contact, kind: 'public_health', availabilityVerified: false,
+      source: {datasetId: '1304', url: publicHealth.dataset.sourceUrl, hubUrl: publicHealth.dataset.hubUrl, scope: publicHealth.dataset.scope, asOf: publicHealth.dataset.asOf, retrievedAt: publicHealth.retrievedAt},
+      questions: [
+        `조회 지역 ${area}에서 등록 관할 '${contact.jurisdiction || '관할 미기재'}'의 담당 창구가 맞나요? 거주 리/동과 현재 담당지역을 확인해 주세요.`,
+        contact.type === '건강생활지원센터' ? '건강생활지원 프로그램 안내·상담의 범위와 운영요일·시간을 확인해 주세요.' : '공공보건 행정·지역 지원 상담의 범위와 운영요일·시간·대리 문의 절차를 확인해 주세요.',
+        '병원 진료·검사·의뢰/회송·의무기록 발급 업무를 여기서 처리할 수 있다고 가정하지 않습니다. 필요한 병원 접수 창구가 따로 있는지 확인해 주세요.',
+        ...(!contact.phone ? ['원자료에 전화번호가 없어 공식 연락처 확인이 먼저 필요합니다.'] : []),
+      ],
+    }));
+    data.limitations.push('제주시 자료35행의 등록 사실이며 서귀포시·제주 전체 의료기관 명부가 아닙니다. 이 행을 기존 병원13곳이나 돌봄19곳의 집계 분모에 합치지 않습니다.',
+      '등록 관할 문구 일치와 등록 소재지 일치를 구분합니다. 소재지가 같아도 실제 담당지역·제공 업무가 확인된 것은 아닙니다. 리 단위 담당은 별도 문의합니다.',
+      '공개 전화번호가 있다는 사실은 현재 운영·응대·진료/협진 제공·환자 수용·이용자격 확인이 아닙니다. 병원·택시·동행 도구에 이 문의처를 자동 배정하지 않습니다.');
+    if (!area) data.missingData.push('공공보건 행정·관할 문의를 위해 조회할 시·읍면동이 필요합니다.');
+    else if (area.startsWith('서귀포시')) data.missingData.push('현재 보유 파일은 제주시 범위입니다. 서귀포시 문의처가 관측되지 않은 것을 실제 기관 부재로 해석하지 않습니다.');
+    else if (!contacts.length) data.missingData.push('이 지역과 연결되는 등록 관할·소재지를 현재 파일에서 찾지 못했습니다. 공식 담당 창구를 별도로 확인해야 합니다.');
+    if (differentDeparture) data.missingData.push('조회 지역은 현재 방문의 출발지와 다릅니다. 조회만 수행했고 사례·기관 선택·문의 상태는 변경하지 않았습니다.');
+    return data;
+  }
   if (analysis === 'support_candidates') {
     const supportKind = input.supportKind ?? 'both';
     ensure(['taxi', 'companion', 'both'].includes(supportKind), '택시·병원동행·모두 중 문의 종류를 지정해 주세요.');

@@ -1,0 +1,311 @@
+{
+  "schemaVersion": 1,
+  "retrievedAt": "2026-11-01T12:33:27.774Z",
+  "dataset": {
+    "id": "1304",
+    "name": "제주특별자치도_제주시_보건지소등현황",
+    "hubUrl": "https://jejudatahub.net/data/view/data/1304",
+    "sourceUrl": "https://www.data.go.kr/data/15056141/fileData.do",
+    "scope": "linked-public-file",
+    "asOf": "2026-03-23",
+    "sourceRows": 35,
+    "rowCount": 35,
+    "fileName": "제주특별자치도_제주시_보건지소등현황_20260323.csv",
+    "fileSha256": "e2ac77a972f8cde38ee4cfb46c149f9f495fe5739eff0d8343563ddb93aab510"
+  },
+  "quality": {
+    "duplicateRows": 0,
+    "missingAddressRows": 0,
+    "missingJurisdictionRows": 0,
+    "missingPhoneRows": 0
+  },
+  "records": [
+    {
+      "id": "public-health1304-1",
+      "type": "보건지소",
+      "name": "애월보건지소",
+      "address": "제주특별자치도 제주시 애월읍 애월로 167",
+      "jurisdiction": "애월읍 일원",
+      "phone": "064-728-1514"
+    },
+    {
+      "id": "public-health1304-2",
+      "type": "보건지소",
+      "name": "한경보건지소",
+      "address": "제주특별자치도 제주시 한경면 두신로 118-2",
+      "jurisdiction": "한경면 일원",
+      "phone": "064-728-8935"
+    },
+    {
+      "id": "public-health1304-3",
+      "type": "보건진료소",
+      "name": "금악진료소",
+      "address": "제주특별자치도 제주시 한림읍 금악로1길 1",
+      "jurisdiction": "금악리 일원",
+      "phone": "064-728-7311"
+    },
+    {
+      "id": "public-health1304-4",
+      "type": "보건진료소",
+      "name": "상명진료소",
+      "address": "제주특별자치도 제주시 한림읍 상명1길 22",
+      "jurisdiction": "상명 월림리 일원",
+      "phone": "064-728-7312"
+    },
+    {
+      "id": "public-health1304-5",
+      "type": "보건진료소",
+      "name": "비양진료소",
+      "address": "제주특별자치도 제주시 한림읍 비양도길 4",
+      "jurisdiction": "비양리 일원",
+      "phone": "064-728-7313"
+    },
+    {
+      "id": "public-health1304-6",
+      "type": "보건진료소",
+      "name": "봉성진료소",
+      "address": "제주특별자치도 제주시 애월읍 녹근로 6",
+      "jurisdiction": "봉성·어음1 2리 일원",
+      "phone": "064-728-7314"
+    },
+    {
+      "id": "public-health1304-7",
+      "type": "보건진료소",
+      "name": "납읍진료소",
+      "address": "제주특별자치도 제주시 애월읍 중산간서로 5519",
+      "jurisdiction": "납읍리 일원",
+      "phone": "064-728-7315"
+    },
+    {
+      "id": "public-health1304-8",
+      "type": "보건진료소",
+      "name": "상가진료소",
+      "address": "제주특별자치도 제주시 애월읍 애상로 226",
+      "jurisdiction": "상가 하가리 일원",
+      "phone": "064-728-7316"
+    },
+    {
+      "id": "public-health1304-9",
+      "type": "보건진료소",
+      "name": "장전진료소",
+      "address": "제주특별자치도 제주시 애월읍 하소로 353",
+      "jurisdiction": "장전 소길리 일원",
+      "phone": "064-728-7317"
+    },
+    {
+      "id": "public-health1304-10",
+      "type": "보건진료소",
+      "name": "고성진료소",
+      "address": "제주특별자치도 제주시 애월읍 광성로 61-2",
+      "jurisdiction": "고성1 2리 일원",
+      "phone": "064-728-7319"
+    },
+    {
+      "id": "public-health1304-11",
+      "type": "보건진료소",
+      "name": "유수암진료소",
+      "address": "제주특별자치도 제주시 애월읍 유수암평화길14-2",
+      "jurisdiction": "유수암리 일원",
+      "phone": "064-728-7318"
+    },
+    {
+      "id": "public-health1304-12",
+      "type": "보건진료소",
+      "name": "광령진료소",
+      "address": "제주특별자치도 제주시 애월읍 광성로 304",
+      "jurisdiction": "광령1 2 3리 일원",
+      "phone": "064-728-7320"
+    },
+    {
+      "id": "public-health1304-13",
+      "type": "보건진료소",
+      "name": "조수진료소",
+      "address": "제주특별자치도 제주시 한경면 용금로468",
+      "jurisdiction": "조수1 낙천리 일원",
+      "phone": "064-728-7321"
+    },
+    {
+      "id": "public-health1304-14",
+      "type": "보건진료소",
+      "name": "저지진료소",
+      "address": "제주특별자치도 제주시 한경면 중산간서로 3699",
+      "jurisdiction": "저지리 일원",
+      "phone": "064-728-7322"
+    },
+    {
+      "id": "public-health1304-15",
+      "type": "보건진료소",
+      "name": "청수진료소",
+      "address": "제주특별자치도 제주시 한경면 중산간서로 3483",
+      "jurisdiction": "청수리 일원",
+      "phone": "064-728-7323"
+    },
+    {
+      "id": "public-health1304-16",
+      "type": "보건진료소",
+      "name": "용수진료소",
+      "address": "제주특별자치도 제주시 한경면 용수길 73",
+      "jurisdiction": "용수리 일원",
+      "phone": "064-728-7324"
+    },
+    {
+      "id": "public-health1304-17",
+      "type": "보건진료소",
+      "name": "산양진료소",
+      "address": "제주특별자치도 제주시 한경면 연명로 12",
+      "jurisdiction": "조수2 산양리 일원",
+      "phone": "064-728-7325"
+    },
+    {
+      "id": "public-health1304-18",
+      "type": "보건소",
+      "name": "제주보건소",
+      "address": "제주특별자치도 제주시 연삼로 264",
+      "jurisdiction": "제주시 일원",
+      "phone": "064-728-4010"
+    },
+    {
+      "id": "public-health1304-19",
+      "type": "건강생활지원센터",
+      "name": "노형 건강생활지원센터",
+      "address": "제주특별자치도 제주시 노형9길 9-4",
+      "jurisdiction": "제주시 노형동 일원",
+      "phone": "064-728-8730"
+    },
+    {
+      "id": "public-health1304-20",
+      "type": "보건지소",
+      "name": "추자보건지소",
+      "address": "제주특별자치도 제주시 추자면 추자로 86",
+      "jurisdiction": "추자면 일원",
+      "phone": "064-728-1519"
+    },
+    {
+      "id": "public-health1304-21",
+      "type": "보건진료소",
+      "name": "하추자진료소",
+      "address": "제주특별자치도 제주시 추자면 추자로 587",
+      "jurisdiction": "하추자리 일원",
+      "phone": "064-728-7301"
+    },
+    {
+      "id": "public-health1304-22",
+      "type": "보건소",
+      "name": "동부보건소",
+      "address": "제주특별자치도 제주시 구좌읍 김녕로 14길 6",
+      "jurisdiction": "제주시 동부지역",
+      "phone": "064-728-1515"
+    },
+    {
+      "id": "public-health1304-23",
+      "type": "보건지소",
+      "name": "구좌 보건지소",
+      "address": "제주특별자치도 제주시 구좌읍 세화12길 9",
+      "jurisdiction": "구좌읍 일원",
+      "phone": "064-728-1517"
+    },
+    {
+      "id": "public-health1304-24",
+      "type": "보건지소",
+      "name": "조천 보건지소",
+      "address": "제주특별자치도 제주시 조천읍 신북로 264",
+      "jurisdiction": "조천읍 일원",
+      "phone": "064-728-1516"
+    },
+    {
+      "id": "public-health1304-25",
+      "type": "보건지소",
+      "name": "우도 보건지소",
+      "address": "제주특별자치도 제주시 우도면 우도로 153",
+      "jurisdiction": "우도면 일원",
+      "phone": "064-728-1518"
+    },
+    {
+      "id": "public-health1304-26",
+      "type": "보건진료소",
+      "name": "하도 보건진료소",
+      "address": "제주특별자치도 제주시 구좌읍 일주동로 3413",
+      "jurisdiction": "하도리 일원",
+      "phone": "064-728-7304"
+    },
+    {
+      "id": "public-health1304-27",
+      "type": "보건진료소",
+      "name": "송당 보건진료소",
+      "address": "제주특별자치도 제주시 구좌읍 송당서1길 4",
+      "jurisdiction": "송당리 일원",
+      "phone": "064-728-7303"
+    },
+    {
+      "id": "public-health1304-28",
+      "type": "보건진료소",
+      "name": "덕천 보건진료소",
+      "address": "제주특별자치도 제주시 구좌읍 덕평로 325-3",
+      "jurisdiction": "덕천리 일원",
+      "phone": "064-728-7302"
+    },
+    {
+      "id": "public-health1304-29",
+      "type": "보건진료소",
+      "name": "대흘 보건진료소",
+      "address": "제주특별자치도 제주시 조천읍 중산간동로 645",
+      "jurisdiction": "대흘리 일원",
+      "phone": "064-728-7306"
+    },
+    {
+      "id": "public-health1304-30",
+      "type": "보건진료소",
+      "name": "선흘1리 보건진료소",
+      "address": "제주특별자치도 제주시 조천읍 선흘동1길 10",
+      "jurisdiction": "선흘1리 일원",
+      "phone": "064-728-7307"
+    },
+    {
+      "id": "public-health1304-31",
+      "type": "보건진료소",
+      "name": "선흘2리 보건진료소",
+      "address": "제주특별자치도 제주시 조천읍 선교로 533",
+      "jurisdiction": "선흘2리 일원",
+      "phone": "064-728-7308"
+    },
+    {
+      "id": "public-health1304-32",
+      "type": "보건진료소",
+      "name": "교래 보건진료소",
+      "address": "제주특별자치도 제주시 조천읍 비자림로 652",
+      "jurisdiction": "교래리 일원",
+      "phone": "064-728-7305"
+    },
+    {
+      "id": "public-health1304-33",
+      "type": "보건소",
+      "name": "서부보건소",
+      "address": "제주특별자치도 제주시 한림읍 강구로 5",
+      "jurisdiction": "제주시 서부지역",
+      "phone": "064-728-1513"
+    },
+    {
+      "id": "public-health1304-34",
+      "type": "건강생활지원센터",
+      "name": "화북 건강생활지원센터",
+      "address": "제주특별자치도 제주시 동화로1길 45-22",
+      "jurisdiction": "제주시 화북 삼양 봉개동 일원",
+      "phone": "064-728-8513"
+    },
+    {
+      "id": "public-health1304-35",
+      "type": "건강생활지원센터",
+      "name": "이호 건강생활지원센터",
+      "address": "제주특별자치도 제주시 도리로 57",
+      "jurisdiction": "제주시 외도 이호 도두동 일원",
+      "phone": "064-728-8694"
+    }
+  ],
+  "rawDataStored": false,
+  "rights": {
+    "label": "이용허락범위 제한 없음",
+    "sourceUrl": "https://www.data.go.kr/data/15056141/fileData.do",
+    "checkedAt": "2026-11-01T12:33:27.774Z",
+    "included": "최소 기관 사실 정제본; 원문 CSV 미포함"
+  }
+}

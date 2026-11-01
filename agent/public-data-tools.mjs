@@ -20,10 +20,10 @@ export const PUBLIC_DATA_TOOLS = Object.freeze([
   },
   {
     name:'analyze_public_data',
-    description:'등록된 공개 snapshot을 코드로 계산한다. facility_compare는 areas 두 지역, support_candidates는 선택 supportKind(taxi/companion/both, 생략시 모두)·area·wheelchair, travel_time은 선택 area만 받는다. 출처·분모·표본·결측을 보존하며 원자료 없는 이동시간은 unavailable로 둔다. 환자 상태·예약을 변경하지 않는다.',
+    description:'등록된 공개 snapshot을 코드로 계산한다. facility_compare는 areas 두 지역, support_candidates는 선택 supportKind(taxi/companion/both, 생략시 모두)·area·wheelchair, travel_time은 선택 area만 받는다. public_health_contacts는 선택 area로 제주시 공공보건 행정·관할 등록 문의처와 질문을 읽으며 병원/택시/동행에 자동 배정하지 않는다. 출처·분모·표본·결측을 보존하며 원자료 없는 이동시간은 unavailable로 둔다. 환자 상태·예약을 변경하지 않는다.',
     readOnly:true,
     inputSchema:objectSchema({
-      analysis:{type:'string',enum:['facility_compare','support_candidates','travel_time']},
+      analysis:{type:'string',enum:['facility_compare','support_candidates','travel_time','public_health_contacts']},
       areas:{type:'array',items:areaSchema,minItems:2,maxItems:2,uniqueItems:true},
       area:areaSchema,
       supportKind:{type:'string',enum:['taxi','companion','both']},
@@ -96,11 +96,13 @@ export function createPublicDataToolExecutor({search=searchPublicDataCatalog,ana
     const data=name === 'search_public_data' ? search(args) : analyze(args,operationalContext(state));
     const sources=dataSourceUrls(data,name).map(value => verifiedSource(value,allowlist));
     const unavailable=name === 'analyze_public_data' && data.status === 'unavailable';
+    const publicHealthAnalysis=name === 'analyze_public_data' && input.analysis === 'public_health_contacts';
     const label=name === 'search_public_data' ? '진료 준비용 공공데이터 목록 조회'
       : input.analysis === 'facility_compare' ? '공개 표본의 지역별 등록 현황 비교'
-      : input.analysis === 'support_candidates' ? '공개 이동·동행 문의 후보 분석' : '이동시간 원자료 접근 범위 확인';
+      : input.analysis === 'support_candidates' ? '공개 이동·동행 문의 후보 분석' : input.analysis === 'public_health_contacts' ? '공공보건 행정·관할 등록 문의처 조회' : '이동시간 원자료 접근 범위 확인';
     const detail=name === 'search_public_data'
       ? `분류 메타데이터에서 관련 ${data.results.length}건을 반환했습니다. 목록·명세와 실제 조회 가능한 공개 snapshot을 구분하며 현재 운영정보는 확인하지 않았습니다.`
+      : publicHealthAnalysis ? unavailable ? '제주시 등록 파일의 조회 범위가 아니거나 지역이 없어 담당 문의처를 정하지 않았습니다. 실제 기관 부재를 뜻하지 않습니다.' : '제주시 공공보건 등록 파일에서 관할 문구·소재지·시 단위 문의처를 구분했습니다. 행정·관할 질문 준비용이며 현재 운영·진료·실제 담당을 확인하거나 사례를 변경하지 않았습니다.'
       : unavailable ? '계산에 필요한 원자료가 없어 수치·평균·ETA를 제공하지 않았습니다. 필요한 자료와 기존 문의 준비로 확인할 질문을 정리했습니다.'
       : '등록된 공개 snapshot의 범위·시점·분모·결측을 보존해 계산했습니다. 문의 준비 제안이며 실제 수용·예약·배차·진료 적합성은 확인하지 않았습니다.';
     const events=[{id:randomUUID(),tool:name,label,detail,status:unavailable ? 'needs_input' : 'completed',isSimulation:false,...(sources[0] ? {source:sources[0]} : {})}];
