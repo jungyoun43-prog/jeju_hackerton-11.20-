@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, writeFile, readFile, access, rm, symlink } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, readFile, access, rm, symlink, cp } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { buildSite } from '../scripts/build.mjs';
@@ -59,4 +60,23 @@ test('앱 밖 파일로 향하는 심볼릭 링크를 게시용 빌드에 복사
   await symlink(join(project, 'private.txt'), join(project, 'app/linked.txt'));
   await assert.rejects(buildSite({ projectRoot: project }), /심볼릭 링크/);
   await assert.rejects(access(join(project, 'dist/linked.txt')));
+});
+
+test('공식 분할 폰트 CSS·92개 WOFF2·명세·OFL을 정적 빌드에 보존한다', async t => {
+  const project = await fixture(t);
+  await mkdir(join(project, 'app/assets'), {recursive:true});
+  await cp(new URL('../app/assets/pretendard/', import.meta.url), join(project, 'app/assets/pretendard'), {recursive:true});
+  await cp(new URL('../app/assets/Pretendard-LICENSE.txt', import.meta.url), join(project, 'app/assets/Pretendard-LICENSE.txt'));
+  await cp(new URL('../app/index.html', import.meta.url), join(project, 'app/index.html'));
+  await buildSite({projectRoot:project, revision:'font-assets'});
+  const directory = join(project, 'dist/assets/pretendard');
+  const manifest = JSON.parse(await readFile(join(directory, 'manifest.json'), 'utf8'));
+  assert.equal(manifest.files.length, 93);
+  for (const file of manifest.files) {
+    const bytes = await readFile(join(directory, file.path));
+    assert.equal(createHash('sha256').update(bytes).digest('hex'), file.sha256);
+  }
+  const license = await readFile(join(directory, manifest.license.path));
+  assert.equal(createHash('sha256').update(license).digest('hex'), manifest.license.sha256);
+  assert.match(await readFile(join(project, 'dist/index.html'), 'utf8'), /\/assets\/pretendard\/pretendardvariable-dynamic-subset\.css/);
 });
