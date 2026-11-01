@@ -22,6 +22,7 @@ export function requestFingerprint(request) {
     message:request.message,history:(request.history ?? []).map(turn=>({role:turn.role,text:turn.text})),
     preferences:request.preferences?{taxiProviderId:request.preferences.taxiProviderId,wheelchair:request.preferences.wheelchair,companionNeeded:request.preferences.companionNeeded}:null,
     applyPreferences:request.applyPreferences ?? false,
+    ...(request.guidedPreparation===true?{guidedPreparation:true}:{}),
   })).digest('hex');
 }
 

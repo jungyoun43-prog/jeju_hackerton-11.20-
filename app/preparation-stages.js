@@ -1,13 +1,8 @@
 import {getCareJourneySummary} from './care-journey.js';
 import {getVisitSupportSummary} from './visit-support.js';
+import {getPreparationWorkflow,PREPARATION_STAGES,PREPARATION_STAGE_IDS} from './preparation-workflow.js';
 
-export const PREPARATION_STAGES=Object.freeze([
-  Object.freeze({id:'records',number:1,title:'요청·자료 확인',shortTitle:'자료 확인'}),
-  Object.freeze({id:'hospitals',number:2,title:'병원·협진 준비',shortTitle:'병원 문의'}),
-  Object.freeze({id:'support',number:3,title:'이동·동행 조율',shortTitle:'이동·동행'}),
-  Object.freeze({id:'plan',number:4,title:'방문 계획·답변',shortTitle:'혼디의 정리'}),
-]);
-export const PREPARATION_STAGE_IDS=Object.freeze(PREPARATION_STAGES.map(stage=>stage.id));
+export {PREPARATION_STAGES,PREPARATION_STAGE_IDS};
 const TOOL_STAGE=Object.freeze({
   apply_care_preferences:'records',get_case:'records',update_visit:'records',request_records:'records',mark_document_missing:'records',
   search_hospital_contacts:'hospitals',select_hospital_contact:'hospitals',request_hospital_contact:'hospitals',
@@ -77,10 +72,10 @@ function baseStage(definition,status,label,summary,facts=[],gaps=[],sources=[]) 
 /** 읽기 전용 화면 projection. 단계 완료는 임상 수락·예약·배차 완료를 뜻하지 않는다. */
 export function getPreparationBoard(state,{events=[],progress=null,pending=false,responseCount=0,requestProblem=''}={}) {
   progress=normalizePreparationProgress(progress);
-  const journey=getCareJourneySummary(state),support=getVisitSupportSummary(state),requirements=state.visitSupport.requirements;
+  const journey=getCareJourneySummary(state),support=getVisitSupportSummary(state),workflow=getPreparationWorkflow(state),requirements=state.visitSupport.requirements;
   const docs=state.documents??[],available=docs.filter(doc=>doc.status==='ready').length;
-  const recordGaps=docs.filter(doc=>doc.status!=='ready').map(doc=>`${doc.label} · ${doc.status==='not_performed'?'의료진 수행·확인 필요':'보유 여부 확인 필요'}`);
-  if(!requirements.appointmentTime)recordGaps.unshift('진료 시각을 확인해 주세요.');
+  const recordGaps=docs.filter(doc=>doc.status!=='ready'&&(doc.id!=='referral'||journey.tasks.some(task=>task.id==='physician-referral'))).map(doc=>`${doc.label} · ${doc.status==='not_performed'?'의료진 수행·확인 필요':'원본·작성일 확보 필요'}`);
+  if(!requirements.appointmentTime)recordGaps.unshift('진료 시각 미확인 · 다른 문의 초안은 먼저 준비할 수 있어요.');
   const records=baseStage(PREPARATION_STAGES[0],recordGaps.length?'needs_input':'available',recordGaps.length?'확인할 정보 있음':'자료 확인 결과',
     `보유 표시 ${available}개 · 합성 자료`,[
       {label:'출발',value:state.patient.area},{label:'방문',value:`${state.patient.nextVisit} · ${requirements.appointmentTime||'시각 미정'}`},
@@ -105,24 +100,24 @@ export function getPreparationBoard(state,{events=[],progress=null,pending=false
     ['taxi','companion'].map(kind=>({label:kind==='taxi'?'이동':'동행',value:support[kind].status==='not_needed'?'필요 없음':support[kind].providerName?`${support[kind].providerName} · ${support[kind].label}`:support[kind].label})),
     [...journey.schedule.recheckReasons,...supportHandoffs.map(item=>`${item.owner} · ${item.detail}`),...support.unresolved],
     ['taxi','companion'].map(kind=>support[kind].status==='not_needed'?null:source(support[kind].source)));
-  const plan=baseStage(PREPARATION_STAGES[3],responseCount?'available':'waiting',responseCount?'이번 요청의 답변':'말씀을 기다리고 있어요.',
-    responseCount?'확인된 준비와 남은 일을 함께 읽어 보세요.':'입력창에 필요한 준비를 한 번에 말씀해 주세요.',
-    [{label:'다음 확인',value:journey.nextActions[0]?.title||'요청하실 내용을 말씀해 주세요.'}],[]);
+  const plan=baseStage(PREPARATION_STAGES[3],workflow.stages[3].status,workflow.stages[3].label,workflow.stages[3].summary,
+    [{label:'다음 할 일',value:workflow.currentTask?.title||'현재 준비 결과 확인'}],workflow.remainingTasks.map(task=>`${task.owner} · ${task.title}`));
   const stages=[records,hospitals,mobility,plan];
+  for(const stage of stages){const taskStage=workflow.stages.find(item=>item.id===stage.id);stage.status=taskStage.status;stage.label=taskStage.label;stage.actor=taskStage.actor;stage.remainingCount=taskStage.remainingCount;}
   // 기호는 자료·문의 준비만 요약한다. 미확인은 문의 실패나 임상 부적합이 아니다.
   records.signal=recordGaps.length?'attention':'available';
   hospitals.signal=hospitalBlocked?'blocked':confirmed===inquiries.length?'available':confirmed?'attention':'waiting';
   const requiredSupport=['taxi','companion'].filter(kind=>support[kind].status!=='not_needed');
   const draftedSupport=requiredSupport.every(kind=>['prepared','available_demo'].includes(support[kind].status));
   mobility.signal=!support.totalNeeded?'not_needed':recheck?'attention':supportBlocked?'blocked':draftedSupport?'available':selected?'attention':'waiting';
-  plan.signal=responseCount?'available':'waiting';
+  plan.signal=plan.status==='not_started'?'waiting':'attention';
   for(const event of Array.isArray(events)?events:[]){
     if(!event||typeof event!=='object')continue;
     const id=PREPARATION_STAGE_IDS.includes(event.stage)?event.stage:event.tool==='analyze_public_data'&&/이동|동행/.test(event.label)?'support':getToolStage(event.tool);
     if(id)stages.find(stage=>stage.id===id).events.push(safeEvent(event));
   }
   for(const stage of stages){stage.events=stage.events.slice(-5);const gaps=[...new Set(stage.gaps)];stage.gapCount=gaps.length;stage.gaps=gaps;}
-  let activeStageId=responseCount?'plan':'records';
+  let activeStageId=workflow.currentStageId;
   const live=pending&&progress?.status==='running'&&PREPARATION_STAGE_IDS.includes(progress.currentStage);
   if(live)activeStageId=progress.currentStage;
   if(pending&&progress){
@@ -135,7 +130,7 @@ export function getPreparationBoard(state,{events=[],progress=null,pending=false
     }
   }
   if(requestProblem){plan.status='needs_input';plan.signal='attention';plan.label='응답 확인 필요';plan.summary=requestProblem;activeStageId='plan';}
-  return {version:1,activeStageId,stages,pending,hasResponse:responseCount>0,progressAvailable:!!progress,
+  return {version:1,activeStageId,stages,workflow,pending,hasResponse:responseCount>0,progressAvailable:!!progress,
     boundary:journey.boundary,overallLabel:pending?(progress?'준비 도구의 진행 상태를 확인하고 있어요.':'요청을 전달하고 답변을 기다리고 있어요.'):'실제 전화·예약·배차는 연결 전 · 현재 합성 사례',
   };
 }

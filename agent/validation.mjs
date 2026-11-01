@@ -20,7 +20,7 @@ export function validateRequestId(value) {
   return value;
 }
 export function validateMessageRequest(body) {
-  assertKeys(body, ['message', 'sessionId', 'history', 'requestId', 'preferences', 'applyPreferences', 'progressToken', 'visitToken']);
+  assertKeys(body, ['message', 'sessionId', 'history', 'requestId', 'preferences', 'applyPreferences', 'progressToken', 'visitToken', 'guidedPreparation']);
   const requestId = validateRequestId(body.requestId);
   fail(typeof body.message === 'string' && body.message.trim().length > 0 && body.message.length <= LIMITS.messageChars && noControl(body.message), 'INVALID_MESSAGE', '요청은 4,000자 이내의 텍스트로 입력해 주세요.');
   if (body.sessionId !== undefined) fail(typeof body.sessionId === 'string' && /^[A-Za-z0-9_-]{43}$/.test(body.sessionId), 'INVALID_SESSION', '세션 식별자 형식을 확인해 주세요.');
@@ -44,7 +44,8 @@ export function validateMessageRequest(body) {
     catch { throw new AgentError('INVALID_PREFERENCES','공개 택시 문의처와 휠체어·동행 필요 여부를 확인해 주세요.'); }
   }
   if (Object.hasOwn(body,'applyPreferences')) fail(typeof body.applyPreferences === 'boolean' && (body.applyPreferences === false || preferences !== undefined), 'INVALID_PREFERENCES','기본 설정을 적용하려면 올바른 설정을 함께 보내 주세요.');
-  return {message:body.message.trim(),sessionId:body.sessionId,history,requestId,...(preferences ? {preferences} : {}),...(Object.hasOwn(body,'applyPreferences') ? {applyPreferences:body.applyPreferences} : {}),...(Object.hasOwn(body,'progressToken') ? {progressToken:body.progressToken} : {}),...(Object.hasOwn(body,'visitToken') ? {visitToken:body.visitToken} : {})};
+  if (Object.hasOwn(body,'guidedPreparation')) fail(typeof body.guidedPreparation === 'boolean','INVALID_GUIDED_PREPARATION','방문 준비 방식은 boolean 값이어야 합니다.');
+  return {message:body.message.trim(),sessionId:body.sessionId,history,requestId,...(preferences ? {preferences} : {}),...(Object.hasOwn(body,'applyPreferences') ? {applyPreferences:body.applyPreferences} : {}),...(Object.hasOwn(body,'progressToken') ? {progressToken:body.progressToken} : {}),...(Object.hasOwn(body,'visitToken') ? {visitToken:body.visitToken} : {}),...(Object.hasOwn(body,'guidedPreparation') ? {guidedPreparation:body.guidedPreparation} : {})};
 }
 function validateVisitToken(value) {
   fail(isVisitToken(value),'INVALID_VISIT_TOKEN','준비 이어하기 식별자 형식을 확인해 주세요.');

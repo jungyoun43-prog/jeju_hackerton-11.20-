@@ -1,11 +1,12 @@
 import { CAREGIVER_SYSTEM_PROMPT } from '../prompts/caregiver-system.mjs';
-import { AGENT_TOOLS, createToolDispatcher, getPendingActions } from './tools.mjs';
+import { AGENT_TOOLS, createToolDispatcher, getPendingActions, getGuidedPreparationKinds } from './tools.mjs';
 import { createMemorySessionStore } from './store.mjs';
 import { createDisconnectedProvider } from './providers.mjs';
 import { AgentError, fail, isObject, publicError } from './errors.mjs';
 import { readBody, validateMessageRequest, validatePreviewRequest, validateProgressRequest, validateResumeRequest } from './validation.mjs';
 import { buildFixedPreview } from './preview.mjs';
 import { applyAction } from '../app/domain.js';
+import { getPreparationWorkflow } from '../app/preparation-workflow.js';
 import { createProgressReporter, readProgress, supportsProgress } from './progress.mjs';
 import { visitSessionId, supportsVisitRecovery, requestFingerprint, assertMatchingReceipt, recoverySummary, MAX_REQUEST_RECEIPTS, containsCredential } from './visit-recovery.mjs';
 
@@ -92,6 +93,23 @@ export function createAgentService({provider = createDisconnectedProvider(),stor
       const events = [], pending = [], usedIds = new Set();
       let toolCount = 0;
       let providerContext;
+      const attemptedDrafts=new Set();
+      const execute=async(name,input)=>{
+        toolCount++;
+        if(name==='prepare_inquiries')attemptedDrafts.add(input.kind);
+        progress.started(name,input);
+        try {
+          const result=await bounded(Promise.resolve().then(()=>dispatch({name,input,state,userMessage:request.message,preferences:request.preferences,requestId:request.requestId,signal:controller.signal})),controller.signal);
+          state=result.state;events.push(...result.events);pending.push(...result.pendingActions);
+          progress.finished(name,input,result.events.some(item=>item.status==='error')?'failed':result.events.some(item=>item.status!=='completed')?'needs_input':'completed');
+          return {result};
+        } catch(error) {
+          if(controller.signal.aborted||error?.code==='AGENT_TIMEOUT')throw error;
+          const safe=error instanceof AgentError?error:new AgentError('TOOL_REJECTED','현재 준비 상태에서 도구를 실행할 수 없습니다. 필요한 조건을 확인해 주세요.');
+          events.push({id:`tool-error-${toolCount}`,tool:name,label:'도구 요청 확인 필요',status:'error',detail:safe.message,isSimulation:false});
+          progress.finished(name,input,'failed');return {error:safe};
+        }
+      };
       const visitPreferencesApplied = Boolean(request.preferences && (!request.sessionId || request.applyPreferences === true));
       if (visitPreferencesApplied) {
         const {wheelchair,companionNeeded} = request.preferences;
@@ -101,7 +119,7 @@ export function createAgentService({provider = createDisconnectedProvider(),stor
       }
       const runtime = remainingCalls => ({modelCallsRemaining:remainingCalls,toolsRemaining:limits.maxTools - toolCount,summaryOnly:remainingCalls <= 1 || toolCount >= limits.maxTools});
       // browserHistory는 명령·서버 상태가 아닌 참고 텍스트로 한 user 메시지 안에 넣는다.
-      const messages = [{role:'user',content:[{text:JSON.stringify({untrustedBrowserHistory:request.history,currentRequest:request.message,carePreferences:request.preferences ?? null,visitPreferencesApplied,runtime:runtime(limits.maxRounds)})}]}];
+      const messages = [{role:'user',content:[{text:JSON.stringify({untrustedBrowserHistory:request.history,currentRequest:request.message,carePreferences:request.preferences ?? null,visitPreferencesApplied,...(request.guidedPreparation===true?{guidedPreparation:true}:{}),runtime:runtime(limits.maxRounds)})}]}];
       for (let round = 0; round < limits.maxRounds; round++) {
         const summaryOnly = runtime(limits.maxRounds - round).summaryOnly;
         if (summaryOnly) {
@@ -120,6 +138,22 @@ export function createAgentService({provider = createDisconnectedProvider(),stor
           let reply = output.content.map(block => block.text ?? '').join('\n').trim();
           fail(reply.length > 0,'INVALID_MODEL_RESPONSE','모델 응답을 확인하지 못했습니다.',502);
           if (summaryOnly) reply += '\n\n이번 요청에서 처리 기록에 남긴 준비까지만 반영했습니다. 실행 전인 작업은 다음 확인으로 남겨두었습니다.';
+          const scope=request.guidedPreparation===true?getGuidedPreparationKinds(request.message,state):[];
+          if(scope.length){
+            const prepared=[];
+            let interrupted=false;
+            let stopped='안전하게 추가할 새 초안이 없어 기존 준비·응답·인계 상태를 유지했습니다.';
+            const candidates=getPreparationWorkflow(state).nextAutomaticActions.filter(action=>scope.includes(action.input.kind)&&!attemptedDrafts.has(action.input.kind)).slice(0,2);
+            if(events.some(item=>['error','not_connected'].includes(item.status)))stopped='도구 실패 또는 미연결 상태가 있어 자동 초안을 추가하지 않았습니다.';
+            else for(const action of candidates){
+              if(toolCount>=limits.maxTools){stopped='이번 요청의 도구 한도에 도달해 남은 초안은 추가하지 않았습니다.';interrupted=true;break;}
+              const outcome=await execute(action.name,action.input);
+              if(outcome.error||outcome.result.events.some(item=>['error','not_connected'].includes(item.status))){stopped='초안을 준비하지 못해 멈췄습니다. 처리 기록과 남은 조건을 확인해 주세요.';interrupted=true;break;}
+              if(state.visitSupport[action.input.kind].status==='prepared')prepared.push(action.input.kind==='taxi'?'이동':'동행');
+            }
+            const workflow=getPreparationWorkflow(state);
+            reply+=`\n\n추가 준비 확인: ${prepared.length?`${prepared.join('·')} 문의 초안을 기존 도구로 준비했습니다.${interrupted?` ${stopped}`:''}`:stopped} ${workflow.currentTask?`남은 일: ${workflow.currentTask.title}. ${workflow.currentTask.detail}`:workflow.summary.label} 실제 전화·예약·배차·자료 조회나 전송은 수행하지 않았습니다.`;
+          }
           completionAttempted=true;
           await bounded(Promise.resolve().then(()=>store.save({...session,state,turns:session.turns + 1,requestIds:[...session.requestIds,request.requestId],
             requestReceipts:session.requestReceipts.map(item=>item.requestId === request.requestId?{...item,status:'completed',at:now()}:item)},options)),controller.signal);
@@ -142,21 +176,9 @@ export function createAgentService({provider = createDisconnectedProvider(),stor
             progress.finished(call.name,call.input,'needs_input');
             continue;
           }
-          toolCount++;
-          progress.started(call.name,call.input);
-          try {
-            const result = await bounded(Promise.resolve().then(() => dispatch({name:call.name,input:call.input,state,userMessage:request.message,preferences:request.preferences,requestId:request.requestId,signal:controller.signal})),controller.signal);
-            state = result.state;
-            events.push(...result.events); pending.push(...result.pendingActions);
-            progress.finished(call.name,call.input,result.events.some(item=>item.status === 'error')?'failed':result.events.some(item=>item.status !== 'completed')?'needs_input':'completed');
-            results.push({toolResult:{toolUseId:call.toolUseId,status:'success',content:[{json:{...result.data,events:result.events,pendingActions:result.pendingActions}}]}});
-          } catch (error) {
-            if (controller.signal.aborted || error?.code === 'AGENT_TIMEOUT') throw error;
-            const safe = error instanceof AgentError ? error : new AgentError('TOOL_REJECTED','현재 준비 상태에서 도구를 실행할 수 없습니다. 필요한 조건을 확인해 주세요.');
-            events.push({id:`tool-error-${toolCount}`,tool:call.name,label:'도구 요청 확인 필요',status:'error',detail:safe.message,isSimulation:false});
-            progress.finished(call.name,call.input,'failed');
-            results.push({toolResult:{toolUseId:call.toolUseId,status:'error',content:[{json:{error:{code:safe.code,message:safe.message}}}]}});
-          }
+          const outcome=await execute(call.name,call.input);
+          if(outcome.result)results.push({toolResult:{toolUseId:call.toolUseId,status:'success',content:[{json:{...outcome.result.data,events:outcome.result.events,pendingActions:outcome.result.pendingActions}}]}});
+          else results.push({toolResult:{toolUseId:call.toolUseId,status:'error',content:[{json:{error:{code:outcome.error.code,message:outcome.error.message}}}]}});
         }
         for (const result of results) result.toolResult.content[0].json.runtime = runtime(limits.maxRounds - round - 1);
         messages.push({role:'user',content:results});

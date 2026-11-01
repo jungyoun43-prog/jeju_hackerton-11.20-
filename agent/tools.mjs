@@ -13,6 +13,7 @@ import { normalizeCarePreferences } from '../app/care-preferences.js';
 import { CALL_TARGETS, buildCallPlan } from '../app/call-policy.js';
 import { CALL_RECOVERY_SCENARIOS, CALL_FAILURE_REASONS, callRecipientId, getCallAttemptGate, getCallRecoveryHandoffs } from '../app/call-recovery.js';
 import { getCareJourneySummary, JOURNEY_SCENARIOS } from '../app/care-journey.js';
+import { getPreparationWorkflow } from '../app/preparation-workflow.js';
 
 const registry = validateSupportRegistry(supportData);
 const HOSPITAL_SOURCE = 'https://jejudatahub.net/data/view/data/859';
@@ -109,8 +110,13 @@ function caseFacts(state) {
     permissions:state.permissions,documents:state.documents.map(({id,label,status,source}) => ({id,label,status,source})),
     inquiries:Object.fromEntries(Object.entries(state.inquiries).map(([target,item]) => [target,{status:item.status,requestedDocuments:item.requestedDocuments,source:'합성 전화 역할 · 실제 발신 없음'}])),
     packet:state.packet,review:state.review,visitSupport:getVisitSupportSummary(state),requirements:state.visitSupport.requirements,
-    nextActions:getPendingActions(state),callPlans:callPlanSummaries(state),careJourney:getCareJourneySummary(state),
+    nextActions:getPendingActions(state),callPlans:callPlanSummaries(state),careJourney:getCareJourneySummary(state),preparationWorkflow:preparationWorkflowContext(state),
   };
+}
+export function preparationWorkflowContext(state) {
+  const {currentStageId,currentTask,stages,nextAutomaticActions,visitReady}=getPreparationWorkflow(state);
+  return {currentStageId,currentTask:currentTask?{id:currentTask.id,status:currentTask.status,actor:currentTask.actor,title:currentTask.title,question:currentTask.question}:null,
+    stages:stages.map(({id,status,actor,remainingCount})=>({id,status,actor,remainingCount})),nextAutomaticActions,visitReady};
 }
 function supportCandidates(state,kind) { return getSupportCandidates(registry,{kind,area:state.patient.area,wheelchair:state.visitSupport.requirements.wheelchair}); }
 function publicProvider(item) { return {...item,source:{...item.source,url:assertSourceUrl(item.source.url)}}; }
@@ -191,6 +197,25 @@ function authorizationClauses(message,state) {
     }
   }
   return clauses;
+}
+/** 이번 요청의 명시적 준비 범위만 쓴다. 읽기·인용·부정은 실행 범위가 아니다. */
+export function getGuidedPreparationKinds(message,state) {
+  const requested=new Set(),blocked=new Set(),exclusive=new Set();
+  for(const part of authorizationClauses(message,state)){
+    // 실발신 금지는 그대로 지키면서, 별도로 요청한 내부 초안까지 금지로 바꾸지 않는다.
+    const clause=part.clause.replace(/(?:실제\s*(?:전화|발신|통화)|실발신)(?:는|은|를|을)?\s*(?:하지|걸지)\s*(?:말아(?:\s*(?:줘(?:요)?|주세요))?|말고|마(?:세요|라)?)/g,'').trim();
+    const kinds=[...(/택시|이동|교통/.test(clause)?['taxi']:[]),...(/동행/.test(clause)?['companion']:[])];
+    const broad=!kinds.length&&/(?:방문|진료|협진)(?:을|를)?\s*(?:전체\s*)?준비/.test(clause)&&!/(?:만|뿐)(?:\s|을|은|해|알|준|정)/.test(clause);
+    if(/하지|말아|마세요|마라|금지|불허|않|필요\s*없|원치|원하지|(?:빼|제외)\s*(?:줘|주세요|하고|해)|(?:^|\s)안\s*(?:준비|정리|문의|알아)|준비\s*안/.test(clause)){
+      for(const kind of kinds.length?kinds:['taxi','companion'])blocked.add(kind);continue;
+    }
+    if(/(?:택시|이동|교통)(?:\s*지원)?\s*만/.test(clause))exclusive.add('taxi');
+    if(/동행(?:\s*지원)?\s*만/.test(clause))exclusive.add('companion');
+    if(/비교|검색|조회|설명|현황|상태|확인만|(?:보여|알려)\s*(?:줘|주세요)|만약|가정|경우|(?:라면|다면|으면)/.test(clause))continue;
+    if(!/(?:준비(?:를)?\s*(?:이어(?:서)?\s*)?(?:해|하)|초안(?:을)?\s*(?:만들어|작성해)|챙겨|알아봐|도와)\s*(?:줘(?:요)?|주세요|주십시오)\s*$/.test(clause))continue;
+    for(const kind of broad?['taxi','companion']:kinds)requested.add(kind);
+  }
+  return ['taxi','companion'].filter(kind=>requested.has(kind)&&!blocked.has(kind)&&(!exclusive.size||exclusive.has(kind)));
 }
 function explicitMissingDocument(message,state,id) {
   const labels={history:/(?:치료|진료)\s*이력|병력\s*요약/,report:/판독문/,referral:/의뢰서/};
@@ -328,7 +353,7 @@ export function createToolDispatcher({phoneAdapter = createPhoneSimulationAdapte
         break;
       }
       case 'get_care_journey':
-        data = getCareJourneySummary(next);
+        data = {...getCareJourneySummary(next),preparationWorkflow:preparationWorkflowContext(next)};
         events.push(event(name,'진료 연결 근거와 다음 할 일 확인','요구 자료·발급과 제출 문의·휠체어·이동·동행의 의존 작업과 조건 변경을 정리했습니다. 진료 연결 결과는 의료진 근거가 없으면 미확인입니다.',{isSimulation:true,source:'합성 사례·고정 합성 안내·공개 snapshot'}));
         break;
       case 'run_journey_demo': {

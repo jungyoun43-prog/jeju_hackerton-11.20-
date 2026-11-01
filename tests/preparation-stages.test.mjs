@@ -35,13 +35,13 @@ test('준비 기호는 미확인·문의 실패·시각 변경을 구분하고 �
 test('초기 네 작업창은 실제 합성 사례를 읽고 미확인·의료진 담당·실연계 경계를 유지한다',()=>{
  const state=createDemoCase(),before=structuredClone(state),board=getPreparationBoard(state);
  assert.deepEqual(board.stages.map(stage=>stage.id),['records','hospitals','support','plan']);
- assert.equal(board.activeStageId,'records');assert.equal(board.stages[0].status,'needs_input');
+ assert.equal(board.activeStageId,'support');assert.equal(board.stages[0].status,'waiting_external');
  assert.match(board.stages[0].gaps.join(' '),/진료 시각/);
  assert.match(board.stages[0].gaps.join(' '),/의료진/);
  assert.equal(board.stages[0].gapCount,board.stages[0].gaps.length,'자세히 읽을 전체 누락 목록과 건수가 일치해야 한다');
  assert.doesNotMatch(board.stages[2].facts.map(fact=>fact.value).join(' '),/문의처 선택 전 · 문의처 선택 전/);
- assert.equal(board.stages[1].status,'waiting');assert.match(board.stages[1].summary,/실제 진료 수락 미확인/);
- assert.equal(board.stages[3].status,'waiting');assert.equal(board.hasResponse,false);
+ assert.equal(board.stages[1].status,'not_started');assert.match(board.stages[1].summary,/실제 진료 수락 미확인/);
+ assert.equal(board.stages[3].status,'not_started');assert.equal(board.hasResponse,false);
  assert.ok(Object.values(board.boundary).every(value=>value===false));assert.deepEqual(state,before);
 });
 
@@ -101,18 +101,18 @@ test('응답 전 관측된 도구 결과는 각 창에 표시하되 마지막 �
  p.stages=p.stages.map(stage=>({...stage,status:stage.id==='plan'?'running':'observed',lastTool:({records:'get_case',hospitals:'request_hospital_contact',support:'prepare_inquiries',plan:'build_report'})[stage.id]}));
  p.events=p.stages.map((stage,index)=>({sequence:index+1,stage:stage.id,tool:stage.lastTool,status:stage.id==='plan'?'started':'completed'}));
  const board=getPreparationBoard(state,{pending:true,progress:p});assert.equal(board.activeStageId,'plan');
- assert.equal(board.stages[1].status,'waiting');assert.match(board.stages[1].liveActivity,/병원 접수 절차 시연.*결과 도착/);
- assert.equal(board.stages[2].status,'waiting');assert.match(board.stages[2].liveActivity,/문의 초안.*결과 도착/);
+ assert.equal(board.stages[1].status,'not_started');assert.match(board.stages[1].liveActivity,/병원 접수 절차 시연.*결과 도착/);
+ assert.equal(board.stages[2].status,'not_started');assert.match(board.stages[2].liveActivity,/문의 초안.*결과 도착/);
  assert.ok(board.stages[3].live);assert.equal(board.stages.filter(stage=>stage.live).length,1);
  assert.match(board.stages[1].summary,/0\/2/);
 });
 
 test('자료 누락과 제주 접수 거절은 관련 창에 남고 임상적 결론·완료가 되지 않는다',async()=>{
  const missing=await preview('missing_record');let board=getPreparationBoard(missing.caseState,{events:missing.events,responseCount:1});
- assert.equal(board.stages[0].status,'needs_input');assert.match(board.stages[0].gaps.join(' '),/판독문/);
- assert.equal(board.stages[3].status,'available');assert.equal(board.activeStageId,'plan');
+ assert.equal(board.stages[0].status,'waiting_external');assert.match(board.stages[0].gaps.join(' '),/판독문/);
+ assert.equal(board.stages[3].status,'waiting_external');assert.equal(board.activeStageId,board.workflow.currentStageId);
  const rejected=await preview('jeju_unavailable');board=getPreparationBoard(rejected.caseState,{events:rejected.events,responseCount:1});
- assert.equal(board.stages[1].status,'needs_input');assert.match(JSON.stringify(board.stages[1].facts),/접수 불가/);
+ assert.equal(board.stages[1].status,'handoff');assert.match(JSON.stringify(board.stages[1].facts),/접수 불가/);
  assert.ok(Object.values(board.boundary).every(value=>value===false));
 });
 
@@ -128,21 +128,21 @@ test('진료 시각 변경은 이동 창을 재확인으로 다시 열고 이전
 test('전화 실패 네 상황은 번호·남은 일의 기존 상태를 지키며 보호자/환자 인계를 표시한다',async()=>{
  for(const [id,target,owner] of [['call_no_answer','support',/보호자/],['call_ai_declined','support',/보호자/],['call_identity_required','hospitals',/환자/],['call_documents_or_schedule','hospitals',/보호자|환자/]]){
   const data=await preview(id),before=structuredClone(data.caseState),board=getPreparationBoard(data.caseState,{events:data.events,responseCount:1});
-  const stage=board.stages.find(stage=>stage.id===target);assert.equal(stage.status,'needs_input',id);
+  const stage=board.stages.find(stage=>stage.id===target);assert.equal(stage.status,'handoff',id);
   assert.match(stage.gaps.join(' '),owner,id);assert.ok(Object.values(board.boundary).every(value=>value===false));assert.deepEqual(data.caseState,before);
  }
 });
 
 test('지원 불필요 조건에서는 선택 전·지원 요청 문구를 섞지 않는다',()=>{
  const state=applyAction(createDemoCase(),{type:'SUPPORT_UPDATE_REQUIREMENTS',values:{transportNeeded:false,companionNeeded:false}});
- const stage=getPreparationBoard(state).stages[2];assert.equal(stage.status,'not_needed');assert.match(stage.label,/필요 없음/);
+ const stage=getPreparationBoard(state).stages[2];assert.equal(stage.status,'not_needed');assert.match(stage.label,/해당 없음/);
  assert.ok(stage.facts.every(fact=>fact.value==='필요 없음'));assert.deepEqual(stage.sources,[]);
 });
 
 test('이동시간 분석·오류·완료 답변은 조회의 의미를 유지하며 이벤트를 제한해 표시한다',()=>{
  const state=createDemoCase(),before=structuredClone(state),events=Array.from({length:8},(_,i)=>({tool:'analyze_public_data',label:'이동시간 원자료 접근 범위 확인',detail:`필요한 원자료와 질문 ${i}`,status:'needs_input',isSimulation:false}));
  const board=getPreparationBoard(state,{events,responseCount:1});assert.equal(board.stages[2].events.length,5);assert.equal(board.stages[0].events.length,0);
- assert.equal(board.stages[3].status,'available');assert.equal(board.stages[3].label,'이번 요청의 답변');
+ assert.equal(board.stages[3].status,'not_started');assert.equal(board.stages[3].label,'방문 준비표 작성 전');
  const failed=getPreparationBoard(state,{requestProblem:'연결을 확인해 주세요.'});assert.equal(failed.activeStageId,'plan');assert.equal(failed.stages[3].status,'needs_input');
  assert.deepEqual(state,before);
 });

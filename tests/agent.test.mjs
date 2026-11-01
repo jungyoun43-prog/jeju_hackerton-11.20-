@@ -4,7 +4,7 @@ import { createAgentService } from '../agent/service.mjs';
 import { createLambdaHandler } from '../agent/handler.mjs';
 import { createMemorySessionStore } from '../agent/store.mjs';
 import { AGENT_TOOLS, createToolDispatcher, assertSourceUrl } from '../agent/tools.mjs';
-import { createDemoCase, buildReport } from '../app/domain.js';
+import { createDemoCase, buildReport, applyAction } from '../app/domain.js';
 import { createConverseProvider } from '../agent/providers.mjs';
 
 const req = (extra = {}) => ({message:'합성 방문 준비를 도와줘',requestId:'request-test-0001',...extra});
@@ -17,6 +17,62 @@ function scripted(outputs) {
   const calls = [];
   return {connected:true,model:'injected-test-model',calls,async respond(input) { calls.push(input); const output = outputs.shift(); assert.ok(output,'검사 provider 응답이 부족합니다.'); return typeof output === 'function' ? output(input) : output; }};
 }
+
+test('guided 준비는 이른 모델 종료 뒤 같은 요청에서 안전한 초안 최대 두 개만 이어 만든다',async()=>{
+  const provider=scripted([done('현재 요청을 확인했습니다.')]),store=createMemorySessionStore();
+  let charged=0;const service=createAgentService({provider,store:{...store,async consumeTurn(...args){charged++;return store.consumeTurn(...args);}}});
+  const request=req({message:'방문 준비를 도와줘',guidedPreparation:true,visitToken:'g'.repeat(43),progressToken:'p'.repeat(43)});
+  const response=await post(service,request),body=json(response);
+  assert.equal(response.statusCode,200);assert.equal(provider.calls.length,1);assert.equal(charged,1);
+  assert.deepEqual(body.events.map(item=>item.tool),['prepare_inquiries','prepare_inquiries']);
+  for(const kind of ['taxi','companion'])assert.equal(body.caseState.visitSupport[kind].status,'prepared');
+  assert.match(body.caseState.visitSupport.taxi.inquiry,/예약 시각: 미확인/);
+  assert.deepEqual(body.caseState.documents,createDemoCase().documents);assert.equal(body.caseState.permissions.share,false);
+  assert.ok(Object.values(body.caseState.inquiries).every(item=>item.status==='not_contacted'));
+  assert.match(body.reply,/이동·동행 문의 초안/);assert.match(body.reply,/실제 전화·예약·배차/);
+  const events=store.inspectProgress()[0].progress.events;
+  assert.equal(events.filter(item=>item.tool==='prepare_inquiries'&&item.status==='completed').length,2);
+  const retry=await post(service,request);assert.equal(retry.statusCode,200);assert.deepEqual(json(retry).caseState,body.caseState);
+  assert.equal(provider.calls.length,1);assert.equal(charged,1);
+});
+
+test('guided false/생략은 기존 동작이고 boolean 외 값은 store·모델 접근 전에 거절한다',async()=>{
+  for(const guidedPreparation of [false,undefined]){
+    const provider=scripted([done('읽은 결과입니다.')]),service=createAgentService({provider});
+    const response=await post(service,req(guidedPreparation===undefined?{}:{guidedPreparation}));
+    assert.equal(response.statusCode,200);assert.deepEqual(json(response).events,[]);
+    assert.equal(json(response).caseState.visitSupport.taxi.status,'not_selected');
+  }
+  const service=createAgentService({store:new Proxy({}, {get(){throw new Error('잘못된 boolean에서 저장소 호출 금지');}})});
+  for(const guidedPreparation of [null,'true',1,[],{}]){
+    const response=await post(service,req({guidedPreparation}));assert.equal(response.statusCode,400);
+    assert.equal(json(response).error.code,'INVALID_GUIDED_PREPARATION');
+  }
+});
+
+test('읽기·비교·부정 요청은 모델이 방문 상태를 바꿔도 fallback 범위를 넓히지 않는다',async()=>{
+  for(const message of ['방문 준비 상태를 보여줘','택시와 동행을 비교해줘','방문 준비하지 말아줘','무관한 질문입니다.']){
+    const provider=scripted([use(call('update_visit',{appointmentTime:'10:00'})),done('확인했습니다.')]);
+    const response=await post(createAgentService({provider}),req({message,guidedPreparation:true}));
+    assert.equal(response.statusCode,200);assert.deepEqual(json(response).events.map(item=>item.tool),['update_visit']);
+    assert.equal(json(response).caseState.visitSupport.taxi.status,'not_selected');
+    assert.equal(provider.calls.length,2);
+  }
+});
+
+test('초안만 요청한 범위·실전화 금지·지원 해당 없음과 도구 한도를 지킨다',async()=>{
+  const provider=scripted([done('초안을 확인합니다.')]);
+  const only=await post(createAgentService({provider}),req({message:'택시 문의 초안을 현재 방문 조건으로 준비해줘. 실제 전화는 하지 말아 줘.',guidedPreparation:true}));
+  assert.equal(only.statusCode,200);assert.deepEqual(json(only).events.map(item=>item.tool),['prepare_inquiries']);
+  assert.equal(json(only).caseState.visitSupport.companion.status,'not_selected');
+  const limited=await post(createAgentService({provider:scripted([done('한도 안에서 준비합니다.')]),config:{maxTools:1}}),req({guidedPreparation:true}));
+  assert.equal(limited.statusCode,200);assert.equal(json(limited).events.length,1);
+  assert.equal(json(limited).caseState.visitSupport.companion.status,'not_selected');
+  const store=createMemorySessionStore(),session=await store.loadOrCreate();
+  session.state=applyAction(session.state,{type:'SUPPORT_UPDATE_REQUIREMENTS',values:{transportNeeded:false,companionNeeded:false}});await store.save(session);
+  const none=await post(createAgentService({store,provider:scripted([done('조건을 유지합니다.')])}),req({sessionId:session.sessionId,guidedPreparation:true}));
+  assert.equal(none.statusCode,200);assert.deepEqual(json(none).events,[]);
+});
 
 test('기본 API는 모델·store 호출 없이 사실대로 미연결503을 반환한다',async () => {
   const store = new Proxy({}, {get() { throw new Error('store must not be touched'); }});
