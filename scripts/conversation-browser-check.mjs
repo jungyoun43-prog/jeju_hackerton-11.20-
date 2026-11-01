@@ -26,8 +26,8 @@ await mkdir(resolve(root,'orchestration/runs'),{recursive:true});
 const browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH||undefined,args:['--no-sandbox','--disable-dev-shm-usage']});
 const checks=[],errors=[];
 const record=(name,ok,detail='')=>{checks.push({name,status:ok?'pass':'fail',detail});console.log(`${ok?'PASS':'FAIL'} ${name}${detail?' · '+detail:''}`);};
-const proof={result:'fail',checkedAt:new Date().toISOString(),url:base.href,sourceHash:await runtimeFingerprint(servedRoot),invokingSourceHash:await runtimeFingerprint(root),checks,errors,apiLive:false,modelInvoked:false,phoneInvoked:false,healthRecordsQueried:false,microphone:'permission-denied, transcript-review and delayed-abort fixtures only',fixedPreview:false,normalInputDisconnected:false,desktop:{width:1440,noOverflow:false},mobile:{width:390,noOverflow:false},fixtureCoverage:{preferences:false,markdown:false,recovery:false,voiceReview:false,voiceCancellation:false,exampleDrafts:false,cancellation:false,contactPlan:false,shortViewport:false},shortViewport:[],runtimeAssets:[],sourceHashScope:process.env.QA_SERVED_SOURCE_ROOT?'explicit QA_SERVED_SOURCE_ROOT; served UI assets compared below':'invoking checkout; served UI assets compared below'};
-const overflow=page=>page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth);
+const proof={result:'fail',checkedAt:new Date().toISOString(),url:base.href,sourceHash:await runtimeFingerprint(servedRoot),invokingSourceHash:await runtimeFingerprint(root),checks,errors,apiLive:false,modelInvoked:false,phoneInvoked:false,healthRecordsQueried:false,microphone:'permission-denied, transcript-review and delayed-abort fixtures only',fixedPreview:false,normalInputDisconnected:false,keylessDisconnectedPosts:0,desktop:{width:1440,height:900,noOverflow:false},mobile:{width:390,height:844,noOverflow:false},fixtureCoverage:{preferences:false,markdown:false,recovery:false,voiceReview:false,voiceCancellation:false,exampleDrafts:false,cancellation:false,contactPlan:false,shortViewport:false},shortViewport:[],runtimeAssets:[],sourceHashScope:process.env.QA_SERVED_SOURCE_ROOT?'explicit QA_SERVED_SOURCE_ROOT; served UI assets compared below':'invoking checkout; served UI assets compared below'};
+const overflow=page=>page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1 && document.documentElement.scrollHeight<=innerHeight+1 && scrollY===0);
 const json=request=>JSON.parse(request.postData());
 const hashMatches=request=>request.headers()['x-amz-content-sha256']===createHash('sha256').update(request.postDataBuffer()).digest('hex');
 const snapshotStorage=page=>page.evaluate(()=>Object.fromEntries(Object.entries(localStorage)));
@@ -39,6 +39,29 @@ async function screenshot(page,name) {
   await page.evaluate(()=>new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(done))));
   await page.screenshot({path:resolve(root,path),fullPage:true});
   return path;
+}
+async function showView(page,view) {
+  const tab=page.locator('#workspace-tab-'+view);
+  if(await tab.isVisible() && await tab.getAttribute('aria-selected')!=='true')await tab.click();
+}
+async function reveal(locator) {
+  const page=locator.page(),view=await locator.evaluate(node=>node.closest('#preparation-rail')?'preparation':node.closest('#chat-workspace')?'chat':null);
+  const target=await locator.elementHandle();
+  if(!await page.locator('dialog[open]').count())for(const id of ['request-examples','composer-help']) {
+    const popup=page.locator('#'+id);
+    if(await popup.evaluate((node,target)=>node.open && !node.contains(target),target))await popup.locator(':scope>summary').click();
+  }
+  if(view)await showView(page,view);
+  for(const details of await locator.locator('xpath=ancestor::details').all())if(!await details.evaluate((node,target)=>node.open || node.querySelector(':scope>summary')?.contains(target),target))await details.locator(':scope>summary').click();
+}
+async function workspaceEvidence(page) {
+  return page.evaluate(()=>{
+    const chat=document.getElementById('chat-workspace'),rail=document.getElementById('preparation-rail'),input=document.getElementById('request-input'),form=document.getElementById('conversation-form'),composer=document.getElementById('chat-composer'),compact=matchMedia('(max-width:900px), (max-height:650px)').matches,layout=document.querySelector('.conversation-layout');
+    const bounds=node=>{const r=node.getBoundingClientRect();return {top:r.top,bottom:r.bottom,left:r.left,right:r.right,width:r.width,height:r.height};},inside=node=>{const r=bounds(node);return r.width>0 && r.height>0 && r.top>=-1 && r.bottom<=innerHeight+1 && r.left>=-1 && r.right<=innerWidth+1;};
+    const regions=[document.getElementById('conversation-scroll'),rail].map(node=>({id:node.id,...bounds(node),clientHeight:node.clientHeight,scrollHeight:node.scrollHeight,scrollTop:node.scrollTop,overflowY:getComputedStyle(node).overflowY,fontSize:parseFloat(getComputedStyle(node.querySelector('.message-body')||node).fontSize),active:!node.closest('[hidden],[inert]')}));
+    const cards=[...document.querySelectorAll('#preparation-board>[data-stage-id]')],tabs=[...document.querySelectorAll('[role="tab"][id^="workspace-tab-"]')],active=layout.dataset.activeView==='preparation'?rail:chat,inactive=active===chat?rail:chat;
+    return {viewportFit:document.documentElement.scrollWidth<=innerWidth+1 && document.documentElement.scrollHeight<=innerHeight+1 && document.body.scrollHeight<=innerHeight+1 && scrollY===0 && inside(document.querySelector('.app-shell')),sharedComposer:document.querySelectorAll('#request-input,#conversation-form,#chat-composer').length===3 && composer.contains(form) && form.contains(input) && !composer.closest('[hidden],[inert]') && [input,document.getElementById('send-request')].every(inside),scrollRegions:regions.every(region=>/auto|scroll/.test(region.overflowY) && (!region.active || region.clientHeight>=Math.max(44,region.fontSize*1.2))) && cards.length===4 && cards.every(node=>! /auto|scroll|hidden|clip/.test(getComputedStyle(node).overflowY) && node.scrollHeight<=node.clientHeight+2),compactPanels:compact?chat.getAttribute('role')==='tabpanel' && rail.getAttribute('role')==='tabpanel' && tabs.length===2 && tabs.every(node=>node.getAttribute('aria-controls')===(node.id==='workspace-tab-chat'?'chat-workspace':'preparation-rail')) && tabs.filter(node=>node.getAttribute('aria-selected')==='true').length===1 && active.hidden===false && !active.inert && inactive.hidden && inactive.inert && !inactive.contains(document.activeElement) && tabs.every(node=>node.tabIndex===(node.getAttribute('aria-selected')==='true'?0:-1)):!chat.hidden && !rail.hidden && !chat.inert && !rail.inert,regions,compact,activeView:layout.dataset.activeView,composer:bounds(composer),body:{width:document.documentElement.scrollWidth,height:document.documentElement.scrollHeight}};
+  });
 }
 async function scenario(name,run) {
   try {await run();} catch(error) {errors.push(`${name}: ${error.message}`);record(name,false,error.message);}
@@ -80,9 +103,11 @@ async function open(width,height,{configured=false,voice,storageSeed,onPost}={})
   return {page,context,requests,networkRequests};
 }
 async function readConversation(page) {
+  await showView(page,'chat');
   await page.locator('.chat-workspace #conversation-scroll').waitFor({state:'visible'});
 }
 async function openVisitSummary(page) {
+  await showView(page,'preparation');
   for(const id of ['visit-summary','case-summary']) {
     const details=page.locator(`#${id}`);
     if(await details.evaluate(node=>node instanceof HTMLDetailsElement && !node.open))await details.locator(':scope>summary').click();
@@ -100,7 +125,7 @@ async function send(page,text) {
 async function confirmAction(page,selector,accept=true) {
   let dialogType='',message='';
   page.once('dialog',async dialog=>{dialogType=dialog.type();message=dialog.message();if(accept)await dialog.accept();else await dialog.dismiss();});
-  await (typeof selector==='string'?page.locator(selector):selector).click();
+  const target=typeof selector==='string'?page.locator(selector):selector;await reveal(target);await target.click();
   return {confirmed:dialogType==='confirm',message};
 }
 async function editPreferences(page,values) {
@@ -122,8 +147,8 @@ function fixtureResponse(request,state,reply='합성 준비 상태를 확인했�
   return {sessionId:fixtureSessionId,requestId:json(request).requestId,reply,caseState:state,events:[{id:'fixture-taxi',tool:'prepare_inquiries',label:'택시 문의 초안 준비',status:'completed',detail:'브라우저 응답 fixture입니다. 실제 발신·예약을 하지 않았습니다.',isSimulation:true,source:'https://jejudatahub.net/data/view/data/327'}],pendingActions:[{id:'fixture-confirm',kind:'support',label:'문의처에 가능 시간 확인',reason:'실제 배차·예약 미확정'}],capabilities:configuredCaps,needsInput:true};
 }
 async function disclosure(page) {
-  const node=page.locator('#composer-disclosure');
-  return (await reachable(node)).reachable && /가상/.test(await node.innerText()) && /실제.*(?:연락|발신).*예약/.test(await node.innerText());
+  const short=page.locator('#composer-disclosure'),full=page.locator('#composer-boundary');
+  return (await reachable(short)).reachable && /시연.*실행.*없음/.test(await short.innerText()) && (await reachable(full)).reachable && /가상/.test(await full.innerText()) && /실제.*(?:연락|발신).*예약.*없음/.test(await full.innerText()) && await page.locator('#request-input').evaluate(node=>node.getAttribute('aria-describedby').split(/\s+/).includes('composer-boundary'));
 }
 async function backgroundLoaded(page) {
   return page.evaluate(async()=>{
@@ -163,6 +188,7 @@ const settleUI=page=>page.evaluate(()=>new Promise(done=>requestAnimationFrame((
 // 화면 아래에 있는 문구는 사용자가 스크롤할 수 있으면 접근 가능하다.
 // overflow:hidden 조상을 프로그램으로 움직여서만 보인 경우는 통과시키지 않는다.
 async function reachable(locator) {
+  await reveal(locator);
   const before=await locator.evaluate(node=>{
     const r=node.getBoundingClientRect(),ancestors=[];
     for(let parent=node.parentElement;parent;parent=parent.parentElement)ancestors.push({top:parent.scrollTop,left:parent.scrollLeft,locked:/^(hidden|clip)$/.test(getComputedStyle(parent).overflowY)});
@@ -180,7 +206,7 @@ async function reachable(locator) {
       if(/^(hidden|clip|auto|scroll)$/.test(style.overflowX)){left=Math.max(left,p.left+parent.clientLeft);right=Math.min(right,p.left+parent.clientLeft+parent.clientWidth);}
     }
     const selfClipped=/^(hidden|clip)$/.test(s.overflowY) && node.scrollHeight>node.clientHeight+2;
-    const fits=r.top>=top-2 && r.bottom<=bottom+2 && r.left>=left-2 && r.right<=right+2;
+    const fits=(r.top>=top-2 && r.bottom<=bottom+2 || !node.matches('button,input,select,textarea,summary,a') && r.height>bottom-top && r.bottom>top && r.top<bottom && bottom-top>=parseFloat(s.fontSize)*1.2) && r.left>=left-2 && r.right<=right+2;
     return {initial:before.initial,reachable:s.display!=='none' && s.visibility!=='hidden' && r.width>0 && r.height>0 && fits && !hiddenScroll && !selfClipped,hiddenScroll,selfClipped,rect:{top:Math.round(r.top),bottom:Math.round(r.bottom)},visibleRange:{top:Math.round(top),bottom:Math.round(bottom)}};
   },before);
 }
@@ -250,18 +276,20 @@ try {
   for(const [width,height,label] of [[1440,900,'desktop'],[390,844,'mobile']])await scenario(`${width}px 실제 API 시나리오`,async()=>{
     const {page,context,requests,networkRequests}=await open(width,height);
     try {
+      Object.assign(proof[label],await workspaceEvidence(page));
       proof[label].noOverflow=await overflow(page);
       proof[label].screenshot=await screenshot(page,`initial-${label}`);
       const initialComposer=await page.locator('#request-input,#send-request').evaluateAll(nodes=>nodes.map(node=>{const r=node.getBoundingClientRect();return {id:node.id,top:r.top,bottom:r.bottom,inViewport:r.top>=0 && r.bottom<=innerHeight && r.width>0 && r.height>0};}));
       const composerAccess=await accessSet(page,['#request-input','#send-request']);
-      record(`${width}px 가로 넘침 없이 대화 뒤 입력·보내기에 문서로 접근`,proof[label].noOverflow && Object.values(composerAccess).every(item=>item.reachable),JSON.stringify({initialComposer,composerAccess}));
+      record(`${width}px 앱 넘침 없이 하단 공통 입력·보내기에 접근`,proof[label].noOverflow && Object.values(composerAccess).every(item=>item.reachable),JSON.stringify({initialComposer,composerAccess}));
       proof[label].chatLayout=await page.evaluate(()=>{
-        const chat=document.querySelector('.chat-workspace'),rail=document.querySelector('.preparation-rail'),board=document.getElementById('preparation-board'),conversation=document.getElementById('conversation-scroll'),messages=document.getElementById('message-list'),examples=document.getElementById('starter-prompts'),form=document.getElementById('conversation-form');
-        const follows=(a,b)=>Boolean(a && b && a.compareDocumentPosition(b)&Node.DOCUMENT_POSITION_FOLLOWING);
-        return Boolean(chat && rail && chat.parentElement===rail.parentElement && chat.parentElement.matches('.conversation-layout') && rail.contains(board) && chat.contains(conversation) && conversation.contains(messages) && !board.contains(messages) && follows(conversation,examples) && follows(examples,form) && chat.contains(form) && document.querySelector('.chat-toolbar #expand-answer')?.closest('.chat-workspace')===chat && document.querySelectorAll('#message-list,#conversation-scroll,#conversation-form,#request-input').length===4 && !board.querySelector('.message,#conversation-form'));
+        const chat=document.getElementById('chat-workspace'),rail=document.getElementById('preparation-rail'),board=document.getElementById('preparation-board'),conversation=document.getElementById('conversation-scroll'),messages=document.getElementById('message-list'),composer=document.getElementById('chat-composer'),form=document.getElementById('conversation-form');
+        return Boolean(chat && rail && chat.parentElement===rail.parentElement && chat.parentElement.matches('.conversation-layout') && rail.contains(board) && chat.contains(conversation) && conversation.contains(messages) && !board.contains(messages) && composer.parentElement===chat.parentElement && composer.contains(form) && !chat.contains(form) && !rail.contains(form) && document.querySelector('.workspace-tools #expand-answer') && document.querySelectorAll('#message-list,#conversation-scroll,#conversation-form,#request-input').length===4 && !board.querySelector('.message,#conversation-form') && !document.querySelector('.chat-identity,.chat-role,#conversation-title'));
       });
-      record(`${width}px 중앙 대화1개→예시→단일 입력, 오른쪽 준비 요약과 분리`,proof[label].chatLayout);
+      record(`${width}px 중앙 대화·준비 패널과 하단 단일 입력·공통 도구 분리`,proof[label].chatLayout);
+      await showView(page,'preparation');
       record(`${width}px 네 작업칸·기호·제목 아이콘은 한 번씩 보이고 모든 상세는 접힘`,await page.locator('#preparation-board>[data-stage-id]').evaluateAll(nodes=>nodes.length===4 && nodes.every(node=>node.checkVisibility())) && await page.locator('#stage-navigation').count()===0 && await page.locator('#preparation-board>.stage-pane>.stage-pane-header .signal-mark').count()===4 && await page.locator('#preparation-board>.stage-pane>.stage-pane-header .stage-topic-icon').count()===4 && await page.locator('[data-stage-details]').evaluateAll(nodes=>nodes.length===4 && nodes.every(node=>node instanceof HTMLDetailsElement && !node.open)) && await page.locator('[data-stage-id="plan"]').isVisible() && await page.locator('#preparation-details').count()===0 && await page.locator('[data-case-status]').count()===4);
+      await readConversation(page);
       record(`${width}px 로고·자가 호스팅 Pretendard·제주 배경, 인물사진 비노출`,await page.locator('.brand img').first().evaluate(e=>e.complete && e.naturalWidth>0) && await backgroundLoaded(page) && await page.locator('.welcome-photo').count()===0 && await page.evaluate(()=>getComputedStyle(document.body).fontFamily.includes('Pretendard') && [...document.fonts].some(font=>font.family.replaceAll('"','')==='Pretendard' && font.status==='loaded')));
       record(`${width}px 설정은 선택이며 준비 대화에 필수 수동 폼 없음`,await page.locator('#conversation-form select,#conversation-form input[type=checkbox]').count()===0 && await page.locator('#preferences-form [required]').count()===0 && await page.locator('#preferences-form select').count()===1);
       record(`${width}px 입력 가까이 실제 연락·예약 한계 표시`,await disclosure(page));
@@ -282,7 +310,7 @@ try {
       const normal=await send(page,'모델 연결 전 자유 입력입니다.');
       await page.locator('.request-error').waitFor();
       const normalPayload=await normal.json(),disconnected=normal.status()===503 && normalPayload.error?.code==='MODEL_NOT_CONNECTED';
-      proof.normalInputDisconnected ||= disconnected;
+      proof.normalInputDisconnected ||= disconnected;if(disconnected)proof.keylessDisconnectedPosts++;
       record(`${width}px 자유 입력은 실제 503·입력 보존·가짜 응답 없음`,disconnected && await input.inputValue()==='모델 연결 전 자유 입력입니다.' && await page.locator('.message.assistant:not(.greeting)').count()===0 && await page.locator('.message.user').count()===1 && await page.locator('.tool-record').count()===0);
       const first=requests.at(-1);
       record(`${width}px 동일 JSON UTF-8 SHA256`,hashMatches(first));
@@ -371,7 +399,7 @@ try {
       const answer=page.locator('.message.assistant:not(.greeting) .message-body').last();
       record(`${width}px Markdown 제목·목록·강조와 안전한 링크 표시`,await answer.locator('h3').count()===1 && await answer.locator('ul ul').count()===1 && await answer.locator('strong').count()>0 && !(await answer.innerText()).includes('# 준비한 내용') && !(await answer.innerText()).includes('**택시') && await answer.locator('a').evaluateAll(links=>links.length===1 && links.every(a=>a.protocol==='https:' && a.target==='_blank' && a.rel.includes('noopener'))));
       record(`${width}px 모델 HTML·javascript 링크는 실행하지 않음`,await answer.locator('img,script,iframe,a[href^="javascript:"]').count()===0 && await page.evaluate(()=>window.__qaXss===undefined));
-      record(`${width}px 새 답변의 시작은 문서에 표시하고 도구 기록은 접어 둠`,(await reachable(answer.locator('h3'))).reachable && await page.locator('#conversation-scroll').evaluate(node=>getComputedStyle(node).overflowY==='visible' && node.scrollHeight<=node.clientHeight+2) && await page.locator('.tool-records').evaluateAll(nodes=>nodes.every(node=>!node.open)));
+      record(`${width}px 새 답변 시작은 중앙 scroller로 읽고 도구 기록은 접어 둠`,(await reachable(answer.locator('h3'))).reachable && await page.locator('#conversation-scroll').evaluate(node=>/auto|scroll/.test(getComputedStyle(node).overflowY) && node.clientHeight>0) && await page.locator('.tool-records').evaluateAll(nodes=>nodes.every(node=>!node.open)));
       record(`${width}px 응답 뒤 키보드 초점은 화면 밖 입력으로 강제하지 않음`,await page.evaluate(()=>{const node=document.activeElement,r=node?.getBoundingClientRect();return node!==document.body && r?.width>0 && r?.height>0 && r.top<innerHeight && r.bottom>0;}));
       const summary=getVisitSupportSummary(state);
       await openVisitSummary(page);
@@ -438,7 +466,7 @@ try {
   for(const [width,height] of [[360,780],[390,844],[768,1024]])await scenario(`${width}px 모바일 설정`,async()=>{
     const {page,context,requests}=await open(width,height);
     try {
-      record(`${width}px 추가 반응형 가로 넘침·문서 입력·실제 처리 한계`,await overflow(page) && (await reachable(page.locator('#send-request'))).reachable && await disclosure(page));
+      record(`${width}px 추가 반응형 앱 넘침·공통 입력·실제 처리 한계`,await overflow(page) && (await reachable(page.locator('#send-request'))).reachable && await disclosure(page));
       await page.locator('#open-care-menu').focus();await page.keyboard.press('Enter');
       record(`${width}px 설정 서랍은 이름·focus·배경 비활성 제공`,await page.locator('#care-rail').getAttribute('role')==='dialog' && await page.locator('#care-rail').getAttribute('aria-modal')==='true' && await page.evaluate(()=>document.activeElement.id==='close-care-menu' && document.querySelector('#workspace-shell').inert));
       const targets=page.locator('#open-care-menu,#close-care-menu,#pref-taxi,.preference-toggle,#nav-preparation,#nav-preferences');
@@ -509,13 +537,13 @@ try {
   for(const [width,height] of [[1440,900],[390,844]])await scenario(`${width}px 예시 초안 fixture`,async()=>{
     const {page,context,requests}=await open(width,height,{configured:true,onPost:request=>({body:fixtureResponse(request,createDemoCase())})});
     try {
-      const input=page.locator('#request-input'),example=page.locator('[data-example]:visible').first();
+      const input=page.locator('#request-input'),example=page.locator('[data-example]').first();await reveal(example);
       const visible=normalizedText(await example.locator('span').innerText());
       await example.click();
       record(`${width}px 예시는 보이는 문구만 초안으로 채우고 POST 없음`,requests.length===0 && normalizedText(await input.inputValue())===visible && !/11월\s*12|오전\s*10/.test(await input.inputValue()) && await page.locator('.message.user').count()===0);
-      const examples=page.locator('[data-example]:visible');
+      const examples=page.locator('[data-example]');
       for(let index=1;index<await examples.count();index++) {
-        await input.fill('');const other=examples.nth(index),copy=normalizedText(await other.locator('span').innerText());await other.click();
+        await input.fill('');const other=examples.nth(index);await reveal(other);const copy=normalizedText(await other.locator('span').innerText());await other.click();
         record(`${width}px 추가 예시 ${index+1}도 보이는 초안만 입력`,requests.length===0 && normalizedText(await input.inputValue())===copy && !/11월\s*12|오전\s*10/.test(await input.inputValue()));
       }
       const existing='직접 쓰던 요청은 예시를 눌러도 먼저 보호해야 합니다.';await input.fill(existing);
@@ -531,11 +559,11 @@ try {
   for(const width of [390,360])await scenario(`${width}x500 읽기·입력 접근 fixture`,async()=>{
     const reply='# 긴 답변의 시작\n\n'+Array.from({length:24},(_,index)=>`확인 ${index+1}. 제주 병원과 기존 도외 병원의 접수 창구·전달할 자료를 확인합니다. 실제 진료 수락이나 예약은 미확정입니다.`).join('\n\n')+'\n\n긴 답변의 마지막 안내입니다.';
     const {page,context,requests}=await open(width,500,{configured:true,onPost:request=>({body:fixtureResponse(request,createDemoCase(),reply)})});
-    const controls=['#request-input','#send-request','#composer-disclosure','.privacy-note'];
+    const controls=['#request-input','#send-request','#composer-disclosure','#composer-boundary','.privacy-note'];
     try {
       await readConversation(page);
-      const initial=await accessSet(page,controls),conversation=await page.locator('#conversation-scroll').evaluate(node=>({height:node.clientHeight,documentFlow:getComputedStyle(node).overflowY==='visible' && node.scrollHeight<=node.clientHeight+2 && document.scrollingElement.scrollHeight>innerHeight}));
-      record(`${width}x500 첫 화면은 문서 스크롤로 입력·고지 접근`,await overflow(page) && Object.values(initial).every(value=>value.reachable) && conversation.documentFlow,JSON.stringify(initial));
+      const initial=await accessSet(page,controls),conversation=await workspaceEvidence(page);
+      record(`${width}x500 첫 화면의 공통 입력·펼친 고지는 작업공간에서 접근`,await overflow(page) && Object.values(initial).every(value=>value.reachable) && conversation.viewportFit && conversation.sharedComposer && conversation.scrollRegions && conversation.compactPanels,JSON.stringify(initial));
       const input=page.locator('#request-input'),multiline=Array.from({length:12},(_,index)=>`${index+1}번째 요청 내용: 진료 자료와 이동을 확인해 주세요.`).join('\n');
       await input.fill(multiline);await input.press('Control+End');
       const multiple=await accessSet(page,controls),textarea=await input.evaluate(node=>({lines:node.value.split('\n').length,lastLine:node.scrollTop+node.clientHeight>=node.scrollHeight-3,scrollable:/auto|scroll/.test(getComputedStyle(node).overflowY)}));
@@ -543,7 +571,7 @@ try {
       await send(page,multiline);
       const answer='.message.assistant:not(.greeting) .message-body';
       const longAnswer=await accessSet(page,[`${answer} h3`,`${answer} p:last-child`,...controls]);
-      record(`${width}x500 긴 답변은 문서로 시작과 마지막까지 읽고 다시 입력 가능`,requests.length===1 && Object.values(longAnswer).every(value=>value.reachable) && await page.locator('#conversation-scroll').evaluate(node=>getComputedStyle(node).overflowY==='visible' && node.scrollHeight<=node.clientHeight+2 && node.scrollTop===0) && await overflow(page),JSON.stringify(longAnswer));
+      record(`${width}x500 긴 답변은 중앙 scroller로 처음·끝을 읽고 공통 입력 유지`,requests.length===1 && Object.values(longAnswer).every(value=>value.reachable) && await page.locator('#conversation-scroll').evaluate(node=>/auto|scroll/.test(getComputedStyle(node).overflowY) && node.clientHeight>0) && await overflow(page),JSON.stringify(longAnswer));
       const before=await page.locator(answer).last().evaluate(node=>parseFloat(getComputedStyle(node).fontSize));
       // CSS zoom은 화면 전체를 축소·확대하므로 쓰지 않고 실제 텍스트의 계산 크기를 2배로 바꾼다.
       await page.evaluate(()=>{
@@ -554,7 +582,7 @@ try {
       await input.fill(multiline);await input.press('Control+End');
       const enlarged=await accessSet(page,[`${answer} h3`,`${answer} p:last-child`,...controls]);
       record(`${width}x500 텍스트 200%에서 대화·입력·전송·고지 접근`,await page.locator(answer).last().evaluate(node=>parseFloat(getComputedStyle(node).fontSize))>=before*1.95 && await input.evaluate(node=>parseFloat(getComputedStyle(node).fontSize)>=31 && node.value.split('\n').length===12 && node.scrollTop+node.clientHeight>=node.scrollHeight-3) && Object.values(enlarged).every(value=>value.reachable) && await overflow(page),JSON.stringify(enlarged));
-      proof.shortViewport.push({width,height:500,textScale:2,initial,multiple,longAnswer,enlarged});
+      proof.shortViewport.push({width,height:500,textScale:2,initial,multiple,longAnswer,enlarged,...await workspaceEvidence(page)});
       await screenshot(page,`short-${width}-text-200`);proof.fixtureCoverage.shortViewport=true;
     } finally {await context.close();}
   });

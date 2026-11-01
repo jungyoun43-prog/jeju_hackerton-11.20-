@@ -18,7 +18,7 @@ const checks=[],errors=[],allPosts=[];
 const proof={
   result:'fail',checkedAt:new Date().toISOString(),url:'',sourceHash:'',checks,errors,
   apiLive:false,modelInvoked:false,phoneInvoked:false,healthRecordsQueried:false,scenarioIds,recoveryScenarioIds,
-  desktop:{width:1440,noOverflow:false,screenshot:null},mobile:{width:390,noOverflow:false,screenshot:null},
+  desktop:{width:1440,height:900,noOverflow:false,screenshot:null},mobile:{width:390,height:844,noOverflow:false,screenshot:null},
   scenarios:[],recoveryScenarios:[],recoveryCoverage:{desktop:false,mobile:false},screenshots:[],shortViewport:[],
   scope:{localhostKeylessOnly:true,fixtures:false,modelInvoked:false,phone:false,externalRecords:false,normalAgentPostAttempts:0,previewRequests:0,retryGate:'고정 preview 상태·표시만 확인하며 시간/횟수 초과 gate는 별도 단위 검사 범위'},
   runtimeAssets:[],sourceHashScope:process.env.QA_SERVED_SOURCE_ROOT?'explicit QA_SERVED_SOURCE_ROOT; served UI assets compared below':'invoking checkout; served UI assets compared below',
@@ -31,7 +31,7 @@ const record=(name,ok,detail='')=>{
   console.log(`${ok?'PASS':'FAIL'} ${name}${detail?' · '+detail:''}`);
 };
 const settle=page=>page.evaluate(()=>new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(done))));
-const noOverflow=page=>page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1);
+const noOverflow=page=>page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1 && document.documentElement.scrollHeight<=innerHeight+1 && scrollY===0);
 const boundarySafe=summary=>['actualCallPlaced','reservationConfirmed','clinicalAcceptanceConfirmed','externalRecordsConnected'].every(key=>summary.boundary?.[key]===false);
 const summaryText=summary=>[
   summary.pathway?.detail,...(summary.tasks??[]).map(task=>`${task.title} ${task.detail}`),
@@ -40,6 +40,29 @@ const summaryText=summary=>[
   ...(summary.nextActions??[]).map(action=>`${action.title} ${action.detail}`),
 ].join(' ');
 
+async function showView(page,view) {
+  const tab=page.locator('#workspace-tab-'+view);
+  if(await tab.isVisible() && await tab.getAttribute('aria-selected')!=='true')await tab.click();
+}
+async function reveal(locator) {
+  const page=locator.page(),view=await locator.evaluate(node=>node.closest('#preparation-rail')?'preparation':node.closest('#chat-workspace')?'chat':null);
+  const target=await locator.elementHandle();
+  if(!await page.locator('dialog[open]').count())for(const id of ['request-examples','composer-help']) {
+    const popup=page.locator('#'+id);
+    if(await popup.evaluate((node,target)=>node.open && !node.contains(target),target))await popup.locator(':scope>summary').click();
+  }
+  if(view)await showView(page,view);
+  for(const details of await locator.locator('xpath=ancestor::details').all())if(!await details.evaluate((node,target)=>node.open || node.querySelector(':scope>summary')?.contains(target),target))await details.locator(':scope>summary').click();
+}
+async function workspaceEvidence(page) {
+  return page.evaluate(()=>{
+    const chat=document.getElementById('chat-workspace'),rail=document.getElementById('preparation-rail'),input=document.getElementById('request-input'),form=document.getElementById('conversation-form'),composer=document.getElementById('chat-composer'),compact=matchMedia('(max-width:900px), (max-height:650px)').matches,layout=document.querySelector('.conversation-layout');
+    const bounds=node=>{const r=node.getBoundingClientRect();return {top:r.top,bottom:r.bottom,left:r.left,right:r.right,width:r.width,height:r.height};},inside=node=>{const r=bounds(node);return r.width>0 && r.height>0 && r.top>=-1 && r.bottom<=innerHeight+1 && r.left>=-1 && r.right<=innerWidth+1;};
+    const regions=[document.getElementById('conversation-scroll'),rail].map(node=>({id:node.id,...bounds(node),clientHeight:node.clientHeight,scrollHeight:node.scrollHeight,scrollTop:node.scrollTop,overflowY:getComputedStyle(node).overflowY,fontSize:parseFloat(getComputedStyle(node.querySelector('.message-body')||node).fontSize),active:!node.closest('[hidden],[inert]')}));
+    const cards=[...document.querySelectorAll('#preparation-board>[data-stage-id]')],tabs=[...document.querySelectorAll('[role="tab"][id^="workspace-tab-"]')],active=layout.dataset.activeView==='preparation'?rail:chat,inactive=active===chat?rail:chat;
+    return {viewportFit:document.documentElement.scrollWidth<=innerWidth+1 && document.documentElement.scrollHeight<=innerHeight+1 && document.body.scrollHeight<=innerHeight+1 && scrollY===0 && inside(document.querySelector('.app-shell')),sharedComposer:document.querySelectorAll('#request-input,#conversation-form,#chat-composer').length===3 && composer.contains(form) && form.contains(input) && !composer.closest('[hidden],[inert]') && [input,document.getElementById('send-request')].every(inside),scrollRegions:regions.every(region=>/auto|scroll/.test(region.overflowY) && (!region.active || region.clientHeight>=Math.max(44,region.fontSize*1.2))) && cards.length===4 && cards.every(node=>! /auto|scroll|hidden|clip/.test(getComputedStyle(node).overflowY) && node.scrollHeight<=node.clientHeight+2),compactPanels:compact?chat.getAttribute('role')==='tabpanel' && rail.getAttribute('role')==='tabpanel' && tabs.length===2 && tabs.every(node=>node.getAttribute('aria-controls')===(node.id==='workspace-tab-chat'?'chat-workspace':'preparation-rail')) && tabs.filter(node=>node.getAttribute('aria-selected')==='true').length===1 && active.hidden===false && !active.inert && inactive.hidden && inactive.inert && !inactive.contains(document.activeElement) && tabs.every(node=>node.tabIndex===(node.getAttribute('aria-selected')==='true'?0:-1)):!chat.hidden && !rail.hidden && !chat.inert && !rail.inert,regions,compact,activeView:layout.dataset.activeView,composer:bounds(composer),body:{width:document.documentElement.scrollWidth,height:document.documentElement.scrollHeight}};
+  });
+}
 async function scenario(name,run) {
   try {await run();}
   catch(error) {errors.push(`${name}: ${error.message}`);record(name,false,error.message);}
@@ -132,7 +155,7 @@ async function clickWithConfirm(page,locator,accept) {
     if(accept)await dialog.accept();else await dialog.dismiss();
   };
   page.on('dialog',handler);
-  try {await locator.click();await settle(page);}
+  try {await reveal(locator);await locator.click();await settle(page);}
   finally {page.off('dialog',handler);}
   return dialogs;
 }
@@ -140,7 +163,7 @@ async function clickWithConfirm(page,locator,accept) {
 async function verifyMainContinuation(page,summary,posts,prefix) {
   const input=page.locator('#request-input'),before=posts.length,existing='결과를 읽으며 직접 작성한 다음 요청입니다.';
   await input.fill(existing);
-  await page.locator('#return-to-request').click();
+  await reveal(page.locator('#return-to-request'));await page.locator('#return-to-request').click();
   const focusedVisible=()=>input.evaluate(node=>{const r=node.getBoundingClientRect();return document.activeElement===node && r.top>=0 && r.bottom<=innerHeight && r.width>0;});
   record(`${prefix} 결과의 입력 복귀는 기존 초안·focus·viewport를 보존하며 POST 없음`,await input.inputValue()===existing && await focusedVisible() && posts.length===before);
   const next=summary.nextActions?.[0],button=page.locator('#next-request-draft');
@@ -152,6 +175,7 @@ async function verifyMainContinuation(page,summary,posts,prefix) {
 }
 
 async function readConversation(page) {
+  await showView(page,'chat');
   await page.locator('.chat-workspace #conversation-scroll').waitFor({state:'visible'});
 }
 
@@ -169,13 +193,14 @@ async function runPreview(page,button,id,posts,prefix) {
   if(!actual)throw new Error('실제 preview 응답 계약이 맞지 않습니다.');
   await readConversation(page);
   const answer=page.locator('.chat-workspace #conversation-scroll .message.assistant:not(.greeting)');
-  record(`${prefix} 미리보기 전체 답변1개는 중앙에서 문서로 읽고 오른쪽 계획과 분리`,await answer.count()===1 && await answer.isVisible() && includes(await answer.innerText(),data.reply) && await page.locator('#conversation-scroll').evaluate(node=>node.closest('.chat-workspace')!==null && !node.closest('#preparation-board') && getComputedStyle(node).overflowY==='visible' && node.scrollHeight<=node.clientHeight+2) && await page.locator('#preparation-board .message,#preparation-board #message-list').count()===0 && !includes(await page.locator('[data-stage-id="plan"]').innerText(),data.reply));
+  record(`${prefix} 미리보기 전체 답변1개는 중앙 scroller에서 읽고 오른쪽 계획과 분리`,await answer.count()===1 && await answer.isVisible() && includes(await answer.innerText(),data.reply) && await page.locator('#conversation-scroll').evaluate(node=>node.closest('.chat-workspace')!==null && !node.closest('#preparation-board') && /auto|scroll/.test(getComputedStyle(node).overflowY) && node.clientHeight>0) && await page.locator('#preparation-board .message,#preparation-board #message-list').count()===0 && !includes(await page.locator('[data-stage-id="plan"]').innerText(),data.reply));
   const summary=await page.evaluate(async state=>(await import('/care-journey.js')).getCareJourneySummary(state),data.caseState);
   return {preview,data,summary};
 }
 
 // overflow:hidden인 조상을 강제로 스크롤해야만 나타나는 버튼은 접근 가능으로 보지 않는다.
 async function reachable(locator) {
+  await reveal(locator);
   const before=await locator.evaluate(node=>{
     const ancestors=[];
     for(let parent=node.parentElement;parent;parent=parent.parentElement)ancestors.push({top:parent.scrollTop,left:parent.scrollLeft,locked:/^(hidden|clip)$/.test(getComputedStyle(parent).overflowY)});
@@ -193,7 +218,7 @@ async function reachable(locator) {
       if(/^(hidden|clip|auto|scroll)$/.test(s.overflowX)){left=Math.max(left,r.left+parent.clientLeft);right=Math.min(right,r.left+parent.clientLeft+parent.clientWidth);}
     }
     const selfClipped=/^(hidden|clip)$/.test(style.overflowY) && node.scrollHeight>node.clientHeight+2;
-    return {reachable:style.display!=='none' && style.visibility!=='hidden' && rect.width>0 && rect.height>0 && rect.top>=top-2 && rect.bottom<=bottom+2 && rect.left>=left-2 && rect.right<=right+2 && !hiddenScroll && !selfClipped,hiddenScroll,selfClipped};
+    return {reachable:style.display!=='none' && style.visibility!=='hidden' && rect.width>0 && rect.height>0 && (rect.top>=top-2 && rect.bottom<=bottom+2 || !node.matches('button,input,select,textarea,summary,a') && rect.height>bottom-top && rect.bottom>top && rect.top<bottom && bottom-top>=parseFloat(style.fontSize)*1.2) && rect.left>=left-2 && rect.right<=right+2 && !hiddenScroll && !selfClipped,hiddenScroll,selfClipped};
   },before);
 }
 
@@ -374,7 +399,7 @@ async function verifyRecoveryShort(page,width,prefix) {
   const dimensions=await panel.evaluate(node=>{const r=node.getBoundingClientRect();return r.left>=-1 && r.top>=-1 && r.right<=innerWidth+1 && r.bottom<=innerHeight+1 && node.scrollWidth<=node.clientWidth+1;});
   const handoff=await reachable(panel.locator('[data-call-handoff-draft]').last()),close=await reachable(page.locator('#close-contact-plan'));
   const overflow=await noOverflow(page),path=await screenshot(page,`${width}-recovery-short`);
-  proof.shortViewport.push({kind:'call-recovery',width,height:500,dimensions,handoff,close,noOverflow:overflow,screenshot:path});
+  proof.shortViewport.push({kind:'call-recovery',width,height:500,dimensions,handoff,close,noOverflow:overflow,screenshot:path,...await workspaceEvidence(page)});
   record(`${prefix} 500px 높이에서도 마지막 인계 문의·닫기 접근`,dimensions && handoff.reachable && close.reachable && overflow);
   await closeContact(page,{escape:true});
 }
@@ -390,10 +415,10 @@ async function verifyShortViewport(page,width,prefix) {
   const path=await screenshot(page,`${width}-short-dialog`);
   await closeJourney(page,{escape:true});
   const composer=await reachable(page.locator('#request-input'));
-  const disclosure=await reachable(page.locator('#composer-disclosure'));
-  const result={width,height:500,dimensions,last,close,composer,disclosure,noOverflow:overflow,screenshot:path};
+  const disclosure=await reachable(page.locator('#composer-disclosure')),fullDisclosure=await reachable(page.locator('#composer-boundary'));
+  const result={width,height:500,dimensions,last,close,composer,disclosure,fullDisclosure,noOverflow:overflow,screenshot:path,...await workspaceEvidence(page)};
   proof.shortViewport.push(result);
-  record(`${prefix} 500px 높이에서 마지막 문의·닫기·복귀 입력 접근`,dimensions && last.reachable && close.reachable && composer.reachable && disclosure.reachable && overflow && await noOverflow(page));
+  record(`${prefix} 500px 높이에서 마지막 문의·닫기·복귀 입력 접근`,dimensions && last.reachable && close.reachable && composer.reachable && disclosure.reachable && fullDisclosure.reachable && /가상.*실제.*연락.*예약.*없음/.test(await page.locator('#composer-boundary').innerText()) && await page.locator('#request-input').evaluate(node=>node.getAttribute('aria-describedby').split(/\s+/).includes('composer-boundary')) && overflow && await noOverflow(page));
 }
 
 try {
@@ -439,6 +464,7 @@ try {
       verifyScenario(summary,data.caseState,await page.locator('#care-journey-content').innerText(),prefix,id);
       const overflow=await noOverflow(page);
       record(`${prefix} 가로 넘침 없음`,overflow);
+      Object.assign(proof[viewport.label],await workspaceEvidence(page));
       proof[viewport.label].noOverflow=id===scenarioIds[0]?overflow:proof[viewport.label].noOverflow && overflow;
       await page.locator('#care-journey-content').evaluate(node=>node.scrollTop=0);
       const path=await screenshot(page,`${viewport.label}-${id}`);
