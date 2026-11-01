@@ -150,7 +150,7 @@ await check('preparation-board-browser-evidence','verification',async()=>{
  const sizes=[[1800,1125],[1440,900],[1152,720],[960,600],[720,450],[1060,900],[390,844],[390,500],[320,500],[768,512]];
  requireThat(proof.viewports?.length>=10 && proof.viewports.every(view=>view.noOverflow) && sizes.every(([width,height])=>proof.viewports.some(view=>view.width===width&&view.height===height)),'PC/모바일/80~200% 대응 가용 CSS 크기10종의 접근·넘침 검사가 필요합니다.');
  requireThat(proof.viewports.every(view=>view.viewportFit===true && view.sharedComposer===true && view.scrollRegions===true && view.compactPanels===true && view.initialSignalSummary===true),'한 화면 경계·같은 공통 입력·공유 스크롤·패널 전환·기호 요약의 실제 관측이 필요합니다.');
- requireThat(proof.viewports.every(view=>view.layout===(view.width>900 && view.height>650?'chat-right-rail':'tabbed-workspace') && view.chatLayout===true),'실제 좌표와 DOM으로 PC 대화/오른쪽4칸과 좁은 창 패널 전환 검사가 필요합니다.');
+ requireThat(proof.viewports.every(view=>view.layout===(view.width>900 && view.height>650?'task-right-navigation':'tabbed-workspace') && view.chatLayout===true),'실제 좌표와 DOM으로 PC 대화/오른쪽4칸과 좁은 창 패널 전환 검사가 필요합니다.');
  requireThat(proof.viewports.every(view=>view.categoryIcons===true && view.compactSummary===true),'네 제목 아이콘과 핵심/상세 분리의 실제 viewport 검사가 필요합니다.');
  requireThat(proof.workspaceScenarios?.length>=10 && proof.workspaceScenarios.every(item=>item.viewportFit===true && item.sharedComposer===true && item.scrollRegions===true && item.compactPanels===true),'장문·표·여러 줄 입력·큰 글자·패널/반응형 전환 후 작업 공간과 공통 입력의 실제 관측이 필요합니다.');
  requireThat(['long-answer-table','multiline-12','text-200','resize-continuity','compact-discovery'].every(id=>proof.workspaceScenarios.some(item=>item.id===id)) && proof.workspaceScenarios.every(item=>item.contentReachable!==false && item.tableKeyboard!==false && item.readingStable!==false) && proof.workspaceScenarios.filter(item=>item.id==='long-answer-table').every(item=>item.contentReachable===true&&item.tableKeyboard===true) && proof.workspaceScenarios.filter(item=>['multiline-12','text-200'].includes(item.id)).every(item=>item.contentReachable===true) && proof.workspaceScenarios.filter(item=>item.id==='resize-continuity').every(item=>item.readingStable===true),'높이 맞춤만으로 본문/고지 도달·표 키보드·반응형 읽기 보존 실패를 통과시키면 안 됩니다.');
@@ -158,40 +158,33 @@ await check('preparation-board-browser-evidence','verification',async()=>{
  for(const view of proof.viewports){const bytes=await readFile(resolve(root,view.screenshot));requireThat(bytes.readUInt32BE(0)===0x89504e47,'읽기 UI PNG 증거가 필요합니다.');}
  return `${proof.checks.length}개 한 화면 작업 공간·공통 입력·공유 스크롤·준비 요약·기호/아이콘·실제 keyless 진행 API·진행/취소 fixture와10개 가용 CSS 크기. 실제 browser zoom·기기·모델/DDB는 별도증거.`;
 });
-await check('actual-model-task-evidence','verification',async()=>{
+await check('historical-model-task-evidence','verification',async()=>{
  const proof=JSON.parse(await readFile(resolve(root,'orchestration/runs/agent-evaluation.json'),'utf8'));
  const {AGENT_EVAL_CASES}=await import('../scripts/agent-eval-cases.mjs');
  const definitionHash=createHash('sha256').update(await readFile(resolve(root,'scripts/evaluate-agent.mjs'))).update(await readFile(resolve(root,'scripts/agent-eval-cases.mjs'))).digest('hex');
- requireThat(proof.result==='pass' && proof.mode==='local-model' && proof.model==='gpt-6.1-sol' && proof.actualModelRequests>0,'실제 Sol 과업 실행 증거가 필요합니다.');
- const currentSourceHash=await runtimeFingerprint(root),changedRuntimeFiles=[];
- requireThat(proof.finalSourceHash===proof.sourceHash && proof.definitionHash===definitionHash && proof.finalDefinitionHash===definitionHash,'실행 중 소스 또는 평가 정의가 바뀌었습니다.');
- if(proof.sourceHash!==currentSourceHash){
-  requireThat(/^[a-f0-9]{40}$/.test(proof.revision),'실제 모델 증거의 고정 커밋이 필요합니다.');
-  const runtimePath=path=>path.startsWith('app/') || path.startsWith('agent/') || path.startsWith('prompts/') || ['scripts/server.mjs','package.json','package-lock.json'].includes(path);
-  const currentPaths=(await sourceFiles(root)).filter(runtimePath).sort();
-  const previousPaths=git('ls-tree','-r','--name-only',proof.revision).split('\n').filter(runtimePath).sort();
-  requireThat(JSON.stringify(currentPaths)===JSON.stringify(previousPaths),'모델 실행 이후 런타임 파일 구성이 바뀌었습니다.');
-  const previousHash=createHash('sha256');
-  for(const path of currentPaths){
-   const oldBytes=execFileSync('git',['show',`${proof.revision}:${path}`],{cwd:root,maxBuffer:32*1024*1024});
-   previousHash.update(path+'\0');previousHash.update(oldBytes);
-   if(!oldBytes.equals(await readFile(resolve(root,path))))changedRuntimeFiles.push(path);
-  }
-  requireThat(previousHash.digest('hex')===proof.sourceHash,'원래 모델 실행 커밋과 증거의 지문이 다릅니다.');
-  requireThat(changedRuntimeFiles.length>0 && changedRuntimeFiles.every(path=>path==='app/conversation.js'),'모델/도구/데이터 코드가 바뀌어 실제 모델 재평가가 필요합니다.');
-  const audit=JSON.parse(await readFile(resolve(root,'orchestration/runs/ui-only-scope-compare.json'),'utf8'));
-  requireThat(audit.oldRevision===proof.revision && audit.baselineSourceHash===proof.sourceHash && audit.currentSourceHash===currentSourceHash && audit.finalSourceHash===currentSourceHash && audit.runtimePathsEqual===true && audit.modelCalls===0 && audit.sourceEdits===0,'같은 UI 변경의 독립 코드 비교가 필요합니다.');
-  requireThat(audit.changedRuntimeFiles.length===changedRuntimeFiles.length && audit.changedRuntimeFiles.every(file=>changedRuntimeFiles.includes(file.path) && file.newSha256===createHash('sha256').update(execFileSync('git',['show',`HEAD:${file.path}`],{cwd:root})).digest('hex')),'독립 검토 이후 UI 파일이 바뀌었습니다.');
- }
- requireThat(proof.cases.length===AGENT_EVAL_CASES.length && AGENT_EVAL_CASES.every(task=>proof.cases.some(item=>item.id===task.id && item.pass && item.checks.every(check=>check.pass) && item.recovery?.stateMatches===true && item.recovery?.requestStatus==='completed')),'필수 과업·상태 검사와 실제 읽기 복구가 모두 필요합니다.');
- requireThat(proof.actualCallsPlaced===false && proof.realRecordsConnected===false && proof.semanticReview==='required-separately','합성 과업을 실제 기관/기록·의미 검토 완료로 확장하지 않습니다.');
- const reviewBytes=await readFile(resolve(root,'orchestration/runs/agent-semantic-review.json'));
- const review=JSON.parse(reviewBytes);
- requireThat(review.result==='pass' && review.sourceHash===proof.sourceHash && review.definitionHash===definitionHash && review.reviewerModelCalls===0 && review.sourceEdits===0,'동일 결과의 읽기 전용 독립 의미 검토가 필요합니다.');
- requireThat(review.evidenceSha256===createHash('sha256').update(await readFile(resolve(root,'orchestration/runs/agent-evaluation.json'))).digest('hex') && review.reviewedCases.length===proof.cases.length && proof.cases.every(item=>review.reviewedCases.some(c=>c.id===item.id && c.result==='pass')),'독립 검토는 현재 실제 응답과 모든 과업을 대조해야 합니다.');
- const scope={checkedAt:new Date().toISOString(),result:'pass',sourceHash:currentSourceHash,modelEvidenceSourceHash:proof.sourceHash,modelEvidenceRevision:proof.revision,modelEvidenceSha256:review.evidenceSha256,changedRuntimeFiles,modelToolDataCodeUnchanged:true,modelReinvokedForUiOnlyChange:false,scope:'실제 모델 결과는 원래 실행 지문으로 보존. 이후 conversation.js의 브라우저 읽기 위치 처리만 바뀐 경우 전체 런타임 파일을 Git 바이트 대조한다. 최신 UI/HTTP 검증은 별도 현재 지문 증거.'};
+ requireThat(proof.result==='pass' && proof.mode==='local-model' && proof.model==='gpt-6.1-sol' && proof.actualModelRequests>0,'과거 실제 Sol 과업의 원실행 증거가 필요합니다.');
+ requireThat(proof.finalSourceHash===proof.sourceHash && proof.definitionHash===definitionHash && proof.finalDefinitionHash===definitionHash,'원실행 중 소스 또는 평가 정의가 바뀌었습니다.');
+ requireThat(/^[a-f0-9]{40}$/.test(proof.revision),'원실행의 고정 커밋이 필요합니다.');
+ const runtimePath=path=>path.startsWith('app/') || path.startsWith('agent/') || path.startsWith('prompts/') || ['scripts/server.mjs','package.json','package-lock.json'].includes(path);
+ const previousPaths=git('ls-tree','-r','--name-only',proof.revision).split('\n').filter(runtimePath).sort();
+ const previousHash=createHash('sha256');
+ for(const path of previousPaths){previousHash.update(path+'\0');previousHash.update(execFileSync('git',['show',`${proof.revision}:${path}`],{cwd:root,maxBuffer:32*1024*1024}));}
+ requireThat(previousHash.digest('hex')===proof.sourceHash,'원실행 커밋과 증거의 지문이 다릅니다.');
+ requireThat(proof.cases.length===AGENT_EVAL_CASES.length && AGENT_EVAL_CASES.every(task=>proof.cases.some(item=>item.id===task.id && item.pass && item.checks.every(check=>check.pass) && item.recovery?.stateMatches===true && item.recovery?.requestStatus==='completed')),'과거 필수 과업·상태 검사와 읽기 복구가 모두 필요합니다.');
+ requireThat(proof.actualCallsPlaced===false && proof.realRecordsConnected===false && proof.semanticReview==='required-separately','과거 합성 과업을 실제 기관/기록 검증으로 확대하지 않습니다.');
+ const review=JSON.parse(await readFile(resolve(root,'orchestration/runs/agent-semantic-review.json')));
+ const evidenceSha256=createHash('sha256').update(await readFile(resolve(root,'orchestration/runs/agent-evaluation.json'))).digest('hex');
+ requireThat(review.result==='pass' && review.sourceHash===proof.sourceHash && review.definitionHash===definitionHash && review.reviewerModelCalls===0 && review.sourceEdits===0,'같은 원실행의 독립 의미 검토가 필요합니다.');
+ requireThat(review.evidenceSha256===evidenceSha256 && review.reviewedCases.length===proof.cases.length && proof.cases.every(item=>review.reviewedCases.some(c=>c.id===item.id && c.result==='pass')),'독립 검토는 실제 응답과 모든 과업을 대조해야 합니다.');
+ const currentSourceHash=await runtimeFingerprint(root), currentVerified=proof.sourceHash===currentSourceHash;
+ const scope={checkedAt:new Date().toISOString(),result:currentVerified?'pass':'unverified',sourceHash:currentSourceHash,finalSourceHash:currentSourceHash,modelEvidenceSourceHash:proof.sourceHash,modelEvidenceRevision:proof.revision,modelEvidenceSha256:evidenceSha256,modelToolDataCodeUnchanged:currentVerified,currentModelValidated:currentVerified,scope:'과거12과업은 원래 커밋에만 귀속한다. 현재 서버·Prompt·workflow 변경은 fixture/keyless 검증이며 실제 모델 품질을 대신하지 않는다.'};
+ if(!currentVerified){
+  const quota=JSON.parse(await readFile(resolve(root,'.impeccable/review/chat-rail/reliable-visit/review/provider-quota-status.json')));
+  requireThat(quota.localConfiguredApiKeyDiagnostic?.errorCode==='credit_balance_exhausted' && quota.furtherModelCallsStopped===true,'현재 모델 미검증의 관측된 호출 중단 근거가 필요합니다.');
+  checks.push({id:'current-model-task-evidence',rule:'verification',status:'unverified',evidence:'현재 서버·Prompt 변경의 실제 모델 품질은 크레딧 소진으로 미검증. 이전12과업/UI-only 예외를 재사용하지 않음.'});
+ } else checks.push({id:'current-model-task-evidence',rule:'verification',status:'pass',evidence:'같은 실행 지문의 실제 모델 고정 과업. 임상·일반 품질 검증은 별도.'});
  await writeFile(resolve(root,'orchestration/runs/agent-evaluation-scope.json'),JSON.stringify(scope,null,2)+'\n');
- return `${proof.cases.length}개 고정 합성 과업·실제 Responses ${proof.actualModelRequests}회·정규 상태/복구·독립 답변 검토. 이후 UI 변경${changedRuntimeFiles.length}개와 모델/도구/데이터 불변은 Git 대조. 임상/실사용/일반 성능 검증은 아님`;
+ return `${proof.revision.slice(0,8)} 당시 ${proof.cases.length}과업·Responses ${proof.actualModelRequests}회·독립 의미 검토만 확인. 현재 변경의 실모델 품질과 분리`;
 });
 await check('visit-recovery-browser-evidence','verification',async()=>{
  const proof=JSON.parse(await readFile(resolve(root,'orchestration/runs/visit-recovery-browser.json'),'utf8'));
@@ -241,11 +234,12 @@ await check('rollback-boundary','rollback',()=>{
  }
  return '작업별 통합 커밋을 HEAD의 조상으로 확인; 허용된 커밋만 revert 가능';
 });
-const passed=checks.filter(c=>c.status==='pass').length;
-const result={evaluatedAt:new Date().toISOString(),commit:git('rev-parse','HEAD'),automated:{passed,total:checks.length,rate:Math.round(passed/checks.length*1000)/10},checks,
- manualUnverified:['전체 운영 데이터 API·최신성·전체 원자료 재배포 조건 (허브계보4종 최소 사실은 실제 사용)','실제 전화·기관 접수·공단 기록 연계·의료진 참여','Terra·일반 과업 품질·실제 휴대폰 키보드/마이크·보호자 참여 평가 (Sol12개 합성 과업과 별도)','임상 유효성·실서비스 개인정보 처리·정책 검토','최종 공지/발표·영상/권리 확인·대회 업로드 및 센터 실기기 실행'],submissionReady:false};
+const passed=checks.filter(c=>c.status==='pass').length,failed=checks.filter(c=>c.status==='fail').length,unverified=checks.filter(c=>c.status==='unverified').length;
+requireThat(passed+failed+unverified===checks.length,'검증 상태를 누락할 수 없습니다.');
+const result={evaluatedAt:new Date().toISOString(),commit:git('rev-parse','HEAD'),automated:{passed,failed,unverified,total:checks.length,rate:Math.round(passed/checks.length*1000)/10},checks,
+ manualUnverified:['현재 guided 서버/Prompt의 실제 모델 과업 품질 (크레딧 소진으로 미검증; 과거12과업과 별도)','전체 운영 데이터 API·최신성·전체 원자료 재배포 조건 (허브계보4종 최소 사실은 실제 사용)','실제 전화·기관 접수·공단 기록 연계·의료진 참여','Terra·일반 과업 품질·실제 휴대폰 키보드/마이크·보호자 참여 평가 (Sol12개 합성 과업과 별도)','임상 유효성·실서비스 개인정보 처리·정책 검토','최종 공지/발표·영상/권리 확인·대회 업로드 및 센터 실기기 실행'],submissionReady:false};
 await mkdir(resolve(root,'orchestration/runs'),{recursive:true});
 await writeFile(resolve(root,'orchestration/runs/latest-eval.json'),JSON.stringify(result,null,2)+'\n');
-for(const item of checks) console.log(`${item.status==='pass'?'PASS':'FAIL'} ${item.id} · ${item.evidence}`);
-console.log(`\n자동 검증 규칙 준수율: ${passed}/${checks.length} (${result.automated.rate}%)\n별도 미검증 요건: ${result.manualUnverified.length}개 · 최종 제출 준비 완료: 아니오\n기록: orchestration/runs/latest-eval.json`);
-if(passed!==checks.length) process.exitCode=1;
+for(const item of checks) console.log(`${item.status==='pass'?'PASS':item.status==='unverified'?'UNVERIFIED':'FAIL'} ${item.id} · ${item.evidence}`);
+console.log(`\n자동 검증 규칙 준수율: ${passed}/${checks.length} (${result.automated.rate}%) · 실패${failed} · 미검증${unverified}\n별도 미검증 요건: ${result.manualUnverified.length}개 · 최종 제출 준비 완료: 아니오\n기록: orchestration/runs/latest-eval.json`);
+if(failed>0) process.exitCode=1;

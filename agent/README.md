@@ -5,7 +5,7 @@
 ## 경로와 실행
 
 - `GET /api/agent/capabilities`: capability 객체. llm:true는 어댑터 설정이며 요청 성공을 보장하지 않습니다. AWS의 첫 조회는 Secret을 준비하지만 모델 추론·세션/예산 DB는 호출하지 않습니다. 준비 실패 시 llm:false를 반환합니다.
-- `POST /api/agent`: `{message,requestId,sessionId?,visitToken?,history?,preferences?,applyPreferences?}`. OpenAI Responses API와 검증된 도구를 실행합니다. 로컬 키가 없으면 MODEL_NOT_CONNECTED/503, AWS 키/저장소 준비 실패는 CLOUD_RUNTIME_UNAVAILABLE/503입니다.
+- `POST /api/agent`: `{message,requestId,sessionId?,visitToken?,history?,preferences?,applyPreferences?,guidedPreparation?}`. OpenAI Responses API와 검증된 도구를 실행합니다. 로컬 키가 없으면 MODEL_NOT_CONNECTED/503, AWS 키/저장소 준비 실패는 CLOUD_RUNTIME_UNAVAILABLE/503입니다.
 - `POST /api/agent/resume`: `{visitToken}`으로 미만료 방문의 확인된 상태·남은 일·복구 메타데이터만 읽습니다. 모델·Secret·budget·lease·새 세션·TTL 연장을 실행하지 않습니다.
 - `POST /api/agent/preview`: `{scenarioId:'aewol-parent-visit',requestId}`. 별도 고정 예시이며 모델·Secret·세션 DB를 호출하지 않습니다.
 
@@ -100,3 +100,11 @@ Lambda는 전용 `OPENAI_SECRET_ARN`·`SESSION_TABLE_NAME`을 함께 요구하�
 진행 DTO와 고정 도구 목록은 `app/preparation-stages.js`에서 한 번 정의하며 브라우저 수신·화면·서버 저장/조회가 같은 엄격 검증을 사용한다. 서버의 `normalizeProgressSnapshot`은 기존 오류 경계를 유지한다.
 
 화면은100dvh 작업 공간의 중앙 채팅·하단 공통 입력과 오른쪽 자료·병원·이동·방문 계획 네 상태다. 좁거나 낮은 창은 같은 대화/준비 패널을 전환한다. 제목 아이콘·핵심 요약 뒤 상세를 펼치며 중앙 대화와 전체 준비 영역에서 읽고 카드별 세로 스크롤은 만들지 않는다. 전체 답변은 중앙 한 곳에만 표시한다. 진행 DTO는 최종 caseState가 아니다. 화면은 마지막 확인된 사실과 실제 실행 관측을 구분하고, 원래 응답을 받은 뒤 사례를 갱신한다. 중지·완료·새대화·재시도에서 늦은 진행도 무시하며 중지는 서버중단이 아니다. 요청id/원문/이력/설정은 재시도에 보존하고 비업무메타데이터인progressToken은 HTTP시도마다 새로 만든다. 이 토큰을 모델/세션/로그/URL/최종응답에 넣지 않는다. [고정 DTO와 범위](../docs/preparation-board-contract.md)를 따른다.
+
+## 현재 할 일과 안전한 이어가기
+
+`getPreparationWorkflow(caseState)`의 현재 작업·단계 상태·안전한 다음 행동을 UI와 도구가 공유합니다. `guidedPreparation`은 선택적 boolean입니다. absent/false는 기존 지문과 실행을 보존하고 true는 별도 본문 지문으로 비교합니다. 신규 UI는 true를 포함한 원래 본문으로 재확인합니다.
+
+true인 명시적 방문 준비 요청에서 모델이 일찍 종료하면 동일45초/16도구 안에서 남은 공개자료 기반 택시·동행 문의 초안을 최대2개 dispatcher로 이어 준비할 수 있습니다. 실제 도구 수·진행·이벤트와 수행 사실을 응답에 반영합니다. 조회만 한 요청·명시적 제한·빠진 필수 조건·기존 실패/인계/재확인을 존중하며 전화/기록/동의/예약 도구로 확대하지 않습니다. resume/진행 조회/단계 탐색은 읽기 전용입니다. 새 DB 상태·endpoint·모델·provider를 추가하지 않습니다.
+
+현재 크레딧 소진으로 새 Prompt·자동 이어가기의 실모델 평가는 보류했습니다. fixture/provider 및 keyless HTTP 검증과 과거 실모델12과업을 구분하며 이전 UI-only 불변 예외를 재사용하지 않습니다. [계약](../docs/guided-visit-contract.md)과 [최신 검증](../docs/implementation-results.md)을 따릅니다.

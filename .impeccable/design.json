@@ -199,9 +199,9 @@
     "railDrawerMaxWidthPx": 1050,
     "compactReadingMaxWidthPx": 900,
     "smallDialogAndComposerMaxWidthPx": 600,
-    "desktopSummary": "PC는 오른쪽 네 준비 요약, 펼친 전체는 하나의 shared rail에서 읽음.",
-    "compactSummary": "좁은 창은 대화/준비 전환과 같은 하단 입력. 네 상태는 같은 DOM/요약/기호와 전체 상세.",
-    "preparationDetails": "각4 native details의 전체 사실·누락·근거·기록을 같은 준비 영역에서 읽음.",
+    "desktopSummary": "PC 오른쪽 네 단계 탐색, 중앙 현재 작업과 선택한 단계의 실제 상세 DOM",
+    "compactSummary": "좁거나 낮은 창도 같은 입력/같은 단계 상세 DOM을 전환해 읽음",
+    "preparationDetails": "선택한 단계의 사실·누락·근거·기록은 중앙에서 읽으며 inactive hidden/inert",
     "workspacePaddingAt1150": "12px 16px",
     "workspacePaddingAt1050": "12px 16px",
     "workspacePaddingAt900": "12px",
@@ -280,7 +280,7 @@
     "developmentWorkspace": "/workspace.html"
   },
   "progress": {
-    "stateSource": "app/preparation-stages.js:getPreparationBoard",
+    "stateSource": "app/preparation-workflow.js:getPreparationWorkflow, app/preparation-stages.js:getPreparationBoard",
     "caseStatuses": [
       "waiting",
       "available",
@@ -296,7 +296,7 @@
     "storage": "memory or existing DynamoDB progress#sha256(token), fixed enum metadata, TTL120s",
     "failureBehavior": "마지막 확인 사실을 유지하고 실제 응답은 계속 기다림",
     "signals": {
-      "available": "○ · 자료/문의 준비 결과 또는 plan 답변 있음. 진료·예약·배차 확정 아님.",
+      "available": "○ · 확인된 자료/문의 초안 존재. 모델 답변 도착·진료·예약·배차 확정 아님.",
       "attention": "△ · 미확인·부분 준비·재확인.",
       "blocked": "× · 기록된 문의 실패·사람 인계.",
       "waiting": "— · 문의 전 / 답변 전.",
@@ -488,5 +488,31 @@
     "presentation": "기존 대화 스크롤의 정적 안내·방문 상세의 읽기 복구. 과거 답변 재생이나 새 큰 헤더 없음. 기존 CSS·색·공통 입력·읽기 초점을 유지.",
     "evidence": "orchestration/runs/visit-recovery-browser.json",
     "nativeZoomEvidence": "orchestration/runs/native-zoom-browser.json"
+  },
+  "guidedPreparation": {
+    "contract": "docs/guided-visit-contract.md",
+    "mode": "Operate",
+    "central": "one current task and selected stage details; secondary native-details conversation history",
+    "right": "four compact navigation rows; selected view independent of actual currentStage",
+    "input": "single shared text/voice composer; quick responses fill draft only",
+    "projection": "app/preparation-workflow.js:getPreparationWorkflow; responseCount never readiness",
+    "states": [
+      "not_started",
+      "needs_input",
+      "prepared",
+      "waiting_external",
+      "handoff",
+      "needs_recheck",
+      "not_needed"
+    ],
+    "actors": [
+      "caregiver",
+      "agent",
+      "institution",
+      "clinician"
+    ],
+    "reading": "same single stage DOM, hidden/inert inactive details; keep source focus and draft",
+    "automation": "explicit guided POST only; bounded public-data inquiry drafting; navigation/resume read-only",
+    "modelQuality": "new server/prompt actual-model evaluation unverified after credit exhaustion; old evidence historical"
   }
 }
