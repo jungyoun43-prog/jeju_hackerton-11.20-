@@ -152,7 +152,7 @@ const negativeActions = {
 };
 const quotedOrTagged = /["'“”‘’「」『』`<>\[\]]|^\s*>|&(?:lt|gt|quot|apos|#\d+|#x[0-9a-f]+);|(?:예시|인용|설명|문구|문장|프롬프트|도구\s*결과)/i;
 const regexText = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-function authorizationTargets(state, clause) {
+function authorizationTargets(state, clause, exact=false) {
   const labels = {
     mainland: [String.raw`기존\s*도외\s*(?:치료\s*)?병원`, String.raw`도외\s*(?:치료\s*)?병원`, String.raw`서울\s*(?:기존\s*)?(?:치료\s*)?병원`],
     jeju: [String.raw`(?:제주|도내|현지)\s*(?:협진\s*)?병원`],
@@ -161,7 +161,7 @@ function authorizationTargets(state, clause) {
   };
   const names = { mainland:state.patient?.existingHospital, jeju:state.selectedHospital?.companyName ?? state.patient?.localHospital, taxi:state.visitSupport?.taxi?.provider?.name, companion:state.visitSupport?.companion?.provider?.name };
   for(const [target,name] of Object.entries(names)) if(typeof name==='string'&&name.trim()) labels[target].push(regexText(name.replace(/\s*\(가상\)/g,'').trim()));
-  return Object.entries(labels).filter(([,aliases])=>new RegExp(aliases.join('|')).test(clause)).map(([target])=>target);
+  return Object.entries(labels).filter(([,aliases])=>new RegExp(exact?`^(?:${aliases.join('|')})$`:aliases.join('|')).test(clause)).map(([target])=>target);
 }
 // 소수·천 단위 구분의 점/쉼표를 절 구분자로 잘라 숫자의 일부가 새 값이 되지 않게 한다.
 function splitAuthorizationClauses(value,separators) {
@@ -228,7 +228,7 @@ export function getGuidedPreparationChanges(message,state) {
   const area=state.patient.area.replace(/\s+/g,''),compact=text.replace(/\s+/g,'');
   if(ADMIN_AREAS.some(value=>{const name=value.split(' ').at(-1).replace(/[읍면시]$/,'');return new RegExp(`${regexText(name)}(?:에서|으로|로|(?:출발|거주|지역))`).test(compact)&&!area.includes(name);})||/(?:출발지|출발\s*지역).{0,12}(?:바꾸|변경|수정)/.test(text))fields.push('area');
   const hospital=state.selectedHospital?.companyName||state.patient.localHospital;
-  const namedHospital=[...text.matchAll(/[가-힣A-Za-z0-9·]+(?:병원|의료원)(?=에서|으로|로|에|을|를|은|는|의|이|가|[\s,.!?]|$)/g)].some(([name])=>!authorizationTargets(state,name).length);
+  const namedHospital=[...text.matchAll(/[가-힣A-Za-z0-9·]+(?:병원|의료원)(?=에서|으로|로|에|을|를|은|는|의|이|가|[\s,.!?]|$)/g)].some(([name])=>!authorizationTargets(state,name,true).length);
   if(namedHospital||hospitalData.records.some(item=>text.includes(item.companyName)&&item.companyName!==hospital)||/(?:다른|새로운|새)\s*(?:제주|도내)?\s*병원|(?:병원|기관).{0,12}(?:바꾸|변경|수정)/.test(text))fields.push('hospital');
   if(/휠체어/.test(text))fields.push('wheelchair');
   for(const [field,subject] of [['transportNeeded','(?:택시|이동)'],['companionNeeded','동행']])if(new RegExp(`${subject}.{0,12}(?:필요\\s*없|불필요|필요해|필요하|추가|제외)`).test(text))fields.push(field);

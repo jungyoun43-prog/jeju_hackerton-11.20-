@@ -114,8 +114,11 @@ test('명시적인 현재 준비 범위만 쓰고 대상 제한·읽기·인용�
   for(const [message,expected] of cases)assert.deepEqual(getGuidedPreparationKinds(message,state),expected,message);
 });
 
-test('목록 밖의 명시 병원·의료원도 미반영 조건으로 잡고 병원동행 표현은 제외한다',()=>{
+test('목록 밖의 명시 병원·의료원도 미반영 조건으로 잡고 병원동행 표현은 제외한다',async()=>{
   const state=createDemoCase();
-  for(const message of ['제주대학교병원에서 방문 준비해줘','서귀포의료원에서 방문 준비해줘'])assert.ok(getGuidedPreparationChanges(message,state).includes('hospital'),message);
-  for(const message of ['병원동행 문의 초안을 준비해줘','병원 동행을 준비해줘','기존 도외 병원 문의와 방문 준비해줘'])assert.ok(!getGuidedPreparationChanges(message,state).includes('hospital'),message);
+  for(const message of ['제주대학교병원에서 방문 준비해줘','서귀포의료원에서 방문 준비해줘','새제주병원에서 방문 준비해줘'])assert.ok(getGuidedPreparationChanges(message,state).includes('hospital'),message);
+  for(const message of ['병원동행 문의 초안을 준비해줘','병원 동행을 준비해줘','제주병원에서 방문 준비해줘','기존 도외 병원 문의와 방문 준비해줘'])assert.ok(!getGuidedPreparationChanges(message,state).includes('hospital'),message);
+  const selected=(await preview('aewol-parent-visit')).caseState;
+  assert.ok(!getGuidedPreparationChanges('기존 제주우리병원에서 방문 준비해줘',selected).includes('hospital'));
+  assert.ok(getGuidedPreparationChanges('새제주우리병원에서 방문 준비해줘',selected).includes('hospital'));
 });
