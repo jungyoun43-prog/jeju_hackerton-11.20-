@@ -14,6 +14,7 @@ const MAX_HISTORY = 8;
 const MAX_HISTORY_TEXT = 2000;
 const PREFERENCES_STORAGE_KEY = 'jeju-care-preferences-v1';
 const mobileRail = window.matchMedia('(max-width:1050px)');
+const compactWorkspace = window.matchMedia('(max-width:900px), (max-height:650px)');
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 const escape = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 const micIcon = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="13" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3m-4 0h8"/></svg>';
@@ -53,7 +54,29 @@ let manualStageSelection=false;
 let unreadAnswer=false;
 let requestProblem='';
 let answerReturnFocus;
+let workspaceView='chat';
+let previewProblem=false;
+const workspaceScroll={chat:0,preparation:0};
 const failedRequests = new Map();
+
+function setWorkspaceView(view,{focus=false}={}) {
+  const layout=document.querySelector('.conversation-layout');
+  if(!layout)return;
+  const panels={chat:document.getElementById('chat-workspace'),preparation:document.getElementById('preparation-rail')};
+  const scrollers={chat:document.getElementById('conversation-scroll'),preparation:panels.preparation};
+  for(const key of Object.keys(panels))if(!panels[key].hidden)workspaceScroll[key]=scrollers[key].scrollTop;
+  workspaceView=view;
+  layout.dataset.activeView=view;
+  for(const key of Object.keys(panels)) {
+    const hidden=compactWorkspace.matches && key!==view;
+    panels[key].hidden=hidden;panels[key].inert=hidden;
+    const tab=document.getElementById('workspace-tab-'+key);
+    tab.setAttribute('aria-selected',String(key===view));tab.tabIndex=key===view?0:-1;
+    if(!hidden)scrollers[key].scrollTop=workspaceScroll[key];
+  }
+  if(view==='preparation')manualStageSelection=true;
+  if(focus)document.getElementById('workspace-tab-'+view).focus({preventScroll:true});
+}
 
 function renderBoard() {
   const progress=activeRequest?.kind==='message'?activeRequest.progress:null;
@@ -61,17 +84,21 @@ function renderBoard() {
   document.getElementById('care-journey-summary').hidden=responseCount===0;
   document.getElementById('return-to-request').hidden=responseCount===0;
   renderPreparationBoard(board,{unreadAnswer,progress});
+  document.getElementById('request-problem-notice').hidden=!(requestProblem || previewProblem);
+  document.getElementById('request-examples').hidden=document.getElementById('starter-prompts').hidden;
 }
 
 function showLatestAnswer() {
+  setWorkspaceView('chat');
   manualStageSelection=false;unreadAnswer=false;renderBoard();
   scrollToMessage(document.querySelector('#message-list .message.assistant:last-child'));
 }
 
 function focusRequest() {
+  setWorkspaceView('chat');
   manualStageSelection=false;unreadAnswer=false;renderBoard();
   const input=document.getElementById('request-input');
-  input.focus({preventScroll:true});input.scrollIntoView({block:'center',behavior:'instant'});
+  input.focus({preventScroll:true});
 }
 
 function markAnswerReady() {
@@ -454,16 +481,18 @@ function appendMessage({role,text,id=makeId(),events=[],greeting=false,isExample
 function scrollToMessage(node) {
   if(!node)return;
   requestAnimationFrame(()=>{
-    if(!node.isConnected)return;
+    if(!node.isConnected || !document.getElementById('conversation-scroll').checkVisibility())return;
     node.setAttribute('tabindex','-1');node.focus({preventScroll:true});
-    node.scrollIntoView({block:'start',behavior:'instant'});
+    const scroller=document.getElementById('conversation-scroll');
+    if(!scroller.checkVisibility())return;
+    scroller.scrollTop+=node.getBoundingClientRect().top-scroller.getBoundingClientRect().top-12;
   });
 }
 
 function resizeInput() {
   const input = document.getElementById('request-input');
   input.style.height = 'auto';
-  input.style.height = `${Math.min(input.scrollHeight,160)}px`;
+  input.style.height = `${Math.min(input.scrollHeight,128)}px`;
   document.getElementById('send-request').disabled = pending || Boolean(activeRecognition) || !input.value.trim();
   document.getElementById('character-count').textContent = `${input.value.length}/${MAX_MESSAGE}`;
   for(const button of document.querySelectorAll('[data-contact-draft],[data-journey-draft],[data-journey-scenario],[data-call-recovery-scenario],#next-request-draft'))button.disabled=pending || Boolean(activeRecognition);
@@ -477,7 +506,7 @@ function fillRequestDraft(text,{source='요청 예시',focus=true}={}) {
   if(input.value.trim() && input.value.trim()!==draft && !window.confirm('입력창에 작성 중인 요청이 있어요. 선택한 문구로 바꿀까요? 취소하면 기존 초안을 유지합니다.'))return false;
   input.value=draft;resizeInput();
   voiceMessage(`${source}를 입력창에 넣었어요. 날짜·대상을 확인하고 고친 뒤 보내 주세요.`);
-  if(focus){input.focus({preventScroll:true});input.scrollIntoView({block:'nearest',behavior:'instant'});}
+  if(focus)input.focus({preventScroll:true});
   return true;
 }
 
@@ -494,7 +523,7 @@ function setPending(value) {
   for (const button of document.querySelectorAll('[data-example]')) button.disabled=value;
   for (const button of document.querySelectorAll('[data-contact-draft],[data-journey-draft],[data-journey-scenario],[data-call-recovery-scenario],#next-request-draft')) button.disabled=value || Boolean(activeRecognition);
   renderBoard();
-  if(value){const cancel=document.getElementById('cancel-request');cancel.focus({preventScroll:true});document.getElementById('pending-message').scrollIntoView({block:'nearest',behavior:'instant'});}
+  if(value){const cancel=document.getElementById('cancel-request');cancel.focus({preventScroll:true});}
 }
 
 function requestIsCurrent(request) {
@@ -504,7 +533,7 @@ function requestIsCurrent(request) {
 function beginRequest(kind,values,timeout) {
   const request={...values,kind,version:conversationVersion,controller:new AbortController()};
   activeRequest=request;
-  requestProblem='';
+  requestProblem='';previewProblem=false;
   request.timer=setTimeout(()=>{if(requestIsCurrent(request))cancelRequest({timedOut:true});},timeout);
   setPending(true);
   return request;
@@ -543,7 +572,7 @@ function cancelRequest({timedOut=false}={}) {
     const copy=timedOut?'응답을 오래 기다려 이 화면의 대기를 마치고 요청을 복원했어요.':'응답 대기를 중지하고 요청을 입력창에 복원했어요.';
     showRequestProblem(request,copy+' 서버 처리는 계속될 수 있습니다. 실제 발신을 중단했다는 뜻은 아니며, 현재 실제 전화는 연결되어 있지 않습니다.',{uncertain:true});
   } else {
-    failedPreviewRequest=request.body;
+    failedPreviewRequest=request.body;previewProblem=true;
     const notice=document.getElementById('mode-notice');
     notice.hidden=false;notice.textContent=(timedOut?'미리보기 응답을 오래 기다려 이 화면의 대기를 마쳤어요.':'미리보기 응답 대기를 중지했어요.')+' 현재 대화와 초안은 유지됩니다. 서버 처리는 계속될 수 있습니다.';
   }
@@ -678,7 +707,7 @@ async function showPreview(scenarioId='aewol-parent-visit') {
     if(!unreadAnswer)scrollToMessage(document.querySelector('#message-list .message.assistant:last-child'));
   } catch {
     if(!requestIsCurrent(request))return;
-    failedPreviewRequest=request.body;
+    failedPreviewRequest=request.body;previewProblem=true;
     notice.hidden=false;notice.textContent='미리보기를 불러오지 못했어요. 연결 상태를 확인한 뒤 다시 눌러주세요.';
     document.getElementById('conversation-status').textContent=notice.textContent;
   } finally {
@@ -699,7 +728,7 @@ async function sendRequest(text,retryId) {
   const coreBody=failed ? {...failed.body} : {message:text,...(sessionId?{sessionId}:{}),history:normalizeHistory(history),requestId,preferences:{...carePreferences},applyPreferences:preferencesNeedApply};
   delete coreBody.progressToken;
   const requestBody={...coreBody,...(capabilities.progress==='poll' && capabilities.llm===true?{progressToken:makeProgressToken()}: {})};
-  manualStageSelection=false;
+  manualStageSelection=compactWorkspace.matches && workspaceView==='preparation';
   let messageNode,replyNode,restoreReading;
   if (retryId) {
     messageNode=document.querySelector(`[data-message-id="${requestId}"]`);
@@ -737,7 +766,7 @@ async function sendRequest(text,retryId) {
 }
 
 function voiceMessage(text,error=false) {
-  const hint=document.getElementById('voice-help');hint.textContent=text;hint.classList.toggle('error',error);
+  const hint=document.getElementById('voice-help');hint.hidden=false;hint.textContent=text;hint.classList.toggle('error',error);
 }
 
 function resetVoiceButton() {
@@ -796,14 +825,15 @@ function resetConversation({focus=true,force=false}={}) {
   if(!force && hasConversationWork() && !window.confirm('현재 대화와 작성 중인 요청이 사라집니다. 새 가상 사례를 시작할까요?'))return false;
   if(activeRecognition){recognitionCancelled=true;activeRecognition.abort();activeRecognition=undefined;resetVoiceButton();}
   stopProgress(activeRequest);conversationVersion++;failedPreviewRequest=undefined;
-  requestProblem='';manualStageSelection=false;unreadAnswer=false;
+  requestProblem='';previewProblem=false;manualStageSelection=false;unreadAnswer=false;
   caseState=createDemoCase();sessionId=undefined;history=[];latestActions=[];latestEvents=[];responseCount=0;previewMode=false;failedRequests.clear();
   preferencesNeedApply=true;
   document.getElementById('message-list').replaceChildren();
   welcomeMessage();document.getElementById('starter-prompts').hidden=false;
   document.getElementById('request-input').value='';resizeInput();renderSnapshot();updateCapabilities();
   document.getElementById('conversation-status').textContent='새 가상 사례로 대화를 시작합니다.';
-  if(focus)document.getElementById('request-input').focus({preventScroll:true});
+  document.getElementById('voice-help').hidden=true;
+  if(focus){setWorkspaceView('chat');document.getElementById('request-input').focus({preventScroll:true});}
   return true;
 }
 
@@ -820,7 +850,7 @@ function welcomeMessage() {
 
 function mount() {
   const brand=`<img src="/assets/hondi-logo-v1.png" alt="" width="480" height="168"/>`;
-  const chatContent=`<div class="conversation-scroll" id="conversation-scroll" aria-label="진료 준비 대화와 다음 행동"><div class="message-list" id="message-list" role="log" aria-label="진료 준비 대화" aria-live="polite" aria-relevant="additions"></div><section class="care-journey-summary" id="care-journey-summary" aria-label="현재 진료 연결과 다음 행동"><div class="journey-summary-state"><h3>현재</h3><strong id="care-journey-current">미확인</strong></div><button type="button" id="open-care-journey" aria-haspopup="dialog" aria-controls="care-journey-dialog">여정·할 일 보기${icon('chevron')}</button><p class="journey-summary-next"><span>이어서 할 일</span><strong id="care-journey-next"></strong></p><button type="button" class="next-request-draft" id="next-request-draft" hidden>다음 문의 초안 넣기${icon('arrow')}</button><p class="next-request-note">초안을 확인·수정한 뒤 직접 보내세요.</p></section><button type="button" class="return-to-request" id="return-to-request" hidden>요청 입력으로${icon('arrow')}</button></div>`;
+  const chatContent=`<div class="conversation-scroll" id="conversation-scroll" tabindex="0" aria-label="진료 준비 대화와 다음 행동"><p class="mode-notice" id="mode-notice">연결 범위를 확인하고 있어요.</p><div class="message-list" id="message-list" role="log" aria-label="진료 준비 대화" aria-live="polite" aria-relevant="additions"></div><section class="care-journey-summary" id="care-journey-summary" aria-label="현재 진료 연결과 다음 행동"><div class="journey-summary-state"><h3>현재</h3><strong id="care-journey-current">미확인</strong></div><button type="button" id="open-care-journey" aria-haspopup="dialog" aria-controls="care-journey-dialog">여정·할 일 보기${icon('chevron')}</button><p class="journey-summary-next"><span>이어서 할 일</span><strong id="care-journey-next"></strong></p><button type="button" class="next-request-draft" id="next-request-draft" hidden>다음 문의 초안 넣기${icon('arrow')}</button><p class="next-request-note">초안을 확인·수정한 뒤 직접 보내세요.</p></section><button type="button" class="return-to-request" id="return-to-request" hidden>요청 입력으로${icon('arrow')}</button></div>`;
   const menuIcon='<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>';
   document.getElementById('app').innerHTML=`
     <div class="app-shell">
@@ -865,32 +895,14 @@ function mount() {
             <div class="header-actions"><span class="connection-state checking" id="connection-state">연결 확인 중</span><button type="button" class="header-button" id="new-conversation">${icon('plus')}<span>새 대화</span></button></div>
           </header>
           <div class="mobile-case-summary" id="mobile-case-summary" aria-label="이번 방문 요약" hidden></div>
-          <div class="conversation-layout">
-            <section class="chat-workspace" aria-labelledby="conversation-title">
-              <div class="chat-toolbar">
-                <div class="chat-identity"><img src="/assets/hondi-mark-v1.png" alt="" width="32" height="32"/><div class="chat-identity-copy"><h2 id="conversation-title">혼디</h2><p class="chat-role">진료 준비 도우미</p></div></div>
-                <div class="chat-toolbar-actions"><button type="button" class="expand-answer" id="expand-answer" aria-label="넓게 읽기" title="넓게 읽기" aria-haspopup="dialog" aria-controls="answer-dialog" disabled>${icon('expand')}<span>넓게 읽기</span></button><button type="button" id="preview-button" class="preview-button">예시 보기${icon('chevron')}</button></div>
-              </div>
-              <p class="mode-notice" id="mode-notice">연결 범위를 확인하고 있어요.</p>
-              ${chatContent}
-              <div class="chat-composer">
-              <div class="starter-prompts" id="starter-prompts"><p>이렇게 요청해 보세요</p>
-                  <button type="button" data-example="저는 동행이 어려워요. 자료와 이동도 준비해 주세요."><span>저는 동행이 어려워요.<br> 자료와 이동도 준비해 주세요.</span>${icon('arrow')}</button>
-                  <button type="button" class="secondary-prompt" data-example="어머니가 휠체어를 이용하세요. 무엇을 확인해야 할까요?"><span>어머니가 휠체어를 이용하세요.<br> 무엇을 확인해야 할까요?</span>${icon('arrow')}</button>
-                </div>
-              <form id="conversation-form" class="conversation-form" aria-busy="false">
-                <label for="request-input" class="visually-hidden">진료 준비 요청</label>
-                <textarea id="request-input" name="message" rows="2" maxlength="${MAX_MESSAGE}" placeholder="예: 어머니 진료 자료와 이동·동행을 준비해줘." autocomplete="off" aria-describedby="composer-disclosure privacy-note voice-help" required></textarea>
-                <div class="composer-actions"><button type="button" id="voice-request" class="voice-button" aria-label="음성으로 요청하기" aria-pressed="false" aria-describedby="voice-help" ${SpeechRecognition?'':'disabled'}>${micIcon}<span>말로 요청</span></button><span class="keyboard-hint">Enter로 전송 · Shift+Enter 줄바꿈</span><span class="character-count" id="character-count">0/${MAX_MESSAGE}</span><button type="submit" class="send-button" id="send-request" aria-label="요청 보내기" disabled>${icon('arrow')}<span>보내기</span></button></div>
-                <p class="voice-help" id="voice-help" role="status">${SpeechRecognition?'음성은 인식한 내용을 확인한 뒤 보내요.':'음성 미지원 브라우저예요. 텍스트로 요청해 주세요.'}</p>
-              </form>
-              <div class="composer-notes"><p class="composer-disclosure" id="composer-disclosure">${icon('info')}가상 사례 · 실제 연락·예약 없음</p><p class="privacy-note" id="privacy-note">주민번호·인증정보·실제 의료기록 입력 금지 · 대화는 새로고침하면 사라져요.</p></div>
-              <div class="pending-message" id="pending-message" hidden><div class="pending-summary"><span class="working-mark"></span><p class="board-activity" id="board-activity" role="status" aria-live="polite"></p></div><button type="button" id="cancel-request" class="cancel-request">응답 대기 중지</button><p class="pending-note">이 화면의 대기만 중지해요. 서버 처리는 계속될 수 있습니다.</p></div>
-              </div>
-            </section>
-            <aside class="preparation-rail" aria-labelledby="preparation-title">${preparationBoardMarkup()}</aside>
+          <div class="workspace-controls">
+            <div class="workspace-tabs" role="tablist" aria-label="작업 영역"><button type="button" id="workspace-tab-chat" role="tab" aria-controls="chat-workspace" aria-selected="true">대화</button><button type="button" id="workspace-tab-preparation" role="tab" aria-controls="preparation-rail" aria-selected="false" tabindex="-1">준비 현황</button></div>
+            <div class="workspace-tools"><button type="button" class="expand-answer" id="expand-answer" aria-label="넓게 읽기" title="넓게 읽기" aria-haspopup="dialog" aria-controls="answer-dialog" disabled>${icon('expand')}<span>넓게 읽기</span></button><button type="button" id="preview-button" class="preview-button">예시 보기${icon('chevron')}</button></div>
           </div>
-            <details class="visit-summary" id="visit-summary"><summary><span>${icon('calendar')}이번 방문 상세</span><span>일정·준비 상태·출처</span>${icon('chevron')}</summary>
+          <div class="conversation-layout" data-active-view="chat">
+            <section class="chat-workspace" id="chat-workspace" role="tabpanel" aria-label="진료 준비 대화">${chatContent}</section>
+            <aside class="preparation-rail" id="preparation-rail" role="tabpanel" aria-label="준비 현황과 방문 상세" tabindex="0">${preparationBoardMarkup()}
+              <details class="visit-summary" id="visit-summary"><summary><span>${icon('calendar')}이번 방문 상세</span><span>일정·준비 상태·출처</span>${icon('chevron')}</summary>
             <aside class="case-sidebar" aria-label="대화에서 준비한 내용">
               <details class="case-summary" id="case-summary" open><summary><span>${icon('calendar')}이번 방문 준비</span>${icon('chevron')}</summary><div id="case-content"></div></details>
               <button type="button" class="report-button" id="save-report" title="대화 응답 후 준비 내역을 저장할 수 있어요." disabled>${icon('download')}준비 내역 저장</button>
@@ -898,6 +910,25 @@ function mount() {
               <details class="source-details"><summary>준비에 사용한 출처${icon('chevron')}</summary><div id="case-sources"></div></details>
               <span class="mode-label" id="mode-label">가상 사례 · 실제 발신 없음</span><p class="service-note">진찰과 진료 계획은 의료진이 결정합니다. 등록된 문의처와 실제 예약·배정은 다릅니다.</p>
             </aside></details>
+            </aside>
+            <div class="chat-composer" id="chat-composer">
+              <div id="answer-ready-notice" class="answer-ready-notice" hidden><button type="button" data-open-stage="plan">새 답변이 도착했어요. 대화에서 보기${icon('arrow')}</button></div>
+              <div id="request-problem-notice" class="request-problem-notice" hidden><button type="button">요청 결과를 확인해 주세요. 대화에서 보기${icon('arrow')}</button></div>
+              <div class="pending-message" id="pending-message" hidden><div class="pending-summary"><span class="working-mark"></span><p class="board-activity" id="board-activity" role="status" aria-live="polite"></p></div><button type="button" id="cancel-request" class="cancel-request">응답 대기 중지</button></div>
+              <form id="conversation-form" class="conversation-form" aria-busy="false">
+                <label for="request-input" class="visually-hidden">진료 준비 요청</label>
+                <textarea id="request-input" name="message" rows="2" maxlength="${MAX_MESSAGE}" placeholder="예: 어머니 진료 자료와 이동·동행을 준비해줘." autocomplete="off" aria-describedby="composer-disclosure privacy-note voice-help" required></textarea>
+                <div class="composer-actions"><button type="button" id="voice-request" class="voice-button" aria-label="음성으로 요청하기" aria-pressed="false" aria-describedby="voice-help" ${SpeechRecognition?'':'disabled'}>${micIcon}<span>말로 요청</span></button><span class="keyboard-hint">Enter로 전송 · Shift+Enter 줄바꿈</span><span class="character-count" id="character-count">0/${MAX_MESSAGE}</span><button type="submit" class="send-button" id="send-request" aria-label="요청 보내기" disabled>${icon('arrow')}<span>보내기</span></button></div>
+              </form>
+              <p class="voice-help" id="voice-help" role="status" hidden></p>
+              <div class="composer-notes"><p class="composer-disclosure" id="composer-disclosure">${icon('info')}가상 사례 · 실제 연락·예약 없음</p>
+                <div class="composer-extras">
+                  <details class="request-examples" id="request-examples"><summary>요청 예시${icon('chevron')}</summary><div class="starter-prompts composer-detail-body" id="starter-prompts"><p>이렇게 요청해 보세요</p><button type="button" data-example="저는 동행이 어려워요. 자료와 이동도 준비해 주세요."><span>저는 동행이 어려워요. 자료와 이동도 준비해 주세요.</span>${icon('arrow')}</button><button type="button" class="secondary-prompt" data-example="어머니가 휠체어를 이용하세요. 무엇을 확인해야 할까요?"><span>어머니가 휠체어를 이용하세요. 무엇을 확인해야 할까요?</span>${icon('arrow')}</button></div></details>
+                  <details class="composer-help" id="composer-help"><summary aria-label="개인정보 입력 금지 안내">개인정보 입력 금지${icon('chevron')}</summary><div class="composer-detail-body"><p>${SpeechRecognition?'음성은 인식한 내용을 확인한 뒤 보내요.':'음성 미지원 브라우저예요. 텍스트로 요청해 주세요.'}</p><p class="privacy-note" id="privacy-note">주민번호·인증정보·실제 의료기록 입력 금지 · 대화는 새로고침하면 사라져요.</p><p class="pending-note">이 화면의 대기만 중지해요. 서버 처리는 계속될 수 있습니다.</p></div></details>
+                </div>
+              </div>
+            </div>
+          </div>
           <p id="conversation-status" class="visually-hidden" role="status" aria-live="polite"></p>
         </main>
       </div>
@@ -938,10 +969,21 @@ function mount() {
   document.getElementById('preview-button').addEventListener('click',()=>showPreview());
   document.getElementById('save-report').addEventListener('click',saveReport);
   document.getElementById('preparation-board').addEventListener('toggle',event=>{if(event.target.matches('[data-stage-details]') && event.target.open)manualStageSelection=true;},true);
-  document.getElementById('preparation-board').addEventListener('focusin',()=>{manualStageSelection=true;});
+  document.getElementById('preparation-rail').addEventListener('focusin',()=>{manualStageSelection=true;});
   document.getElementById('return-to-request').addEventListener('click',focusRequest);
   document.getElementById('next-request-draft').addEventListener('click',()=>{const next=getCareJourneySummary(caseState).nextActions[0];if(next?.requestDraft && fillRequestDraft(next.requestDraft,{source:'다음 문의 초안',focus:false}))focusRequest();});
   document.getElementById('answer-ready-notice').addEventListener('click',showLatestAnswer);
+  // 접힌 작업 영역을 다시 열 때 끝난 메타 피드백을 반복하지 않는다.
+  for(const type of ['animationend','animationcancel'])document.getElementById('message-list').addEventListener(type,event=>{if(event.animationName==='hondi-reply-ready' && event.target.matches('.message-meta'))event.target.dataset.replyFeedback='complete';});
+  document.getElementById('request-problem-notice').addEventListener('click',()=>{setWorkspaceView('chat');scrollToMessage(previewProblem?document.getElementById('mode-notice'):document.querySelector('#message-list .message.failed:last-of-type'));});
+  for(const view of ['chat','preparation'])document.getElementById('workspace-tab-'+view).addEventListener('click',()=>{setWorkspaceView(view);if(view==='chat'){manualStageSelection=false;unreadAnswer=false;}renderBoard();});
+  document.querySelector('.workspace-tabs').addEventListener('keydown',event=>{
+    if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
+    event.preventDefault();const view=event.key==='Home'?'chat':event.key==='End'?'preparation':workspaceView==='chat'?'preparation':'chat';
+    setWorkspaceView(view,{focus:true});if(view==='chat'){manualStageSelection=false;unreadAnswer=false;}renderBoard();
+  });
+  compactWorkspace.addEventListener('change',()=>{const focus=document.activeElement;const view=focus?.closest('#preparation-rail')?'preparation':focus?.closest('#chat-workspace')?'chat':workspaceView;setWorkspaceView(view);if(focus?.closest('[inert]'))document.getElementById('workspace-tab-'+workspaceView).focus({preventScroll:true});});
+  for(const id of ['request-examples','composer-help'])document.getElementById(id).addEventListener('toggle',event=>{if(event.target.open)document.getElementById(id==='request-examples'?'composer-help':'request-examples').open=false;});
   document.getElementById('expand-answer').addEventListener('click',openAnswer);
   const answerDialog=document.getElementById('answer-dialog');
   document.getElementById('close-answer').addEventListener('click',()=>answerDialog.close());
@@ -960,7 +1002,7 @@ function mount() {
     if(contactDialog.open)return;
     document.body.classList.remove('records-dialog-open');
     const target=contactDialog.returnValue==='draft'?input:contactDialog.returnValue==='preview' && pending?document.getElementById('cancel-request'):mobileRail.matches?document.getElementById('open-care-menu'):contactPlanReturnFocus;
-    if(target?.isConnected){target.focus({preventScroll:true});if(contactDialog.returnValue==='draft')target.scrollIntoView({block:'nearest',behavior:'instant'});}
+    if(target?.isConnected){target.focus({preventScroll:true});}
   });
   contactDialog.addEventListener('keydown',event=>trapDialogFocus(event,contactDialog));
   document.getElementById('contact-plans').addEventListener('click',event=>{
@@ -983,7 +1025,7 @@ function mount() {
     if(journeyDialog.open)return;
     document.body.classList.remove('records-dialog-open');
     const target=journeyDialog.returnValue==='draft'?input:journeyDialog.returnValue==='preview' && pending?document.getElementById('cancel-request'):careJourneyReturnFocus;
-    if(target?.isConnected){target.focus({preventScroll:true});if(journeyDialog.returnValue==='draft')target.scrollIntoView({block:'nearest',behavior:'instant'});}
+    if(target?.isConnected){target.focus({preventScroll:true});}
   });
   journeyDialog.addEventListener('keydown',event=>trapDialogFocus(event,journeyDialog));
   document.getElementById('care-journey-content').addEventListener('click',event=>{
@@ -1016,10 +1058,10 @@ function mount() {
   closeCareMenu({restoreFocus:false});
   window.addEventListener('beforeunload',event=>{if(hasConversationWork()){event.preventDefault();event.returnValue='';}});
   document.addEventListener('click',event=>{
-    const example=event.target.closest('[data-example]');if(example && !pending)fillRequestDraft(example.dataset.example);
+    const example=event.target.closest('[data-example]');if(example && !pending && fillRequestDraft(example.dataset.example))document.getElementById('request-examples').open=false;
     const retry=event.target.closest('[data-retry]');if(retry && failedRequests.has(retry.dataset.retry))sendRequest(failedRequests.get(retry.dataset.retry).text,retry.dataset.retry);
   });
-  resizeInput();
+  setWorkspaceView('chat');resizeInput();
   fetch(API+'/capabilities',{cache:'no-store'}).then(response=>{if(!response.ok)throw new Error('unavailable');return response.json();}).then(data=>updateCapabilities(data.capabilities || data)).catch(()=>updateCapabilities({llm:false}));
 }
 

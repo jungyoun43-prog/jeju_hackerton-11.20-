@@ -13,10 +13,9 @@ export function preparationBoardMarkup() {
   const section=stage=>`<section id="stage-${stage.id}" class="stage-pane" data-stage-id="${stage.id}" data-stage-status="waiting" data-signal="waiting" tabindex="-1" aria-labelledby="stage-title-${stage.id}">
       <header class="stage-pane-header"><h2 id="stage-title-${stage.id}">${icon(topics[stage.id],'stage-topic-icon')}${stage.id==='plan'?'방문 계획':stage.title}</h2><span class="stage-status" data-stage-status="waiting" data-signal="waiting">${signalMarkup('waiting')}<span>확인 전</span></span></header>
       <p class="stage-live" data-stage-live hidden></p>
-      <dl class="stage-preview" data-stage-preview></dl><p class="stage-brief" data-stage-brief></p><details class="stage-details" data-stage-details><summary aria-label="${stage.id==='plan'?'방문 계획':stage.shortTitle} 자세히 보기"><span>자세히 보기</span>${icon('chevron')}</summary><div class="stage-pane-body"><p class="stage-summary" data-stage-summary></p><dl class="stage-facts" data-stage-facts></dl><section class="stage-gaps" data-stage-gaps></section><div class="stage-sources" data-stage-sources></div><details class="stage-log" data-stage-log><summary><span data-stage-log-label>처리 기록</span>${icon('chevron')}</summary><div data-stage-events></div></details></div></details>
+      <dl class="stage-preview" data-stage-preview></dl><details class="stage-details" data-stage-details><summary aria-label="${stage.id==='plan'?'방문 계획':stage.shortTitle} 자세히 보기"><span>자세히 보기</span><span class="stage-brief" data-stage-brief></span>${icon('chevron')}</summary><div class="stage-pane-body"><p class="stage-summary" data-stage-summary></p><dl class="stage-facts" data-stage-facts></dl><section class="stage-gaps" data-stage-gaps></section><div class="stage-sources" data-stage-sources></div><details class="stage-log" data-stage-log><summary><span data-stage-log-label>처리 기록</span>${icon('chevron')}</summary><div data-stage-events></div></details></div></details>
     </section>`;
   return `<div class="preparation-heading"><h2 id="preparation-title">준비 현황</h2><p class="preparation-note">자료·문의 준비 상태예요.<br>실제 진료·예약·배차 확정은 아닙니다.</p></div>
-    <div id="answer-ready-notice" class="answer-ready-notice" hidden><button type="button" data-open-stage="plan">새 답변이 도착했어요. 대화에서 보기${icon('arrow')}</button></div>
     <div id="preparation-board" class="preparation-board" aria-label="진료 준비 내역">${PREPARATION_STAGES.map(section).join('')}</div>`;
 }
 
@@ -35,12 +34,13 @@ function sourceMarkup(source) {
 }
 
 export function preservePreparationReading() {
-  const anchor=document.activeElement;
-  if(!document.getElementById('preparation-board')?.contains(anchor))return;
+  const anchor=document.activeElement,scroller=document.getElementById('preparation-rail');
+  if(!scroller?.contains(anchor) || !scroller.checkVisibility())return;
   const bounds=anchor.getBoundingClientRect();
-  if(bounds.top>=innerHeight || bounds.bottom<=0)return;
+  const frame=scroller.getBoundingClientRect();
+  if(bounds.top>=frame.bottom || bounds.bottom<=frame.top)return;
   return ()=>{
-    if(anchor.isConnected && document.activeElement===anchor)document.scrollingElement.scrollTop+=anchor.getBoundingClientRect().top-bounds.top;
+    if(anchor.isConnected && document.activeElement===anchor)scroller.scrollTop+=anchor.getBoundingClientRect().top-bounds.top;
   };
 }
 
@@ -66,10 +66,10 @@ export function renderPreparationBoard(board,{unreadAnswer=false,progress=null}=
     const live=pane.querySelector('[data-stage-live]');
     const observed=progress?.currentStage===stage.id || (progress?.events??[]).some(event=>event.stage===stage.id) || progress?.stages?.some(item=>item.id===stage.id && item.lastTool);
     live.hidden=!(board.pending && progress?.status==='running' && board.progressAvailable && observed && stage.liveActivity);live.textContent=stage.liveActivity;
-    const preview=stage.id==='records'?stage.facts.slice(1):stage.facts;
+    const preview=(stage.id==='records'?stage.facts.slice(1):stage.facts).slice(0,1);
     replaceMarkup(pane.querySelector('[data-stage-preview]'),preview.map(fact=>`<div><dt>${escape(fact.label)}</dt><dd>${escape(fact.value||'확인 전')}</dd></div>`).join(''));
     const brief=pane.querySelector('[data-stage-brief]');
-    brief.hidden=!stage.gapCount;brief.textContent=stage.gapCount?`${stage.gapCount}가지 더 확인할 내용이 있어요.`:'';
+    brief.hidden=!stage.gapCount;brief.textContent=stage.gapCount?`추가 확인 ${stage.gapCount}건`:'';
     replaceMarkup(pane.querySelector('[data-stage-facts]'),stage.facts.map(fact=>`<div><dt>${escape(fact.label)}</dt><dd>${escape(fact.value||'확인 전')}</dd></div>`).join(''));
     replaceMarkup(pane.querySelector('[data-stage-gaps]'),stage.gaps.length?`<h3>확인할 내용 <span>${stage.gapCount??stage.gaps.length}건</span></h3><ul>${stage.gaps.map(gap=>`<li>${escape(gap)}</li>`).join('')}</ul>`:'');
     replaceMarkup(pane.querySelector('[data-stage-sources]'),stage.sources.map(sourceMarkup).join(''));
