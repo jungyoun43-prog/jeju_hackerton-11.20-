@@ -68,6 +68,7 @@ async function readStage(page,id) {
   await showView(page,'preparation');
   await page.locator('#stage-navigation>button[data-open-stage="'+id+'"]').click();
   await showView(page,'chat');
+  if(await page.evaluate(()=>window.__qaBoardClock===true))await page.clock.runFor(40);else await page.evaluate(()=>new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(done))));
   const details=page.locator('[data-stage-id="'+id+'"] [data-stage-details]');
   if(!await details.evaluate(node=>node.open))await details.locator(':scope>summary').click();
 }
@@ -268,7 +269,7 @@ async function open(width,height,{fixture=false,capabilities=fixture?caps:null,r
     await page.locator('#preparation-board').waitFor({state:'attached'});
     await page.waitForFunction(configured=>document.querySelector('#connection-state')?.textContent===(configured?'대화 연결 설정됨':'AI 모델 미연결'),capabilities?.llm===true);
     await page.evaluate(()=>document.fonts.ready);
-    if(fixture && mockClock)await page.clock.install();
+    if(fixture && mockClock){await page.clock.install();await page.evaluate(()=>window.__qaBoardClock=true);}
     return {page,context,actualPosts};
   } catch(error) {await context.close();throw error;}
 }
@@ -548,6 +549,7 @@ try {
       record('진행 중지는 원문 복원·서버 처리와 화면 대기를 구분',await page.locator('#request-input').inputValue()===JSON.parse(firstMain.body).message && /대기.*중지|중지.*대기/.test(await page.locator('#conversation-status').innerText()) && /서버|처리.*계속/.test(await page.locator('#conversation-status').innerText()));
       const secondMain=await begin(page,'새 문의의 자료를 먼저 읽겠습니다.',1);
       const secondPoll=await advancePoll(page,1);
+      await readStage(page,'records');await page.locator('[data-stage-id="records"] [data-stage-details]>summary').focus();
       record('새 요청은 다른 토큰을 쓰고 이전 조회를 중단',JSON.parse(firstMain.body).progressToken!==JSON.parse(secondMain.body).progressToken && (await calls(page,'/api/agent/progress'))[0].aborted);
       const openPosition=await readingPosition(page);
       await release(page,secondPoll,progress('support',8));
