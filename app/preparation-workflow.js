@@ -70,10 +70,10 @@ export function getPreparationWorkflow(state) {
     const stageTasks=tasks.filter(task=>task.stageId===definition.id),left=stageTasks.filter(task=>task.status!=='prepared');
     const status=definition.id==='support'&&!needed.length?'not_needed':definition.id==='plan'?hasWork?'waiting_external':'not_started':statusOf(stageTasks);
     const active=left.find(task=>task.status===status)||left[0];
-    return {id:definition.id,title:definition.title,status,label:labels[status],summary:'',actor:active?.actor||'institution',remainingCount:definition.id==='plan'?remaining.length:left.length};
+    return {id:definition.id,title:definition.title,status,label:status==='not_started'&&stageTasks.some(task=>task.status==='prepared')?'남은 준비 있음':labels[status],summary:'',actor:active?.actor||'institution',remainingCount:definition.id==='plan'?remaining.length:left.length};
   });
   const plan=stages[3];plan.label=hasWork?'미확인을 포함한 방문 준비표':'방문 준비표 작성 전';plan.summary=`현재 상태로 계산한 준비표 · 남은 일 ${remaining.length}건 · 실제 예약·배차·진료 수락 미확인`;
-  for(const stage of stages.slice(0,3))stage.summary=stage.status==='not_needed'?'이동과 동행 모두 요청하지 않은 조건입니다.':`${labels[stage.status]} · 남은 일 ${stage.remainingCount}건`;
+  for(const stage of stages.slice(0,3))stage.summary=stage.status==='not_needed'?'이동과 동행 모두 요청하지 않은 조건입니다.':`${stage.label} · 남은 일 ${stage.remainingCount}건`;
   const waitingCount=remaining.filter(task=>['waiting_external','handoff'].includes(task.status)).length;
   return {version:1,currentStageId:currentTask?.stageId||'plan',currentTask,stages,remainingTasks:remaining,nextAutomaticActions:actions,
     summary:{label:remaining.length?`준비 결과와 남은 일 ${remaining.length}건`:'확인한 준비 결과',remainingCount:remaining.length,waitingCount,preparedCount:tasks.filter(task=>task.status==='prepared').length},visitReady:false};

@@ -29,6 +29,33 @@ test('방문 토큰은 고정된 해시 세션으로 분리하고 업무 지문�
   const next=validateMessageRequest(body({sessionId:visitSessionId(token),progressToken:'p'.repeat(43),history:[{text:'기존 요청',role:'user'}],preferences:{companionNeeded:false,wheelchair:true,taxiProviderId:'auto'}}));
   assert.equal(requestFingerprint(first),requestFingerprint(next));
   assert.notEqual(requestFingerprint(first),requestFingerprint({...first,message:'다른 요청'}));
+  assert.equal(requestFingerprint(first),requestFingerprint({...first,guidedPreparation:false}));
+  assert.notEqual(requestFingerprint(first),requestFingerprint({...first,guidedPreparation:true}));
+});
+
+test('guided true는 receipt의 별도 업무 내용이며 false/생략의 이전 요청 지문은 유지한다',async()=>{
+  const legacy=fixture({outputs:[done()]});
+  assert.equal((await post(legacy.service,body({guidedPreparation:false}))).statusCode,200);
+  assert.equal((await post(legacy.service)).statusCode,200);
+  const changed=await post(legacy.service,body({guidedPreparation:true}));assert.equal(changed.statusCode,409);assert.equal(parsed(changed).error.code,'REQUEST_CONFLICT');
+  assert.equal(legacy.calls.length,1);assert.equal(legacy.charged(),1);
+  const guided=fixture({outputs:[done()]}),request=body({message:'방문 준비를 도와줘',guidedPreparation:true});
+  const first=await post(guided.service,request);assert.equal(first.statusCode,200);
+  assert.equal(parsed(first).caseState.visitSupport.taxi.status,'prepared');
+  const falseMode=await post(guided.service,{...request,guidedPreparation:false});assert.equal(falseMode.statusCode,409);
+  assert.equal((await post(guided.service,request)).statusCode,200);assert.equal(guided.calls.length,1);assert.equal(guided.charged(),1);
+  assert.equal(guided.memory.inspect()[0].requestReceipts.length,1);
+});
+
+test('guided 준비 완료 뒤 resume는 상태만 읽고 남은 자동 행동·모델·예산·TTL을 실행하지 않는다',async()=>{
+  const f=fixture({outputs:[done()]}),request=body({message:'택시 문의 초안을 준비해줘',guidedPreparation:true});
+  const response=await post(f.service,request);assert.equal(response.statusCode,200);
+  const state=parsed(response).caseState;assert.equal(state.visitSupport.taxi.status,'prepared');assert.equal(state.visitSupport.companion.status,'not_selected');
+  const before=f.operations.length,expiresAt=f.memory.inspect()[0].expiresAt;
+  f.advance(10);
+  const result=await resume(f.service);assert.equal(result.statusCode,200);assert.deepEqual(parsed(result).caseState,state);
+  assert.deepEqual(f.operations.slice(before),['loadOrCreate']);assert.equal(f.memory.inspect()[0].expiresAt,expiresAt);
+  assert.equal(f.calls.length,1);assert.equal(f.charged(),1);assert.equal(Object.hasOwn(parsed(result),'reply'),false);
 });
 
 test('첫 응답을 잃고 sessionId 없이 재시도해도 도구·모델·차감은 한 번만 수행한다',async()=>{

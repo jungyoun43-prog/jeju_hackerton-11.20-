@@ -68,10 +68,91 @@ test('초안만 요청한 범위·실전화 금지·지원 해당 없음과 도�
   const limited=await post(createAgentService({provider:scripted([done('한도 안에서 준비합니다.')]),config:{maxTools:1}}),req({guidedPreparation:true}));
   assert.equal(limited.statusCode,200);assert.equal(json(limited).events.length,1);
   assert.equal(json(limited).caseState.visitSupport.companion.status,'not_selected');
+  assert.match(json(limited).reply,/도구 한도/);
   const store=createMemorySessionStore(),session=await store.loadOrCreate();
   session.state=applyAction(session.state,{type:'SUPPORT_UPDATE_REQUIREMENTS',values:{transportNeeded:false,companionNeeded:false}});await store.save(session);
   const none=await post(createAgentService({store,provider:scripted([done('조건을 유지합니다.')])}),req({sessionId:session.sessionId,guidedPreparation:true}));
   assert.equal(none.statusCode,200);assert.deepEqual(json(none).events,[]);
+});
+
+test('개인 기록 미연결·의료진 대기는 남기면서 독립 문의 초안은 이어 준비한다',async()=>{
+  const provider=scripted([use(call('request_records',{source:'nhis'},'nhis-1'),call('prepare_review',{},'review-1')),done('실제 기록은 미연결입니다.')]);
+  const result=await post(createAgentService({provider}),req({message:'건강 기록 연동은 미설정이어도 방문 준비를 도와줘',guidedPreparation:true})),body=json(result);
+  assert.equal(result.statusCode,200);assert.equal(provider.calls.length,2);
+  assert.deepEqual(body.events.map(item=>item.tool),['request_records','prepare_review','prepare_inquiries','prepare_inquiries']);
+  assert.equal(body.events[0].status,'not_connected');assert.equal(body.events[1].status,'needs_input');
+  assert.equal(body.caseState.documents.find(item=>item.id==='report').status,'missing');
+  assert.equal(body.caseState.documents.find(item=>item.id==='exam').status,'not_performed');
+  for(const kind of ['taxi','companion'])assert.equal(body.caseState.visitSupport[kind].status,'prepared');
+  assert.ok(body.pendingActions.some(item=>/기록|진찰|의료진/.test(item.label)));
+});
+
+test('지원 미연결·초안 실패는 해당 종류만 멈추고 다른 독립 초안은 진행한다',async()=>{
+  const dispatch=createToolDispatcher({phoneAdapter:null});
+  const provider=scripted([use(call('request_support_contact',{kind:'taxi'})),done('이동 전화는 미연결입니다.')]);
+  const response=await post(createAgentService({provider,dispatch}),req({guidedPreparation:true})),body=json(response);
+  assert.equal(response.statusCode,200);assert.equal(body.caseState.visitSupport.taxi.status,'not_selected');
+  assert.equal(body.caseState.visitSupport.companion.status,'prepared');assert.equal(body.events[0].status,'not_connected');
+  const failing=async input=>{if(input.name==='prepare_inquiries'&&input.input.kind==='taxi')throw new Error('합성 taxi 실패');return createToolDispatcher()(input);};
+  const partial=await post(createAgentService({provider:scripted([done('요청을 확인했습니다.')]),dispatch:failing}),req({guidedPreparation:true}));
+  assert.equal(partial.statusCode,200);assert.equal(json(partial).caseState.visitSupport.taxi.status,'not_selected');
+  assert.equal(json(partial).caseState.visitSupport.companion.status,'prepared');
+  assert.equal(json(partial).events[0].status,'error');assert.match(json(partial).reply,/일부 초안.*해당 대상은 멈/);
+});
+
+test('조건 변경 실패·필수 조건 부재·도구 한도 뒤에는 예전 조건의 초안을 추가하지 않는다',async()=>{
+  const provider=scripted([use(call('update_visit',{date:'2026-02-30'})),done('날짜 확인이 필요합니다.')]);
+  const failed=await post(createAgentService({provider}),req({guidedPreparation:true}));
+  assert.equal(failed.statusCode,200);assert.equal(json(failed).caseState.visitSupport.taxi.status,'not_selected');
+  assert.equal(json(failed).events.length,1);assert.match(json(failed).reply,/변경을 반영하지 못해/);
+  const store=createMemorySessionStore(),session=await store.loadOrCreate();session.state.patient.area='';await store.save(session);
+  const missing=await post(createAgentService({store,provider:scripted([done('지역을 확인해 주세요.')])}),req({sessionId:session.sessionId,guidedPreparation:true}));
+  assert.equal(missing.statusCode,200);assert.deepEqual(json(missing).events,[]);assert.match(json(missing).reply,/출발 지역/);
+  const exhausted=await post(createAgentService({provider:scripted([use(call('get_case')),done('현재 상태를 정리합니다.')]),config:{maxTools:1}}),req({guidedPreparation:true}));
+  assert.equal(exhausted.statusCode,200);assert.ok(json(exhausted).events.every(item=>item.tool!=='prepare_inquiries'));
+  assert.equal(json(exhausted).caseState.visitSupport.taxi.status,'not_selected');assert.match(json(exhausted).reply,/도구 한도/);
+});
+
+test('명시한 새 날짜·시각·지역·기관·휠체어 조건이 미반영이면 이전 조건으로 fallback하지 않는다',async()=>{
+  for(const message of ['11월 13일 15시로 바꾸고 방문 준비해줘','서귀포로 출발 지역을 바꾸고 방문 준비해줘','다른 제주 병원으로 바꾸고 방문 준비해줘','휠체어가 필요하니 방문 준비해줘']){
+    const provider=scripted([done('조건을 확인했습니다.')]);
+    const response=await post(createAgentService({provider}),req({message,guidedPreparation:true}));
+    assert.equal(response.statusCode,200,message);assert.deepEqual(json(response).events,[],message);
+    assert.equal(json(response).caseState.visitSupport.taxi.status,'not_selected',message);assert.match(json(response).reply,/조건.*반영하지 못해/,message);
+  }
+  for(const input of [{date:'2026-11-13'},{date:'2026-11-13',appointmentTime:'15:00'}]){
+    const provider=scripted([use(call('update_visit',input)),done('조건을 반영했습니다.')]);
+    const response=await post(createAgentService({provider}),req({message:'11월 13일 15시로 바꾸고 방문 준비해줘',guidedPreparation:true}));
+    assert.equal(response.statusCode,200);
+    assert.equal(json(response).caseState.visitSupport.taxi.status,input.appointmentTime?'prepared':'not_selected');
+  }
+});
+
+test('기존 초안·가능/실패 응답·인계와 시각 변경은 자동 초안으로 덮거나 재시도하지 않는다',async()=>{
+  for(const scenarioId of ['missing_record','call_ai_declined','call_no_answer','time_changed']){
+    const seed=json(await post(createAgentService(),{scenarioId,requestId:'guided-seed-preview-0001'},'/api/agent/preview'));
+    const store=createMemorySessionStore(),session=await store.loadOrCreate();session.state=seed.caseState;await store.save(session);
+    const provider=scripted([done('현재 상태를 유지합니다.')]);
+    const result=await post(createAgentService({store,provider}),req({sessionId:session.sessionId,guidedPreparation:true}));
+    assert.equal(result.statusCode,200,scenarioId);const body=json(result);
+    for(const kind of ['taxi','companion'])if(['prepared','available_demo','unavailable_demo','unreachable_demo','needs_recheck'].includes(seed.caseState.visitSupport[kind].status))assert.deepEqual(body.caseState.visitSupport[kind],seed.caseState.visitSupport[kind],`${scenarioId}:${kind}`);
+    assert.deepEqual(body.caseState.callRecovery,seed.caseState.callRecovery,scenarioId);
+    if(scenarioId==='time_changed')assert.deepEqual(body.events,[]);
+    assert.equal(provider.calls.length,1,scenarioId);
+  }
+});
+
+test('도구의 작은 업무 요약은 같은 단계·현재 작업만 제공하고 준비 권한으로 쓰지 않는다',async()=>{
+  const dispatch=createToolDispatcher(),state=createDemoCase();
+  for(const name of ['get_case','get_care_journey']){
+    const result=await dispatch({name,input:{},state});
+    const workflow=result.data.preparationWorkflow;
+    assert.equal(workflow.visitReady,false);assert.equal(workflow.stages.length,4);
+    assert.equal(workflow.currentTask.actor,'agent');assert.equal(workflow.currentTask.id,'taxi-draft');
+    assert.equal(Object.hasOwn(workflow,'remainingTasks'),false);
+    assert.equal(Object.hasOwn(workflow,'dataImpact'),false);
+    assert.equal(Object.hasOwn(workflow.currentTask,'detail'),false);
+  }
 });
 
 test('기본 API는 모델·store 호출 없이 사실대로 미연결503을 반환한다',async () => {

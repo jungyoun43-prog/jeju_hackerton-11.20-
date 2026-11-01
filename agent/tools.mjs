@@ -217,6 +217,19 @@ export function getGuidedPreparationKinds(message,state) {
   }
   return ['taxi','companion'].filter(kind=>requested.has(kind)&&!blocked.has(kind)&&(!exclusive.size||exclusive.has(kind)));
 }
+/** 명시한 새 조건을 모델이 건너뛰면 이전 조건으로 자동 초안을 만들지 않는다. */
+export function getGuidedPreparationChanges(message,state) {
+  const text=String(message).normalize('NFKC'),fields=[];
+  if(/\d{4}-\d{2}-\d{2}|\d{1,2}\s*월\s*\d{1,2}\s*일|내일|모레|다음\s*(?:주|달)|(?:방문일|날짜).{0,12}(?:바꾸|변경|수정)/.test(text))fields.push('date');
+  if(/\d{1,2}\s*:\s*\d{2}|\d{1,2}\s*시|오전|오후|(?:시각|시간).{0,12}(?:바꾸|변경|수정)/.test(text))fields.push('appointmentTime');
+  const area=state.patient.area.replace(/\s+/g,''),compact=text.replace(/\s+/g,'');
+  if(ADMIN_AREAS.some(value=>{const name=value.split(' ').at(-1).replace(/[읍면시]$/,'');return new RegExp(`${regexText(name)}(?:에서|으로|로|(?:출발|거주|지역))`).test(compact)&&!area.includes(name);})||/(?:출발지|출발\s*지역).{0,12}(?:바꾸|변경|수정)/.test(text))fields.push('area');
+  const hospital=state.selectedHospital?.companyName||state.patient.localHospital;
+  if(hospitalData.records.some(item=>text.includes(item.companyName)&&item.companyName!==hospital)||/(?:다른|새로운|새)\s*(?:제주|도내)?\s*병원|(?:병원|기관).{0,12}(?:바꾸|변경|수정)/.test(text))fields.push('hospital');
+  if(/휠체어/.test(text))fields.push('wheelchair');
+  for(const [field,subject] of [['transportNeeded','(?:택시|이동)'],['companionNeeded','동행']])if(new RegExp(`${subject}.{0,12}(?:필요\\s*없|불필요|필요해|필요하|추가|제외)`).test(text))fields.push(field);
+  return fields;
+}
 function explicitMissingDocument(message,state,id) {
   const labels={history:/(?:치료|진료)\s*이력|병력\s*요약/,report:/판독문/,referral:/의뢰서/};
   const absent='없(?:어|어요|습니다|다|음|어서|고)|미보유|분실|발급\\s*전|준비(?:가)?\\s*(?:안|않|못)|보유(?:하고)?\\s*있지\\s*않';

@@ -12,7 +12,7 @@ const preview=id=>buildFixedPreview({scenarioId:id,requestId:'board-projection-f
 test('준비 기호는 미확인·문의 실패·시각 변경을 구분하고 실제 수락을 만들지 않는다',async()=>{
  const initial=getPreparationBoard(createDemoCase());
  assert.deepEqual(initial.stages.map(stage=>stage.signal),['attention','waiting','waiting','waiting']);
- const cases=[['missing_record','records','attention'],['missing_record','support','available'],
+ const cases=[['missing_record','records','attention'],['missing_record','support','attention'],
   ['jeju_unavailable','hospitals','blocked'],['time_changed','support','attention'],
   ['call_no_answer','support','blocked'],['call_ai_declined','support','blocked'],
   ['call_identity_required','hospitals','blocked'],['call_documents_or_schedule','hospitals','blocked']];
@@ -24,10 +24,10 @@ test('준비 기호는 미확인·문의 실패·시각 변경을 구분하고 �
   assert.deepEqual(response.caseState,before,id);
  }
  const partial=applyAction(createDemoCase(),{type:'RECORD_CALL',target:'mainland',outcome:'documents'});
- assert.equal(getPreparationBoard(partial).stages[1].signal,'attention');
+ assert.equal(getPreparationBoard(partial).stages[1].signal,'waiting');
  const drafted=await preview('missing_record');
  const selected=applyAction(createDemoCase(),{type:'SUPPORT_SELECT_PROVIDER',kind:'taxi',provider:drafted.caseState.visitSupport.taxi.provider});
- assert.equal(getPreparationBoard(selected).stages[2].signal,'attention');
+ assert.equal(getPreparationBoard(selected).stages[2].signal,'waiting');
  const pending=getPreparationBoard(createDemoCase(),{pending:true,progress:progress('hospitals')});
  assert.deepEqual(pending.stages.map(stage=>stage.signal),initial.stages.map(stage=>stage.signal));
 });

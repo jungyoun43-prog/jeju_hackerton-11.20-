@@ -31,6 +31,14 @@ test('응답 횟수만 바뀌거나 관측 완료가 와도 업무 상태·기�
   assert.notEqual(first.stages[3].signal,'available');
 });
 
+test('단계 기호는 같은 업무 상태에서 계산하며 일부 절차 안내를 전체 준비의 ○로 만들지 않는다',async()=>{
+  const response=await preview('aewol-parent-visit'),board=getPreparationBoard(response.caseState,{responseCount:1});
+  const signals={not_started:'waiting',needs_input:'attention',prepared:'available',waiting_external:'attention',handoff:'blocked',needs_recheck:'attention',not_needed:'not_needed'};
+  for(const item of board.stages)assert.equal(item.signal,signals[item.status],item.id);
+  assert.equal(board.stages[1].status,'not_started');assert.equal(board.stages[1].signal,'waiting');
+  assert.equal(board.stages[1].label,'남은 준비 있음');assert.match(board.stages[1].summary,/2\/2/);
+});
+
 test('시각 미정은 기관 확인으로 남기며 이미 아는 날짜·지역으로 독립 초안을 준비한다',async()=>{
   const state=createDemoCase(),workflow=getPreparationWorkflow(state),dispatch=createToolDispatcher();
   const time=workflow.remainingTasks.find(item=>item.id==='appointment-time');

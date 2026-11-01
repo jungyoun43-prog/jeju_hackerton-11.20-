@@ -1,5 +1,5 @@
 import { CAREGIVER_SYSTEM_PROMPT } from '../prompts/caregiver-system.mjs';
-import { AGENT_TOOLS, createToolDispatcher, getPendingActions, getGuidedPreparationKinds } from './tools.mjs';
+import { AGENT_TOOLS, createToolDispatcher, getPendingActions, getGuidedPreparationKinds, getGuidedPreparationChanges } from './tools.mjs';
 import { createMemorySessionStore } from './store.mjs';
 import { createDisconnectedProvider } from './providers.mjs';
 import { AgentError, fail, isObject, publicError } from './errors.mjs';
@@ -93,7 +93,8 @@ export function createAgentService({provider = createDisconnectedProvider(),stor
       const events = [], pending = [], usedIds = new Set();
       let toolCount = 0;
       let providerContext;
-      const attemptedDrafts=new Set();
+      const attemptedDrafts=new Set(),blockedDrafts=new Set(),appliedConditions=new Set();
+      let contextRejected=false;
       const execute=async(name,input)=>{
         toolCount++;
         if(name==='prepare_inquiries')attemptedDrafts.add(input.kind);
@@ -101,11 +102,19 @@ export function createAgentService({provider = createDisconnectedProvider(),stor
         try {
           const result=await bounded(Promise.resolve().then(()=>dispatch({name,input,state,userMessage:request.message,preferences:request.preferences,requestId:request.requestId,signal:controller.signal})),controller.signal);
           state=result.state;events.push(...result.events);pending.push(...result.pendingActions);
+          if(result.events.every(item=>item.status==='completed')){
+            if(name==='update_visit')for(const field of Object.keys(input))appliedConditions.add(field);
+            if(name==='select_hospital_contact')appliedConditions.add('hospital');
+          }
+          if(['update_visit','select_hospital_contact'].includes(name)&&result.events.some(item=>item.status!=='completed'))contextRejected=true;
+          if(name==='request_support_contact'&&result.events.some(item=>['error','not_connected'].includes(item.status)))blockedDrafts.add(input.kind);
           progress.finished(name,input,result.events.some(item=>item.status==='error')?'failed':result.events.some(item=>item.status!=='completed')?'needs_input':'completed');
           return {result};
         } catch(error) {
           if(controller.signal.aborted||error?.code==='AGENT_TIMEOUT')throw error;
           const safe=error instanceof AgentError?error:new AgentError('TOOL_REJECTED','현재 준비 상태에서 도구를 실행할 수 없습니다. 필요한 조건을 확인해 주세요.');
+          if(['update_visit','select_hospital_contact'].includes(name))contextRejected=true;
+          if(name==='request_support_contact')blockedDrafts.add(input.kind);
           events.push({id:`tool-error-${toolCount}`,tool:name,label:'도구 요청 확인 필요',status:'error',detail:safe.message,isSimulation:false});
           progress.finished(name,input,'failed');return {error:safe};
         }
@@ -114,6 +123,7 @@ export function createAgentService({provider = createDisconnectedProvider(),stor
       if (visitPreferencesApplied) {
         const {wheelchair,companionNeeded} = request.preferences;
         state = applyAction(state,{type:'SUPPORT_UPDATE_REQUIREMENTS',values:{wheelchair,companionNeeded}});
+        appliedConditions.add('wheelchair');appliedConditions.add('companionNeeded');
         events.push({id:'care-preferences-applied',tool:'apply_care_preferences',label:'기본 이동 조건 반영',status:'completed',detail:'기기의 휠체어·동행 필요 설정을 합성 사례에 반영했습니다. 이번 요청에서 조건을 바꿀 수 있으며 문의·정보 공유 동의는 변경하지 않았습니다.',isSimulation:true,source:'기기 기본 설정'});
         progress.finished('apply_care_preferences');
       }
@@ -143,12 +153,12 @@ export function createAgentService({provider = createDisconnectedProvider(),stor
             const prepared=[];
             let interrupted=false;
             let stopped='안전하게 추가할 새 초안이 없어 기존 준비·응답·인계 상태를 유지했습니다.';
-            const candidates=getPreparationWorkflow(state).nextAutomaticActions.filter(action=>scope.includes(action.input.kind)&&!attemptedDrafts.has(action.input.kind)).slice(0,2);
-            if(events.some(item=>['error','not_connected'].includes(item.status)))stopped='도구 실패 또는 미연결 상태가 있어 자동 초안을 추가하지 않았습니다.';
+            const candidates=getPreparationWorkflow(state).nextAutomaticActions.filter(action=>scope.includes(action.input.kind)&&!attemptedDrafts.has(action.input.kind)&&!blockedDrafts.has(action.input.kind)).slice(0,2);
+            if(contextRejected||getGuidedPreparationChanges(request.message,state).some(field=>!appliedConditions.has(field)))stopped='방문 조건 또는 문의 기관 변경을 반영하지 못해 자동 초안을 추가하지 않았습니다.';
             else for(const action of candidates){
               if(toolCount>=limits.maxTools){stopped='이번 요청의 도구 한도에 도달해 남은 초안은 추가하지 않았습니다.';interrupted=true;break;}
               const outcome=await execute(action.name,action.input);
-              if(outcome.error||outcome.result.events.some(item=>['error','not_connected'].includes(item.status))){stopped='초안을 준비하지 못해 멈췄습니다. 처리 기록과 남은 조건을 확인해 주세요.';interrupted=true;break;}
+              if(outcome.error||outcome.result.events.some(item=>['error','not_connected'].includes(item.status))){stopped='일부 초안을 준비하지 못해 해당 대상은 멈췄습니다. 처리 기록과 남은 조건을 확인해 주세요.';interrupted=true;continue;}
               if(state.visitSupport[action.input.kind].status==='prepared')prepared.push(action.input.kind==='taxi'?'이동':'동행');
             }
             const workflow=getPreparationWorkflow(state);

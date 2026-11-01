@@ -65,6 +65,7 @@ export function normalizePreparationProgress(value) {
 const source=value=>value&&typeof value.url==='string'?{url:value.url,label:value.datasetId?`제주데이터허브 ${value.datasetId}`:'공식 서비스 안내'}:null;
 const uniqueSources=items=>[...new Map(items.filter(Boolean).map(item=>[item.url,item])).values()];
 const safeEvent=event=>({tool:String(event.tool??''),label:String(event.label??'처리 결과').slice(0,160),detail:String(event.detail??'').slice(0,500),status:event.status,isSimulation:event.isSimulation===true,source:typeof event.source==='string'?event.source:''});
+const WORKFLOW_SIGNALS=Object.freeze({not_started:'waiting',needs_input:'attention',prepared:'available',waiting_external:'attention',handoff:'blocked',needs_recheck:'attention',not_needed:'not_needed'});
 function baseStage(definition,status,label,summary,facts=[],gaps=[],sources=[]) {
   return {...definition,status,label,summary,facts,gaps,sources:uniqueSources(sources),events:[],liveActivity:'',live:false};
 }
@@ -103,14 +104,8 @@ export function getPreparationBoard(state,{events=[],progress=null,pending=false
   const plan=baseStage(PREPARATION_STAGES[3],workflow.stages[3].status,workflow.stages[3].label,workflow.stages[3].summary,
     [{label:'다음 할 일',value:workflow.currentTask?.title||'현재 준비 결과 확인'}],workflow.remainingTasks.map(task=>`${task.owner} · ${task.title}`));
   const stages=[records,hospitals,mobility,plan];
-  for(const stage of stages){const taskStage=workflow.stages.find(item=>item.id===stage.id);stage.status=taskStage.status;stage.label=taskStage.label;stage.actor=taskStage.actor;stage.remainingCount=taskStage.remainingCount;}
+  for(const stage of stages){const taskStage=workflow.stages.find(item=>item.id===stage.id);stage.status=taskStage.status;stage.label=taskStage.label;stage.actor=taskStage.actor;stage.remainingCount=taskStage.remainingCount;stage.signal=WORKFLOW_SIGNALS[stage.status];}
   // 기호는 자료·문의 준비만 요약한다. 미확인은 문의 실패나 임상 부적합이 아니다.
-  records.signal=recordGaps.length?'attention':'available';
-  hospitals.signal=hospitalBlocked?'blocked':confirmed===inquiries.length?'available':confirmed?'attention':'waiting';
-  const requiredSupport=['taxi','companion'].filter(kind=>support[kind].status!=='not_needed');
-  const draftedSupport=requiredSupport.every(kind=>['prepared','available_demo'].includes(support[kind].status));
-  mobility.signal=!support.totalNeeded?'not_needed':recheck?'attention':supportBlocked?'blocked':draftedSupport?'available':selected?'attention':'waiting';
-  plan.signal=plan.status==='not_started'?'waiting':'attention';
   for(const event of Array.isArray(events)?events:[]){
     if(!event||typeof event!=='object')continue;
     const id=PREPARATION_STAGE_IDS.includes(event.stage)?event.stage:event.tool==='analyze_public_data'&&/이동|동행/.test(event.label)?'support':getToolStage(event.tool);
