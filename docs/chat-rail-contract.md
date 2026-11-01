@@ -37,3 +37,14 @@
 - reduced motion에서는 hover/active의 공간이동과 답변 등장 애니메이션을 제거한다. 정적인 열린 방향·선택/열림 면·실제 대기·키보드 focus는 남긴다. 기존 모바일 서랍의 닫힘 transform을 전역none으로 지우지 않는다.
 
 구현은 전용worktree의 app/conversation.css만 소유한다. 검증은 별도worktree의 scripts/preparation-board-browser-check.mjs만 수정한다. 기존 reduce6viewport·진행/취소·출처DOM/focus·native표를 보존하고 PC/모바일×일반/줄인동작의 실제색/대비·hover/press·반복펼침/입력비발송·답변메타1회/복사본제외를 확인한다. normal-motion fixture도 실제 LLM/발신/기록은 요청하지 않는다. proof.motionScenarios는width/reducedMotion/greenSurfaces/contrastPassed/interactionFeedback/replyFeedback/readingStable/normalPostAttempts를 기록하며 일반·reduce 각2viewport를 포함한다. CSS compositor와 mock JS 시계를 구분해 실제 상태를 조건 대기한다. 통합 후 같은 소스의 기존 전체 하네스와 현재 CI/CD로 검증·게시한다.
+
+## 대화 상단 개선
+
+후속 사용자 피드백은 채팅창, 특히 ‘혼디와 대화’ 상단이 어색하다는 것이다. 이 절은 앞의 짙은 초록 띠와 제목 문구 고정보다 우선한다. 다른 영역의 초록·주황 역할은 유지한다.
+
+- 두꺼운 전체 너비 색 띠를 흰 대화면과 이어지는 상단으로 바꾼다. 기존 `hondi-mark-v1.png`와 ‘혼디’ 이름, 짧은 진료 준비 역할 설명으로 대화 상대를 표시한다. 가짜 온라인·가용성·진행 상태나 새 인물/그림은 추가하지 않는다.
+- 대화 상대와 도구를 분리한다. 기존 `conversation-title`, `expand-answer`, `preview-button`과 기능은 유지하고 예시/넓게 읽기는 작은 보조 행동으로 정리한다. 좁은 화면에서 아이콘으로 줄이는 버튼에는 같은 접근성 이름·설명과 44px 조작 영역을 남긴다. 초기 넓게 읽기의 실제 disabled도 유지한다.
+- 흰 상단의 이름·보조 행동은 기존 초록, 보조 설명은 기존 muted, 초점은 흰 면에서 구별되는 주황/초록이다. 텍스트4.5:1·초점3:1을 확인하며 이전 어두운 띠의 흰색 강제 규칙을 남기지 않는다. 1440/1060/390/320에서 제목과 행동이 겹치거나 가로로 넘치지 않아야 한다.
+- 중앙 대화/하단 입력·오른쪽 네 칸·자연 높이·단일 폼·고지·본문/출처·이미 구현한 짧은 CSS 피드백은 유지한다. 헤더 마크업/CSS 외 Controller·모델·데이터·권한·기록/전화는 바꾸지 않는다. 오래된 선택자/토큰은 교체하며 override를 추가로 쌓지 않는다.
+
+UI는 전용 worktree에서 `app/conversation.js`의 상단 마크업과 `app/conversation.css`만 소유한다. QA는 별도 worktree의 기존 `scripts/preparation-board-browser-check.mjs`에서 상단의 기존 색/대비 단언을 새 의미와 접근성에 맞춘다. 새 라이브러리·프레임워크·별도 영구 검사 파일은 추가하지 않는다. 기존 motionScenarios의 greenSurfaces는 주변 민트/초록 역할과 흰 대화 상단을 함께 확인하며 나머지 모션·진행·취소·출처 읽기 단언은 유지한다. 통합 담당자가 문서/하네스와 같은 소스의 기존 검사·공개 배포를 마무리한다.
