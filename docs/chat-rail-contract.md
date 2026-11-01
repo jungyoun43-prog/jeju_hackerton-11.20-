@@ -25,3 +25,15 @@
 ## 주황 포인트 후속 요청
 
 환자 이름은 case-heading/rail-patient에서 이름 부분만 인라인으로 강조한다. 나머지 제목 문구와 접근성 이름은 그대로 보존하고, 기존 escape로 이름을 문자 처리한다. 주 행동/포커스 토큰은 짙은 주황, 활성 보내기는 흰 글자, 다음 문의 초안은 별도 옅은 peach 토큰을 사용한다. 비활성 보내기·전체 soft 바탕·보조 링크·아이콘·성공/미확인/실패의 의미색은 유지한다. 중앙 채팅·오른쪽4칸의 배치나 동작을 바꾸지 않는다. 낮은 영향의 시각 변경이므로 새 영구 테스트/설정/라이브러리를 추가하지 않고 실제 활성·hover·focus·비활성·답변 상태를 PC/모바일에서 확인한다.
+
+## 초록 영역과 짧은 상호작용
+
+최신 사용자 요청은 색이 부족하고 밋밋하므로 초록과 인터랙션을 더하는 것이다. 앞의 보조 파랑 유지 제한보다 이 항목을 우선한다. 주황 이름/보내기/다음초안은 유지하며 밝은 화면에서 다음 역할을 부여한다.
+
+- 대화 toolbar는#1C4D36/흰 글자, 탐색면#F4F8F4, 선택/사용자 말풍선의soft#EDF6EF, 보조 링크/아이콘secondary#285C43/hover#1B4631. 오른쪽 카드는 흰 면, good#267149/warning#875617/danger#A33D34와 기호/설명은 보존한다. 본문ink/muted·제주 배경·구조/크기/모델/권한은 유지한다.
+- 녹색toolbar의 글자/버튼/아이콘은 흰색이며 focus는 흰색 또는 옅은 밝은색으로3:1이상 구분한다. 주황focus를 이 어두운 면에 그대로 쓰지 않는다. 보조 hover의 과거 파랑 하드코딩도 현재 역할로 정리한다. 비활성 제어는 실제 disabled를 유지한다.
+- CSS만으로 누름1px·주 행동/예시 arrow hover2px·native details chevron/면·경계 변화를 제공한다. 카드/본문 전체를 이동하거나 height/width/margin으로 여닫지 않는다. 펼친 내용은 여전히 자연높이/페이지 스크롤이다. input focus/색 피드백은 실제 입력에서만 보인다.
+- 모션의 주 장면은 실제 최종 응답이 추가된 순간이다. `#message-list` 직계의 최신 assistant/non-greeting metadata에만 약240ms·1회의 옅은 초록 색/clip 피드백을 준다. 본문 전체 래스터·이전 답변·넓게읽기복사본·초기인사에는 재생하지 않는다. 본문/메타 기본상태는 항상 visible이며 keyframe/JS 실패에도 감추지 않는다. 새 클래스·JS 타이머/별도 진행/애니메이션 라이브러리는 필요 없다.
+- reduced motion에서는 hover/active의 공간이동과 답변 등장 애니메이션을 제거한다. 정적인 열린 방향·선택/열림 면·실제 대기·키보드 focus는 남긴다. 기존 모바일 서랍의 닫힘 transform을 전역none으로 지우지 않는다.
+
+구현은 전용worktree의 app/conversation.css만 소유한다. 검증은 별도worktree의 scripts/preparation-board-browser-check.mjs만 수정한다. 기존 reduce6viewport·진행/취소·출처DOM/focus·native표를 보존하고 PC/모바일×일반/줄인동작의 실제색/대비·hover/press·반복펼침/입력비발송·답변메타1회/복사본제외를 확인한다. normal-motion fixture도 실제 LLM/발신/기록은 요청하지 않는다. proof.motionScenarios는width/reducedMotion/greenSurfaces/contrastPassed/interactionFeedback/replyFeedback/readingStable/normalPostAttempts를 기록하며 일반·reduce 각2viewport를 포함한다. CSS compositor와 mock JS 시계를 구분해 실제 상태를 조건 대기한다. 통합 후 같은 소스의 기존 전체 하네스와 현재 CI/CD로 검증·게시한다.
