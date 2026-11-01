@@ -488,3 +488,32 @@ UI와 기존 준비판 검사 파일은 두 전용 worktree로 나눴다. UI 변
 14:07 UTC에 추가 공개 receipt 검사는429/MODEL_RATE_LIMITED로 진행하지 못했다. 첫 시도는 세부 HTTP 관측이 부족했고 두 번째는 첫응답429를 기록했으므로 성공으로 처리하지 않는다. 로컬 설정키에 실제 의무기록 없이 최소 'Reply OK.'를 보내 직접 진단한 응답은429, error.code=credit_balance_exhausted, type=insufficient_quota, Retry-After 없음이었다. 키 원문·vendor message는 저장하지 않았고 로컬/AWS키 동일성을 비교했다고 주장하지 않는다. 추가 모델 호출은 중단했다.
 
 현재 일반 모델 대화에는 사용 가능한 API 크레딧이 필요하다. 새 키만 만들면 같은 계정의 잔액이 충전된다고 안내하지 않는다. 고정 예시·정적 화면과 만료 전 확인 상태의 읽기 복구는 모델 호출과 별개다. 추가 공개 완료중복 검사는 한도 때문에 미완료이며, 로컬 실제HTTP32검사와 SDK/DDB fixture·앞서 성공한 공개2과업의 완료복구를 그 검사로 대체해 성공했다고 쓰지 않는다. 마지막 문서 커밋은 이 실행 상태만 갱신하며 런타임 지문db4는 바꾸지 않는다. 실제 모델2과업은 원공개bc79 실행으로 보존한다.
+
+### 3.20 현재 할 일 중심 방문 준비
+
+PRD v0.21 · 사용자 승인2026-11-01. 중앙은 지금 확인할 일과 선택한 단계 상세, 오른쪽은 방문·자료 / 병원·협진 / 이동·동행 / 방문 준비표의 네 탐색 행으로 바꿨다. 대화·처리 기록은 보조 기록으로 펼치고 같은 텍스트·음성 입력을 유지한다. 필수 폼 네 개를 제출하거나 다음 버튼을 눌러야 하는 흐름이 아니다. [현재 계약](guided-visit-contract.md)과 [교차 검토](reviews/2026-11-01-guided-preparation.md)를 따른다.
+
+`getPreparationWorkflow(state)`가 기존 사례·진료 여정·지원 상태만 읽어 현재 작업·담당자·남은 일·안전한 다음 초안을 계산한다. 보호자 질문과 기관·의료진 확인 필요, 인계·해당없음·변경 후 재확인을 구분한다. responseCount·진행 observed·모델 종료만으로 완료되지 않으며 실제 방문 준비 완료는false다. 출처 추가·확정 응답·단계 선택·복구 중 같은 링크/초점/읽기·초안을 보존하고, 최근 답변 접근과 준비표 단일 목록을 제공한다.
+
+신규 UI의 `guidedPreparation:true`는 같은 명시적 요청 안에서 남은 공개자료 기반 택시·동행 초안 최대2개만 기존 dispatcher로 이어 준비한다. 읽기/비교·대상별 금지/단독 요청, 기기 설정과 새 조건의 충돌, 미반영 날짜·기관·지원조건, 실패/인계/재확인을 존중한다. 건강기록 미연결·의료진 확인 필요는 독립 준비를 막지 않는다. 실제 전화·기록 조회/전송·예약·배차·동의 변경을 이 자동 경로로 실행하지 않는다. strict boolean/지문 분리, 기존false·필드 생략 지문 호환, 도구/시간 한도와 복구의 읽기 경계를 검증했다.
+
+| 검증 | 현재 실행 결과와 범위 |
+| --- | --- |
+| 단위·도메인·서버 | 434/434, 종료0. 기본 설정/명시 조건·기관명 전체 일치·대상 제외·미연결/실패·receipt/한도·resume 회귀 포함 |
+| 수동 개발 화면 | 47/47, 종료0. 기존 `/workspace.html` 보존 |
+| 대화 | 193/193, 종료0. 실제 keyless HTTP agent6/preview3과 브라우저 fixture 구분. PC·모바일의 성공→503/중지 후 최근 답변4조합 통과 |
+| 진료 연결·실패 예시 | 250/250, 종료0. 실제 keyless preview14건, 일반 모델POST0 |
+| 현재 작업·단계 UI | 371/371, 종료0. 가용 CSS크기10종·단일입력/단계DOM·담당자·준비표 항목·읽기/초안·모션/접근성 검사 |
+| 복구 UI | 73/73, 종료0. workflow 재계산, 원문/답변 재생 없음·자동 실행 없음, 출처와 초안 보존 |
+| 실제 로컬 HTTP 통합 | 36/36, 종료0. actual HTTP agent10/resume4, provider fixture8회. 실모델/AWS/외부HTTP0 |
+| 실제 Chromium 탭 확대 | 43/43, 종료0. 격리 Xvfb/MV3 `chrome.tabs.setZoom/getZoom`, 80/100/125/150/200%, 같은 입력/출처·키보드·고지, 실제 keyless preview1건 |
+| 규칙 eval | 81통과/82항목, 실패0·미검증1(현재 모델 과업 품질), 종료0. 미검증을pass로 세지 않음 |
+| 기획서 | HTML/PDF12페이지. 같은 소스의 실제 keyless preview에서 중앙 현재 작업이 보이는 PC캡처, 페이지 수/PNG/PDF SHA 확인 |
+
+동결 실행 지문은 `1e470373099c111a13858ec213d73295875ebde7f060243ee475210f55cbae66`다. 위7개 브라우저/HTTP proof는pass/errors[]·동일sourceHash이고 finalSourceHash를 제공하는 검사도 시작/끝이 같다. 실제 탭 확대와 CSS가용크기·글자200%는 구분하며 툴바 직접조작·실제 휴대폰 키보드/마이크·다른 브라우저·스크린리더를 검증한 것으로 확대하지 않는다. 캡처는 `.impeccable/review/chat-rail/guided-visit/`, 개별 실행은 `orchestration/runs/`의 현재파일, QA요약은 `output/guided-qa/summary.json`이다. PDF 캡처는 과거 채팅 모습 대신 현재 작업이 보이는 실제 고정 합성 예시를 사용한다.
+
+초기 board359/366·recovery72/73 실패 원본은지문940cfe에 귀속해 보존했다. 원인 중 중앙 안내 높이 보정은 같은출처의viewport위치/초점/가시성으로 검증하고, 열린고지·선택단계·native transition의실제상태가 안정된 뒤 관측하도록 고쳤다. 미연결/기관 역할·원문/초안·키보드·실행 한도 등의 보호 조건을 삭제하지 않았다. 새 런타임1e470에서 전체 영향검사를 fresh 실행했다.
+
+**현재 서버/Prompt·자동 이어가기의 실제 모델 품질은 미검증이다.** 크레딧 소진 뒤 유료 모델 요청을 추가하지 않았다. 과거963794d/0544 지문의12과업·46Responses와 공개bc79/db4의2과업은 원실행 이력으로 보존하며 새 버전의 실모델 통과나 UI-only 불변 예외로 사용하지 않는다. eval은 이력의 원커밋·지문·독립 의미검토만 확인하고 current-model-task-evidence를unverified로 분리한다. provider fixture·고정 preview·현재UI/HTTP 성공은 일반 자연어/모델 품질·실제 기관 업무 성공과 다르다.
+
+공개 배포는 [Actions](https://github.com/jungyoun43-prog/jeju_hackerton-11.20-/actions/workflows/deploy-aws.yml), `aws-deployment.json`·`preparation-board-deployed.json`의 현재revision/범위를 따른다. 공개 검증은 모델을 호출하지 않는14고정preview·정적바이트·같은웹/API revision·10가용크기·원점403 범위다. ZIP의독립설치·434개검사/웹·Lambda빌드·CRC/키제외·소스지문은 `release.json`과 `output/final-archive-check.json`을 따른다. 실제 환자/기관·전화/기록·임상/법률·보호자 참여/실기기·센터PC·대회업로드는 별도다.

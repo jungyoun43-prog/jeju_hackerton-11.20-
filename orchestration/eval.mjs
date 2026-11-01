@@ -126,6 +126,7 @@ await check('conversation-browser-evidence','verification',async()=>{
  requireThat(proof.modelInvoked===false && proof.phoneInvoked===false && proof.healthRecordsQueried===false,'연동 보류 범위를 실제 호출 검증으로 표시하면 안 됩니다.');
  requireThat(proof.desktop.noOverflow && proof.mobile.noOverflow,'PC·모바일 대화 화면에 가로 넘침이 있습니다.');
  requireThat(proof.sourceHash===await runtimeFingerprint(root),'대화 화면 증거 이후 실행 소스가 변경됐습니다. 다시 캡처하세요.');
+ requireThat(proof.lastAnswerRecovery?.length===4 && [1440,390].every(width=>['failure','cancel'].every(ending=>proof.lastAnswerRecovery.some(item=>item.width===width && item.ending===ending && item.reachesPreviousAnswer && item.noExtraPost && item.draftPreserved))),'성공 뒤 실패·중지에서도 최근 실제 답변과 초안·읽기 전용 접근이 필요합니다.');
  for(const path of [proof.desktop.screenshot,proof.mobile.screenshot]) {const bytes=await readFile(resolve(root,path));requireThat(bytes.readUInt32BE(0)===0x89504e47,'유효한 PNG 대화 화면 증거가 아닙니다.');}
  return `${proof.checks.length}개 실제 API/화면 검사·고정 예시·일반503·입력복원·출처 확인. 실제 모델·음성·발신 품질 검증은 아님`;
 });
@@ -155,7 +156,7 @@ await check('preparation-board-browser-evidence','verification',async()=>{
  requireThat(proof.workspaceScenarios?.length>=10 && proof.workspaceScenarios.every(item=>item.viewportFit===true && item.sharedComposer===true && item.scrollRegions===true && item.compactPanels===true),'장문·표·여러 줄 입력·큰 글자·패널/반응형 전환 후 작업 공간과 공통 입력의 실제 관측이 필요합니다.');
  requireThat(['long-answer-table','multiline-12','text-200','resize-continuity','compact-discovery'].every(id=>proof.workspaceScenarios.some(item=>item.id===id)) && proof.workspaceScenarios.every(item=>item.contentReachable!==false && item.tableKeyboard!==false && item.readingStable!==false) && proof.workspaceScenarios.filter(item=>item.id==='long-answer-table').every(item=>item.contentReachable===true&&item.tableKeyboard===true) && proof.workspaceScenarios.filter(item=>['multiline-12','text-200'].includes(item.id)).every(item=>item.contentReachable===true) && proof.workspaceScenarios.filter(item=>item.id==='resize-continuity').every(item=>item.readingStable===true),'높이 맞춤만으로 본문/고지 도달·표 키보드·반응형 읽기 보존 실패를 통과시키면 안 됩니다.');
  requireThat(proof.motionScenarios?.length===4 && ['no-preference','reduce'].every(mode=>[1440,390].every(width=>proof.motionScenarios.some(item=>item.width===width && item.reducedMotion===mode))) && proof.motionScenarios.every(item=>item.greenSurfaces && item.contrastPassed && item.interactionFeedback && item.replyFeedback && item.readingStable && item.normalPostAttempts===0),'초록 대비와 일반/줄인동작의 PC·모바일 피드백/읽기 보존 검사가 필요합니다.');
- const guidedFields=['naturalRequest','caregiverQuestionOnly','currentAndSelectedSeparated','readOnlyNavigation','historyOriginal','responseCountIndependent','observedIndependent','institutionWaitingPreserved','notNeededPreserved','visitNotReady','draftOnly'];
+ const guidedFields=['naturalRequest','caregiverQuestionOnly','currentAndSelectedSeparated','readOnlyNavigation','historyOriginal','responseCountIndependent','observedIndependent','institutionWaitingPreserved','notNeededPreserved','visitNotReady','draftOnly','planListMatches'];
  requireThat(proof.guidedScenarios?.length===2 && [1440,390].every(width=>proof.guidedScenarios.some(item=>item.id==='current-task-flow' && item.width===width && item.normalPostAttempts===0 && guidedFields.every(field=>item[field]===true))),'현재 작업·선택 단계 분리, 질문 담당자, 조회/초안 무발신과 응답/관측 독립 검사가 필요합니다.');
  for(const view of proof.viewports){const bytes=await readFile(resolve(root,view.screenshot));requireThat(bytes.readUInt32BE(0)===0x89504e47,'읽기 UI PNG 증거가 필요합니다.');}
  return `${proof.checks.length}개 한 화면 작업 공간·공통 입력·공유 스크롤·준비 요약·기호/아이콘·실제 keyless 진행 API·진행/취소 fixture와10개 가용 CSS 크기. 실제 browser zoom·기기·모델/DDB는 별도증거.`;
@@ -227,6 +228,8 @@ await check('native-tab-zoom-browser-evidence','verification',async()=>{
  requireThat(proof.zoomScenarios.every(view=>view.rootZoom==='1' && view.bodyTransform==='none' && view.viewportFit && view.noOverflow && view.sharedComposer && view.scrollRegions && view.compactPanels && view.targets44),'확대를 CSS 축소로 상쇄하거나 입력/읽기 접근을 제거하면 안 됩니다.');
  requireThat(proof.normalModelPostAttempts===0 && proof.otherPostAttempts===0 && proof.modelInvoked===false && proof.fixtureResponses===false && proof.fixedPreviewRequests>0,'실제 keyless preview와 GET·native 확대만 사용하는 범위를 지켜야 합니다.');
  requireThat(proof.cleanup?.contextClosed && proof.cleanup?.xvfbStopped && proof.cleanup?.temporaryProfileRemoved,'격리 브라우저·화면·임시 프로필 정리가 필요합니다.');
+ requireThat(proof.guidedPreviewCapture?.width===1440 && proof.guidedPreviewCapture?.height===900 && ['taskVisible','currentMatches','selectedMatches','historyClosed'].every(field=>proof.guidedPreviewCapture[field]===true),'실제 keyless preview의 현재 작업이 보이는 기획서용 PC 캡처가 필요합니다.');
+ const guidedImage=await readFile(proof.guidedPreviewScreenshot);requireThat(guidedImage.readUInt32BE(0)===0x89504e47,'현재 작업 PNG 캡처가 필요합니다.');
  for(const view of proof.zoomScenarios){const bytes=await readFile(resolve(root,view.screenshot));requireThat(bytes.readUInt32BE(0)===0x89504e47,'실제 native 확대 PNG 캡처가 필요합니다.');}
  return `${proof.checks.length}개 격리 Chromium/Xvfb·MV3 탭 확대와 초안/출처 읽기/고지 확인. 툴바 직접조작·실제 휴대폰/하드웨어 검증은 아님`;
 });

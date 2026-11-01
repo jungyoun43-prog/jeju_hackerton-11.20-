@@ -315,16 +315,16 @@
       "app/icons.js",
       "app/preparation-stages.js"
     ],
-    "captures": ".impeccable/review/chat-rail/viewport/: current viewport workspace and independent observations; deployed/: current published layout",
+    "captures": ".impeccable/review/chat-rail/guided-visit/: 현재 작업·단계 탐색·대화/복구·native확대·실제keyless preview",
     "geometryRecord": "orchestration/runs/preparation-board-browser.json",
     "observations": "동일d1c68ae5에서 수동47/대화189/여정236/보드359 pass/프로세스종료0·errors[]. 가용크기10종/장문·표·입력·큰글자/반응형왕복33관측/normal-reduce4조합 true. 독립 보완후 새차단0. 단위360/규칙69 pass/종료0. 공개배포는 최신 runs 증거.",
     "previousCaptures": ".impeccable/review/task-first/, grid/, reading/, board/: 이전 배치 이력",
-    "limits": "CSS available size10종/글자200%를 검사하되 실제 browser zoom UI·실기기/가상키보드/다른브라우저/스크린리더는 미검증. context/detector126 이력으로 자동 디자인 판정없음. 모델/DynamoDB는 이전9fc11bc 원증거이며 이번 UI 수정의 실모델/전화/개인기록 호출0.",
+    "limits": "현재 서버/Prompt의 실제 모델 품질은 크레딧 소진으로 미검증. CSS가용크기10종과 실제Chromium탭API80~200%확대를 구분한다. 툴바 직접조작/휴대폰/마이크/다른브라우저/스크린리더·기관/기록/임상/법률은 별도. Impeccable launcher126 이력으로 자동 디자인 판정은 없음.",
     "progressDomSource": "app/preparation-board-view.js의 확정/진행 목록 분리와 WeakMap 문자열 guard를 소스로 대조. 최종 root 브라우저 QA 결과와 구분.",
     "uxAuditBefore": "docs/reviews/2026-11-01-chat-rail.md",
     "uxAuditAfter": "docs/reviews/2026-11-01-chat-rail.md",
     "cliDetector": "기존126 권한 오류 이력으로 이번 자동 결과 없음. 직접 문맥·렌더·독립 검토로 보완.",
-    "uiSourceRevision": "50cb00d",
+    "uiSourceRevision": "986f474",
     "orangeAccent": {
       "scope": "환자 이름 부분·활성보내기·포커스·다음문의초안만. 의미색/배치/보조파랑유지.",
       "captures": ".impeccable/review/chat-rail/color/",
@@ -468,6 +468,33 @@
       },
       "unitChecks": 360,
       "automatedRuleChecks": 69
+    },
+    "guidedPreparation": {
+      "sourceHash": "1e470373099c111a13858ec213d73295875ebde7f060243ee475210f55cbae66",
+      "contract": "docs/guided-visit-contract.md",
+      "review": "docs/reviews/2026-11-01-guided-preparation.md",
+      "unitChecks": 434,
+      "browserChecks": {
+        "browser": 47,
+        "conversation-browser": 193,
+        "journey-browser": 250,
+        "preparation-board-browser": 371,
+        "visit-recovery-browser": 73,
+        "visit-recovery-integration": 36,
+        "native-zoom-browser": 43
+      },
+      "automatedRules": {
+        "passed": 81,
+        "failed": 0,
+        "unverified": 1,
+        "total": 82,
+        "rate": 98.8
+      },
+      "modelCalls": 0,
+      "actualModelQuality": "unverified",
+      "captures": ".impeccable/review/chat-rail/guided-visit/",
+      "proposalScreenshot": ".impeccable/review/chat-rail/guided-visit/native-zoom/guided-preview-desktop.png",
+      "limits": "고정provider/keyless preview/실제HTTP/Chromium범위. 보호자참여·기관/의료·실기기·일반모델품질과다름."
     }
   },
   "references": {

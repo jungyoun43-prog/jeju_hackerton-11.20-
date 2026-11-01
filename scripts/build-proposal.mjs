@@ -18,12 +18,12 @@ try {
   await page.goto(pathToFileURL(resolve(root,'docs/submission-proposal.html')).href,{waitUntil:'load'});
   await page.evaluate(()=>document.fonts.ready);
   await page.locator('.revision').evaluateAll((nodes,label)=>nodes.forEach(node=>node.textContent=label),`구현 ${revision.slice(0,8)} · ${sourceHash.slice(0,10)}`);
-  const proofPath=resolve(root,'orchestration/runs/conversation-browser.json');
+  const proofPath=resolve(root,'orchestration/runs/native-zoom-browser.json');
   let screenshotIncluded=false,screenshotPath;
   try {
     const proof=JSON.parse(await readFile(proofPath,'utf8'));
-    if(proof.result==='pass' && proof.sourceHash===sourceHash && proof.fixedPreview===true) {
-      const selected=proof.desktop?.width===1440 && proof.desktop?.height===900 ? {screenshot:dirname(proof.desktop.screenshot)+'/conversation-preview-desktop.png'} : null;
+    if(proof.result==='pass' && proof.sourceHash===sourceHash && proof.fixedPreviewRequests===1 && proof.modelInvoked===false && proof.fixtureResponses===false && proof.guidedPreviewCapture?.taskVisible && proof.guidedPreviewCapture?.currentMatches && proof.guidedPreviewCapture?.selectedMatches && proof.guidedPreviewCapture?.historyClosed) {
+      const selected=proof.guidedPreviewCapture.width===1440 && proof.guidedPreviewCapture.height===900 ? {screenshot:proof.guidedPreviewScreenshot} : null;
       if(selected?.screenshot) {
         const bytes=await readFile(resolve(root,selected.screenshot));
         if(bytes.readUInt32BE(0)!==0x89504e47)throw new Error('검증 캡처가 PNG가 아닙니다.');
