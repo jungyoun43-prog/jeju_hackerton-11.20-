@@ -6,7 +6,7 @@ import { formatMessage } from './message-format.js';
 import { buildCallPlan, CALL_TARGETS } from './call-policy.js';
 import { getCareJourneySummary, JOURNEY_SCENARIOS, CALL_RECOVERY_SCENARIOS } from './care-journey.js';
 import { getPreparationBoard, normalizePreparationProgress } from './preparation-stages.js';
-import { preparationBoardMarkup, renderPreparationBoard, preservePreparationReading } from './preparation-board-view.js';
+import { preparationBoardMarkup, preparationNavigationMarkup, renderPreparationBoard, preservePreparationReading } from './preparation-board-view.js';
 
 const API = '/api/agent';
 const MAX_MESSAGE = 1600;
@@ -60,6 +60,8 @@ let patientRecordsReturnFocus;
 let contactPlanReturnFocus;
 let careJourneyReturnFocus;
 let manualStageSelection=false;
+let selectedStageId;
+let preparationBoard;
 let unreadAnswer=false;
 let requestProblem='';
 let answerReturnFocus;
@@ -90,17 +92,36 @@ function setWorkspaceView(view,{focus=false}={}) {
 function renderBoard() {
   const progress=activeRequest?.kind==='message'?activeRequest.progress:null;
   const board=getPreparationBoard(caseState,{events:latestEvents,progress,pending,responseCount,requestProblem});
+  preparationBoard=board;
+  if(!manualStageSelection || !selectedStageId)selectedStageId=board.workflow.currentStageId;
   document.getElementById('care-journey-summary').hidden=responseCount===0;
   document.getElementById('return-to-request').hidden=responseCount===0;
-  renderPreparationBoard(board,{unreadAnswer,progress});
+  renderPreparationBoard(board,{unreadAnswer,progress,selectedStageId,disableDrafts:pending||Boolean(activeRecognition)});
+  document.getElementById('conversation-history-count').textContent=responseCount?`${responseCount}회 응답`:'';
   document.getElementById('request-problem-notice').hidden=pending || !(requestProblem || previewProblem);
   document.getElementById('request-examples').hidden=document.getElementById('starter-prompts').hidden;
 }
 
 function showLatestAnswer() {
   setWorkspaceView('chat');
-  manualStageSelection=false;unreadAnswer=false;renderBoard();
+  manualStageSelection=true;unreadAnswer=false;renderBoard();
   scrollToMessage(document.querySelector('#message-list .message.assistant:last-child'));
+}
+
+function showCurrentTask({focus=true}={}) {
+  setWorkspaceView('chat');
+  manualStageSelection=false;unreadAnswer=false;renderBoard();
+  const scroller=document.getElementById('conversation-scroll');scroller.scrollTop=0;
+  if(focus)document.getElementById('current-task-title').focus({preventScroll:true});
+}
+
+function selectPreparationStage(id) {
+  if(!preparationBoard?.stages.some(stage=>stage.id===id))return;
+  selectedStageId=id;manualStageSelection=true;
+  setWorkspaceView('chat');renderBoard();
+  const pane=document.querySelector(`[data-stage-id="${id}"]`);
+  pane.querySelector('[data-stage-details]').open=true;
+  scrollToMessage(pane);
 }
 
 function focusRequest() {
@@ -590,6 +611,8 @@ function appendMessage({role,text,id=makeId(),events=[],greeting=false,isExample
 
 function scrollToMessage(node) {
   if(!node)return;
+  const historyDetails=node.closest('#conversation-history');
+  if(historyDetails)historyDetails.open=true;
   requestAnimationFrame(()=>{
     if(!node.isConnected || !document.getElementById('conversation-scroll').checkVisibility())return;
     node.setAttribute('tabindex','-1');node.focus({preventScroll:true});
@@ -605,7 +628,7 @@ function resizeInput() {
   input.style.height = `${Math.min(input.scrollHeight,128)}px`;
   document.getElementById('send-request').disabled = pending || Boolean(activeRecognition) || !input.value.trim();
   document.getElementById('character-count').textContent = `${input.value.length}/${MAX_MESSAGE}`;
-  for(const button of document.querySelectorAll('[data-contact-draft],[data-journey-draft],[data-journey-scenario],[data-call-recovery-scenario],#next-request-draft'))button.disabled=pending || Boolean(activeRecognition);
+  for(const button of document.querySelectorAll('[data-contact-draft],[data-journey-draft],[data-journey-scenario],[data-call-recovery-scenario],[data-workflow-draft],[data-workflow-choice],#next-request-draft'))button.disabled=pending || Boolean(activeRecognition);
   renderVisitRecovery();
 }
 
@@ -632,7 +655,7 @@ function setPending(value) {
   document.getElementById('conversation-form').setAttribute('aria-busy',String(value));
   document.getElementById('send-request').setAttribute('aria-label',value?'요청 응답을 기다리는 중':'요청 보내기');
   for (const button of document.querySelectorAll('[data-example]')) button.disabled=value;
-  for (const button of document.querySelectorAll('[data-contact-draft],[data-journey-draft],[data-journey-scenario],[data-call-recovery-scenario],#next-request-draft')) button.disabled=value || Boolean(activeRecognition);
+  for (const button of document.querySelectorAll('[data-contact-draft],[data-journey-draft],[data-journey-scenario],[data-call-recovery-scenario],[data-workflow-draft],[data-workflow-choice],#next-request-draft')) button.disabled=value || Boolean(activeRecognition);
   renderBoard();
   renderVisitRecovery();
   if(value){const cancel=document.getElementById('cancel-request');cancel.focus({preventScroll:true});}
@@ -823,7 +846,7 @@ async function showPreview(scenarioId='aewol-parent-visit') {
     // 미리보기의 LLM 미사용은 전역 모델 연결 설정과 별개다.
     updateCapabilities();renderSnapshot();
     document.getElementById('conversation-status').textContent='고정된 합성 대화 예시를 불러왔습니다. 실제 모델 응답과 전화는 아닙니다.';
-    if(!unreadAnswer)scrollToMessage(document.querySelector('#message-list .message.assistant:last-child'));
+    if(!unreadAnswer)showCurrentTask();
   } catch {
     if(!requestIsCurrent(request))return;
     failedPreviewRequest=request.body;previewProblem=true;
@@ -853,7 +876,7 @@ async function sendRequest(text,retryId) {
     visitToken=makeProgressToken();storeVisitToken();
   }
   const requestId=retryId || makeId();
-  const coreBody=failed ? {...failed.body} : {message:text,...(sessionId?{sessionId}:{}),...(visitToken && capabilities.visitRecovery==='token'?{visitToken}:{}),history:normalizeHistory(history),requestId,preferences:{...carePreferences},applyPreferences:preferencesNeedApply};
+  const coreBody=failed ? {...failed.body} : {message:text,...(sessionId?{sessionId}:{}),...(visitToken && capabilities.visitRecovery==='token'?{visitToken}:{}),history:normalizeHistory(history),requestId,preferences:{...carePreferences},applyPreferences:preferencesNeedApply,guidedPreparation:true};
   delete coreBody.progressToken;
   const requestBody={...coreBody,...(capabilities.progress==='poll' && capabilities.llm===true?{progressToken:makeProgressToken()}: {})};
   manualStageSelection=compactWorkspace.matches && workspaceView==='preparation';
@@ -887,7 +910,8 @@ async function sendRequest(text,retryId) {
     updateCapabilities(/MODEL_NOT_CONFIGURED|MODEL_DISABLED|LLM_NOT_CONFIGURED|MODEL_NOT_CONNECTED/.test(code)?{llm:false}:undefined);
   } finally {
     if(finishRequest(request)) {
-      if(!replyNode || !manualStageSelection)scrollToMessage(replyNode || messageNode);
+      if(!replyNode)scrollToMessage(messageNode);
+      else if(!manualStageSelection)showCurrentTask();
       else restoreReading?.();
     }
   }
@@ -960,10 +984,11 @@ function resetConversation({focus=true,force=false}={}) {
   clearVisitRecovery();
   if(activeRecognition){recognitionCancelled=true;activeRecognition.abort();activeRecognition=undefined;resetVoiceButton();}
   stopProgress(activeRequest);conversationVersion++;failedPreviewRequest=undefined;
-  requestProblem='';previewProblem=false;manualStageSelection=false;unreadAnswer=false;
+  requestProblem='';previewProblem=false;manualStageSelection=false;selectedStageId=undefined;unreadAnswer=false;
   caseState=createDemoCase();sessionId=undefined;history=[];latestActions=[];latestEvents=[];responseCount=0;previewMode=false;failedRequests.clear();
   preferencesNeedApply=true;
   document.getElementById('message-list').replaceChildren();
+  document.getElementById('conversation-history').open=false;
   welcomeMessage();document.getElementById('starter-prompts').hidden=false;
   document.getElementById('request-input').value='';resizeInput();renderSnapshot();updateCapabilities();
   document.getElementById('conversation-status').textContent='새 가상 사례로 대화를 시작합니다.';
@@ -985,7 +1010,7 @@ function welcomeMessage() {
 
 function mount() {
   const brand=`<img src="/assets/hondi-logo-v1.png" alt="" width="480" height="168"/>`;
-  const chatContent=`<div class="conversation-scroll" id="conversation-scroll" tabindex="0" aria-label="진료 준비 대화와 다음 행동"><p class="mode-notice" id="mode-notice">연결 범위를 확인하고 있어요.</p><p class="mode-notice" id="visit-recovery-notice" role="status" hidden></p><div class="message-list" id="message-list" role="log" aria-label="진료 준비 대화" aria-live="polite" aria-relevant="additions"></div><section class="care-journey-summary" id="care-journey-summary" aria-label="현재 진료 연결과 다음 행동"><div class="journey-summary-state"><h3>현재</h3><strong id="care-journey-current">미확인</strong></div><button type="button" id="open-care-journey" aria-haspopup="dialog" aria-controls="care-journey-dialog">여정·할 일 보기${icon('chevron')}</button><p class="journey-summary-next"><span>이어서 할 일</span><strong id="care-journey-next"></strong></p><button type="button" class="next-request-draft" id="next-request-draft" hidden>다음 문의 초안 넣기${icon('arrow')}</button><p class="next-request-note">초안을 확인·수정한 뒤 직접 보내세요.</p></section><button type="button" class="return-to-request" id="return-to-request" hidden>요청 입력으로${icon('arrow')}</button></div>`;
+  const chatContent=`<div class="conversation-scroll" id="conversation-scroll" tabindex="0" aria-label="지금 준비할 일과 단계 상세"><p class="mode-notice" id="mode-notice">연결 범위를 확인하고 있어요.</p><p class="mode-notice" id="visit-recovery-notice" role="status" hidden></p>${preparationBoardMarkup()}<details class="conversation-history" id="conversation-history"><summary><span>대화·처리 기록</span><span id="conversation-history-count"></span>${icon('chevron')}</summary><div class="message-list" id="message-list" role="log" aria-label="진료 준비 대화" aria-live="polite" aria-relevant="additions"></div><section class="care-journey-summary" id="care-journey-summary" aria-label="현재 진료 연결과 다음 행동"><div class="journey-summary-state"><h3>현재</h3><strong id="care-journey-current">미확인</strong></div><button type="button" id="open-care-journey" aria-haspopup="dialog" aria-controls="care-journey-dialog">여정·할 일 보기${icon('chevron')}</button><p class="journey-summary-next"><span>이어서 할 일</span><strong id="care-journey-next"></strong></p><button type="button" class="next-request-draft" id="next-request-draft" hidden>다음 문의 초안 넣기${icon('arrow')}</button><p class="next-request-note">초안을 확인·수정한 뒤 직접 보내세요.</p></section><button type="button" class="return-to-request" id="return-to-request" hidden>요청 입력으로${icon('arrow')}</button></details></div>`;
   const menuIcon='<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>';
   document.getElementById('app').innerHTML=`
     <div class="app-shell">
@@ -1031,12 +1056,12 @@ function mount() {
           </header>
           <div class="mobile-case-summary" id="mobile-case-summary" aria-label="이번 방문 요약" hidden></div>
           <div class="workspace-controls">
-            <div class="workspace-tabs" role="tablist" aria-label="작업 영역"><button type="button" id="workspace-tab-chat" role="tab" aria-controls="chat-workspace" aria-selected="true">대화</button><button type="button" id="workspace-tab-preparation" role="tab" aria-controls="preparation-rail" aria-selected="false" aria-label="준비 현황" title="준비 현황" tabindex="-1">준비</button></div>
+            <div class="workspace-tabs" role="tablist" aria-label="작업 영역"><button type="button" id="workspace-tab-chat" role="tab" aria-controls="chat-workspace" aria-selected="true">할 일</button><button type="button" id="workspace-tab-preparation" role="tab" aria-controls="preparation-rail" aria-selected="false" aria-label="준비 단계" title="준비 단계" tabindex="-1">준비 단계</button></div>
             <div class="workspace-tools"><button type="button" class="expand-answer" id="expand-answer" aria-label="넓게 읽기" title="넓게 읽기" aria-haspopup="dialog" aria-controls="answer-dialog" disabled>${icon('expand')}<span>넓게 읽기</span></button><button type="button" id="preview-button" class="preview-button" aria-label="예시 보기" title="예시 보기">예시${icon('chevron')}</button></div>
           </div>
           <div class="conversation-layout" data-active-view="chat">
-            <section class="chat-workspace" id="chat-workspace" role="tabpanel" aria-label="진료 준비 대화">${chatContent}</section>
-            <aside class="preparation-rail" id="preparation-rail" role="tabpanel" aria-label="준비 현황과 방문 상세" tabindex="0">${preparationBoardMarkup()}
+            <section class="chat-workspace" id="chat-workspace" role="tabpanel" aria-label="지금 준비할 일과 단계 상세">${chatContent}</section>
+            <aside class="preparation-rail" id="preparation-rail" role="tabpanel" aria-label="준비 길잡이와 방문 상세" tabindex="0">${preparationNavigationMarkup()}
               <details class="visit-summary" id="visit-summary"><summary><span>${icon('calendar')}이번 방문 상세</span><span>일정·준비 상태·출처</span>${icon('chevron')}</summary>
             <aside class="case-sidebar" aria-label="대화에서 준비한 내용">
               <details class="case-summary" id="case-summary" open><summary><span>${icon('calendar')}이번 방문 준비</span>${icon('chevron')}</summary><div id="case-content"></div></details>
@@ -1051,7 +1076,7 @@ function mount() {
               <form id="conversation-form" class="conversation-form" aria-busy="false">
                 <label for="request-input" class="visually-hidden">진료 준비 요청</label>
                 <textarea id="request-input" name="message" rows="2" maxlength="${MAX_MESSAGE}" placeholder="예: 어머니 진료 자료와 이동·동행을 준비해줘." autocomplete="off" aria-describedby="composer-disclosure composer-boundary privacy-note voice-help" required></textarea>
-                <div class="composer-actions"><button type="button" id="voice-request" class="voice-button" aria-label="음성으로 요청하기" aria-pressed="false" aria-describedby="voice-help" ${SpeechRecognition?'':'disabled'}>${micIcon}<span>말로 요청</span></button><span class="keyboard-hint">Enter로 전송 · Shift+Enter 줄바꿈</span><span class="character-count" id="character-count">0/${MAX_MESSAGE}</span><div id="answer-ready-notice" class="answer-ready-notice" hidden><button type="button" data-open-stage="plan" aria-label="새 답변이 도착했어요. 대화에서 보기" title="새 답변이 도착했어요. 대화에서 보기">새 답변</button></div><div id="request-problem-notice" class="request-problem-notice" hidden><button type="button" aria-label="요청 결과를 확인해 주세요. 대화에서 보기" title="요청 결과를 확인해 주세요. 대화에서 보기">오류 보기</button></div><div class="pending-message" id="pending-message" hidden><button type="button" id="cancel-request" class="cancel-request" aria-label="응답 대기 중지" title="응답 대기 중지"><span class="working-mark" aria-hidden="true"></span>중지</button></div><button type="submit" class="send-button" id="send-request" aria-label="요청 보내기" title="요청 보내기" disabled>${icon('arrow')}<span>보내기</span></button></div>
+                <div class="composer-actions"><button type="button" id="voice-request" class="voice-button" aria-label="음성으로 요청하기" aria-pressed="false" aria-describedby="voice-help" ${SpeechRecognition?'':'disabled'}>${micIcon}<span>말로 요청</span></button><span class="keyboard-hint">Enter로 전송 · Shift+Enter 줄바꿈</span><span class="character-count" id="character-count">0/${MAX_MESSAGE}</span><div id="answer-ready-notice" class="answer-ready-notice" hidden><button type="button" aria-label="새 답변이 도착했어요. 대화에서 보기" title="새 답변이 도착했어요. 대화에서 보기">새 답변</button></div><div id="request-problem-notice" class="request-problem-notice" hidden><button type="button" aria-label="요청 결과를 확인해 주세요. 대화에서 보기" title="요청 결과를 확인해 주세요. 대화에서 보기">오류 보기</button></div><div class="pending-message" id="pending-message" hidden><button type="button" id="cancel-request" class="cancel-request" aria-label="응답 대기 중지" title="응답 대기 중지"><span class="working-mark" aria-hidden="true"></span>중지</button></div><button type="submit" class="send-button" id="send-request" aria-label="요청 보내기" title="요청 보내기" disabled>${icon('arrow')}<span>보내기</span></button></div>
               </form>
               <div class="composer-notes"><p class="composer-disclosure" id="composer-disclosure">${icon('info')}시연 · 실행 없음</p>
                 <div class="composer-extras">
@@ -1101,8 +1126,22 @@ function mount() {
   document.getElementById('preview-button').addEventListener('click',()=>showPreview());
   document.getElementById('save-report').addEventListener('click',saveReport);
   document.getElementById('resume-visit').addEventListener('click',resumeVisit);
+  document.getElementById('stage-navigation').addEventListener('click',event=>{
+    const button=event.target.closest('[data-open-stage]');if(button)selectPreparationStage(button.dataset.openStage);
+  });
+  document.getElementById('return-to-current-task').addEventListener('click',()=>showCurrentTask());
+  document.getElementById('current-task-draft').addEventListener('click',()=>{
+    const task=preparationBoard?.workflow.currentTask;
+    if(task?.requestDraft && fillRequestDraft(task.requestDraft,{source:'다음 준비 요청 초안',focus:false}))focusRequest();
+  });
+  document.getElementById('current-task-choices').addEventListener('click',event=>{
+    const button=event.target.closest('[data-workflow-choice]'),task=preparationBoard?.workflow.currentTask;
+    const choice=task?.actor==='caregiver'&&task.choices.find(item=>item.id===button?.dataset.workflowChoice);
+    if(choice?.requestDraft && fillRequestDraft(choice.requestDraft,{source:'답변 초안',focus:false}))focusRequest();
+  });
   document.getElementById('preparation-board').addEventListener('toggle',event=>{if(event.target.matches('[data-stage-details]') && event.target.open)manualStageSelection=true;},true);
-  const preparationRail=document.getElementById('preparation-rail');
+  document.getElementById('conversation-history').addEventListener('toggle',event=>{if(event.target.open)manualStageSelection=true;});
+  const preparationRail=document.getElementById('preparation-rail'),conversationScroll=document.getElementById('conversation-scroll');
   let restoreResizeReading,readingResizeFrame=0,readingWidth=innerWidth,readingHeight=innerHeight,inputEndVisible=true;
   const rememberReading=()=>{
     if(!readingResizeFrame && readingWidth===innerWidth && readingHeight===innerHeight){
@@ -1112,6 +1151,8 @@ function mount() {
   };
   preparationRail.addEventListener('focusin',()=>{manualStageSelection=true;rememberReading();});
   preparationRail.addEventListener('scroll',rememberReading,{passive:true});
+  conversationScroll.addEventListener('focusin',event=>{if(event.target.closest('.stage-pane,#conversation-history'))manualStageSelection=true;rememberReading();});
+  conversationScroll.addEventListener('scroll',rememberReading,{passive:true});
   input.addEventListener('scroll',rememberReading,{passive:true});
   input.addEventListener('focus',rememberReading);
   input.addEventListener('input',rememberReading);
@@ -1121,10 +1162,11 @@ function mount() {
       restoreResizeReading?.();
       const anchor=document.activeElement;
       if(anchor===input && !composing && inputEndVisible && input.selectionStart===input.value.length && input.selectionEnd===input.value.length)input.scrollTop=input.scrollHeight;
-      if(preparationRail.contains(anchor) && preparationRail.checkVisibility()){
-        const bounds=anchor.getBoundingClientRect(),frame=preparationRail.getBoundingClientRect();
+      const scroller=[preparationRail,conversationScroll].find(node=>node.contains(anchor) && node.checkVisibility());
+      if(scroller){
+        const bounds=anchor.getBoundingClientRect(),frame=scroller.getBoundingClientRect();
         // 작아진 영역에서는 출처를 보이게 두고, 다시 넓어지면 원래 읽던 위치로 돌아간다.
-        preparationRail.scrollTop+=bounds.top<frame.top+8?bounds.top-frame.top-8:Math.max(0,bounds.bottom-frame.bottom+8);
+        scroller.scrollTop+=bounds.top<frame.top+8?bounds.top-frame.top-8:Math.max(0,bounds.bottom-frame.bottom+8);
       }
       readingResizeFrame=requestAnimationFrame(()=>{readingWidth=innerWidth;readingHeight=innerHeight;readingResizeFrame=0;});
     });
@@ -1135,11 +1177,11 @@ function mount() {
   // 접힌 작업 영역을 다시 열 때 끝난 메타 피드백을 반복하지 않는다.
   for(const type of ['animationend','animationcancel'])document.getElementById('message-list').addEventListener(type,event=>{if(event.animationName==='hondi-reply-ready' && event.target.matches('.message-meta'))event.target.dataset.replyFeedback='complete';});
   document.getElementById('request-problem-notice').addEventListener('click',()=>{setWorkspaceView('chat');scrollToMessage(previewProblem?document.getElementById('mode-notice'):document.querySelector('#message-list .message.failed:last-of-type'));});
-  for(const view of ['chat','preparation'])document.getElementById('workspace-tab-'+view).addEventListener('click',()=>{setWorkspaceView(view);if(view==='chat'){manualStageSelection=false;unreadAnswer=false;}renderBoard();});
+  for(const view of ['chat','preparation'])document.getElementById('workspace-tab-'+view).addEventListener('click',()=>{setWorkspaceView(view);renderBoard();});
   document.querySelector('.workspace-tabs').addEventListener('keydown',event=>{
     if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
     event.preventDefault();const view=event.key==='Home'?'chat':event.key==='End'?'preparation':workspaceView==='chat'?'preparation':'chat';
-    setWorkspaceView(view,{focus:true});if(view==='chat'){manualStageSelection=false;unreadAnswer=false;}renderBoard();
+    setWorkspaceView(view,{focus:true});renderBoard();
   });
   compactWorkspace.addEventListener('change',()=>{const focus=document.activeElement;const view=focus?.closest('#preparation-rail')?'preparation':focus?.closest('#chat-workspace')?'chat':workspaceView;setWorkspaceView(view);if(focus?.closest('[inert]'))document.getElementById('workspace-tab-'+workspaceView).focus({preventScroll:true});});
   for(const id of ['request-examples','composer-help'])document.getElementById(id).addEventListener('toggle',event=>{if(event.target.open)document.getElementById(id==='request-examples'?'composer-help':'request-examples').open=false;});
