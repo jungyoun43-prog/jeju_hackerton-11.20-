@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "name": "혼디 · 보호자 진료 준비",
   "mode": "operate",
-  "direction": "중앙 채팅과 오른쪽4상태는 유지. 주황 이름/주행동, forest 대화헤더·mint 탐색/선택·초록 보조행동으로 구분하며 실제 최신 답변의 메타와 클릭/펼침에 짧은 CSS 피드백을 제공한다.",
+  "direction": "중앙 채팅과 오른쪽4상태 유지. 흰 대화 상단에 기존 혼디 심볼·짧은 이름/역할과 보조 도구를 배치한다. 주황 이름/주 행동·mint 탐색/선택·초록 보조 행동과 짧은 CSS 피드백은 보존한다.",
   "seedReference": "seed:a25f97f1d883646c",
   "layoutAuthority": {
     "contract": "docs/chat-rail-contract.md",
@@ -29,8 +29,9 @@
     "primarySoft": "#FFF1E7",
     "secondaryHover": "#1B4631",
     "selected": "#EDF6EF",
-    "chatHeader": "#1C4D36",
-    "chatHeaderText": "#FFFFFF"
+    "chatHeader": "#FFFFFF",
+    "chatHeaderText": "#285C43",
+    "chatHeaderFocus": "#A84D16"
   },
   "typography": {
     "display": "Pretendard, sans-serif",
@@ -61,7 +62,9 @@
     "chatTitlePx": 17,
     "mobileChatTitlePx": 16,
     "stageStatusPx": 13,
-    "mobileStageStatusPx": 14
+    "mobileStageStatusPx": 14,
+    "chatRolePx": 14,
+    "mobileChatRolePx": 13
   },
   "shape": {
     "surfaceRadiusPx": 12,
@@ -170,7 +173,9 @@
     "mobileChatComposerPadding": "0 16px 18px",
     "preparationGapPx": 12,
     "mobilePreparationGapPx": 14,
-    "rightRailPx": 310
+    "rightRailPx": 310,
+    "chatHeaderPadding": "10px 24px",
+    "mobileChatHeaderPadding": "10px 12px"
   },
   "elevation": {
     "preparationPane": "none",
@@ -182,7 +187,7 @@
     "controls": "3px solid var(--primary); outline-offset:3px",
     "preparationSection": "2px solid var(--secondary); outline-offset:3px",
     "composer": "border-color:var(--primary); outline:2px solid var(--primary); outline-offset:1px",
-    "chatToolbar": "밝은 outline으로 어두운 green 위3:1이상; orange/body focus는기존대로"
+    "chatToolbar": "흰 면에서 주황3px/offset3px. 이전 흰 focus 강제는 제거."
   },
   "motion": {
     "controlTransition": "background-color 150ms ease, color 150ms ease, border-color 150ms ease",
@@ -310,14 +315,14 @@
     ],
     "captures": ".impeccable/review/chat-rail/: current central chat/right rail renders",
     "geometryRecord": "orchestration/runs/preparation-board-browser.json",
-    "observations": "동일15f5053a 지문에서 수동47/대화189/여정236/보드249·단위360·규칙65 pass/종료0. normal/reduce×1440/390 색/대비/피드백/읽기 보존4조합, 독립 재검토 새 차단0. 공개배포는 최신 runs 증거.",
+    "observations": "동일c4a44c75에서 수동47/대화189/여정236/보드249·단위360·규칙67 pass/종료0. 흰상단·정체성·접근성/대비와 normal/reduce4조합 모두true. 독립재검토 새차단0. 공개배포는 최신 runs 증거.",
     "previousCaptures": ".impeccable/review/task-first/, grid/, reading/, board/: 이전 배치 이력",
     "limits": "layout detector전후126로자동결과없음. 실제모델·DynamoDB는이전9fc11bc 증거로구분/새호출0. 실제휴대폰·마이크/다른브라우저/스크린리더·센터PC·전화/개인기록·의료법률은미검증.",
     "progressDomSource": "app/preparation-board-view.js의 확정/진행 목록 분리와 WeakMap 문자열 guard를 소스로 대조. 최종 root 브라우저 QA 결과와 구분.",
     "uxAuditBefore": "docs/reviews/2026-11-01-chat-rail.md",
     "uxAuditAfter": "docs/reviews/2026-11-01-chat-rail.md",
-    "cliDetector": "이번 layout detect 실제126 Permission denied; 자동발견/합격 아님.",
-    "uiSourceRevision": "8e39435",
+    "cliDetector": "기존126 권한 오류 이력으로 이번 자동 결과 없음. 직접 문맥·렌더·독립 검토로 보완.",
+    "uiSourceRevision": "8fa5f37",
     "orangeAccent": {
       "scope": "환자 이름 부분·활성보내기·포커스·다음문의초안만. 의미색/배치/보조파랑유지.",
       "captures": ".impeccable/review/chat-rail/color/",
@@ -361,6 +366,36 @@
       "targetedChecks": 29,
       "independentReview": ".impeccable/review/chat-rail/green/independent-review.md",
       "sourceHash": "15f5053ae46d56bdcce16399dec06c9b1f9ad4b456cec10731ba7921b5862c53"
+    },
+    "chatIdentity": {
+      "captures": ".impeccable/review/chat-rail/identity/",
+      "source": "상단 markup/CSS2파일22추가/17삭제, Controller/API변경0",
+      "uiWidths": [
+        1440,
+        1060,
+        390,
+        320
+      ],
+      "realKeylessPreview": 1,
+      "replayedPreviewFixtures": 3,
+      "normalPostAttempts": 0,
+      "contrast": {
+        "nameAndUtilityOnWhite": 7.772,
+        "roleOnWhite": 5.368,
+        "focusOnWhite": 5.618,
+        "focusOnHover": 5.091
+      },
+      "sourceHash": "c4a44c75e65fd298b3142577857f8fdc6c6e1c2b8ac9fa5ee425d47dcf8f59be",
+      "targetedChecks": 29,
+      "rootBrowserChecks": {
+        "workspace": 47,
+        "conversation": 189,
+        "journey": 236,
+        "board": 249
+      },
+      "rootMotionProof": "orchestration/runs/preparation-board-browser.json: motionScenarios4개 all true",
+      "independentReview": ".impeccable/review/chat-rail/identity/independent-review.md",
+      "limits": "390읽기라벨/320pending도구정렬은선택권고. 실제보호자 발견성·실기기/다른브라우저·스크린리더 별도. 일반모델/전화/개인기록 요청0."
     }
   },
   "references": {

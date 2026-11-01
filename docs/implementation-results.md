@@ -401,3 +401,14 @@ plan도 이제 오른쪽 정보이므로 이전 selectedStageId===plan의 답변
 UI와 기존 준비판 검사 파일은 두 전용 worktree로 나눴다. UI 변경은 `app/conversation.css` 1파일 33줄 추가·9줄 삭제이며 Controller·API·데이터·권한·전화/기록 경계는 바꾸지 않았다. UI 담당의 PC 1440·1060/모바일 390 × normal/reduce 6개 관측, 실제 keyless preview 1건·저장 응답 fixture 12건·일반 모델 POST 0건과 독립 재검토의 POST 0건을 구분한다. 독립 검토는 소스·대표 캡처 및 별도 모바일 상세 읽기에서 새 차단 문제를 발견하지 않았다. 캡처·별도 보고서는 `.impeccable/review/chat-rail/green/`이다.
 
 실행 지문은 `15f5053ae46d56bdcce16399dec06c9b1f9ad4b456cec10731ba7921b5862c53`다. 동일 지문의 네 통합 브라우저 프로세스가 모두 종료0이며 수동47/47·대화189/189·여정236/236·준비판249/249, pass/errors[]와 sourceHash·보드 finalSourceHash를 대조했다. 신규 normal/reduce×PC1440/모바일390의 4조합에서 색·대비·누름/펼침·최신 답변·읽기 보존은 모두 참이고 실제 일반 POST는0이다. 단위·서버360/360·자동 규칙65/65도 종료0이다. 등록 worktree는 누적51개, 이번 개발은2개다. 공개 CI·고정 preview·정적/API revision·초록/주황/네 상태의 실제 화면은 최신 `orchestration/runs/{preparation-board-deployed,aws-deployment}.json`과 `.impeccable/review/chat-rail/deployed/layout.json`, 독립 설치·최종 ZIP은 `release.json`·`output/final-archive-check.json`을 따른다. 유료 모델·실발신·개인기록을 이번 색/모션 검증에서 호출하지 않으며 이전 `9fc11bc` 실모델/DynamoDB 증거를 새 실행으로 바꾸지 않는다. 실제 휴대폰·센터 PC의 프레임 성능, Safari/Firefox·스크린리더·실마이크·임상/법률·15페이지 PDF/대회 제출은 미검증이다.
+
+
+## 3.17 혼디 대화 상단
+
+사용자가 채팅창, 특히 ‘혼디와 대화’ 상단을 지적해 짙은 초록 띠를 흰 대화면과 이어지는 혼디 표시로 교체했다. 기존 귤 심볼·‘혼디’ 이름·‘진료 준비 도우미’ 역할을 한 묶음으로 두고 예시/넓게 읽기는 오른쪽 보조 도구로 정리했다. 같은 제목 ID·버튼 동작·실제 disabled·키보드 복귀와 44px 조작 영역을 보존한다. 모바일의 확대 아이콘에도 기존 접근성 이름과 설명을 남긴다. 흰 면의 초록 이름/도구·muted 역할·주황 초점으로 대비를 구분하며, 탐색·말풍선의 민트와 기존 주황/상태색·짧은 CSS 피드백은 유지한다.
+
+상단 마크업과 CSS를 전용 UI worktree에서 수정하고 기존 보드의 상단 색/대비 단언을 별도 QA worktree에서 맞췄다. 기존 모션·취소·진행·출처 DOM/focus·읽기 위치·단일 대화/입력·실제/합성 경계는 보존한다. 새 이미지·라이브러리·프레임워크·Controller/API/모델/데이터 변경은 없다. 통합·실제 화면·공개 배포의 최종 결과는 이번 동일 실행 지문의 기록을 따른다. 이전9fc11bc 실제 Sol/DynamoDB 증거는 원 revision에 유지하며 이번 UI 수정에서 실제 모델·전화·개인기록을 호출하지 않는다. 실제 휴대폰·센터 PC 성능과 다른 브라우저/스크린리더는 미검증이다.
+
+독립 재검토는 같은 두 소스 파일·대표11캡처와 별도320px GET-only 관측에서 새 차단 문제를 발견하지 않았다. 제목/도구7.77:1·역할5.37:1·흰 면 초점5.62:1이며 별도 POST는0이다. 390px의 읽기 라벨 표시와320px 대기 문구의 둘째 줄 정렬은 선택 권고로 기록했다. 현재는 모바일 공통 확대 아이콘과 긴 대기 문구의 자연 줄바꿈을 유지하며 실제 보호자의 발견성 평가는 별도다. 기록과 캡처는 `.impeccable/review/chat-rail/identity/`에 남긴다.
+
+실행 지문은 `c4a44c75e65fd298b3142577857f8fdc6c6e1c2b8ac9fa5ee425d47dcf8f59be`다. 네 통합 브라우저가 모두 종료0이며 수동47/47·대화189/189·여정236/236·준비판249/249, pass/errors[]·같은 sourceHash와 보드 finalSourceHash를 대조했다. 기존4개 motion 조합에서 새 상단·대비·피드백·출처 읽기 보존은 모두 참이고 실제 일반 POST는0이다. 단위·서버360/360·자동 규칙67/67도 종료0이다. 등록 worktree는 누적53개, 이번 개발은2개다. 대상 검사 첫 실행의 외부143 중단은 완료 proof가 없어 통과에서 제외했고, 코드 변경 없이 같은4조합만 직접 node/소유TTY로 재실행해29/29를 확인했다. CI·공개 정적/API revision·실제 고정 preview와 새 상단/배치·최종 ZIP의 현재 결과는 최신 `orchestration/runs/{preparation-board-deployed,aws-deployment,release}.json`, `.impeccable/review/chat-rail/deployed/layout.json`과 `output/final-archive-check.json`을 따른다.

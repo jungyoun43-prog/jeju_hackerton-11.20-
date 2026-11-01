@@ -1,6 +1,6 @@
 {
   "baseCommit": "e1e7e44",
-  "updatedAt": "2026-11-01T06:15:10.142044+00:00",
+  "updatedAt": "2026-11-01T06:28:20.149607+00:00",
   "tasks": {
     "ui": {
       "phase": "verified",
@@ -447,27 +447,31 @@
       "note": "기존 보드 검사1파일137추가/8삭제. 새 PC/모바일 normal·reduce4조합은 모든5boolean true/normalPOST0. targeted29/29 뒤 root전체보드249/249·errors[]·동일15f/finalhash. 첫2회 검사기 가정/이벤트관측 실패를 보존하고 수정. 위임/호출 경계 유지."
     },
     "chat-identity-ui": {
-      "phase": "implementing",
+      "phase": "verified",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261101-chat-identity-ui",
-      "integrationCommits": [],
-      "note": "혼디 대화 상단의 기존 심볼/이름·흰 면/보조 행동·접근성 개선. 구현과 검사 소유권 분리, 기존 진행/권한/Agent 동작 유지."
+      "integrationCommits": [
+        "8fa5f37"
+      ],
+      "note": "상단마크업/CSS2파일22추가/17삭제. 동결c4a44c75에서 자체4폭/실preview1·fixture3·일반POST0, 독립320 GET-only/대표11캡처 새차단0. root4종47/189/236/249·단위360·규칙67 종료0. 임시서버/링크정리·clean."
     },
     "chat-identity-qa": {
-      "phase": "implementing",
+      "phase": "verified",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261101-chat-identity-qa",
-      "integrationCommits": [],
-      "note": "혼디 대화 상단의 기존 심볼/이름·흰 면/보조 행동·접근성 개선. 구현과 검사 소유권 분리, 기존 진행/권한/Agent 동작 유지."
+      "integrationCommits": [
+        "4d4c6aa"
+      ],
+      "note": "상단 단언1파일14추가/8삭제, helper/schema/기존보호 유지. c4a44c75 targeted29/29→root전체249/249·4조합 all true·errors[]/일반POST0. 첫143중단은원인미상·로그보존/성공인용X. 직접node/소유TTY재실행 종료0·clean."
     }
   },
   "review": {
     "phase": "verified",
-    "role": "초록과 짧은 인터랙션의 독립 디자인 재검토 및 root 브라우저 대조",
+    "role": "혼디 대화 상단의 독립 디자인 재검토와 root 실제 렌더/기능 대조",
     "findings": [
-      "대화/탐색 초록·주 행동 주황·흰 상태 카드/○△× 의미색 분리",
-      "흰 toolbar focus와 초록 면 글자의 실제 대비, 줄인 동작의 정적 구분 유지",
-      "최신 실제 응답 노드 메타240ms1회·인사/과거/reader 제외, 출처 DOM/focus/읽기 위치 보존"
+      "흰 대화면의 기존 귤심볼·혼디·진료 준비 역할과 보조 도구로 위계 개선",
+      "독립320px GET-only에서 겹침/넘침0·44px·주황focus·초안 비발송 확인",
+      "선택권고:390px 읽기 라벨 유지/320px 대기 도구 우측 정렬; 현재 구현의 차단 사유 아님"
     ],
-    "resolution": "동일15f지문에서 네 브라우저47/189/236/249·단위360·규칙65 모두 pass/종료0. 독립 재검토 새 차단0. 대상 fixture와 keyless preview·실모델/실기기 경계를 구분. 공개배포는 최신 runs 증거를 따른다."
+    "resolution": "동일 c4a44c75 지문에서 4종47/189/236/249·단위360·규칙67 모두 pass/종료0. normal/reduce4조합의 새상단·기존피드백/읽기보존 통과. 실제 모델·기관/전화·기록·실기기 사용성 검증과 구분하며 공개배포는 최신 runs 증거를 따른다."
   },
   "awsDeployment": {
     "phase": "verified",
