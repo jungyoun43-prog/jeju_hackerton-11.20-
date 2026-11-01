@@ -1,6 +1,6 @@
 {
   "baseCommit": "e1e7e44",
-  "updatedAt": "2026-11-01T05:46:57.578809+00:00",
+  "updatedAt": "2026-11-01T05:57:07.114969+00:00",
   "tasks": {
     "ui": {
       "phase": "verified",
@@ -429,6 +429,18 @@
         "8fa9cdd"
       ],
       "note": "UI2파일7추가/7삭제:이름/활성send/focus#A84D16·hover#873A10·nextdraft#FFF1E7. 의미색/보조파랑/배치/동작유지. 대상31/normalPOST0/keylesspreview1/fixture2·독립색차단0. 동결efc749933e063752b02a904c3a0ee56618253b8bc6c62e5dc36309d49b1075ba 에서기존하네스한번fresh실행:수동47/대화189/여정236(실preview14/일반POST0)/보드229·단위360·규칙63 전부pass/종료0. 새영구테스트/라이브러리없음. 공개/ZIP은최신runs,실모델은9fc11bc이전증거로구분/재호출0."
+    },
+    "green-ui": {
+      "phase": "implementing",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261101-green-ui",
+      "integrationCommits": [],
+      "note": "초록의영역/보조행동색·짧은CSS피드백·reduced motion. CSS와기존보드검사파일을각각분리소유. source/DOM/권한/모델/시연경계유지."
+    },
+    "green-qa": {
+      "phase": "implementing",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261101-green-qa",
+      "integrationCommits": [],
+      "note": "초록의영역/보조행동색·짧은CSS피드백·reduced motion. CSS와기존보드검사파일을각각분리소유. source/DOM/권한/모델/시연경계유지."
     }
   },
   "review": {

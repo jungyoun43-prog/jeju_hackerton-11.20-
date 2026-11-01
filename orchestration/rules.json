@@ -582,6 +582,22 @@
         "app/conversation.js",
         "app/conversation.css"
       ]
+    },
+    {
+      "id": "green-ui",
+      "branch": "design/green-feedback",
+      "baseCommit": "2f1ede1710f48eff0fc0bf570b2b0ba65cb3a914",
+      "allow": [
+        "app/conversation.css"
+      ]
+    },
+    {
+      "id": "green-qa",
+      "branch": "test/green-feedback",
+      "baseCommit": "2f1ede1710f48eff0fc0bf570b2b0ba65cb3a914",
+      "allow": [
+        "scripts/preparation-board-browser-check.mjs"
+      ]
     }
   ],
   "rules": [
