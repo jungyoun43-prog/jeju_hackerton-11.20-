@@ -3,6 +3,7 @@ import { icon } from './icons.js';
 
 const escape=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 const topics={records:'folder',hospitals:'hospital',support:'car',plan:'calendar'};
+const taskStatusLabel={not_started:'준비할 일',needs_input:'보호자 확인 필요',prepared:'준비 결과 있음',waiting_external:'기관·의료진 확인 필요',handoff:'사람에게 인계',needs_recheck:'변경 조건 재확인',not_needed:'해당 없음'};
 function signalMarkup(signal) {
   const shape=({available:'<circle cx="12" cy="12" r="7"/>',attention:'<path d="M12 4 21 20H3Z"/>',blocked:'<path d="m5 5 14 14M19 5 5 19"/>'})[signal]||'<path d="M5 12h14"/>';
   return `<svg class="signal-mark" data-signal="${escape(signal)}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${shape}</svg>`;
@@ -18,9 +19,9 @@ export function preparationBoardMarkup() {
   const section=stage=>`<section id="stage-${stage.id}" class="stage-pane" data-stage-id="${stage.id}" data-stage-status="waiting" data-signal="waiting" tabindex="-1" aria-labelledby="stage-title-${stage.id}" hidden inert>
       <header class="stage-pane-header"><h2 id="stage-title-${stage.id}">${icon(topics[stage.id],'stage-topic-icon')}${escape(stage.title)}</h2><span class="stage-status" data-stage-status="waiting" data-signal="waiting">${signalMarkup('waiting')}<span>확인 전</span></span></header>
       <p class="stage-live" data-stage-live hidden></p>
-      <dl class="stage-preview" data-stage-preview></dl><details class="stage-details" data-stage-details><summary aria-label="${escape(stage.shortTitle)} 자세히 보기"><span>확인한 내용과 근거</span><span class="stage-brief" data-stage-brief></span>${icon('chevron')}</summary><div class="stage-pane-body"><p class="stage-summary" data-stage-summary></p><dl class="stage-facts" data-stage-facts></dl><section class="stage-gaps" data-stage-gaps></section>${stage.id==='plan'?'<section class="workflow-remaining" id="workflow-remaining"><h3>아직 남은 일</h3><p id="workflow-remaining-note"></p><ol id="workflow-remaining-list"></ol></section>':''}<div class="stage-sources" data-stage-sources></div><details class="stage-log" data-stage-log><summary><span data-stage-log-label>처리 기록</span>${icon('chevron')}</summary><div data-stage-events></div></details></div></details>
+      <dl class="stage-preview" data-stage-preview></dl><details class="stage-details" data-stage-details><summary aria-label="${escape(stage.shortTitle)} 자세히 보기"><span>확인한 내용과 근거</span><span class="stage-brief" data-stage-brief></span>${icon('chevron')}</summary><div class="stage-pane-body"><p class="stage-summary" data-stage-summary></p><dl class="stage-facts" data-stage-facts></dl><section class="stage-gaps${stage.id==='plan'?' workflow-remaining':''}" ${stage.id==='plan'?'id="workflow-remaining"':''} data-stage-gaps></section><div class="stage-sources" data-stage-sources></div><details class="stage-log" data-stage-log><summary><span data-stage-log-label>처리 기록</span>${icon('chevron')}</summary><div data-stage-events></div></details></div></details>
     </section>`;
-  return `<section class="current-preparation-task" id="current-preparation-task" aria-labelledby="current-task-heading"><div class="current-task-heading"><h2 id="current-task-heading">지금 준비할 일</h2><span id="current-task-stage"></span></div><h3 id="current-task-title" tabindex="-1"></h3><p class="current-task-detail" id="current-task-detail"></p><p class="current-task-owner" id="current-task-owner"></p><p class="current-task-question" id="current-task-question" hidden></p><div class="current-task-choices" id="current-task-choices" hidden></div><button type="button" class="next-request-draft" id="current-task-draft" data-workflow-draft hidden>이 내용으로 요청 초안 넣기${icon('arrow')}</button><p class="workflow-draft-note" id="workflow-draft-note" hidden>초안을 확인·수정한 뒤 아래 입력창에서 보내 주세요.</p><p class="current-task-waiting" id="current-task-waiting" role="status" hidden></p></section>
+  return `<section class="current-preparation-task" id="current-preparation-task" aria-labelledby="current-task-heading"><div class="current-task-heading"><h2 id="current-task-heading">지금 준비할 일</h2><span id="current-task-stage"></span><button type="button" class="current-task-answer" id="current-task-answer" hidden>이번 요청 답변 보기${icon('chevron')}</button></div><h3 id="current-task-title" tabindex="-1"></h3><p class="current-task-detail" id="current-task-detail"></p><p class="current-task-owner" id="current-task-owner"></p><p class="current-task-question" id="current-task-question" hidden></p><div class="current-task-choices" id="current-task-choices" hidden></div><button type="button" class="next-request-draft" id="current-task-draft" data-workflow-draft hidden>이 내용으로 요청 초안 넣기${icon('arrow')}</button><p class="workflow-draft-note" id="workflow-draft-note" hidden>초안을 확인·수정한 뒤 아래 입력창에서 보내 주세요.</p><p class="current-task-waiting" id="current-task-waiting" role="status" hidden></p></section>
     <div class="stage-reading-tools"><span id="stage-reading-label">현재 단계 상세</span><button type="button" id="return-to-current-task" hidden>지금 할 일로${icon('arrow')}</button></div>
     <div id="preparation-board" class="preparation-board" aria-label="진료 준비 내역">${PREPARATION_STAGES.map(section).join('')}</div>`;
 }
@@ -62,7 +63,7 @@ export function preservePreparationReading() {
   };
 }
 
-export function renderPreparationBoard(board,{unreadAnswer=false,progress=null,selectedStageId,disableDrafts=false}={}) {
+export function renderPreparationBoard(board,{unreadAnswer=false,progress=null,selectedStageId,reviewing=false,disableDrafts=false}={}) {
   const workflow=board.workflow;
   const selected=PREPARATION_STAGES.some(stage=>stage.id===selectedStageId)?selectedStageId:workflow.currentStageId;
   const realProgress=board.pending && progress?.status==='running' && board.progressAvailable && PREPARATION_STAGES.some(stage=>stage.id===progress.currentStage);
@@ -84,7 +85,7 @@ export function renderPreparationBoard(board,{unreadAnswer=false,progress=null,s
   document.getElementById('current-task-stage').textContent=initial?'':workflow.stages.find(stage=>stage.id===workflow.currentStageId)?.title||'';
   document.getElementById('current-task-title').textContent=initial?'필요한 준비를 한 번에 말씀해 주세요.':task?.title||'현재 방문 준비와 남은 일을 확인해 주세요.';
   document.getElementById('current-task-detail').textContent=initial?'알려주신 방문·자료는 이어서 쓰고, 꼭 필요한 조건만 확인할게요.':task?.detail||'방문 준비표에서 확인된 내용과 기관·의료진에게 남은 일을 함께 읽을 수 있어요.';
-  const owner=document.getElementById('current-task-owner');owner.hidden=initial||!task?.owner;owner.textContent=task?.owner?`담당 · ${task.owner}`:'';
+  const owner=document.getElementById('current-task-owner');owner.hidden=initial||!task?.owner;owner.textContent=task?.owner?`담당 · ${task.owner} · ${taskStatusLabel[task.status]}`:'';
   const question=document.getElementById('current-task-question');question.hidden=initial||task?.actor!=='caregiver'||!task?.question;question.textContent=task?.question||'';
   const choices=document.getElementById('current-task-choices');
   const taskChoices=!initial && task?.actor==='caregiver'?task.choices:[];
@@ -93,8 +94,9 @@ export function renderPreparationBoard(board,{unreadAnswer=false,progress=null,s
   const draft=document.getElementById('current-task-draft');draft.hidden=initial||!task?.requestDraft;draft.disabled=disableDrafts;
   for(const button of choices.querySelectorAll('button'))button.disabled=disableDrafts;
   document.getElementById('workflow-draft-note').hidden=draft.hidden&&choices.hidden;
-  const waiting=document.getElementById('current-task-waiting');waiting.hidden=!board.pending;waiting.textContent=board.overallLabel;
-  document.getElementById('return-to-current-task').hidden=selected===workflow.currentStageId;
+  const waiting=document.getElementById('current-task-waiting');waiting.hidden=!board.pending;
+  if(waiting.textContent!==board.overallLabel)waiting.textContent=board.overallLabel;
+  document.getElementById('return-to-current-task').hidden=!reviewing&&selected===workflow.currentStageId;
   document.getElementById('stage-reading-label').textContent=selected===workflow.currentStageId?'현재 단계 상세':'선택한 단계 상세 · 읽기 전용';
   for(const stage of board.stages) {
     const workStage=workflow.stages.find(item=>item.id===stage.id);
@@ -123,7 +125,10 @@ export function renderPreparationBoard(board,{unreadAnswer=false,progress=null,s
     const brief=pane.querySelector('[data-stage-brief]');
     brief.hidden=!stage.gapCount;brief.textContent=stage.gapCount?`확인할 내용 ${stage.gapCount}건`:'';
     replaceMarkup(pane.querySelector('[data-stage-facts]'),stage.facts.map(fact=>`<div><dt>${escape(fact.label)}</dt><dd>${escape(fact.value||'확인 전')}</dd></div>`).join(''));
-    replaceMarkup(pane.querySelector('[data-stage-gaps]'),stage.gaps.length?`<h3>확인할 내용 <span>${stage.gapCount??stage.gaps.length}건</span></h3><ul>${stage.gaps.map(gap=>`<li>${escape(gap)}</li>`).join('')}</ul>`:'');
+    const gapsMarkup=stage.id==='plan'
+      ? `<h3>아직 남은 일 <span>${stage.gapCount}건</span></h3><p id="workflow-remaining-note">남은 일 ${workflow.summary.remainingCount}건 · 기관·의료진 확인 ${workflow.summary.waitingCount}건. 실제 진료·예약·배차는 확정되지 않았어요.</p><ol id="workflow-remaining-list">${workflow.remainingTasks.map(item=>`<li data-workflow-task="${escape(item.id)}" data-workflow-status="${escape(item.status)}"><strong>${escape(item.title)}</strong><span>${escape(item.owner)} · ${escape(taskStatusLabel[item.status])}</span><p>${escape(item.detail)}</p></li>`).join('')}</ol>`
+      : stage.gaps.length?`<h3>확인할 내용 <span>${stage.gapCount??stage.gaps.length}건</span></h3><ul>${stage.gaps.map(gap=>`<li>${escape(gap)}</li>`).join('')}</ul>`:'';
+    replaceMarkup(pane.querySelector('[data-stage-gaps]'),gapsMarkup);
     renderPreparationSources(pane.querySelector('[data-stage-sources]'),stage.sources);
     const liveEvents=board.pending?(progress?.events??[]).filter(event=>event.stage===stage.id):[];
     const count=stage.events.length+liveEvents.length;
@@ -136,7 +141,5 @@ export function renderPreparationBoard(board,{unreadAnswer=false,progress=null,s
     replaceMarkup(eventHost.querySelector('[data-stage-live-events]'),liveEvents.map(event=>`<li class="stage-live-event" data-progress-sequence="${event.sequence}"><p>${escape(progressActivity(event))}</p></li>`).join(''));
     eventHost.querySelector('.stage-log-empty').hidden=count>0;
   }
-  document.getElementById('workflow-remaining-note').textContent=`남은 일 ${workflow.summary.remainingCount}건 · 기관·의료진 대기 ${workflow.summary.waitingCount}건. 실제 진료·예약·배차는 확정되지 않았어요.`;
-  replaceMarkup(document.getElementById('workflow-remaining-list'),workflow.remainingTasks.map(item=>`<li data-workflow-task="${escape(item.id)}" data-workflow-status="${escape(item.status)}"><strong>${escape(item.title)}</strong><span>${escape(item.owner)}</span><p>${escape(item.detail)}</p></li>`).join(''));
   restoreReading?.();
 }

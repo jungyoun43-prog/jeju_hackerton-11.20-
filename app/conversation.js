@@ -96,9 +96,10 @@ function renderBoard() {
   if(!manualStageSelection || !selectedStageId)selectedStageId=board.workflow.currentStageId;
   document.getElementById('care-journey-summary').hidden=responseCount===0;
   document.getElementById('return-to-request').hidden=responseCount===0;
-  renderPreparationBoard(board,{unreadAnswer,progress,selectedStageId,disableDrafts:pending||Boolean(activeRecognition)});
+  renderPreparationBoard(board,{unreadAnswer,progress,selectedStageId,reviewing:manualStageSelection,disableDrafts:pending||Boolean(activeRecognition)});
   const replyCount=document.querySelectorAll('#message-list .message.assistant:not(.greeting)').length;
   document.getElementById('conversation-history-count').textContent=replyCount?`${replyCount}회 응답`:'';
+  document.getElementById('current-task-answer').hidden=!replyCount;
   document.getElementById('request-problem-notice').hidden=pending || !(requestProblem || previewProblem);
   document.getElementById('request-examples').hidden=document.getElementById('starter-prompts').hidden;
 }
@@ -122,7 +123,7 @@ function selectPreparationStage(id) {
   setWorkspaceView('chat');renderBoard();
   const pane=document.querySelector(`[data-stage-id="${id}"]`);
   pane.querySelector('[data-stage-details]').open=true;
-  scrollToMessage(pane);
+  scrollToMessage(pane,document.querySelector('.stage-reading-tools'));
 }
 
 function focusRequest() {
@@ -612,7 +613,7 @@ function appendMessage({role,text,id=makeId(),events=[],greeting=false,isExample
 }
 
 
-function scrollToMessage(node) {
+function scrollToMessage(node,readFrom=node) {
   if(!node)return;
   const historyDetails=node.closest('#conversation-history');
   if(historyDetails)historyDetails.open=true;
@@ -621,7 +622,7 @@ function scrollToMessage(node) {
     node.setAttribute('tabindex','-1');node.focus({preventScroll:true});
     const scroller=document.getElementById('conversation-scroll');
     if(!scroller.checkVisibility())return;
-    scroller.scrollTop+=node.getBoundingClientRect().top-scroller.getBoundingClientRect().top-12;
+    scroller.scrollTop+=readFrom.getBoundingClientRect().top-scroller.getBoundingClientRect().top-12;
   });
 }
 
@@ -1133,6 +1134,7 @@ function mount() {
     const button=event.target.closest('[data-open-stage]');if(button)selectPreparationStage(button.dataset.openStage);
   });
   document.getElementById('return-to-current-task').addEventListener('click',()=>showCurrentTask());
+  document.getElementById('current-task-answer').addEventListener('click',showLatestAnswer);
   document.getElementById('current-task-draft').addEventListener('click',()=>{
     const task=preparationBoard?.workflow.currentTask;
     if(task?.requestDraft && fillRequestDraft(task.requestDraft,{source:'다음 준비 요청 초안',focus:false}))focusRequest();
