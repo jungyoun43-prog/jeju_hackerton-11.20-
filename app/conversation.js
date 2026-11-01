@@ -1102,7 +1102,33 @@ function mount() {
   document.getElementById('save-report').addEventListener('click',saveReport);
   document.getElementById('resume-visit').addEventListener('click',resumeVisit);
   document.getElementById('preparation-board').addEventListener('toggle',event=>{if(event.target.matches('[data-stage-details]') && event.target.open)manualStageSelection=true;},true);
-  document.getElementById('preparation-rail').addEventListener('focusin',()=>{manualStageSelection=true;});
+  const preparationRail=document.getElementById('preparation-rail');
+  let restoreResizeReading,readingResizeFrame=0,readingWidth=innerWidth,readingHeight=innerHeight,inputEndVisible=true;
+  const rememberReading=()=>{
+    if(!readingResizeFrame && readingWidth===innerWidth && readingHeight===innerHeight){
+      restoreResizeReading=preservePreparationReading();
+      inputEndVisible=input.scrollTop+input.clientHeight>=input.scrollHeight-2;
+    }
+  };
+  preparationRail.addEventListener('focusin',()=>{manualStageSelection=true;rememberReading();});
+  preparationRail.addEventListener('scroll',rememberReading,{passive:true});
+  input.addEventListener('scroll',rememberReading,{passive:true});
+  input.addEventListener('focus',rememberReading);
+  input.addEventListener('input',rememberReading);
+  window.addEventListener('resize',()=>{
+    cancelAnimationFrame(readingResizeFrame);
+    readingResizeFrame=requestAnimationFrame(()=>{
+      restoreResizeReading?.();
+      const anchor=document.activeElement;
+      if(anchor===input && !composing && inputEndVisible && input.selectionStart===input.value.length && input.selectionEnd===input.value.length)input.scrollTop=input.scrollHeight;
+      if(preparationRail.contains(anchor) && preparationRail.checkVisibility()){
+        const bounds=anchor.getBoundingClientRect(),frame=preparationRail.getBoundingClientRect();
+        // 작아진 영역에서는 출처를 보이게 두고, 다시 넓어지면 원래 읽던 위치로 돌아간다.
+        preparationRail.scrollTop+=bounds.top<frame.top+8?bounds.top-frame.top-8:Math.max(0,bounds.bottom-frame.bottom+8);
+      }
+      readingResizeFrame=requestAnimationFrame(()=>{readingWidth=innerWidth;readingHeight=innerHeight;readingResizeFrame=0;});
+    });
+  });
   document.getElementById('return-to-request').addEventListener('click',focusRequest);
   document.getElementById('next-request-draft').addEventListener('click',()=>{const next=getCareJourneySummary(caseState).nextActions[0];if(next?.requestDraft && fillRequestDraft(next.requestDraft,{source:'다음 문의 초안',focus:false}))focusRequest();});
   document.getElementById('answer-ready-notice').addEventListener('click',showLatestAnswer);
