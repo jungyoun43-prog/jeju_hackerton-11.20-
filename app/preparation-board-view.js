@@ -2,22 +2,22 @@ import { PREPARATION_STAGES, progressActivity } from './preparation-stages.js';
 import { icon } from './icons.js';
 
 const escape=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
-const expandIcon='<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5M3 3l6 6m12-6-6 6M3 21l6-6m12 6-6-6"/></svg>';
 const signalLabel=stage=>({available:stage.id==='plan'?'답변 있음':'준비 결과 있음',attention:stage.status==='needs_recheck'?'재확인':'추가 확인',blocked:'문의 실패 · 인계',waiting:stage.id==='plan'?'답변 전':'문의 전',not_needed:'필요 없음'})[stage.signal]||'확인 전';
 function signalMarkup(signal) {
   const shape=({available:'<circle cx="12" cy="12" r="7"/>',attention:'<path d="M12 4 21 20H3Z"/>',blocked:'<path d="m5 5 14 14M19 5 5 19"/>'})[signal]||'<path d="M5 12h14"/>';
   return `<svg class="signal-mark" data-signal="${escape(signal)}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${shape}</svg>`;
 }
 
-export function preparationBoardMarkup(planContent) {
-  const section=stage=>`<section id="stage-${stage.id}" class="stage-pane${stage.id==='plan'?' answer-pane':''}" data-stage-id="${stage.id}" data-stage-status="waiting" data-signal="waiting" tabindex="-1" aria-labelledby="stage-title-${stage.id}">
-      <header class="stage-pane-header"><h2 id="stage-title-${stage.id}">${stage.id==='plan'?'혼디의 정리':stage.title}</h2><span class="stage-status" data-stage-status="waiting" data-signal="waiting">${signalMarkup('waiting')}<span>확인 전</span></span>${stage.id==='plan'?`<button type="button" class="expand-answer" id="expand-answer" aria-haspopup="dialog" aria-controls="answer-dialog" disabled>${expandIcon}<span>넓게 읽기</span></button>`:''}</header>
+export function preparationBoardMarkup() {
+  const topics={records:'folder',hospitals:'hospital',support:'car',plan:'calendar'};
+  const section=stage=>`<section id="stage-${stage.id}" class="stage-pane" data-stage-id="${stage.id}" data-stage-status="waiting" data-signal="waiting" tabindex="-1" aria-labelledby="stage-title-${stage.id}">
+      <header class="stage-pane-header"><h2 id="stage-title-${stage.id}">${icon(topics[stage.id],'stage-topic-icon')}${stage.id==='plan'?'방문 계획':stage.title}</h2><span class="stage-status" data-stage-status="waiting" data-signal="waiting">${signalMarkup('waiting')}<span>확인 전</span></span></header>
       <p class="stage-live" data-stage-live hidden></p>
-      ${stage.id==='plan'?`<p class="stage-summary" data-stage-summary></p>${planContent}<button type="button" class="return-to-request" id="return-to-request">요청 입력으로${icon('arrow')}</button>`:`<dl class="stage-preview" data-stage-preview></dl><p class="stage-brief" data-stage-brief></p><details class="stage-details" data-stage-details><summary aria-label="${stage.shortTitle} 자세히 보기"><span>자세히 보기</span>${icon('chevron')}</summary><div class="stage-pane-body"><p class="stage-summary" data-stage-summary></p><dl class="stage-facts" data-stage-facts></dl><section class="stage-gaps" data-stage-gaps></section><div class="stage-sources" data-stage-sources></div><details class="stage-log" data-stage-log><summary><span data-stage-log-label>처리 기록</span>${icon('chevron')}</summary><div data-stage-events></div></details></div></details>`}
+      <dl class="stage-preview" data-stage-preview></dl><p class="stage-brief" data-stage-brief></p><details class="stage-details" data-stage-details><summary aria-label="${stage.id==='plan'?'방문 계획':stage.shortTitle} 자세히 보기"><span>자세히 보기</span>${icon('chevron')}</summary><div class="stage-pane-body"><p class="stage-summary" data-stage-summary></p><dl class="stage-facts" data-stage-facts></dl><section class="stage-gaps" data-stage-gaps></section><div class="stage-sources" data-stage-sources></div><details class="stage-log" data-stage-log><summary><span data-stage-log-label>처리 기록</span>${icon('chevron')}</summary><div data-stage-events></div></details></div></details>
     </section>`;
-  return `<div class="preparation-heading"><h2>준비 현황</h2><p class="preparation-note">자료·문의 준비 상태예요. 실제 진료·예약·배차 확정은 아닙니다.</p></div>
-    <div id="answer-ready-notice" class="answer-ready-notice" hidden><button type="button" data-open-stage="plan">새 답변이 도착했어요. 혼디의 정리 보기${icon('arrow')}</button></div>
-    <div id="preparation-board" class="preparation-board" aria-label="진료 준비 내역과 답변">${PREPARATION_STAGES.map(section).join('')}</div>`;
+  return `<div class="preparation-heading"><h2 id="preparation-title">준비 현황</h2><p class="preparation-note">자료·문의 준비 상태예요.<br>실제 진료·예약·배차 확정은 아닙니다.</p></div>
+    <div id="answer-ready-notice" class="answer-ready-notice" hidden><button type="button" data-open-stage="plan">새 답변이 도착했어요. 대화에서 보기${icon('arrow')}</button></div>
+    <div id="preparation-board" class="preparation-board" aria-label="진료 준비 내역">${PREPARATION_STAGES.map(section).join('')}</div>`;
 }
 
 const renderedMarkup=new WeakMap();
@@ -34,11 +34,20 @@ function sourceMarkup(source) {
   } catch {return '';}
 }
 
+export function preservePreparationReading() {
+  const anchor=document.activeElement;
+  if(!document.getElementById('preparation-board')?.contains(anchor))return;
+  const bounds=anchor.getBoundingClientRect();
+  if(bounds.top>=innerHeight || bounds.bottom<=0)return;
+  return ()=>{
+    if(anchor.isConnected && document.activeElement===anchor)document.scrollingElement.scrollTop+=anchor.getBoundingClientRect().top-bounds.top;
+  };
+}
+
 export function renderPreparationBoard(board,{unreadAnswer=false,progress=null}={}) {
   const realProgress=board.pending && progress?.status==='running' && board.progressAvailable && PREPARATION_STAGES.some(stage=>stage.id===progress.currentStage);
   const boardNode=document.getElementById('preparation-board');
-  const readingAnchor=board.pending && boardNode.contains(document.activeElement) && document.activeElement.matches('a[href]')?document.activeElement:null;
-  const readingBounds=readingAnchor?.getBoundingClientRect();
+  const restoreReading=preservePreparationReading();
   boardNode.dataset.activeStage=realProgress?board.activeStageId:'';
   boardNode.dataset.pending=String(board.pending);
   const activity=document.getElementById('board-activity');
@@ -57,12 +66,10 @@ export function renderPreparationBoard(board,{unreadAnswer=false,progress=null}=
     const live=pane.querySelector('[data-stage-live]');
     const observed=progress?.currentStage===stage.id || (progress?.events??[]).some(event=>event.stage===stage.id) || progress?.stages?.some(item=>item.id===stage.id && item.lastTool);
     live.hidden=!(board.pending && progress?.status==='running' && board.progressAvailable && observed && stage.liveActivity);live.textContent=stage.liveActivity;
-    if(stage.id!=='plan'){
-      const preview=stage.id==='records'?stage.facts.slice(1):stage.facts;
-      replaceMarkup(pane.querySelector('[data-stage-preview]'),preview.map(fact=>`<div><dt>${escape(fact.label)}</dt><dd>${escape(fact.value||'확인 전')}</dd></div>`).join(''));
-      const brief=pane.querySelector('[data-stage-brief]');
-      brief.hidden=!stage.gapCount;brief.textContent=stage.gapCount?`${stage.gapCount}가지 더 확인할 내용이 있어요.`:'';
-    }
+    const preview=stage.id==='records'?stage.facts.slice(1):stage.facts;
+    replaceMarkup(pane.querySelector('[data-stage-preview]'),preview.map(fact=>`<div><dt>${escape(fact.label)}</dt><dd>${escape(fact.value||'확인 전')}</dd></div>`).join(''));
+    const brief=pane.querySelector('[data-stage-brief]');
+    brief.hidden=!stage.gapCount;brief.textContent=stage.gapCount?`${stage.gapCount}가지 더 확인할 내용이 있어요.`:'';
     replaceMarkup(pane.querySelector('[data-stage-facts]'),stage.facts.map(fact=>`<div><dt>${escape(fact.label)}</dt><dd>${escape(fact.value||'확인 전')}</dd></div>`).join(''));
     replaceMarkup(pane.querySelector('[data-stage-gaps]'),stage.gaps.length?`<h3>확인할 내용 <span>${stage.gapCount??stage.gaps.length}건</span></h3><ul>${stage.gaps.map(gap=>`<li>${escape(gap)}</li>`).join('')}</ul>`:'');
     replaceMarkup(pane.querySelector('[data-stage-sources]'),stage.sources.map(sourceMarkup).join(''));
@@ -77,7 +84,5 @@ export function renderPreparationBoard(board,{unreadAnswer=false,progress=null}=
     replaceMarkup(eventHost.querySelector('[data-stage-live-events]'),liveEvents.map(event=>`<li class="stage-live-event" data-progress-sequence="${event.sequence}"><p>${escape(progressActivity(event))}</p></li>`).join(''));
     eventHost.querySelector('.stage-log-empty').hidden=count>0;
   }
-  if(readingAnchor?.isConnected && readingBounds.top<innerHeight && readingBounds.bottom>0 && document.activeElement===readingAnchor){
-    document.scrollingElement.scrollTop+=readingAnchor.getBoundingClientRect().top-readingBounds.top;
-  }
+  restoreReading?.();
 }

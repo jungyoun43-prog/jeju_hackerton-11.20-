@@ -25,6 +25,8 @@ const paths = {
   lock: '<rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3m-4 4v3"/>',
   external: '<path d="M14 3h7v7m0-7L10 14M10 3H3v18h18v-7"/>',
   send: '<path d="m3 3 18 9-18 9 3-9Z"/><path d="M6 12h15"/>',
+  message: '<path d="M21 15a3 3 0 0 1-3 3H8l-5 3V6a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3Z"/><path d="M7 8h10M7 12h7"/>',
+  expand: '<path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5M3 3l6 6m12-6-6 6M3 21l6-6m12 6-6-6"/>',
   close: '<path d="m6 6 12 12M6 18 18 6"/>',
   plus: '<path d="M12 4v16M4 12h16"/>',
   bell: '<path d="M5 17V9a7 7 0 0 1 14 0v8l2 2H3Zm5 5h4"/>',
