@@ -178,7 +178,7 @@ function response(call,state=createDemoCase(),reply='브라우저 fixture의 합
     events:[{id:'board-records',tool:'get_case',label:'합성 사례 확인',status:'completed',detail:'브라우저 응답 fixture이며 실제 환자 기록 조회가 아닙니다.',isSimulation:true}],
     pendingActions:[],capabilities:caps,needsInput:true};
 }
-async function open(width,height,{fixture=false,capabilities=fixture?caps:null,reducedMotion='reduce'}={}) {
+async function open(width,height,{fixture=false,capabilities=fixture?caps:null,reducedMotion='reduce',mockClock=fixture}={}) {
   const context=await browser.newContext({viewport:{width,height},locale:'ko-KR',reducedMotion,serviceWorkers:'block'});
   const actualPosts=[];
   await context.route('**/*',async route=>{
@@ -250,7 +250,7 @@ async function open(width,height,{fixture=false,capabilities=fixture?caps:null,r
     await page.locator('#preparation-board').waitFor({state:'attached'});
     await page.waitForFunction(configured=>document.querySelector('#connection-state')?.textContent===(configured?'대화 연결 설정됨':'AI 모델 미연결'),capabilities?.llm===true);
     await page.evaluate(()=>document.fonts.ready);
-    if(fixture)await page.clock.install();
+    if(fixture && mockClock)await page.clock.install();
     return {page,context,actualPosts};
   } catch(error) {await context.close();throw error;}
 }
@@ -731,10 +731,11 @@ try {
 
   await scenario('동일 작업공간 크기 전환·읽기 보존',async()=>{
     if(!previewEvidence)throw new Error('크기 전환에 사용할 실제 keyless preview 근거가 없습니다.');
-    const {page,context,actualPosts}=await open(1152,720,{fixture:true});
+    // native scroll 전달과 RAF를 같은 실제 시계로 관측한다.
+    const {page,context,actualPosts}=await open(1152,720,{fixture:true,mockClock:false});
     try {
       const call=await begin(page,'가용 공간을 바꾸기 전의 합성 준비 요청입니다.');
-      await release(page,call,{...response(call,previewEvidence.caseState,previewEvidence.reply),events:previewEvidence.events,pendingActions:previewEvidence.pendingActions});
+      await page.evaluate(({index,body})=>window.__boardFixture.settle(index,200,body),{index:call.index,body:{...response(call,previewEvidence.caseState,previewEvidence.reply),events:previewEvidence.events,pendingActions:previewEvidence.pendingActions}});
       await page.waitForFunction(()=>document.getElementById('conversation-form').getAttribute('aria-busy')==='false');
       const input=await page.locator('#request-input').elementHandle(),draft='화면 크기를 바꿔도 보존할 다음 요청';await page.locator('#request-input').fill(draft);
       await readStage(page,'hospitals');
@@ -742,15 +743,31 @@ try {
       const source=await page.locator('[data-stage-id="hospitals"] [data-stage-events] a[href^="https://"]').first().elementHandle();
       if(!source)throw new Error('크기 전환 전에 읽을 공개 출처가 없습니다.');
       await source.scrollIntoViewIfNeeded();await source.focus();
-      const snapshot=()=>source.evaluate(node=>({sameNode:node.isConnected,focused:document.activeElement===node,details:node.closest('[data-stage-details]').open,log:node.closest('[data-stage-log]').open,scrollTop:document.getElementById('preparation-rail').scrollTop,active:document.querySelector('.conversation-layout').dataset.activeView}));
-      const before=await snapshot(),samples=[];
+      await source.evaluate(node=>{window.__qaResizeSource=node;});
+      const snapshot=()=>source.evaluate(node=>{
+        const rail=document.getElementById('preparation-rail'),r=node.getBoundingClientRect(),f=rail.getBoundingClientRect();
+        const frame={top:f.top+rail.clientTop,bottom:f.top+rail.clientTop+rail.clientHeight,left:f.left+rail.clientLeft,right:f.left+rail.clientLeft+rail.clientWidth};
+        return {sameNode:node===window.__qaResizeSource && node.isConnected,focused:document.activeElement===node,details:node.closest('[data-stage-details]').open,log:node.closest('[data-stage-log]').open,scrollTop:rail.scrollTop,active:document.querySelector('.conversation-layout').dataset.activeView,top:r.top,bottom:r.bottom,left:r.left,right:r.right,height:r.height,frame,href:node.href,text:node.textContent,visible:node.checkVisibility() && !node.closest('[hidden],[inert]') && r.top>=Math.max(0,frame.top)-2 && r.bottom<=Math.min(innerHeight,frame.bottom)+2 && r.left>=Math.max(0,frame.left)-2 && r.right<=Math.min(innerWidth,frame.right)+2,viewport:{width:innerWidth,height:innerHeight}};
+      });
+      const settled=async()=>{
+        let previous,stableAt=performance.now();
+        return (await nativeUntil(async()=>{
+          const position=await snapshot(),signature=JSON.stringify(position);
+          if(signature!==previous){previous=signature;stableAt=performance.now();}
+          return {position,stable:performance.now()-stableAt>=80};
+        },sample=>sample.stable,5000)).position;
+      };
+      const before=await settled(),samples=[];
+      if(!before.sameNode || !before.focused || !before.visible)throw new Error('크기 전환 전 출처 focus·가시성 전제를 확보하지 못했습니다.');
       for(const [width,height] of [[720,450],[1152,720]]) {
-        await page.setViewportSize({width,height});await page.clock.runFor(80);
-        const position=await snapshot(),workspace=await workspaceEvidence(page),sameComposer=await input.evaluate(node=>node===document.getElementById('request-input')) && await page.locator('#request-input').inputValue()===draft;
-        const readingStable=position.sameNode && position.focused && position.details && position.log && Math.abs(position.scrollTop-before.scrollTop)<=2 && (!workspace.compact || position.active==='preparation');
-        samples.push({width,height,position,workspace,sameComposer,readingStable});
+        await page.setViewportSize({width,height});
+        const beforeCapture=await settled();await shot(page,'resize-continuity-'+width);const position=await settled(),workspace=await workspaceEvidence(page),sameComposer=await input.evaluate(node=>node===document.getElementById('request-input')) && await page.locator('#request-input').inputValue()===draft;
+        const expectedTop=Math.min(Math.max(before.top,Math.max(0,position.frame.top)+8),Math.min(height,position.frame.bottom)-8-position.height);
+        const roundTrip=width===before.viewport.width && height===before.viewport.height;
+        const readingStable=[beforeCapture,position].every(item=>item.viewport.width===width && item.viewport.height===height && item.sameNode && item.focused && item.details && item.log && item.visible && item.href===before.href && item.text===before.text && Math.abs(item.top-expectedTop)<=2) && (!workspace.compact || position.active==='preparation') && (!roundTrip || Math.abs(position.scrollTop-before.scrollTop)<=2 && Math.abs(position.left-before.left)<=1);
+        samples.push({width,height,beforeCapture,position,expectedTop,roundTrip,workspace,sameComposer,readingStable});
         record(width+'x'+height+' 같은 context 전환은 출처·focus·열림·rail 읽기·초안 보존',readingStable && sameComposer && workspace.viewportFit && workspace.sharedComposer && workspace.scrollRegions && workspace.compactPanels && actualPosts.length===0,JSON.stringify({before,...samples.at(-1)}));
-        proof.workspaceScenarios.push({id:'resize-continuity',width,height,...workspace,sharedComposer:workspace.sharedComposer && sameComposer,readingStable});
+        proof.workspaceScenarios.push({id:'resize-continuity',width,height,...workspace,sharedComposer:workspace.sharedComposer && sameComposer,readingStable,sourceReading:{before,beforeCapture,after:position,expectedTop,roundTrip}});
       }
     } finally {await context.close();}
   });
