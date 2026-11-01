@@ -511,17 +511,22 @@
     "guided-backend": {
       "phase": "implementing",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261101-guided-backend",
-      "note": "현재 할 일 중심 흐름 계약 docs/guided-visit-contract.md. 실모델 호출 금지, fixture와 keyless 시연 검증. 이전 실제 모델 증거를 새 로직 검증으로 대체하지 않음."
+      "note": "현재 할 일 중심 흐름 계약 docs/guided-visit-contract.md. 실모델 호출 금지, fixture와 keyless 시연 검증. 이전 실제 모델 증거를 새 로직 검증으로 대체하지 않음.",
+      "integrationCommits": []
     },
     "guided-ui": {
-      "phase": "implementing",
+      "phase": "integrating",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261101-guided-ui",
-      "note": "현재 할 일 중심 흐름 계약 docs/guided-visit-contract.md. 실모델 호출 금지, fixture와 keyless 시연 검증. 이전 실제 모델 증거를 새 로직 검증으로 대체하지 않음."
+      "note": "현재 할 일 중심 흐름 계약 docs/guided-visit-contract.md. 실모델 호출 금지, fixture와 keyless 시연 검증. 이전 실제 모델 증거를 새 로직 검증으로 대체하지 않음.",
+      "integrationCommits": [
+        "52dc6c0"
+      ]
     },
     "guided-qa": {
       "phase": "implementing",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261101-guided-qa",
-      "note": "현재 할 일 중심 흐름 계약 docs/guided-visit-contract.md. 실모델 호출 금지, fixture와 keyless 시연 검증. 이전 실제 모델 증거를 새 로직 검증으로 대체하지 않음."
+      "note": "현재 할 일 중심 흐름 계약 docs/guided-visit-contract.md. 실모델 호출 금지, fixture와 keyless 시연 검증. 이전 실제 모델 증거를 새 로직 검증으로 대체하지 않음.",
+      "integrationCommits": []
     }
   },
   "review": {
