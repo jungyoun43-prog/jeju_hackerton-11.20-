@@ -480,3 +480,11 @@ UI와 기존 준비판 검사 파일은 두 전용 worktree로 나눴다. UI 변
 기획서는 본문/표/필수 항목12페이지를 검토했고 최신 PDF9페이지에는 동일 소스의 실제 고정 예시 화면을 넣었다. 실제 LLM 화면으로 오인하지 않게 캡션을 명시했다. PDF 생성·ZIP·자동검사 통과는 대회 업로드 완료가 아니다. 최신 CI/공개/ZIP 결과는 runs/aws-deployment.json·agent-evaluation-deployed.json·visit-recovery-deployed.json·release.json과 output/final-archive-check.json을 따른다.
 
 실제 전화 계정·위임/번호/기록 처리, 개인기록·환자/가족 인증, 실제 기관/의료진·보호자 참여 평가·휴대폰/센터PC·임상/법률 검토·발표/영상/최종 업로드는 후속이다. 이 미검증 범위를 자동 규칙 준수율이나 합성 응답으로 대신하지 않는다.
+
+### 공개 배포와 공급자 한도 관측
+
+`bc79e52add460866e5e04c1cadd2935526d4ce92`의 [CI41313760536](https://github.com/jungyoun43-prog/jeju_hackerton-11.20-/actions/runs/41313760536)는 설치·409검사·웹/Lambda 빌드·OIDC 배포·같은revision/hash 검증을 완료했다. 공개 Sol의 방문 준비21.155초/공공보건 문의12.046초 두 과업과 각각의 실제 저장 상태/완료receipt 읽기 복구가 통과했고 별도 답변 검토도2/2였다. 내부 Responses 횟수는 공개 API에서 계측하지 않았다. 고정preview14건·262개 검사/정적21파일 바이트와 GET-only10크기 검사도 같은 공개revision에서 통과했다. ZIP 독립 설치409/409·정적/Lambda 빌드·실행 지문/CRC 일치를 확인했다.
+
+14:07 UTC에 추가 공개 receipt 검사는429/MODEL_RATE_LIMITED로 진행하지 못했다. 첫 시도는 세부 HTTP 관측이 부족했고 두 번째는 첫응답429를 기록했으므로 성공으로 처리하지 않는다. 로컬 설정키에 실제 의무기록 없이 최소 'Reply OK.'를 보내 직접 진단한 응답은429, error.code=credit_balance_exhausted, type=insufficient_quota, Retry-After 없음이었다. 키 원문·vendor message는 저장하지 않았고 로컬/AWS키 동일성을 비교했다고 주장하지 않는다. 추가 모델 호출은 중단했다.
+
+현재 일반 모델 대화에는 사용 가능한 API 크레딧이 필요하다. 새 키만 만들면 같은 계정의 잔액이 충전된다고 안내하지 않는다. 고정 예시·정적 화면과 만료 전 확인 상태의 읽기 복구는 모델 호출과 별개다. 추가 공개 완료중복 검사는 한도 때문에 미완료이며, 로컬 실제HTTP32검사와 SDK/DDB fixture·앞서 성공한 공개2과업의 완료복구를 그 검사로 대체해 성공했다고 쓰지 않는다. 마지막 문서 커밋은 이 실행 상태만 갱신하며 런타임 지문db4는 바꾸지 않는다. 실제 모델2과업은 원공개bc79 실행으로 보존한다.
