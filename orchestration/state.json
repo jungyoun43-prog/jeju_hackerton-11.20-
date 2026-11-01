@@ -1,6 +1,6 @@
 {
   "baseCommit": "e1e7e44",
-  "updatedAt": "2026-10-31T16:28:21.334241+00:00",
+  "updatedAt": "2026-11-01",
   "tasks": {
     "ui": {
       "phase": "verified",
@@ -403,6 +403,18 @@
         "c547877"
       ],
       "note": "입력상단·PC2×2/모바일4칸 핵심/native상세·상태4개·기존nextActions초안/복귀noPOST·보이는대기/완료focus 통합. 독립A 이전 첫요청/후속문의P1 해결·새차단0. 동결지문 d08f861032f2e76b30f4dea959567ab291dbf624881ec0dbb941e4e8f3b54d0f 에서 단위360/360·대화186/186·여정236/236(실preview14/일반POST0)·수동47/47·준비판212/212·규칙60/60·Lambda빌드/전부종료0. oldgreeting 포함 대화count 실패는 실제답변/고유원문/본문ID와SHA 보존 단언으로 강화해 영향받은 대화만 재실행. 공개/ZIP은 최신runs 증거 기준. 실제모델은9fc11bc 기존증거로 구분하며 재호출없음."
+    },
+    "chat-rail-ui": {
+      "phase": "implementing",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261101-chat-rail-ui",
+      "integrationCommits": [],
+      "note": "중앙 채팅·오른쪽 세로4칸 준비 현황/아이콘. chat-rail 계약에 따라 전용파일만 수정."
+    },
+    "chat-rail-qa": {
+      "phase": "implementing",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261101-chat-rail-qa",
+      "integrationCommits": [],
+      "note": "중앙 채팅·오른쪽 세로4칸 준비 현황/아이콘. chat-rail 계약에 따라 전용파일만 수정."
     }
   },
   "review": {

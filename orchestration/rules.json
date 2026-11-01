@@ -552,6 +552,27 @@
         "scripts/journey-browser-check.mjs",
         "scripts/preparation-board-browser-check.mjs"
       ]
+    },
+    {
+      "id": "chat-rail-ui",
+      "branch": "design/chat-right-rail",
+      "baseCommit": "d547a76",
+      "allow": [
+        "app/conversation.js",
+        "app/conversation.css",
+        "app/preparation-board-view.js",
+        "app/icons.js"
+      ]
+    },
+    {
+      "id": "chat-rail-qa",
+      "branch": "test/chat-right-rail",
+      "baseCommit": "d547a76",
+      "allow": [
+        "scripts/conversation-browser-check.mjs",
+        "scripts/journey-browser-check.mjs",
+        "scripts/preparation-board-browser-check.mjs"
+      ]
     }
   ],
   "rules": [
