@@ -1,6 +1,6 @@
 {
   "baseCommit": "e1e7e44",
-  "updatedAt": "2026-11-01T16:35:33.289381+00:00",
+  "updatedAt": "2026-11-01T17:07:22.063783+00:00",
   "tasks": {
     "ui": {
       "phase": "verified",
@@ -509,31 +509,52 @@
       "note": "1304 공식CSV35행 재취득·관할우선공공보건문의·범위밖null·45/45. 실제Sol해당과업+독립답변검토pass. 허브계보4종/공식안내2건/카탈로그1329 구분."
     },
     "guided-backend": {
-      "phase": "implementing",
+      "phase": "validating",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261101-guided-backend",
-      "note": "현재 할 일 중심 흐름 계약 docs/guided-visit-contract.md. 실모델 호출 금지, fixture와 keyless 시연 검증. 이전 실제 모델 증거를 새 로직 검증으로 대체하지 않음.",
-      "integrationCommits": []
+      "note": "현재 작업 흐름 통합. source 변경 뒤 새 fixture/keyless/브라우저/HTTP 검증 진행. 이전 actual-model 결과는 이력이며 현재 모델 품질 미검증.",
+      "integrationCommits": [
+        "5d7da43",
+        "34b66ea",
+        "2a3de90"
+      ]
     },
     "guided-ui": {
-      "phase": "integrating",
+      "phase": "validating",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261101-guided-ui",
-      "note": "현재 할 일 중심 흐름 계약 docs/guided-visit-contract.md. 실모델 호출 금지, fixture와 keyless 시연 검증. 이전 실제 모델 증거를 새 로직 검증으로 대체하지 않음.",
+      "note": "현재 작업 흐름 통합. source 변경 뒤 새 fixture/keyless/브라우저/HTTP 검증 진행. 이전 actual-model 결과는 이력이며 현재 모델 품질 미검증.",
       "integrationCommits": [
-        "52dc6c0"
+        "52dc6c0",
+        "cf22f67",
+        "1e604d4",
+        "87293ab",
+        "986f474"
       ]
     },
     "guided-qa": {
-      "phase": "implementing",
+      "phase": "validating",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261101-guided-qa",
-      "note": "현재 할 일 중심 흐름 계약 docs/guided-visit-contract.md. 실모델 호출 금지, fixture와 keyless 시연 검증. 이전 실제 모델 증거를 새 로직 검증으로 대체하지 않음.",
-      "integrationCommits": []
+      "note": "현재 작업 흐름 통합. source 변경 뒤 새 fixture/keyless/브라우저/HTTP 검증 진행. 이전 actual-model 결과는 이력이며 현재 모델 품질 미검증.",
+      "integrationCommits": [
+        "d0f26d1",
+        "f208f17",
+        "e181df9",
+        "f3f85c9",
+        "57aa4e8",
+        "80dca64",
+        "6ffb5ab",
+        "1436659",
+        "1a747aa"
+      ]
     }
   },
   "review": {
-    "phase": "implementing",
+    "phase": "validating",
     "role": "공통 projection·안전한 자동 초안·현재 할 일 UI 독립 통합검토",
-    "findings": [],
-    "resolution": "새 소스 검증 전. 기존 모델 평가·규칙 통과를 새 변경에 귀속하지 않는다."
+    "findings": [
+      "기본 설정과 명시 조건의 구분·목록 밖 기관·빼고/제외한 범위를 교차 검토해 수정",
+      "후속 실패/중지 뒤 최근 답변 접근·상태 기호·단일 준비표·출처 읽기 보존 보완"
+    ],
+    "resolution": "현재 소스의 fresh 검증 대기. 실제 모델 호출은 크레딧 소진으로 중단 유지."
   },
   "awsDeployment": {
     "phase": "verified",
