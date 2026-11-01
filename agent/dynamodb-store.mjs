@@ -10,13 +10,13 @@ import hospitalData from '../app/data/hospital-candidates.json' with { type: 'js
 import supportData from '../app/data/visit-support-providers.json' with { type: 'json' };
 import { AgentError } from './errors.mjs';
 import { isProgressKey, isProgressWriterId, normalizeProgressSnapshot, PROGRESS_TTL_SECONDS } from './progress.mjs';
+import { normalizeRequestReceipts, containsCredential } from './visit-recovery.mjs';
 
 const MAX_ITEM_BYTES = 192 * 1024;
 const OPERATION_TIMEOUT_MS = 4000;
 const SESSION_ID = /^[A-Za-z0-9_-]{43}$/;
 const REQUEST_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{11,79}$/;
 const forbidden = /^(?:__proto__|constructor|prototype|messages?|history|reply|context|providerContext|encrypted_content|ciphertext|authorization|apiKey|OPENAI_API_KEY)$/i;
-const credential = /\b(?:AKIA|ASIA)[A-Z0-9]{16}\b|\bsk-(?:proj-)?[A-Za-z0-9_-]{20,}|-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/;
 const ownErrors = new WeakSet();
 const storeError = (code, message, status) => { const error = new AgentError(code, message, status); ownErrors.add(error); return error; };
 const unavailable = () => storeError('SESSION_STORE_UNAVAILABLE', '대화 상태를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.', 503);
@@ -46,7 +46,7 @@ function jsonClone(value, depth = 0, count = { nodes: 0 }) {
   if (value === null || typeof value === 'boolean') return value;
   if (typeof value === 'number') { requireValue(Number.isSafeInteger(value)); return value; }
   if (typeof value === 'string') {
-    requireValue(value.length <= 20000 && !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/u.test(value) && !credential.test(value));
+    requireValue(value.length <= 20000 && !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/u.test(value) && !containsCredential(value));
     return value;
   }
   if (Array.isArray(value)) { requireValue(value.length <= 200); return value.map(item => jsonClone(item, depth + 1, count)); }
@@ -160,8 +160,10 @@ export function createDynamoSessionStore({ client, tableName, region = 'ap-north
     try {
       const key = sessionKey(item?.sessionId);
       integer(item.turns, 0, 40);
-      requireValue(Array.isArray(item.requestIds) && item.requestIds.length <= 41 && item.requestIds.every(id => typeof id === 'string' && REQUEST_ID.test(id) && !credential.test(id)));
-      const normalized = { ...key, sessionId: item.sessionId, state: normalizedState(item.state), turns: item.turns, requestIds: item.requestIds.slice(-40), expiresAt };
+      requireValue(Array.isArray(item.requestIds) && item.requestIds.length <= 41 && item.requestIds.every(id => typeof id === 'string' && REQUEST_ID.test(id) && !containsCredential(id)));
+      const requestIds=item.requestIds.slice(-40);
+      const normalized = { ...key, sessionId: item.sessionId, state: normalizedState(item.state), turns: item.turns, requestIds,
+        ...(item.requestReceipts !== undefined?{requestReceipts:normalizeRequestReceipts(item.requestReceipts,requestIds)}:{}), expiresAt };
       requireValue(Buffer.byteLength(JSON.stringify(normalized), 'utf8') <= MAX_ITEM_BYTES);
       return normalized;
     } catch { throw invalidState(); }
@@ -169,7 +171,7 @@ export function createDynamoSessionStore({ client, tableName, region = 'ap-north
   function readItem(item, sessionId) {
     if (!item) throw expired();
     try {
-      keys(item, ['pk', 'sessionId', 'state', 'turns', 'requestIds', 'expiresAt', 'leaseOwner', 'leaseUntil'], ['pk', 'sessionId', 'state', 'turns', 'requestIds', 'expiresAt']);
+      keys(item, ['pk', 'sessionId', 'state', 'turns', 'requestIds', 'requestReceipts', 'expiresAt', 'leaseOwner', 'leaseUntil'], ['pk', 'sessionId', 'state', 'turns', 'requestIds', 'expiresAt']);
       integer(item.expiresAt, 0, Number.MAX_SAFE_INTEGER);
       requireValue(item.pk === `session#${sessionId}` && item.sessionId === sessionId);
       const normalized = itemFor(item, item.expiresAt);
@@ -180,6 +182,7 @@ export function createDynamoSessionStore({ client, tableName, region = 'ap-north
   }
   return {
     kind: 'dynamodb',
+    visitRecovery: true,
     async writeProgress(key,value,{expiresAt,writerId,...options} = {}) {
       return safe(async()=>{
         const time=seconds();
@@ -211,20 +214,28 @@ export function createDynamoSessionStore({ client, tableName, region = 'ap-north
         return snapshot;
       });
     },
-    async loadOrCreate(sessionId, options) {
+    async loadOrCreate(sessionId, options = {}) {
       return safe(async () => {
         if (sessionId !== undefined && sessionId !== null) {
           const key = sessionKey(sessionId);
           const result = await send(new GetCommand({ TableName: tableName, Key: key, ConsistentRead: true }), options);
           return readItem(result?.Item, sessionId);
         }
-        for (let attempt = 0; attempt < 3; attempt++) {
-          const id = randomBytes(32).toString('base64url');
+        const initialId=options.initialSessionId;
+        if(initialId !== undefined)sessionKey(initialId);
+        for (let attempt = 0; attempt < (initialId?1:3); attempt++) {
+          const id = initialId ?? randomBytes(32).toString('base64url');
           const item = itemFor({ sessionId: id, state: createDemoCase(), turns: 0, requestIds: [] }, seconds() + ttlSeconds);
           try {
             await send(new PutCommand({ TableName: tableName, Item: item, ConditionExpression: 'attribute_not_exists(#pk)', ExpressionAttributeNames: { '#pk': 'pk' } }), options);
             const { pk, ...result } = item; return result;
-          } catch (error) { if (!conditional(error)) throw error; }
+          } catch (error) {
+            if (!conditional(error)) throw error;
+            if(initialId) {
+              const result=await send(new GetCommand({TableName:tableName,Key:sessionKey(initialId),ConsistentRead:true}),options);
+              return readItem(result?.Item,initialId);
+            }
+          }
         }
         throw unavailable();
       });

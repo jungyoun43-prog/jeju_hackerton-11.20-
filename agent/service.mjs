@@ -3,10 +3,11 @@ import { AGENT_TOOLS, createToolDispatcher, getPendingActions } from './tools.mj
 import { createMemorySessionStore } from './store.mjs';
 import { createDisconnectedProvider } from './providers.mjs';
 import { AgentError, fail, isObject, publicError } from './errors.mjs';
-import { readBody, validateMessageRequest, validatePreviewRequest, validateProgressRequest } from './validation.mjs';
+import { readBody, validateMessageRequest, validatePreviewRequest, validateProgressRequest, validateResumeRequest } from './validation.mjs';
 import { buildFixedPreview } from './preview.mjs';
 import { applyAction } from '../app/domain.js';
 import { createProgressReporter, readProgress, supportsProgress } from './progress.mjs';
+import { visitSessionId, supportsVisitRecovery, requestFingerprint, assertMatchingReceipt, recoverySummary, MAX_REQUEST_RECEIPTS, containsCredential } from './visit-recovery.mjs';
 
 const builtRevision = typeof __APP_REVISION__ === 'string' ? __APP_REVISION__ : 'development';
 const positiveInteger = (value,fallback,max) => Number.isSafeInteger(Number(value)) && Number(value) > 0 && Number(value) <= max ? Number(value) : fallback;
@@ -40,14 +41,14 @@ function modelMessage(value) {
  * context는 한 요청의 reasoning replay에만 사용하고 세션·응답·로그에 남기지 않는다.
  * 브라우저의 caseState·의료기록·source·toolResult는 입력으로 받지 않는다.
  */
-export function createAgentService({provider = createDisconnectedProvider(),store = createMemorySessionStore(),dispatch = createToolDispatcher(),config = {},progressReadOnly = false} = {}) {
+export function createAgentService({provider = createDisconnectedProvider(),store = createMemorySessionStore(),dispatch = createToolDispatcher(),config = {},progressReadOnly = false,now = Date.now} = {}) {
   const revision = String(config.revision ?? process.env.APP_REVISION ?? builtRevision).slice(0,80);
   const limits = {
     maxTurns:positiveInteger(config.maxTurns,20,40), maxRounds:positiveInteger(config.maxRounds,6,8), maxTools:positiveInteger(config.maxTools,12,16),
     deadlineMs:positiveInteger(config.deadlineMs,45000,45000), dailyTurns:positiveInteger(config.dailyTurns ?? process.env.DEMO_DAILY_TURN_LIMIT,80,80),
   };
   const progressAvailable = () => (provider.connected === true || progressReadOnly === true) && supportsProgress(store);
-  const capabilities = progress => ({llm:provider.connected === true,model:typeof provider.model === 'string' ? provider.model : '',phone:'simulation',healthRecords:'demo',voiceInput:'browser',progress,revision});
+  const capabilities = progress => ({llm:provider.connected === true,model:typeof provider.model === 'string' ? provider.model : '',phone:'simulation',healthRecords:'demo',voiceInput:'browser',progress,visitRecovery:supportsVisitRecovery(store)?'token':'unavailable',revision});
   const getCapabilities = () => capabilities(progressAvailable()?'poll':'unavailable');
 
   async function runTurn(request) {
@@ -55,22 +56,37 @@ export function createAgentService({provider = createDisconnectedProvider(),stor
     fail(provider.connected === true,'MODEL_NOT_CONNECTED','대화 모델 API를 아직 연결하지 않았습니다. 입력은 보존되며 고정 대화 예시를 확인할 수 있습니다.',503);
     const controller = new AbortController(), timer = setTimeout(() => controller.abort(),limits.deadlineMs);
     const progress = createProgressReporter({store,token:request.progressToken});
-    let session, acquired=false;
+    let session, acquired=false,receiptStarted=false,completionAttempted=false,completed=false;
     try {
       const options={signal:controller.signal};
-      session=await bounded(Promise.resolve().then(()=>store.loadOrCreate(request.sessionId,options)),controller.signal);
-      await bounded(Promise.resolve().then(()=>store.acquire(session.sessionId,options)),controller.signal);
-      acquired=true;
-      session=await bounded(Promise.resolve().then(()=>store.loadOrCreate(session.sessionId,options)),controller.signal);
+      const initialSessionId=request.visitToken?visitSessionId(request.visitToken):undefined;
+      if(initialSessionId) {
+        fail(supportsVisitRecovery(store),'VISIT_RECOVERY_UNAVAILABLE','준비 이어하기를 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.',503);
+        fail(!request.sessionId || request.sessionId === initialSessionId,'INVALID_SESSION','이 방문의 세션 식별자를 확인해 주세요.');
+      }
+      const digest=requestFingerprint(request);
+      session=await bounded(Promise.resolve().then(()=>store.loadOrCreate(request.sessionId,{...options,...(initialSessionId?{initialSessionId}:{})})),controller.signal);
+      assertMatchingReceipt(session.requestReceipts?.find(item=>item.requestId === request.requestId),digest,now());
+      if(!session.requestIds.includes(request.requestId)) {
+        await bounded(Promise.resolve().then(()=>store.acquire(session.sessionId,options)),controller.signal);
+        acquired=true;
+        session=await bounded(Promise.resolve().then(()=>store.loadOrCreate(session.sessionId,options)),controller.signal);
+        assertMatchingReceipt(session.requestReceipts?.find(item=>item.requestId === request.requestId),digest,now());
+      }
       if (session.requestIds.includes(request.requestId)) {
+        const pendingActions=getPendingActions(session.state),needsInput=pendingActions.length > 0;
         progress.completed();
         await progress.flush({signal:controller.signal});
         return {
           sessionId:session.sessionId,requestId:request.requestId,reply:'이미 처리한 요청입니다. 저장된 준비 상태를 다시 표시합니다.',caseState:session.state,
-          events:[],pendingActions:getPendingActions(session.state),capabilities:getCapabilities(),needsInput:false,
+          events:[],pendingActions,capabilities:getCapabilities(),needsInput,
         };
       }
       fail(session.turns < limits.maxTurns,'TURN_LIMIT','이 대화의 요청 한도에 도달했습니다. 새 대화를 시작해 주세요.',429);
+      fail((session.requestReceipts?.length ?? 0) < MAX_REQUEST_RECEIPTS,'REQUEST_LIMIT','이 방문의 요청 처리 기록 한도에 도달했습니다. 새 대화를 시작해 주세요.',429);
+      session={...session,requestReceipts:[...(session.requestReceipts ?? []),{requestId:request.requestId,digest,status:'started',at:now()}]};
+      await bounded(Promise.resolve().then(()=>store.save(session,options)),controller.signal);
+      receiptStarted=true;
       await bounded(Promise.resolve().then(()=>store.consumeTurn(limits.dailyTurns,options)),controller.signal);
       let state = session.state;
       const events = [], pending = [], usedIds = new Set();
@@ -104,7 +120,10 @@ export function createAgentService({provider = createDisconnectedProvider(),stor
           let reply = output.content.map(block => block.text ?? '').join('\n').trim();
           fail(reply.length > 0,'INVALID_MODEL_RESPONSE','모델 응답을 확인하지 못했습니다.',502);
           if (summaryOnly) reply += '\n\n이번 요청에서 처리 기록에 남긴 준비까지만 반영했습니다. 실행 전인 작업은 다음 확인으로 남겨두었습니다.';
-          await bounded(Promise.resolve().then(()=>store.save({...session,state,turns:session.turns + 1,requestIds:[...session.requestIds,request.requestId]},options)),controller.signal);
+          completionAttempted=true;
+          await bounded(Promise.resolve().then(()=>store.save({...session,state,turns:session.turns + 1,requestIds:[...session.requestIds,request.requestId],
+            requestReceipts:session.requestReceipts.map(item=>item.requestId === request.requestId?{...item,status:'completed',at:now()}:item)},options)),controller.signal);
+          completed=true;
           const allPending = dedupe([...pending,...getPendingActions(state)]);
           const needsInput = allPending.length > 0 || events.some(item => item.status !== 'completed');
           progress.completed(needsInput);
@@ -152,6 +171,11 @@ export function createAgentService({provider = createDisconnectedProvider(),stor
       controller.abort();
       if(acquired) {
         const cleanup=AbortSignal.timeout(2500);
+        // 최종 저장의 ack가 유실됐을 수 있으므로 완료 시도 뒤에는 이전 상태로 덮지 않는다.
+        if(receiptStarted && !completionAttempted && !completed) {
+          try {await bounded(Promise.resolve().then(()=>store.save({...session,requestReceipts:session.requestReceipts.map(item=>item.requestId === request.requestId?{...item,status:'failed',at:now()}:item)},{signal:cleanup})),cleanup);}
+          catch { /* started 기록은 lease 시간 뒤 중단 상태로 읽고 자동 재실행하지 않는다. */ }
+        }
         // 저장 결과는 유지하고, 정리 실패 시 만료 lease로 회복한다. 원문·SDK 오류는 기록하지 않는다.
         try {await bounded(Promise.resolve().then(()=>store.release(session.sessionId,{signal:cleanup})),cleanup);}
         catch { /* 영속 lease는 Lambda 수명보다 긴 65초 후 다시 획득할 수 있다. */ }
@@ -164,16 +188,23 @@ export function createAgentService({provider = createDisconnectedProvider(),stor
     try {
       const route = path.split('?')[0];
       if (route === '/api/agent/capabilities' && method === 'GET') return response(200,getCapabilities(),revision);
-      fail(['/api/agent','/api/agent/preview','/api/agent/capabilities','/api/agent/progress'].includes(route),'NOT_FOUND','요청한 API가 없습니다.',404);
+      fail(['/api/agent','/api/agent/preview','/api/agent/capabilities','/api/agent/progress','/api/agent/resume'].includes(route),'NOT_FOUND','요청한 API가 없습니다.',404);
       fail(method === 'POST' && route !== '/api/agent/capabilities','METHOD_NOT_ALLOWED','지원하지 않는 요청 방식입니다.',405);
       const contentType = Object.entries(requestHeaders).find(([name]) => name.toLowerCase() === 'content-type')?.[1];
       fail(contentType === undefined || /^application\/json(?:;|$)/i.test(String(contentType)),'UNSUPPORTED_MEDIA_TYPE','JSON 형식의 요청이 필요합니다.',415);
       const parsed = readBody(body);
+      if(route === '/api/agent/resume') {
+        const request=validateResumeRequest(parsed);
+        fail(supportsVisitRecovery(store),'VISIT_RECOVERY_UNAVAILABLE','준비 이어하기를 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.',503);
+        const session=await store.loadOrCreate(visitSessionId(request.visitToken));
+        return response(200,{sessionId:session.sessionId,caseState:session.state,pendingActions:getPendingActions(session.state),recovery:recoverySummary(session,now())},revision);
+      }
       if(route === '/api/agent/progress') {
         const request = validateProgressRequest(parsed);
         return response(200,progressAvailable()?await readProgress(store,request.progressToken):{available:false,progress:null},revision);
       }
-      if (typeof parsed?.requestId === 'string' && /^[A-Za-z0-9][A-Za-z0-9_-]{11,79}$/.test(parsed.requestId)) requestId = parsed.requestId;
+      if (typeof parsed?.requestId === 'string' && /^[A-Za-z0-9][A-Za-z0-9_-]{11,79}$/.test(parsed.requestId) && !containsCredential(parsed.requestId)
+        && ![parsed.visitToken,parsed.progressToken].some(token=>typeof token === 'string' && /^[A-Za-z0-9_-]{43}$/.test(token) && parsed.requestId.includes(token))) requestId = parsed.requestId;
       if (route === '/api/agent/preview') {
         const request = validatePreviewRequest(parsed);
         return response(200,await buildFixedPreview({capabilities:capabilities('unavailable'),requestId:request.requestId,scenarioId:request.scenarioId}),revision);

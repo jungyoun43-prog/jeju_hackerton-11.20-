@@ -1,5 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
+import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
+import { DYNAMODB_SDK_CONFIG } from '../agent/cloud-runtime.mjs';
 import { createDynamoSessionStore } from '../agent/dynamodb-store.mjs';
 import { createAgentService } from '../agent/service.mjs';
 import { createToolDispatcher } from '../agent/tools.mjs';
@@ -7,6 +10,7 @@ import { buildFixedPreview } from '../agent/preview.mjs';
 import { getCareJourneySummary } from '../app/care-journey.js';
 import { AgentError } from '../agent/errors.mjs';
 import { createProgressReporter, progressKey, readProgress } from '../agent/progress.mjs';
+import { visitSessionId } from '../agent/visit-recovery.mjs';
 
 const tableName = 'test-synthetic-sessions';
 const initialTime = Date.parse('2026-10-31T12:00:00Z');
@@ -407,4 +411,103 @@ test('legacy 선택 필드 없는 세션과 7개 고정 상황의 ID·시점·�
     const badGuidance=clone(restored);badGuidance.careJourney.rawText='PRIVATE medical original';
     await assert.rejects(store.save({...item,state:badGuidance}),safeError('SESSION_STATE_INVALID',503));
   }
+});
+
+
+test('방문 토큰의 초기 세션은 다른 store 인스턴스의 경쟁에서도 조건부로 한 번만 생성한다',async()=>{
+  const f=fixture(),a=f.store(),b=f.store(),sessionId=visitSessionId('v'.repeat(43));
+  const [first,second]=await Promise.all([a.loadOrCreate(undefined,{initialSessionId:sessionId}),b.loadOrCreate(undefined,{initialSessionId:sessionId})]);
+  assert.equal(first.sessionId,sessionId);assert.deepEqual(first,second);assert.equal(f.client.items.size,1);
+  assert.ok(f.client.calls.some(call=>call.name==='GetCommand'&&call.input.ConsistentRead===true));
+  const before=f.client.calls.length;await assert.rejects(a.loadOrCreate(undefined,{initialSessionId:'PRIVATE'}),safeError('INVALID_SESSION',400));assert.equal(f.client.calls.length,before);
+});
+
+test('첫 응답 유실 뒤 다른 DDB store/서비스에서도 완료 snapshot과 차감 한 건을 유지한다',async()=>{
+  const f=fixture(),visitToken='w'.repeat(43),request={visitToken,message:'합성 준비를 확인해 주세요.',requestId:'ddb-recovery-request-001'};
+  let calls=0;const provider={connected:true,model:'fixture',async respond(){calls++;return {content:[{text:'합성 준비 안내'}],stopReason:'end_turn'};}};
+  const send=service=>service.handleAgentRequest({method:'POST',path:'/api/agent',body:request});
+  const first=await send(createAgentService({store:f.store(),provider,now:f.now}));assert.equal(first.statusCode,200);
+  const latest=createAgentService({store:f.store(),provider,now:f.now}),before=f.client.calls.length,retry=await send(latest);
+  assert.equal(retry.statusCode,200);assert.deepEqual(JSON.parse(retry.body).caseState,JSON.parse(first.body).caseState);assert.equal(calls,1);
+  assert.equal(f.client.item('budget#2026-10-31').used,1);assert.equal(JSON.stringify(f.client.calls).includes(visitToken),false);
+  assert.deepEqual(f.client.calls.slice(before).map(call=>call.name),['PutCommand','GetCommand']);
+  const key=`session#${visitSessionId(visitToken)}`,expiresAt=f.client.item(key).expiresAt;
+  f.advance(100);const beforeResume=f.client.calls.length,resume=await latest.handleAgentRequest({method:'POST',path:'/api/agent/resume',body:{visitToken}});
+  assert.equal(resume.statusCode,200);assert.equal(JSON.parse(resume.body).recovery.request.status,'completed');
+  assert.deepEqual(f.client.calls.slice(beforeResume).map(call=>call.name),['GetCommand']);assert.equal(f.client.item(key).expiresAt,expiresAt);assert.equal(calls,1);
+});
+
+test('초기 DDB Put ack 유실은 다음 최초 요청을 같은 세션에 연결하며 중복 모델/예산을 만들지 않는다',async()=>{
+  const f=fixture(),original=f.client.send.bind(f.client),visitToken='x'.repeat(43);let lost=true,calls=0;
+  f.client.send=async(command,options)=>{const result=await original(command,options);if(lost&&command.constructor.name==='PutCommand'&&command.input.Item.pk.startsWith('session#')){lost=false;throw new Error('PRIVATE initial acknowledgement lost');}return result;};
+  const request={visitToken,message:'합성 상태를 알려 주세요.',requestId:'ddb-initial-ack-request-001'};
+  const provider={connected:true,model:'fixture',async respond(){calls++;return {content:[{text:'합성 안내'}],stopReason:'end_turn'};}};
+  const send=()=>createAgentService({store:f.store(),provider,now:f.now}).handleAgentRequest({method:'POST',path:'/api/agent',body:request});
+  assert.equal((await send()).statusCode,503);assert.equal(calls,0);assert.equal(f.client.item('budget#2026-10-31'),undefined);
+  assert.equal((await send()).statusCode,200);assert.equal((await send()).statusCode,200);assert.equal(calls,1);assert.equal(f.client.item('budget#2026-10-31').used,1);
+  assert.equal([...f.client.items.values()].filter(item=>item.pk.startsWith('session#')).length,1);
+});
+
+test('DDB receipt 시작/완료 ack 유실 뒤에는 unknown을 재실행하거나 완료 상태를 롤백하지 않는다',async()=>{
+  for(const stage of ['started','completed']){
+    const f=fixture(),original=f.client.send.bind(f.client),visitToken=(stage==='started'?'y':'z').repeat(43);let lost=true,calls=0;
+    f.client.send=async(command,options)=>{const result=await original(command,options);if(lost&&command.constructor.name==='PutCommand'&&command.input.Item.requestReceipts?.at(-1)?.status===stage){lost=false;throw new Error('PRIVATE receipt acknowledgement lost');}return result;};
+    const request={visitToken,message:'합성 준비를 알려 주세요.',requestId:'ddb-receipt-ack-request-001'};
+    const provider={connected:true,model:'fixture',async respond(){calls++;return {content:[{text:'합성 준비 안내'}],stopReason:'end_turn'};}};
+    const service=()=>createAgentService({store:f.store(),provider,now:f.now});
+    const send=()=>service().handleAgentRequest({method:'POST',path:'/api/agent',body:request});
+    assert.equal((await send()).statusCode,503);
+    const stored=f.client.item(`session#${visitSessionId(visitToken)}`);assert.equal(stored.requestReceipts[0].status,stage);
+    if(stage==='started'){
+      const retry=await send();assert.equal(retry.statusCode,409);assert.equal(JSON.parse(retry.body).error.code,'REQUEST_IN_PROGRESS');
+      f.advance(66);const recovery=await service().handleAgentRequest({method:'POST',path:'/api/agent/resume',body:{visitToken}});assert.equal(JSON.parse(recovery.body).recovery.request.status,'interrupted');
+      assert.equal((await send()).statusCode,409);assert.equal(calls,0);assert.equal(f.client.item('budget#2026-10-31'),undefined);
+    }else{assert.equal((await send()).statusCode,200);assert.equal(calls,1);assert.equal(stored.turns,1);assert.equal(f.client.item('budget#2026-10-31').used,1);}
+    assert.equal(f.client.calls.some(call=>call.name==='PutCommand'&&call.input.Item.requestReceipts?.at(-1)?.status==='failed'),false);
+  }
+});
+
+test('독립 DDB 실행의 최초 경쟁에서도 한 실행만 모델/예산으로 진행한다',async t=>{
+  const f=fixture(),visitToken='q'.repeat(43),request={visitToken,message:'합성 준비를 알려 주세요.',requestId:'ddb-race-recovery-001'};
+  let entered,release,calls=0;const started=new Promise(resolve=>{entered=resolve;});
+  const provider={connected:true,model:'fixture',async respond(){calls++;entered();return new Promise(resolve=>{release=()=>resolve({content:[{text:'합성 안내'}],stopReason:'end_turn'});});}};
+  t.after(()=>release?.());const a=createAgentService({store:f.store(),provider,now:f.now}),b=createAgentService({store:f.store(),provider,now:f.now});
+  const first=a.handleAgentRequest({method:'POST',path:'/api/agent',body:request});await started;
+  const second=await b.handleAgentRequest({method:'POST',path:'/api/agent',body:request});assert.equal(second.statusCode,409);assert.equal(calls,1);assert.equal(f.client.item('budget#2026-10-31').used,1);
+  release();assert.equal((await first).statusCode,200);
+});
+
+test('DDB receipt의 원문 추가·중복ID·상태오염은 저장/조회 경계에서 거절한다',async()=>{
+  const f=fixture(),{store,item}=await locked(f),valid={requestId:'ddb-receipt-validation-001',digest:'a'.repeat(64),status:'started',at:initialTime};
+  for(const receipts of [[{...valid,message:'PRIVATE'}],[valid,valid],[{...valid,status:'completed'}],[{...valid,status:'unknown'}],[{...valid,requestId:'sk-proj-'+ 'x'.repeat(40)}],new Array(1)])await assert.rejects(store.save({...item,requestReceipts:receipts}),safeError('SESSION_STATE_INVALID',503));
+  await store.save({...item,requestReceipts:[valid]});const key=f.client.key(tableName,`session#${item.sessionId}`),row=f.client.items.get(key);row.requestReceipts[0].reply='PRIVATE';
+  await assert.rejects(store.loadOrCreate(item.sessionId),safeError('SESSION_STATE_INVALID',503));
+});
+
+test('DDB budget ack 유실 뒤 같은 요청은 차감을 다시 수행하지 않는다',async()=>{
+  const f=fixture(),original=f.client.send.bind(f.client),visitToken='l'.repeat(43);let lost=true,calls=0;
+  f.client.send=async(command,options)=>{const result=await original(command,options);if(lost&&command.constructor.name==='UpdateCommand'&&command.input.Key.pk.startsWith('budget#')){lost=false;throw new Error('PRIVATE budget acknowledgement lost');}return result;};
+  const provider={connected:true,model:'fixture',async respond(){calls++;throw new Error('모델 호출 금지');}},request={visitToken,message:'합성 상태를 알려 주세요.',requestId:'ddb-budget-ack-request-001'};
+  const send=()=>createAgentService({store:f.store(),provider,now:f.now}).handleAgentRequest({method:'POST',path:'/api/agent',body:request});
+  assert.equal((await send()).statusCode,503);assert.equal(f.client.item('budget#2026-10-31').used,1);assert.equal(calls,0);
+  const retry=await send();assert.equal(retry.statusCode,409);assert.equal(JSON.parse(retry.body).error.code,'REQUEST_INTERRUPTED');assert.equal(f.client.item('budget#2026-10-31').used,1);assert.equal(calls,0);
+});
+
+
+test('실제 SDK는 적용 후 HTTP500인 budget ADD를 한 번만 보내고 자동 재차감하지 않는다',async()=>{
+  async function run(maxAttempts){
+    let sends=0,used=0;
+    const client=DynamoDBDocumentClient.from(new DynamoDBClient({region:'ap-northeast-2',...DYNAMODB_SDK_CONFIG,...(maxAttempts?{maxAttempts}:{}),credentials:{accessKeyId:'fixture-access',secretAccessKey:'fixture-secret'},
+      requestHandler:{async handle(request){
+        const body=JSON.parse(request.body);assert.ok(body.Key?.pk?.S?.startsWith('budget#'),'로컬 budget fixture만 허용');
+        sends++;used++;
+        return {response:{statusCode:sends===1?500:200,headers:{'content-type':'application/x-amz-json-1.0','x-amzn-requestid':'fixture-request-id'},body:Buffer.from(sends===1?JSON.stringify({__type:'com.amazonaws.dynamodb.v20120810#InternalServerError',message:'PRIVATE fixture acknowledgement lost after applied write'}):'{}')}};
+      },destroy(){}}}));
+    const store=createDynamoSessionStore({client,tableName,now:()=>initialTime});
+    try{if(maxAttempts===2)await store.consumeTurn(80);else await assert.rejects(store.consumeTurn(80),safeError('SESSION_STORE_UNAVAILABLE',503));}
+    finally{client.destroy();}
+    return {sends,used};
+  }
+  assert.deepEqual(await run(),{sends:1,used:1});
+  assert.deepEqual(await run(2),{sends:2,used:2},'기존 재시도 설정의 음성 대조군은 실제로 중복 ADD를 재현한다.');
 });

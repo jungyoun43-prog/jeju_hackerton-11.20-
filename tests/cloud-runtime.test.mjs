@@ -5,6 +5,8 @@ import { createLambdaHandler } from '../agent/handler.mjs';
 import { createMemorySessionStore } from '../agent/store.mjs';
 import { AgentError } from '../agent/errors.mjs';
 import { createProgressReporter, progressKey } from '../agent/progress.mjs';
+import { visitSessionId } from '../agent/visit-recovery.mjs';
+import { createDemoCase } from '../app/domain.js';
 
 const ACCOUNT = '123456789012';
 const ARN = `arn:aws:secretsmanager:ap-northeast-2:${ACCOUNT}:secret:fixture/openai-token-Ab12Cd`;
@@ -154,7 +156,7 @@ test('Lambda HTTPv2/context·base64 wrapper로 cloud runtime과 실제 도구 lo
   const handle=createCloudAgentRequestHandler({getRuntime:f.getRuntime});const lambda=createLambdaHandler(handle);
   const result=await lambda({rawPath:'/api/agent',requestContext:{http:{method:'POST'}},isBase64Encoded:true,body:Buffer.from(JSON.stringify(post().body)).toString('base64')},COMMAND_CONTEXT);
   assert.equal(result.statusCode,200);const body=parse(result);assert.equal(body.events[0].tool,'get_case');assert.equal(body.capabilities.llm,true);
-  assert.deepEqual(operations.slice(0,4),['loadOrCreate','acquire','loadOrCreate','consumeTurn']);assert.ok(operations.includes('save'));assert.ok(operations.includes('release'));
+  assert.deepEqual(operations.slice(0,5),['loadOrCreate','acquire','loadOrCreate','save','consumeTurn']);assert.ok(operations.includes('save'));assert.ok(operations.includes('release'));
   assert.equal(sent.length,2);assert.equal(sent[1].input.some(item=>item.type==='function_call_output' && item.call_id==='cloud_call'),true);
   assert.equal(result.body.includes(KEY),false);assert.equal(result.body.includes('PRIVATE_REASONING_FIXTURE'),false);assert.equal(JSON.stringify(memory.inspect()).includes(KEY),false);
   const oversized=await lambda({rawPath:'/api/agent',requestContext:{http:{method:'POST'}},isBase64Encoded:true,body:'x'.repeat(33000)},COMMAND_CONTEXT);assert.equal(oversized.statusCode,413);
@@ -295,4 +297,41 @@ test('cold local poll·ARN 누락 cloud poll은 env 키나 runtime factory를 �
   const handle=createCloudAgentRequestHandler({getRuntime}),input=post({progressToken:'y'.repeat(43)},'/api/agent/progress');
   assert.deepEqual(parse(await handle(input)),{available:false,progress:null});
   assert.deepEqual(parse(await handle(input,COMMAND_CONTEXT)),{available:false,progress:null});assert.equal(factories,0);
+});
+
+
+test('cold cloud 복구는 Secret/provider/lease/budget 없이 검증된 세션 Get 한 번만 실행한다',async()=>{
+  const visitToken='r'.repeat(43),sessionId=visitSessionId(visitToken),state=createDemoCase(),expiresAt=Math.floor(Date.now()/1000)+3600,at=Date.now();
+  const calls=[];let secrets=0,factories=0;
+  const row={pk:`session#${sessionId}`,sessionId,state,turns:1,requestIds:[requestId],requestReceipts:[{requestId,digest:'a'.repeat(64),status:'completed',at}],expiresAt};
+  const getRuntime=createCloudRuntimeGetter({env:{...ENV},documentClient:{async send(command){calls.push(command);return {Item:structuredClone(row)};}},secretsClient:{async send(){secrets++;throw new Error('PRIVATE forbidden secret');}},runtimeFactory(){factories++;throw new Error('provider 구성 금지');}});
+  const handle=createCloudAgentRequestHandler({getRuntime}),result=await handle(post({visitToken},'/api/agent/resume'),COMMAND_CONTEXT),value=parse(result);
+  assert.equal(result.statusCode,200);assert.equal(value.sessionId,sessionId);assert.deepEqual(value.caseState,state);assert.equal(value.recovery.savedAt,new Date(at).toISOString());assert.equal(value.recovery.expiresAt,expiresAt);
+  assert.equal(secrets,0);assert.equal(factories,0);assert.equal(calls.length,1);assert.equal(calls[0].constructor.name,'GetCommand');
+  assert.deepEqual(calls[0].input,{TableName:ENV.SESSION_TABLE_NAME,Key:{pk:`session#${sessionId}`},ConsistentRead:true});
+  for(const raw of [visitToken,KEY,ARN])assert.equal(result.body.includes(raw),false);
+});
+
+test('cloud 복구 입력 오류는 getter 전에 거절하고 저장소 오류를 만료404로 바꾸지 않는다',async()=>{
+  let calls=0;const handle=createCloudAgentRequestHandler({getRuntime:async()=>{calls++;throw new Error('PRIVATE store unavailable');}}),visitToken='s'.repeat(43);
+  for(const [input,status] of [[post({},'/api/agent/resume'),400],[post({visitToken:'bad'},'/api/agent/resume'),400],[post({visitToken,sessionId:'PRIVATE'},'/api/agent/resume'),400],[{method:'GET',path:'/api/agent/resume'},405],[{...post({visitToken},'/api/agent/resume'),headers:{'content-type':'text/plain'}},415]])assert.equal((await handle(input,COMMAND_CONTEXT)).statusCode,status);
+  assert.equal(calls,0);const failure=await handle(post({visitToken},'/api/agent/resume'),COMMAND_CONTEXT);
+  assert.equal(failure.statusCode,503);assert.equal(parse(failure).error.code,'SESSION_STORE_UNAVAILABLE');assert.equal(failure.body.includes('PRIVATE'),false);assert.equal(calls,1);
+});
+
+test('cold local 복구와 ARN 없는 Lambda 복구는 키/runtime 초기화를 시작하지 않는다',async()=>{
+  let factories=0;const env={};Object.defineProperty(env,'OPENAI_API_KEY',{get(){throw new Error('PRIVATE key read forbidden');}});
+  const getRuntime=createCloudRuntimeGetter({env,runtimeFactory(){factories++;throw new Error('runtime 구성 금지');}}),handle=createCloudAgentRequestHandler({getRuntime}),input=post({visitToken:'t'.repeat(43)},'/api/agent/resume');
+  assert.equal((await handle(input)).statusCode,404);const cloud=await handle(input,COMMAND_CONTEXT);assert.equal(cloud.statusCode,503);assert.equal(parse(cloud).error.code,'SESSION_STORE_UNAVAILABLE');assert.equal(factories,0);
+});
+
+test('Secret 초기화가 진행 중이어도 방문 복구는 기다리지 않고 기존 저장소만 읽는다',async t=>{
+  let entered,release;const gate=new Promise(resolve=>{release=resolve;}),started=new Promise(resolve=>{entered=resolve;});
+  t.after(()=>release());let secretCalls=0;
+  const f=fixture({secretsClient:{async send(){secretCalls++;entered();await gate;return secret();}}}),visitToken='u'.repeat(43);
+  const saved=await f.memory.loadOrCreate(undefined,{initialSessionId:visitSessionId(visitToken)});
+  const handle=createCloudAgentRequestHandler({getRuntime:f.getRuntime}),normal=handle(post(),COMMAND_CONTEXT);await started;
+  const recovered=await handle(post({visitToken},'/api/agent/resume'),COMMAND_CONTEXT);
+  assert.equal(recovered.statusCode,200);assert.equal(parse(recovered).sessionId,saved.sessionId);assert.equal(secretCalls,1);assert.equal(f.modelCalls.length,0);
+  release();assert.equal((await normal).statusCode,200);assert.equal(secretCalls,1);assert.equal(f.modelCalls.length,1);
 });

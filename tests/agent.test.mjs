@@ -22,7 +22,7 @@ test('기본 API는 모델·store 호출 없이 사실대로 미연결503을 반
   const store = new Proxy({}, {get() { throw new Error('store must not be touched'); }});
   const service = createAgentService({store,config:{revision:'test-sha'}});
   const caps = await service.handleAgentRequest({method:'GET',path:'/api/agent/capabilities'});
-  assert.deepEqual(json(caps),{llm:false,model:'',phone:'simulation',healthRecords:'demo',voiceInput:'browser',progress:'unavailable',revision:'test-sha'});
+  assert.deepEqual(json(caps),{llm:false,model:'',phone:'simulation',healthRecords:'demo',voiceInput:'browser',progress:'unavailable',visitRecovery:'unavailable',revision:'test-sha'});
   const result = await post(service);
   assert.equal(result.statusCode,503);
   assert.equal(json(result).error.code,'MODEL_NOT_CONNECTED');
@@ -128,7 +128,9 @@ test('서버 세션 상태를 다음 턴에 유지하며 requestId 중복은 도
   const provider = scripted([use(call('update_visit',{date:'2026-11-16'})),done('합성 날짜 반영'),use(call('get_case',{},'case-2')),done('서버 날짜를 확인했습니다.')]);
   const store = createMemorySessionStore(),service = createAgentService({provider,store,config:{dailyTurns:2}});
   const first = json(await post(service));
-  const retry = await post(service,req({sessionId:first.sessionId,message:'중복요청에서는 바꾸지 않아야 함'}));
+  const changed = await post(service,req({sessionId:first.sessionId,message:'중복 식별자에 다른 요청'}));
+  assert.equal(changed.statusCode,409);assert.equal(json(changed).error.code,'REQUEST_CONFLICT');
+  const retry = await post(service,req({sessionId:first.sessionId}));
   assert.equal(retry.statusCode,200); assert.match(json(retry).reply,/이미 처리/); assert.equal(provider.calls.length,2);
   const second = json(await post(service,req({sessionId:first.sessionId,requestId:'request-test-0002'})));
   assert.equal(second.caseState.patient.nextVisit,'2026-11-16');
