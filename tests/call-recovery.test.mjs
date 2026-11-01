@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createDemoCase, applyAction } from '../app/domain.js';
 import { CALL_RECOVERY_SCENARIOS, getCallAttemptGate, getCallRecoveryHandoffs } from '../app/call-recovery.js';
 import { getCareJourneySummary } from '../app/care-journey.js';
+import { getVisitSupportSummary } from '../app/visit-support.js';
 import { createToolDispatcher } from '../agent/tools.mjs';
 import { createAgentService } from '../agent/service.mjs';
 
@@ -85,6 +86,7 @@ test('이동·동행 지원도 같은 gate를 사용하고 정책 미설정·거
   for(const reason of ['no_answer','ai_declined','identity_required']) {
     const f=fixture(reason);let result=await f.dispatch({name:'prepare_inquiries',input:{kind:'taxi'},state:createDemoCase()});
     result=await f.dispatch({name:'request_support_contact',input:{kind:'taxi'},state:result.state});
+    assert.equal(result.data.label,`${getCallRecoveryHandoffs(result.state)[0].title} · 시연`);
     result=await f.dispatch({name:'request_support_contact',input:{kind:'taxi'},state:result.state});
     assert.equal(f.calls(),1);const handoff=getCallRecoveryHandoffs(result.state)[0];assert.match(handoff.contact.phone,/^0|^1899/);
     assert.equal(handoff.stopAutomatic,true);assert.equal(handoff.attempts.length,1);
@@ -98,6 +100,11 @@ test('4개 고정복구 preview는 명시 시연만 허용하며 키·store·모
     const response=await service.handleAgentRequest({method:'POST',path:'/api/agent/preview',body:{scenarioId:id,requestId:'recovery-preview-test-001'}});
     assert.equal(response.statusCode,200);const body=JSON.parse(response.body),summary=getCareJourneySummary(body.caseState);
     assert.equal(body.isPreview,true);assert.equal(body.capabilities.llm,false);assert.equal(body.sessionId,'');assert.ok(summary.handoffs.length);
+    if(id==='call_ai_declined') {
+      const support=getVisitSupportSummary(body.caseState);
+      assert.match(support.taxi.label,/AI 응대 거절 · 보호자 인계/);
+      assert.doesNotMatch(support.unresolved.join(' '),/불통/);
+    }
     for(const handoff of summary.handoffs){assert.equal(handoff.stopAutomatic,true);assert.equal(handoff.actualCallPlaced,false);assert.equal(handoff.retryPolicy.scheduled,false);}
     assert.ok(body.events.some(x=>/자동 문의 중단/.test(x.label)));
   }

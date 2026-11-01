@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createDemoCase, applyAction, getTasks, getProgress, calculateBurden, buildReport } from '../app/domain.js';
 import { parseHospitalImport } from '../app/datahub.js';
 import { createVisitSupport, applyVisitSupportAction, reconcileVisitSupport, getVisitSupportSummary, buildSupportInquiry, buildVisitSupportReport } from '../app/visit-support.js';
+import supportData from '../app/data/visit-support-providers.json' with { type: 'json' };
 
 const act = (state, type, args = {}) => applyAction(state, { type, ...args });
 function withDestination(state = createDemoCase(), address = '제주특별자치도 제주시 합성방문로 1') {
@@ -34,6 +35,12 @@ function prepared(state = createDemoCase(), serviceType = 'call_taxi') {
 }
 function available(state = createDemoCase(), serviceType = 'call_taxi', confirmations = {}) {
   return act(prepared(state, serviceType), 'SUPPORT_RECORD_RESPONSE', { kind: provider(serviceType).kind, outcome: 'available', ...confirmations });
+}
+function failedSupport(reason, kind = 'taxi') {
+  const record = supportData.providers.find(item => item.kind === kind && item.region === '제주시');
+  let state = act(createDemoCase(), 'SUPPORT_SELECT_PROVIDER', { kind, provider: record });
+  state = act(state, 'SUPPORT_PREPARE_INQUIRY', { kind });
+  return act(state, 'CALL_RECORD_ATTEMPT', { target: kind, outcome: reason, at: '2026-11-01T12:00:00.000Z' });
 }
 
 test('초기 지원은 단일 방문의 문의 준비이며 기존 병원·자료·반복비용 의미를 보존한다', () => {
@@ -131,6 +138,77 @@ test('불가·불통은 다른 문의처나 재문의 작업을 만들고 의료
     assert.deepEqual(next.review, state.review);
     assert.deepEqual(next.packet, state.packet);
     assert.deepEqual(next.documents, state.documents);
+  }
+});
+
+test('이동·동행 요약과 미확인·보고서는 무응답·AI 거절·본인확인·서류·일정·접수 이유를 구분한다', () => {
+  for (const kind of ['taxi', 'companion']) {
+    const labels = new Set();
+    for (const [reason, expected] of [
+      ['no_answer', /무응답/], ['ai_declined', /AI 응대 거절 · 보호자 인계/],
+      ['identity_required', /본인확인 요구 · 환자 직접 단계/], ['missing_documents', /서류 부족 · 발급 작업/],
+      ['no_slots', /예약 불가 · 다른 날짜/], ['not_participating', /접수 미참여/],
+    ]) {
+      const state = failedSupport(reason, kind), before = structuredClone(state);
+      const summary = getVisitSupportSummary(state), item = summary[kind];
+      assert.match(item.label, expected);
+      assert.match(item.label, /시연/);
+      assert.doesNotMatch(item.label, /불통/);
+      assert.equal(item.status, 'unreachable_demo');
+      assert.equal(item.ready, false);
+      for (const text of [item.unresolved.join(' '), summary.unresolved.join(' '), summary.nextActions.find(action => action.kind === kind).reason, buildVisitSupportReport(state)]) {
+        assert.match(text, expected);
+        assert.doesNotMatch(text, /불통/);
+      }
+      labels.add(item.label);
+      assert.deepEqual(state, before);
+    }
+    assert.equal(labels.size, 6);
+  }
+});
+
+test('같은 수신처의 새 초안은 인계 이유를 보존하고 새 문의처에는 이전 AI 거절을 붙이지 않는다', () => {
+  for (const kind of ['taxi', 'companion']) {
+    const failed = failedSupport('ai_declined', kind), before = structuredClone(failed);
+    const same = act(failed, 'SUPPORT_PREPARE_INQUIRY', { kind });
+    assert.equal(getVisitSupportSummary(same)[kind].status, 'prepared');
+    assert.match(getVisitSupportSummary(same)[kind].label, /AI 응대 거절 · 보호자 인계/);
+    const record = supportData.providers.find(item => item.kind === kind && item.region === '제주시' && item.id !== failed.visitSupport[kind].provider.id);
+    let changed = act(failed, 'SUPPORT_SELECT_PROVIDER', { kind, provider: record });
+    assert.equal(getVisitSupportSummary(changed)[kind].label, '문의처 선택');
+    changed = act(changed, 'SUPPORT_PREPARE_INQUIRY', { kind });
+    const summary = getVisitSupportSummary(changed);
+    assert.equal(summary[kind].label, '초안 준비 · 응답 전');
+    assert.doesNotMatch(summary[kind].unresolved.join(' '), /AI 응대 거절/);
+    assert.doesNotMatch(buildVisitSupportReport(changed), /AI 응대 거절/);
+    assert.deepEqual(changed.callRecovery, failed.callRecovery);
+    assert.deepEqual(failed, before);
+  }
+});
+
+test('조건 재확인과 필요 없음은 같은 수신처의 과거 인계 이유보다 우선한다', () => {
+  for (const kind of ['taxi', 'companion']) {
+    const failed = failedSupport('ai_declined', kind), before = structuredClone(failed);
+    const changes = [
+      state => act(state, 'SUPPORT_UPDATE_REQUIREMENTS', { values: { appointmentTime: '10:30' } }),
+      state => act(state, 'UPDATE_PATIENT', { values: { nextVisit: '2026-11-13' } }),
+    ];
+    for (const change of changes) {
+      const changed = change(failed), item = getVisitSupportSummary(changed)[kind];
+      assert.equal(item.status, 'needs_recheck');
+      assert.equal(item.label, '조건 변경 · 재확인 필요');
+      assert.doesNotMatch(item.unresolved.join(' '), /AI 응대 거절/);
+      assert.deepEqual(changed.callRecovery, failed.callRecovery);
+    }
+    const needed = kind === 'taxi' ? 'transportNeeded' : 'companionNeeded';
+    const off = act(failed, 'SUPPORT_UPDATE_REQUIREMENTS', { values: { [needed]: false } });
+    const item = getVisitSupportSummary(off)[kind];
+    assert.equal(item.status, 'not_needed');
+    assert.equal(item.label, '필요 없음');
+    assert.deepEqual(item.unresolved, []);
+    assert.deepEqual(off.callRecovery, failed.callRecovery);
+    assert.equal(getVisitSupportSummary(act(off, 'SUPPORT_UPDATE_REQUIREMENTS', { values: { [needed]: true } }))[kind].label, '조건 변경 · 재확인 필요');
+    assert.deepEqual(failed, before);
   }
 });
 

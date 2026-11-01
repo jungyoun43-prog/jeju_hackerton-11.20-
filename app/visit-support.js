@@ -1,4 +1,5 @@
 import { getJourneyContactContext } from './care-journey.js';
+import { callRecipientId, getCallRecoveryHandoffs } from './call-recovery.js';
 
 /** 단일 방문의 이동·동행 문의 준비. 실제 발신·예약·배차·결제를 수행하지 않는다. */
 const KINDS = ['taxi', 'companion'];
@@ -262,16 +263,21 @@ export function getVisitSupportSummary(state) {
   const destinationKnown = Boolean(object(state.selectedHospital) && state.selectedHospital.companyName?.trim() && context.address);
   const unresolved = [], nextActions = [];
   let preparedCount = 0, totalNeeded = 0;
+  let handoffs;
   const result = {};
   for (const kind of KINDS) {
     const entry = support[kind], needed = support.requirements[neededKey(kind)], name = kindName(kind);
     const labels = { not_selected: '문의처 선택 전', selected: '문의처 선택', prepared: '초안 준비 · 응답 전', available_demo: '가능 응답 · 시연', unavailable_demo: '불가 응답 · 시연', unreachable_demo: '불통 · 시연', needs_recheck: '조건 변경 · 재확인 필요' };
-    result[kind] = { status: needed ? entry.status : 'not_needed', label: needed ? labels[entry.status] : '필요 없음', providerName: entry.provider?.name || '', source: entry.provider ? { ...entry.provider.source } : null, questions: needed ? questionsFor(state, kind) : [], ready: false, unresolved: [] };
+    const recovery = state.callRecovery?.targets[kind];
+    const handoff = needed && entry.status !== 'needs_recheck' && recovery?.reason && recovery.recipientId === callRecipientId(state, kind)
+      ? (handoffs ??= getCallRecoveryHandoffs(state)).find(item => item.target === kind) : null;
+    const label = !needed ? '필요 없음' : handoff ? `${handoff.title} · 시연` : labels[entry.status];
+    result[kind] = { status: needed ? entry.status : 'not_needed', label, providerName: entry.provider?.name || '', source: entry.provider ? { ...entry.provider.source } : null, questions: needed ? questionsFor(state, kind) : [], ready: false, unresolved: [] };
     if (!needed) continue;
     totalNeeded += 1;
     const gaps = [];
     if (!entry.provider) gaps.push(`${name} 문의처가 정해지지 않았습니다.`);
-    else if (entry.status !== 'available_demo') gaps.push(`${name} ${labels[entry.status]} 상태입니다.`);
+    else if (entry.status !== 'available_demo') gaps.push(`${name} ${label} 상태입니다.`);
     if (!context.area) gaps.push('출발 지역이 미확인입니다.');
     if (!validDate(context.date)) gaps.push('방문 날짜가 미확인입니다.');
     if (!context.appointmentTime) gaps.push('예약 시각이 미확인입니다.');
