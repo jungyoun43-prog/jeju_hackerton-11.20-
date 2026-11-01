@@ -950,15 +950,15 @@ try {
       await source.scrollIntoViewIfNeeded();await source.focus();
       const snapshot=()=>source.evaluate(node=>{const rect=node.getBoundingClientRect();return {connected:node.isConnected,focused:document.activeElement===node,top:rect.top,left:rect.left,open:node.closest('[data-stage-log]').open && node.closest('[data-stage-details]').open,unmoved:[...document.querySelectorAll('.stage-pane,.message,.message-body')].every(item=>getComputedStyle(item).transform==='none')};});
       const before=await snapshot(),pastQuiet=await page.locator('#message-list>.message.assistant>.message-meta').evaluateAll(nodes=>nodes.every(node=>getComputedStyle(node).animationName==='none' && node.getAnimations().length===0));
+      const deferredReplyFeedback=await page.locator('#conversation-history').evaluate(node=>!node.open || Boolean(node.closest('[hidden],[inert]')));
       const reply='# 읽던 출처를 유지하는 최종 답변\n\n'+Array.from({length:8},()=> '자료와 문의를 준비하는 합성 응답입니다. 실제 발신·예약·배차는 하지 않았습니다.').join('\n\n');
       await release(page,second,{...response(second,previewEvidence.caseState,reply),events:previewEvidence.events,pendingActions:previewEvidence.pendingActions});
       await page.waitForFunction(()=>document.querySelector('#conversation-form').getAttribute('aria-busy')==='false');
       const readingSamples=[];observedAt=performance.now();
-      const compact=(await workspaceEvidence(page)).compact;
       await nativeUntil(async()=>{readingSamples.push(await snapshot());return motionEvents();},()=>performance.now()-observedAt>=300);
       const after=await snapshot();readingSamples.push(after);
       evidence.readingStable=before.connected && before.focused && before.open && before.unmoved && readingSamples.every(item=>item.connected && item.focused && item.open && item.unmoved && Math.abs(item.top-before.top)<=2 && Math.abs(item.left-before.left)<=1);
-      const waiting=await motionEvents();readerQuiet &&=waiting.length===afterFirst.length;
+      const waiting=await motionEvents();if(deferredReplyFeedback)readerQuiet &&=waiting.length===afterFirst.length;
       await page.locator('#answer-ready-notice>button').click();await flush(page);
       observedAt=performance.now();
       const finalEvents=await nativeUntil(motionEvents,events=>reduce?performance.now()-observedAt>=280:events.filter(event=>event.type==='animationend').length>=2);
