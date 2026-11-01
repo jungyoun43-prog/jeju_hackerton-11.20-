@@ -894,7 +894,7 @@ try {
       const toolbarColors=await contrast(page,toolbarSelector);
       const focus=(await contrast(page,'#preview-button'))[0];
       const keyboardFocus=await previewButton.evaluate(node=>node.matches(':focus-visible') && ['rgb(168, 77, 22)','rgb(40, 92, 67)'].includes(getComputedStyle(node).outlineColor)) && focus?.outlineVisible && focus.outlineRatio>=3;
-      await reveal(example);await reveal(summary);if(await details.evaluate(node=>node.open))await summary.click();
+      await reveal(example);await reveal(summary);if(await details.evaluate(node=>node.open))await summary.click();await page.mouse.move(1,1);await summary.evaluate(node=>node.blur());await nativeFinished(summary);
       const closedSummary=await feedback(summary),closedIcon=await feedback(summary.locator(':scope>.icon'));
       await reveal(example);await example.hover();await nativeFinished(example);
       const exampleHover=await feedback(example),exampleIcon=await feedback(example.locator(':scope>.icon'));
@@ -914,7 +914,7 @@ try {
       }
       const opened=await feedback(summary),drawerSafe=width>1050 || await page.locator('#care-rail').evaluate(node=>{const style=getComputedStyle(node);return style.visibility==='hidden' && new DOMMatrix(style.transform).e<=-node.getBoundingClientRect().width;});
       evidence.interactionFeedback=disabled && draftOnly && inputFocus && nativeDetails && opened.background!==closedSummary.background && drawerSafe && exampleHover.color==='rgb(27, 70, 49)' && exampleHover.background===soft && exampleHover.width>=44 && exampleHover.height>=44 && exampleIcon.x===(reduce?0:2) && sendIcon.x===(reduce?0:2) && pressed.width===sendIdle.width && pressed.height===sendIdle.height && pressed.width>=44 && pressed.height>=44 && await input.inputValue()===draft && (await calls(page)).length===0;
-      record(label+' 실제 hover·누름·44px·반복 native 펼침·입력 초안은 POST 없이 유지',evidence.interactionFeedback,JSON.stringify({exampleHover,exampleIcon,sendIdle,sendHover,sendIcon,pressed,nativeDetails,inputFocus,drawerSafe}));
+      record(label+' 실제 hover·누름·44px·반복 native 펼침·입력 초안은 POST 없이 유지',evidence.interactionFeedback,JSON.stringify({closedSummary,closedIcon,opened,exampleHover,exampleIcon,sendIdle,sendHover,sendIcon,pressed,nativeDetails,inputFocus,drawerSafe}));
       const primaryPreserved=surfaces.names.length===2 && surfaces.names.every(color=>color===orange) && sendIdle.background===orange && sendIdle.color==='rgb(255, 255, 255)' && sendHover.background==='rgb(135, 58, 16)';
       const greetingQuiet=await page.locator('#message-list>.greeting>.message-meta').evaluate(node=>getComputedStyle(node).animationName==='none' && node.getAnimations().length===0);
       await showView(page,'chat');
