@@ -132,13 +132,16 @@ await check('preparation-board-browser-evidence','verification',async()=>{
  requireThat(proof.sourceHash===await runtimeFingerprint(root) && proof.finalSourceHash===proof.sourceHash,'읽기 UI 증거와 현재 실행 소스 지문이 다릅니다.');
  requireThat(proof.apiLive===true && proof.apiProgress?.unregistered?.status===200 && proof.apiProgress.unregistered.available===false && proof.apiProgress?.invalid?.status===400,'실제 keyless 진행 조회의 미등록200·잘못된입력400 검사가 필요합니다.');
  requireThat(proof.scope?.unmockedNormalPostAttempts===0 && proof.scope?.blockedPostAttempts===0,'보드 검증에서 실제 일반 모델 요청을 보내지 않습니다.');
- requireThat(proof.viewports?.length>=6 && proof.viewports.every(view=>view.noOverflow) && proof.viewports.some(view=>view.width>=1280) && proof.viewports.some(view=>view.width===390&&view.height===500),'PC/모바일/짧은화면의 접근·넘침 검사가 필요합니다.');
- requireThat(proof.viewports.every(view=>view.documentFlow===true && view.initialSignalSummary===true),'모든 viewport에서 문서 흐름·내부 세로 스크롤 없음·기호 요약 검사가 필요합니다.');
- requireThat(proof.viewports.every(view=>view.layout===(view.width>900?'chat-right-rail':'chat-then-status') && view.chatLayout===true),'실제 좌표와 DOM으로 중앙 대화·입력과 오른쪽/모바일 아래4칸 검사가 필요합니다.');
+ const sizes=[[1800,1125],[1440,900],[1152,720],[960,600],[720,450],[1060,900],[390,844],[390,500],[320,500],[768,512]];
+ requireThat(proof.viewports?.length>=10 && proof.viewports.every(view=>view.noOverflow) && sizes.every(([width,height])=>proof.viewports.some(view=>view.width===width&&view.height===height)),'PC/모바일/80~200% 대응 가용 CSS 크기10종의 접근·넘침 검사가 필요합니다.');
+ requireThat(proof.viewports.every(view=>view.viewportFit===true && view.sharedComposer===true && view.scrollRegions===true && view.compactPanels===true && view.initialSignalSummary===true),'한 화면 경계·같은 공통 입력·공유 스크롤·패널 전환·기호 요약의 실제 관측이 필요합니다.');
+ requireThat(proof.viewports.every(view=>view.layout===(view.width>900 && view.height>650?'chat-right-rail':'tabbed-workspace') && view.chatLayout===true),'실제 좌표와 DOM으로 PC 대화/오른쪽4칸과 좁은 창 패널 전환 검사가 필요합니다.');
  requireThat(proof.viewports.every(view=>view.categoryIcons===true && view.compactSummary===true),'네 제목 아이콘과 핵심/상세 분리의 실제 viewport 검사가 필요합니다.');
+ requireThat(proof.workspaceScenarios?.length>=10 && proof.workspaceScenarios.every(item=>item.viewportFit===true && item.sharedComposer===true && item.scrollRegions===true && item.compactPanels===true),'장문·표·여러 줄 입력·큰 글자·패널/반응형 전환 후 작업 공간과 공통 입력의 실제 관측이 필요합니다.');
+ requireThat(['long-answer-table','multiline-12','text-200','resize-continuity','compact-discovery'].every(id=>proof.workspaceScenarios.some(item=>item.id===id)) && proof.workspaceScenarios.every(item=>item.contentReachable!==false && item.tableKeyboard!==false && item.readingStable!==false) && proof.workspaceScenarios.filter(item=>item.id==='long-answer-table').every(item=>item.contentReachable===true&&item.tableKeyboard===true) && proof.workspaceScenarios.filter(item=>['multiline-12','text-200'].includes(item.id)).every(item=>item.contentReachable===true) && proof.workspaceScenarios.filter(item=>item.id==='resize-continuity').every(item=>item.readingStable===true),'높이 맞춤만으로 본문/고지 도달·표 키보드·반응형 읽기 보존 실패를 통과시키면 안 됩니다.');
  requireThat(proof.motionScenarios?.length===4 && ['no-preference','reduce'].every(mode=>[1440,390].every(width=>proof.motionScenarios.some(item=>item.width===width && item.reducedMotion===mode))) && proof.motionScenarios.every(item=>item.greenSurfaces && item.contrastPassed && item.interactionFeedback && item.replyFeedback && item.readingStable && item.normalPostAttempts===0),'초록 대비와 일반/줄인동작의 PC·모바일 피드백/읽기 보존 검사가 필요합니다.');
  for(const view of proof.viewports){const bytes=await readFile(resolve(root,view.screenshot));requireThat(bytes.readUInt32BE(0)===0x89504e47,'읽기 UI PNG 증거가 필요합니다.');}
- return `${proof.checks.length}개 중앙 채팅·오른쪽 준비 현황·문서 스크롤·기호/아이콘·실제 keyless 진행 API·진행/취소 fixture와6개viewport. 실제모델·DDB 진행은 별도공개증거.`;
+ return `${proof.checks.length}개 한 화면 작업 공간·공통 입력·공유 스크롤·준비 요약·기호/아이콘·실제 keyless 진행 API·진행/취소 fixture와10개 가용 CSS 크기. 실제 browser zoom·기기·모델/DDB는 별도증거.`;
 });
 await check('rollback-boundary','rollback',()=>{
  for(const task of rules.tasks) {

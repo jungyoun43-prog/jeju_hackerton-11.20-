@@ -1,6 +1,6 @@
 {
   "baseCommit": "e1e7e44",
-  "updatedAt": "2026-11-01T06:40:32.998789+00:00",
+  "updatedAt": "2026-11-01T08:02:03.908128+00:00",
   "tasks": {
     "ui": {
       "phase": "verified",
@@ -463,27 +463,35 @@
       "note": "상단 단언1파일14추가/8삭제, helper/schema/기존보호 유지. c4a44c75 targeted29/29→root전체249/249·4조합 all true·errors[]/일반POST0. 첫143중단은원인미상·로그보존/성공인용X. 직접node/소유TTY재실행 종료0·clean."
     },
     "viewport-ui": {
-      "phase": "implementing",
+      "phase": "verified",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261101-viewport-ui",
-      "integrationCommits": [],
-      "note": "소개블록제거·100dvh작업공간·일정padding/공통입력·responsive전환. 구현과검사소유권분리, 실제Agent/데이터·위임경계유지."
+      "integrationCommits": [
+        "199e651",
+        "50cb00d"
+      ],
+      "note": "199e651/50cb00d 통합, 최종d1c68ae5에서 독립 복합관측·sourcefocus왕복·큰글자32px·44px조작·안내키보드끝도달 확인. 초기footer누적/24px축소실패 보완. 3UI파일175추가455삭제, 새의존성/이미지/모델/서버변경0. 전용worktree clean·자기서버/임시링크정리."
     },
     "viewport-qa": {
-      "phase": "implementing",
+      "phase": "verified",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261101-viewport-qa",
-      "integrationCommits": [],
-      "note": "소개블록제거·100dvh작업공간·일정padding/공통입력·responsive전환. 구현과검사소유권분리, 실제Agent/데이터·위임경계유지."
+      "integrationCommits": [
+        "079b760",
+        "bf0307f",
+        "70b2d9e"
+      ],
+      "note": "079b760/bf0307f/70b2d9e 통합. d1c68ae5 동일소스에서legacy47·con189·journey236·board359 전체pass/프로세스0·errors[]. 10크기/33workspace/4motion통과. con실HTTPagent6/preview3·초기미연결2·실모델0구분. 최초download/경계/leading실패·측정/대상증거보존. 전용worktree clean."
     }
   },
   "review": {
     "phase": "verified",
-    "role": "혼디 대화 상단의 독립 디자인 재검토와 root 실제 렌더/기능 대조",
+    "role": "한 화면 작업 공간의 독립 사용 흐름·출처/focus/안내 키보드 검토와 root 통합 렌더/브라우저 대조",
     "findings": [
-      "흰 대화면의 기존 귤심볼·혼디·진료 준비 역할과 보조 도구로 위계 개선",
-      "독립320px GET-only에서 겹침/넘침0·44px·주황focus·초안 비발송 확인",
-      "선택권고:390px 읽기 라벨 유지/320px 대기 도구 우측 정렬; 현재 구현의 차단 사유 아님"
+      "초기720x450 footer누적으로준비20px·큰글자24px축소를발견해50cb00d로수정",
+      "동결d1c에서복합큰글자32px·공통163px입력/44px보내기·읽기92/142/142px와전체안내키보드끝도달",
+      "반응형왕복같은출처DOM/focus/rail379→379·위치392.6875px유지",
+      "선택권고:720x450큰글자에서읽기공간92px는좁아보조도구행합침/실사용성후속검토"
     ],
-    "resolution": "동일 c4a44c75 지문에서 4종47/189/236/249·단위360·규칙67 모두 pass/종료0. normal/reduce4조합의 새상단·기존피드백/읽기보존 통과. 실제 모델·기관/전화·기록·실기기 사용성 검증과 구분하며 공개배포는 최신 runs 증거를 따른다."
+    "resolution": "네로컬suite47/189/236/359 pass/종료0·errors[]·동일d1c, 10viewport/33workspace/4motion true. 독립범위새차단0. 실제browserzoomUI·실기기/키보드·다른브라우저/스크린리더·실모델/기관/전화/기록/의료법률과구분. 단위360/360·자동규칙69/69도종료0. 현재CI·공개배포는최신runs를따른다."
   },
   "awsDeployment": {
     "phase": "verified",

@@ -2,12 +2,12 @@
   "schemaVersion": 1,
   "name": "혼디 · 보호자 진료 준비",
   "mode": "operate",
-  "direction": "중앙 채팅과 오른쪽4상태 유지. 흰 대화 상단에 기존 혼디 심볼·짧은 이름/역할과 보조 도구를 배치한다. 주황 이름/주 행동·mint 탐색/선택·초록 보조 행동과 짧은 CSS 피드백은 보존한다.",
+  "direction": "소개 블록을 제거하고100dvh 안의 작업 공간을 사용한다. 일정한 여백·중앙 대화 스크롤과 하단 공통 입력, PC 오른쪽4요약/좁은 창 패널 전환으로 구성하며 기존 초록·주황·의미색과 짧은 CSS 피드백을 유지한다.",
   "seedReference": "seed:a25f97f1d883646c",
   "layoutAuthority": {
-    "contract": "docs/chat-rail-contract.md",
+    "contract": "docs/viewport-workspace-contract.md",
     "seed": "none (user-pinned)",
-    "scope": "사용자 명시 변경: 이전2×2를 중앙 채팅·오른쪽 세로4칸으로 교체. 단일 대화와 입력, 기존 권한/시연/진행 경계, 상태칸 내부Y스크롤 없음 유지."
+    "scope": "최신 사용자 고정: 소개 블록 삭제·한 화면 작업 공간·패딩/빈공간 정리. 단일DOM/공통입력·실제경계·카드별스크롤없음/공유영역읽기."
   },
   "colors": {
     "background": "#F3F5F8",
@@ -28,28 +28,25 @@
     "focus": "#305D91",
     "primarySoft": "#FFF1E7",
     "secondaryHover": "#1B4631",
-    "selected": "#EDF6EF",
-    "chatHeader": "#FFFFFF",
-    "chatHeaderText": "#285C43",
-    "chatHeaderFocus": "#A84D16"
+    "selected": "#EDF6EF"
   },
   "typography": {
     "display": "Pretendard, sans-serif",
     "body": "Pretendard, Apple SD Gothic Neo, Malgun Gothic, sans-serif",
     "dialogTitle": "MaruBuri, serif",
-    "desktopTitlePx": 24,
-    "mobileTitlePx": 22,
-    "paneTitlePx": 15,
+    "desktopTitlePx": 22,
+    "mobileTitlePx": 20,
+    "paneTitlePx": 14,
     "paneTitleWeight": 650,
     "answerTitlePx": 18,
     "mobileAnswerTitlePx": 17,
-    "paneStatusPx": 14,
+    "paneStatusPx": 13,
     "paneSummaryPx": 14,
     "metadataMinimumPx": 13,
     "descriptiveTextPx": 15,
     "answerTextPx": 16,
     "answerLineHeight": 1.9,
-    "mobileAnswerLineHeight": 1.85,
+    "mobileAnswerLineHeight": 1.8,
     "factsLineHeight": 1.8,
     "answerMaxWidth": "72ch",
     "inputPx": 16,
@@ -58,13 +55,9 @@
     "brandFontBoundary": "현재 로고는 PNG. 브랜드 텍스트용 MaruBuri 레거시 규칙은 실제 사례·본문 제목 글꼴이 아님.",
     "requestHeadingPx": 20,
     "mobileRequestHeadingPx": 18,
-    "mobilePaneTitlePx": 16,
-    "chatTitlePx": 17,
-    "mobileChatTitlePx": 16,
+    "mobilePaneTitlePx": 14,
     "stageStatusPx": 13,
-    "mobileStageStatusPx": 14,
-    "chatRolePx": 14,
-    "mobileChatRolePx": 13
+    "mobileStageStatusPx": 13
   },
   "shape": {
     "surfaceRadiusPx": 12,
@@ -72,11 +65,12 @@
     "badgeRadiusPx": 5,
     "visitPanelRadiusPx": 12,
     "composerRadiusPx": 12,
-    "mobileComposerRadiusPx": 10,
+    "mobileComposerRadiusPx": 12,
     "dialogRadiusPx": 16,
     "smallDialogRadiusPx": 13,
     "summaryButtonRadiusPx": 3,
-    "expandedReadingButtonRadiusPx": 6
+    "expandedReadingButtonRadiusPx": 6,
+    "requestFormRadiusPx": 10
   },
   "assets": {
     "logo": "/assets/hondi-logo-v1.png",
@@ -86,11 +80,15 @@
     "iconRegistry": "app/icons.js (기존 SVG 체계; message/expand 경로 추가)"
   },
   "viewports": [
+    "1800x1125",
     "1440x900",
-    "1280x800",
+    "1152x720",
+    "960x600",
+    "720x450",
+    "1060x900",
     "390x844",
-    "360x780",
     "390x500",
+    "320x500",
     "768x512"
   ],
   "constraints": [
@@ -110,16 +108,16 @@
     "음성은 인식 후 사용자가 확인·수정하고 보내며 실제 발신이 아님",
     "모바일 서랍의 포커스·Escape·복귀와 실제 작성 내용의 초기화 확인을 제공",
     "사용자 후속 요청에 따라 인물 사진·caption을 제거하고 바다·현무암 배경을 작업면에 은은하게 사용",
-    "PC 중앙 대화와 하단 입력, 오른쪽 세로4칸 준비 상태; 모바일은 채팅 뒤 네 상태 전체 표시, 본문과 칸은 자연 높이/페이지 스크롤",
+    "100dvh 작업 공간의 중앙 대화 스크롤·하단 공통 입력·PC 오른쪽4요약. 좁은 창은 같은 패널 전환이며 비활성 영역은 키보드에서 제외.",
     "사용자가 준비 내역·출처를 읽는 중 새 답변이 오면 새 답변 안내를 제공하고 진행 갱신만으로 펼침·읽기 위치·포커스를 바꾸지 않음",
-    "이번 방문 상세는 중앙/오른쪽 두 열 아래 접힌 details이며 내부 흰 면은 정적 위치·얇은 경계·그림자 없음",
+    "이번 방문 상세는 오른쪽 공유 영역 끝의 기존 native details, 전체 근거/기록과 같은 영역에서 읽는다.",
     "오른쪽 네 native details는 해당 전체 사실/누락/근거/이력을 펼치고 모델·전화·예약을 실행하지 않음",
     "넓게 읽기는 선택 사항이며 답변 전체는 페이지에도 표시. 열 때의 대화 복사본에서 버튼/id를 제거하고 닫기/Escape 뒤 연 버튼으로 포커스 복귀",
     "결과 있음과 응답 완료는 환자의 준비완료·임상 수락·예약·배차 확정이 아님",
     "환자 정보·건강 기록은 현재 합성 상태의 읽기 전용 dialog이며 열기만으로 조회·인증하지 않음",
     "건강정보 고속도로는 특정 connector 미구현으로 항상 미연결·불러온 기록 없음이며 generic healthRecords와 구분",
     "예시는 보이는 문장만 초안으로 채우고 날짜·시각 추가/자동 POST 없이 확인 후 전송",
-    "본문·준비 내역·방문 상세는 높이 auto·최대 높이 없음·overflow visible을 유지하며 짧은 화면·긴 입력·큰 글자에서도 문서 스크롤로 입력/전송/고지 접근",
+    "본문/준비 전체는 공유 스크롤 영역에서 읽고, 카드별 내부 스크롤은 만들지 않는다. 긴 textarea/표/기존 dialog의 표준 스크롤은 유지한다.",
     "일반 요청·미리보기 응답 대기 중지와 원문 보존을 제공하고 서버/실제발신 중단과 구분",
     "요청 토큰·대화 버전으로 늦은 응답/오류/finally가 새 초안과 대화를 덮지 않게 보호",
     "실패 재시도는 원문·history·requestId·세션·설정 snapshot의 업무 본문을 유지하며 progressToken은 HTTP 시도마다 새로 만들 수 있고 첫응답전 재실행 한계를 고지",
@@ -149,33 +147,31 @@
     "브랜드 초록은 toolbar·탐색/선택/말풍선·보조행동 역할이며 상태good/warning/danger·흰상태카드는유지. 최신답변metadata만240ms1회,reduce에서는이동/새답변animation없고정적상태남음."
   ],
   "spacing": {
-    "mainTopPx": 24,
-    "workspacePadding": "24px 28px 32px",
-    "workspaceMaxWidthPx": 1440,
-    "summaryGapPx": 24,
-    "mobileSummaryGapPx": 12,
-    "preparationSectionPadding": "16px 16px 2px",
-    "mobilePreparationSectionPadding": "16px 16px 3px",
-    "paneBodyPadding": "details:8px 0 14px",
+    "mainTopPx": 12,
+    "workspacePadding": "12px 16px",
+    "workspaceMaxWidthPx": null,
+    "summaryGapPx": 12,
+    "mobileSummaryGapPx": 0,
+    "preparationSectionPadding": "10px 12px 0",
+    "mobilePreparationSectionPadding": "10px 12px 0",
+    "paneBodyPadding": "8px 0 12px",
     "promptMarginTopPx": 8,
     "mobilePromptMarginTopPx": 3,
-    "composerMarginTopPx": 8,
-    "mobileComposerMarginTopPx": 8,
-    "visitPanelPadding": "20px 24px",
-    "mobileVisitPanelPadding": "16px",
-    "desktopRailPx": 240,
-    "narrowDesktopRailPx": 230,
-    "composerPadding": "16px 18px 11px",
-    "mobileComposerPadding": "13px 13px 10px",
-    "chatPadding": "24px",
-    "mobileChatPadding": "20px 16px",
-    "chatComposerPadding": "0 24px 22px",
-    "mobileChatComposerPadding": "0 16px 18px",
-    "preparationGapPx": 12,
-    "mobilePreparationGapPx": 14,
-    "rightRailPx": 310,
-    "chatHeaderPadding": "10px 24px",
-    "mobileChatHeaderPadding": "10px 12px"
+    "composerMarginTopPx": 0,
+    "mobileComposerMarginTopPx": 0,
+    "visitPanelPadding": "12px",
+    "mobileVisitPanelPadding": "12px",
+    "desktopRailPx": 224,
+    "narrowDesktopRailPx": 224,
+    "composerPadding": "8px 10px 4px",
+    "mobileComposerPadding": "8px 10px 4px",
+    "chatPadding": "16px",
+    "mobileChatPadding": "12px",
+    "chatComposerPadding": "8px 12px",
+    "mobileChatComposerPadding": "8px",
+    "preparationGapPx": 8,
+    "mobilePreparationGapPx": 8,
+    "rightRailPx": 300
   },
   "elevation": {
     "preparationPane": "none",
@@ -187,7 +183,7 @@
     "controls": "3px solid var(--primary); outline-offset:3px",
     "preparationSection": "2px solid var(--secondary); outline-offset:3px",
     "composer": "border-color:var(--primary); outline:2px solid var(--primary); outline-offset:1px",
-    "chatToolbar": "흰 면에서 주황3px/offset3px. 이전 흰 focus 강제는 제거."
+    "workspaceTools": "흰 면에서 주황3px/offset3px. 이전 흰 focus 강제는 제거."
   },
   "motion": {
     "controlTransition": "background-color 150ms ease, color 150ms ease, border-color 150ms ease",
@@ -203,48 +199,54 @@
     "railDrawerMaxWidthPx": 1050,
     "compactReadingMaxWidthPx": 900,
     "smallDialogAndComposerMaxWidthPx": 600,
-    "readingFlow": {
-      "columns": 2,
-      "rightRailPx": 310,
-      "preparationColumns": 1,
-      "display": "grid",
-      "height": "auto",
-      "maxHeight": "none",
-      "overflowY": "visible",
-      "mobileColumns": 1,
-      "gapPx": 24,
-      "mobileGapPx": 24,
-      "alignItems": "start"
-    },
-    "desktopSummary": "네 칸 header의 상태4개만. 별도 상태 nav 없음.",
-    "compactSummary": "네 칸 모두 핵심사실·추가확인건수, native 자세히 보기로 전체 사실/누락/근거/기록. plan에는 전체답변 없음.",
-    "preparationDetails": "각4 [data-stage-details] 기본닫힘; 제목/아이콘/상태/핵심은항상보임, 펼침은문서높이를늘림.",
-    "workspacePaddingAt1150": "22px 24px 28px",
-    "workspacePaddingAt1050": "20px 24px 28px",
-    "workspacePaddingAt900": "16px 16px 24px",
-    "answerDialogWidth": "min(1050px,calc(100vw - 48px))",
+    "desktopSummary": "PC는 오른쪽 네 준비 요약, 펼친 전체는 하나의 shared rail에서 읽음.",
+    "compactSummary": "좁은 창은 대화/준비 전환과 같은 하단 입력. 네 상태는 같은 DOM/요약/기호와 전체 상세.",
+    "preparationDetails": "각4 native details의 전체 사실·누락·근거·기록을 같은 준비 영역에서 읽음.",
+    "workspacePaddingAt1150": "12px 16px",
+    "workspacePaddingAt1050": "12px 16px",
+    "workspacePaddingAt900": "12px",
+    "answerDialogWidth": "min(1050px,calc(100vw - 24px))",
     "mobileAnswerDialogWidth": "calc(100vw - 24px)",
-    "answerDialogMaxHeight": "calc(100dvh - 48px)",
+    "answerDialogMaxHeight": "calc(100dvh - 24px)",
     "mobileAnswerDialogMaxHeight": "calc(100dvh - 24px)",
-    "textareaMaxHeight": "160px",
+    "textareaMaxHeight": "min(128px,16dvh); height<=550px:48px",
     "tableMinWidth": "32rem",
     "tableOverflowX": "auto",
     "scrollExceptions": [
+      "중앙 대화 이력",
+      "전체 준비 영역",
       "긴 입력칸",
       "긴 표의 가로 스크롤",
-      "사용자가 연 읽기 전용 native dialog",
-      "설정 탐색"
+      "기존 dialog/설정 탐색"
     ],
-    "composerPosition": "중앙대화 아래 문서 흐름. 채팅 PC 최소높이calc(100dvh - 148px)/1050이하calc(100dvh - 220px)/900이하0. fixed/sticky 덮개 없음."
+    "composerPosition": "100dvh 작업 공간의 하단 공통 입력. 패널 전환 밖에 남으며 초기/장문/대기에서 도달 가능.",
+    "workspace": {
+      "height": "100dvh",
+      "bodyOverflow": "hidden",
+      "minHeight": 0,
+      "columns": 2,
+      "rightRailPx": 300,
+      "gapPx": 12,
+      "compactColumns": 1,
+      "compactWhen": "max-width:900px OR max-height:650px",
+      "scrollRegions": [
+        "conversation-scroll",
+        "preparation-rail"
+      ],
+      "cardOverflowY": "visible"
+    },
+    "shortHeader": "height<=550px에서는환자이름을보이고전체진료준비제목은같은aria-label/DOM에보존",
+    "statusControls": "중지/새답변/오류는기존form44px조작줄공유,활성시보조글자수접기",
+    "inputGuidance": "짧은고지시연/실행없음과예시/안내요약;full원문은native안내+inputaria-describedby. 동적voicefeedback은안내자동열림/새편집요청때정리."
   },
   "composition": {
     "conversation": [
       "caregiver-case-and-optional-preferences-rail",
       "compact-case-heading",
-      "central-single-conversation-and-next-action-before-examples-and-composer",
+      "viewport-bounded-single-conversation-and-shared-composer",
       "right-rail-four-vertical-compact-stages-with-category-icons-and-native-details",
       "plan-summary-without-duplicating-central-conversation",
-      "collapsed-visit-details-below-both-columns",
+      "existing-visit-details-at-end-of-preparation-rail",
       "pending-only-observed-progress-activity",
       "care-journey-current-and-next-action-hidden-before-first-response",
       "actual-observed-progress-separate-from-last-confirmed-case-facts",
@@ -262,13 +264,12 @@
       "visible-final-message-focus-instead-of-forced-offscreen-input-focus"
     ],
     "mobile": [
-      "chat-and-common-composer-before-all-four-preparation-summaries",
-      "same-four-stage-cells-with-category-icons-in-one-column",
-      "full-conversation-and-answer-readable-through-document-scroll",
-      "manual-reading-preserved-with-new-answer-notice",
-      "optional-preferences-drawer-and-single-common-composer",
-      "document-scroll-to-send-controls-and-disclosure",
-      "compact-stage-facts-with-expandable-full-details"
+      "tabbed-chat-and-preparation-workspace",
+      "single-shared-composer-visible-across-panels",
+      "same-four-stage-nodes-and-existing-details",
+      "manual-source-reading-preserved-in-shared-rail",
+      "new-answer-notice-selects-chat-before-focus",
+      "optional-preferences-drawer"
     ],
     "preview": [
       "explicit-fixed-scenario-action",
@@ -306,6 +307,7 @@
   "evidence": {
     "checkedOn": "2026-11-01",
     "sources": [
+      "docs/viewport-workspace-contract.md",
       "docs/chat-rail-contract.md",
       "app/conversation.css",
       "app/conversation.js",
@@ -313,16 +315,16 @@
       "app/icons.js",
       "app/preparation-stages.js"
     ],
-    "captures": ".impeccable/review/chat-rail/: current central chat/right rail renders",
+    "captures": ".impeccable/review/chat-rail/viewport/: current viewport workspace and independent observations; deployed/: current published layout",
     "geometryRecord": "orchestration/runs/preparation-board-browser.json",
-    "observations": "동일c4a44c75에서 수동47/대화189/여정236/보드249·단위360·규칙67 pass/종료0. 흰상단·정체성·접근성/대비와 normal/reduce4조합 모두true. 독립재검토 새차단0. 공개배포는 최신 runs 증거.",
+    "observations": "동일d1c68ae5에서 수동47/대화189/여정236/보드359 pass/프로세스종료0·errors[]. 가용크기10종/장문·표·입력·큰글자/반응형왕복33관측/normal-reduce4조합 true. 독립 보완후 새차단0. 단위360/규칙69 pass/종료0. 공개배포는 최신 runs 증거.",
     "previousCaptures": ".impeccable/review/task-first/, grid/, reading/, board/: 이전 배치 이력",
-    "limits": "layout detector전후126로자동결과없음. 실제모델·DynamoDB는이전9fc11bc 증거로구분/새호출0. 실제휴대폰·마이크/다른브라우저/스크린리더·센터PC·전화/개인기록·의료법률은미검증.",
+    "limits": "CSS available size10종/글자200%를 검사하되 실제 browser zoom UI·실기기/가상키보드/다른브라우저/스크린리더는 미검증. context/detector126 이력으로 자동 디자인 판정없음. 모델/DynamoDB는 이전9fc11bc 원증거이며 이번 UI 수정의 실모델/전화/개인기록 호출0.",
     "progressDomSource": "app/preparation-board-view.js의 확정/진행 목록 분리와 WeakMap 문자열 guard를 소스로 대조. 최종 root 브라우저 QA 결과와 구분.",
     "uxAuditBefore": "docs/reviews/2026-11-01-chat-rail.md",
     "uxAuditAfter": "docs/reviews/2026-11-01-chat-rail.md",
     "cliDetector": "기존126 권한 오류 이력으로 이번 자동 결과 없음. 직접 문맥·렌더·독립 검토로 보완.",
-    "uiSourceRevision": "8fa5f37",
+    "uiSourceRevision": "50cb00d",
     "orangeAccent": {
       "scope": "환자 이름 부분·활성보내기·포커스·다음문의초안만. 의미색/배치/보조파랑유지.",
       "captures": ".impeccable/review/chat-rail/color/",
@@ -396,6 +398,76 @@
       "rootMotionProof": "orchestration/runs/preparation-board-browser.json: motionScenarios4개 all true",
       "independentReview": ".impeccable/review/chat-rail/identity/independent-review.md",
       "limits": "390읽기라벨/320pending도구정렬은선택권고. 실제보호자 발견성·실기기/다른브라우저·스크린리더 별도. 일반모델/전화/개인기록 요청0."
+    },
+    "viewportWorkspace": {
+      "contract": "docs/viewport-workspace-contract.md",
+      "sourceHash": "d1c68ae52aa064e1e0dbc4fe54338c04dbe81b9e8559423ee3eea437a8e26ef4",
+      "runtimeFiles": 3,
+      "runtimeDiff": {
+        "insertions": 175,
+        "deletions": 455
+      },
+      "availableCssSizes": [
+        "1800x1125",
+        "1440x900",
+        "1152x720",
+        "960x600",
+        "720x450",
+        "1060x900",
+        "390x844",
+        "390x500",
+        "320x500",
+        "768x512"
+      ],
+      "compactQuery": "(max-width:900px), (max-height:650px)",
+      "sameDom": true,
+      "sharedComposer": true,
+      "bodyTextPx": 16,
+      "testedEnlargedTextPx": 32,
+      "independentReview": ".impeccable/review/chat-rail/viewport/independent-review.md",
+      "independentEvidence": ".impeccable/review/chat-rail/viewport/summary.json",
+      "independentActualKeylessPreview": 1,
+      "independentNormalPostAttempts": 0,
+      "compoundReadingHeightPx": {
+        "720x450Text200": 92,
+        "390x500Text200": 142,
+        "320x500Text200": 142
+      },
+      "sourceFocusRoundTrip": {
+        "sizes": [
+          "1152x720",
+          "720x450",
+          "1152x720"
+        ],
+        "railScrollTopBefore": 379,
+        "railScrollTopAfter": 379,
+        "sourceYBefore": 392.6875,
+        "sourceYAfter": 392.6875
+      },
+      "guideKeyboardBottom": {
+        "width": 320,
+        "height": 500,
+        "textScale": 2,
+        "scrollTop": 454,
+        "scrollMaximum": 454
+      },
+      "limits": "한 화면은 전체 답변을 동시에 표시한다는 뜻이 아니다. 대화/전체 준비의 공유 스크롤과 native 안내를 사용한다. 매우 낮은 창의 읽기 공간은 좁으며 실제 사용자 발견성/실기기 검증은 별도다.",
+      "rootBrowserChecks": {
+        "workspace": 47,
+        "conversation": 189,
+        "journey": 236,
+        "board": 359
+      },
+      "workspaceScenarioCount": 33,
+      "motionScenarioCount": 4,
+      "conversationActualHttpPosts": {
+        "agent": 6,
+        "preview": 3,
+        "keylessDisconnectedInitialCheckCount": 2,
+        "actualModelCalls": 0
+      },
+      "unitChecks": 360,
+      "automatedRuleChecks": 69
     }
   },
   "references": {
