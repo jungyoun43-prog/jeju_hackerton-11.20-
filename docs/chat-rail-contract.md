@@ -21,3 +21,7 @@
 - QA: scripts/conversation-browser-check.mjs, scripts/journey-browser-check.mjs, scripts/preparation-board-browser-check.mjs만 소유한다. 이전2×2/대화가plan안/입력상단 단언을 새 계약으로 교체한다. 기존 SHA·preview14/일반POST0·전화 인계·음성/취소·같은출처/focus·긴표/큰글자/6viewport 단언은 보존한다.
 - 통합: 문서/하네스/eval/배포. PC 실제 좌표에서 패널이 채팅 오른쪽/네 칸 같은x·증가y, 모바일에서 채팅 다음 네 칸을 확인한다. 중앙 메시지와 입력이 각각 한 개, 오른쪽에 전체답변 없음, 네 제목 아이콘과 상태가 모두 있어야 한다. 준비판 proof는 layout='chat-right-rail' 또는 'chat-then-status', chatLayout/compactSummary/categoryIcons를 기록한다.
 - 소유한 키 없는 로컬 서버와 route fixture로 검증한다. 실제 LLM/전화/개인기록 요청은 하지 않는다. 구현 후 PC·모바일 렌더와 동일 검토자의 사용자 흐름 재검토 후 기존 CI/CD로 게시한다. 과거 실제 Sol/DDB 증거는 원 revision에 남기며 이번 UI 결과로 재표기하지 않는다.
+
+## 주황 포인트 후속 요청
+
+환자 이름은 case-heading/rail-patient에서 이름 부분만 인라인으로 강조한다. 나머지 제목 문구와 접근성 이름은 그대로 보존하고, 기존 escape로 이름을 문자 처리한다. 주 행동/포커스 토큰은 짙은 주황, 활성 보내기는 흰 글자, 다음 문의 초안은 별도 옅은 peach 토큰을 사용한다. 비활성 보내기·전체 soft 바탕·보조 링크·아이콘·성공/미확인/실패의 의미색은 유지한다. 중앙 채팅·오른쪽4칸의 배치나 동작을 바꾸지 않는다. 낮은 영향의 시각 변경이므로 새 영구 테스트/설정/라이브러리를 추가하지 않고 실제 활성·hover·focus·비활성·답변 상태를 PC/모바일에서 확인한다.
