@@ -407,9 +407,9 @@ function renderSnapshot() {
   const patient = caseState.patient;
   const confirmed = Object.values(caseState.inquiries).filter(item => item.status === 'confirmed').length;
   const time = caseState.visitSupport?.requirements?.appointmentTime;
-  document.getElementById('case-heading').textContent = `${patient.name} 님의 진료 준비`;
+  document.getElementById('case-heading').innerHTML = `<span class="patient-name">${escape(patient.name)}</span> 님의 진료 준비`;
   document.getElementById('case-caption').textContent = `${patient.area} · 보호자 ${patient.caregiver} · 합성 사례`;
-  document.getElementById('rail-patient').textContent = `${patient.name} 님`;
+  document.getElementById('rail-patient').innerHTML = `<span class="patient-name">${escape(patient.name)}</span> 님`;
   document.getElementById('rail-caregiver').textContent = `보호자 ${patient.caregiver}의 가상 가족 사례`;
   document.getElementById('rail-area').textContent = patient.area;
   renderPreferences();
