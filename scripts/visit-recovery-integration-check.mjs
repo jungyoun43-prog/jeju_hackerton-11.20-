@@ -7,7 +7,7 @@ import {fileURLToPath,pathToFileURL} from 'node:url';
 import {execFileSync} from 'node:child_process';
 
 const root=resolve(process.env.QA_SERVED_SOURCE_ROOT||resolve(dirname(fileURLToPath(import.meta.url)),'..'));
-const directory='.impeccable/review/chat-rail/guided-visit/integration',tokenKey='hondi-visit-token-v1';
+const directory='.impeccable/review/chat-rail/use-performance/integration',tokenKey='hondi-visit-token-v1';
 const firstText='합성 방문을 2026년 11월 19일 오후 2시로 바꾸고 남은 준비를 알려 주세요.';
 const nextText='합성 방문을 2026년 11월 26일 오전 11시로 바꾸고 남은 준비를 알려 주세요.';
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
@@ -151,7 +151,7 @@ try{
       record(`${width}px 다음 새 요청은 같은 방문의 날짜·시각 변경`,/11월 26일/.test(changed) && /11:00/.test(changed) && nextStorage===first.visitToken && finalState.sessionId===recorded.sessionId && finalState.turns===2 && fixture.counts.logicalTurns===2 && fixture.counts.providerRespond===4 && fixture.counts.consumeTurn===2 && await page.locator('.message.user.failed').count()===0 && fit(await layout(page)));
       record(`${width}px 최종 화면도 식별자 비노출·정상 공통 입력`,await privateValuesAbsent(page,protectedValues) && await page.locator('#request-input').inputValue()==='' && await page.locator('#send-request').isDisabled());
       const finalCapture=await capture(page,`changed-${width}x${height}`),assets=await Promise.all(assetChecks);
-      record(`${width}px 실제 브라우저 JS/CSS 바이트가 현재 root 소스와 동일`,assets.length>0 && assets.every(asset=>asset.matches) && ['conversation.js','conversation.css','preparation-stages.js','preparation-workflow.js','preparation-board-view.js'].every(file=>assets.some(asset=>asset.file===file)));
+      record(`${width}px 실제 브라우저 JS/CSS 바이트가 현재 root 소스와 동일`,assets.length>0 && assets.every(asset=>asset.matches) && ['conversation.js','conversation.css','preparation-stages.js','preparation-workflow.js','preparation-board-view.js','visit-support.js'].every(file=>assets.some(asset=>asset.file===file)));
       record(`${width}px 모든 실제 POST의 payload hash 일치·서버 오류 없음`,fixture.counts.requestHashesValid && fixture.counts.serverErrors===0 && fixture.counts.preview===0);
       proof.staticFiles.push(...assets);
       proof.viewports.push({width,height,...await layout(page),completedResponseLost:true,sameTokenRestored:true,transcriptNotReplayed:true,actualResumeReadOnly:true,firstRequestReplayedWithoutEffects:true,bodyConflictRejected:true,nextRequestChangedVisit:true,draftPreserved:true,identifiersAbsent:true,guidedProjection:Object.values(projection).every(Boolean),fixtureProviderRespondCalls:fixture.counts.providerRespond,fixtureLogicalTurns:fixture.counts.logicalTurns,budgetConsumptions:fixture.counts.consumeTurn,actualHttpPosts:{agent:fixture.counts.agent,resume:fixture.counts.resume,progress:fixture.counts.progress,preview:fixture.counts.preview},screenshots:[recoveryCapture,preparationCapture,finalCapture]});

@@ -17,7 +17,7 @@ catch {throw new Error('선택 QA 도구 Playwright가 필요합니다. README�
 const base=new URL(process.env.BASE_URL||'http://127.0.0.1:4173');
 // 이 검사는 실제 503/고정 preview와 주입 응답을 함께 쓴다. 공개 유료 서버에서는 실행하지 않는다.
 if(!['localhost','127.0.0.1','[::1]'].includes(base.hostname) || !['http:','https:'].includes(base.protocol) || base.username || base.password)throw new Error('BASE_URL은 키를 끈 localhost QA 서버여야 합니다.');
-const directory='.impeccable/review/chat-rail/guided-visit/conversation';
+const directory='.impeccable/review/chat-rail/use-performance/conversation';
 const storageKey='jeju-care-preferences-v1';
 const fixtureSessionId='q'.repeat(43);
 const configuredCaps={llm:true,model:'gpt-6.1-sol',phone:'simulation',healthRecords:'demo',voiceInput:'browser'};
@@ -26,7 +26,7 @@ await mkdir(resolve(root,'orchestration/runs'),{recursive:true});
 const browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH||undefined,args:['--no-sandbox','--disable-dev-shm-usage']});
 const checks=[],errors=[];
 const record=(name,ok,detail='')=>{checks.push({name,status:ok?'pass':'fail',detail});console.log(`${ok?'PASS':'FAIL'} ${name}${detail?' · '+detail:''}`);};
-const proof={result:'fail',checkedAt:new Date().toISOString(),url:base.href,sourceHash:await runtimeFingerprint(servedRoot),invokingSourceHash:await runtimeFingerprint(root),checks,errors,apiLive:false,modelInvoked:false,phoneInvoked:false,healthRecordsQueried:false,microphone:'permission-denied, transcript-review and delayed-abort fixtures only',fixedPreview:false,normalInputDisconnected:false,keylessDisconnectedInitialCheckCount:0,actualHttpPostCounts:{agent:0,preview:0},desktop:{width:1440,height:900,noOverflow:false},mobile:{width:390,height:844,noOverflow:false},lastAnswerRecovery:[],fixtureCoverage:{lastAnswerRecovery:false,preferences:false,markdown:false,recovery:false,voiceReview:false,voiceCancellation:false,exampleDrafts:false,cancellation:false,contactPlan:false,shortViewport:false},shortViewport:[],runtimeAssets:[],sourceHashScope:process.env.QA_SERVED_SOURCE_ROOT?'explicit QA_SERVED_SOURCE_ROOT; served UI assets compared below':'invoking checkout; served UI assets compared below'};
+const proof={result:'fail',checkedAt:new Date().toISOString(),url:base.href,sourceHash:await runtimeFingerprint(servedRoot),invokingSourceHash:await runtimeFingerprint(root),checks,errors,apiLive:false,modelInvoked:false,phoneInvoked:false,healthRecordsQueried:false,microphone:'permission-denied, transcript-review and delayed-abort fixtures only',fixedPreview:false,normalInputDisconnected:false,keylessDisconnectedInitialCheckCount:0,actualHttpPostCounts:{agent:0,preview:0},desktop:{width:1440,height:900,noOverflow:false},mobile:{width:390,height:844,noOverflow:false},interfaceScenarios:[],loadingScenarios:[],lazyRecordScenarios:[],supportReasonScenarios:[],lastAnswerRecovery:[],fixtureCoverage:{lastAnswerRecovery:false,preferences:false,markdown:false,recovery:false,voiceReview:false,voiceCancellation:false,exampleDrafts:false,cancellation:false,contactPlan:false,shortViewport:false},shortViewport:[],runtimeAssets:[],sourceHashScope:process.env.QA_SERVED_SOURCE_ROOT?'explicit QA_SERVED_SOURCE_ROOT; served UI assets compared below':'invoking checkout; served UI assets compared below'};
 const overflow=page=>page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1 && document.documentElement.scrollHeight<=innerHeight+1 && scrollY===0);
 const json=request=>JSON.parse(request.postData());
 const hashMatches=request=>request.headers()['x-amz-content-sha256']===createHash('sha256').update(request.postDataBuffer()).digest('hex');
@@ -173,7 +173,7 @@ async function backgroundLoaded(page) {
 async function openPatientRecords(page) {
   if(await page.locator('#open-care-menu').isVisible())await page.locator('#open-care-menu').click();
   await page.locator('#nav-patient-records').click();
-  const panel=page.locator('#patient-records-dialog');await panel.waitFor();return panel;
+  const panel=page.locator('#patient-records-dialog');await panel.waitFor();await page.evaluate(()=>document.fonts.ready);return panel;
 }
 async function closePatientRecords(page,{escape=false}={}) {
   if(escape)await page.keyboard.press('Escape');else await page.locator('#close-patient-records').click();
@@ -229,7 +229,7 @@ async function accessSet(page,selectors) {
 async function openContactPlan(page) {
   if(await page.locator('#open-care-menu').isVisible())await page.locator('#open-care-menu').click();
   await page.locator('#nav-contact-plan').click();
-  const panel=page.locator('#contact-plan-dialog');await panel.waitFor();return panel;
+  const panel=page.locator('#contact-plan-dialog');await panel.waitFor();await page.evaluate(()=>document.fonts.ready);return panel;
 }
 async function closeContactPlan(page,{escape=false}={}) {
   if(escape)await page.keyboard.press('Escape');else await page.locator('#close-contact-plan').click();
@@ -277,7 +277,7 @@ try {
   record('API 응답 캐시 금지',capResponse.headers.get('cache-control')==='no-store');
   if(!keyless)throw new Error('실제 모델이 연결됐거나 keyless 상태를 확인하지 못해 POST 검사를 중단합니다.');
   proof.apiLive=true;
-  for(const path of ['conversation.js','conversation.css','preparation-board-view.js','preparation-stages.js','preparation-workflow.js','icons.js']) {
+  for(const path of ['conversation.js','conversation.css','preparation-board-view.js','preparation-stages.js','preparation-workflow.js','visit-support.js','icons.js','assets/pretendard/pretendardvariable-dynamic-subset.css']) {
     const response=await fetch(new URL('/'+path,base),{redirect:'error',signal:AbortSignal.timeout(8000)});
     const expected=await readFile(resolve(servedRoot,'app',path));
     const hash=value=>createHash('sha256').update(value).digest('hex');
@@ -300,8 +300,15 @@ try {
       record(`${width}px 중앙 단일 업무·보조 대화 기록·단계 안내와 공통 입력 분리`,proof[label].chatLayout);
       await showView(page,'preparation');
       record(`${width}px 네 단계 탐색·단일 본문·hidden/inert·보조 기록 DOM 유지`,await page.locator('#preparation-board>[data-stage-id]').evaluateAll(nodes=>nodes.length===4 && nodes.filter(node=>!node.hidden&&!node.inert).length===1 && nodes.every(node=>node.hidden===node.inert)) && await page.locator('#stage-navigation>button[data-open-stage]').count()===4 && await page.locator('#preparation-board>.stage-pane>.stage-pane-header .signal-mark').count()===4 && await page.locator('#preparation-board>.stage-pane>.stage-pane-header .stage-topic-icon').count()===4 && await page.locator('[data-stage-details]').evaluateAll(nodes=>nodes.length===4 && nodes.every(node=>node instanceof HTMLDetailsElement)) && await page.locator('#conversation-history').evaluate(node=>node instanceof HTMLDetailsElement && !node.open) && await page.locator('#preparation-details').count()===0 && await page.locator('[data-case-status]').count()===4);
+      const loading=await page.evaluate(()=>{const fonts=performance.getEntriesByType('resource').map(entry=>new URL(entry.name)).filter(url=>url.pathname.endsWith('.woff2')).map(url=>url.pathname),preloads=[...document.querySelectorAll('link[rel="preload"][as="font"]')].map(node=>new URL(node.href).pathname),style=getComputedStyle(document.getElementById('request-input'));return {fonts,preloads,subsetFonts:fonts.length>0&&fonts.every(path=>path.startsWith('/assets/pretendard/woff2-dynamic-subset/')),oldWholeFontAbsent:!fonts.some(path=>path.endsWith('/PretendardVariable.woff2')),maruDeferred:!fonts.some(path=>path.endsWith('/MaruBuri-SemiBold.woff2')),wholeFontPreloadsAbsent:!preloads.some(path=>/PretendardVariable\.woff2$|MaruBuri-SemiBold\.woff2$/.test(path)),inputFamily:style.fontFamily.includes('Pretendard'),inputFontPx:parseFloat(style.fontSize)};});
+      record(`${width}px 초기 폰트는 자체 호스팅 분할본·닫힌 창 제목 폰트 지연·입력16px`,loading.subsetFonts&&loading.oldWholeFontAbsent&&loading.maruDeferred&&loading.wholeFontPreloadsAbsent&&loading.inputFamily&&loading.inputFontPx>=16,JSON.stringify(loading));proof.loadingScenarios.push({width,...loading});
       await readConversation(page);
       record(`${width}px 로고·자가 호스팅 Pretendard·제주 배경, 인물사진 비노출`,await page.locator('.brand img').first().evaluate(e=>e.complete && e.naturalWidth>0) && await backgroundLoaded(page) && await page.locator('.welcome-photo').count()===0 && await page.evaluate(()=>getComputedStyle(document.body).fontFamily.includes('Pretendard') && [...document.fonts].some(font=>font.family.replaceAll('"','')==='Pretendard' && font.status==='loaded')));
+      const newChatNamed=await page.getByRole('button',{name:'새 대화',exact:true}).count()===1 && await page.locator('#new-conversation').getAttribute('title')==='새 대화',flow=page.locator('#preview-button'),examples=page.locator('#request-examples>summary'),distinctExamples=await page.getByRole('button',{name:'준비 흐름 체험',exact:true}).count()===1&&await flow.getAttribute('title')==='준비 흐름 체험'&&normalizedText(await flow.innerText())==='체험'&&await examples.getAttribute('aria-label')==='요청 예시'&&await examples.getAttribute('title')==='요청 예시'&&normalizedText(await examples.innerText())==='요청 예시';
+      record(`${width}px 새 대화의 이름·title과 체험/요청 예시의 두 동작 명칭 구분`,newChatNamed&&distinctExamples);
+      await examples.focus();await page.keyboard.press('Enter');const draftExamplesReadOnly=await page.locator('#request-examples').evaluate(node=>node.open)&&requests.length===0&&await page.locator('#request-input').inputValue()==='';await page.keyboard.press('Enter');
+      record(`${width}px 요청 예시 펼치기는 고정 흐름이나 모델 요청을 실행하지 않음`,draftExamplesReadOnly&&requests.length===0);
+      const interfaceSample={width,newChatNamed,distinctExamples,draftExamplesReadOnly,actualFixedFlow:false};proof.interfaceScenarios.push(interfaceSample);
       record(`${width}px 설정은 선택이며 준비 대화에 필수 수동 폼 없음`,await page.locator('#conversation-form select,#conversation-form input[type=checkbox]').count()===0 && await page.locator('#preferences-form [required]').count()===0 && await page.locator('#preferences-form select').count()===1);
       record(`${width}px 입력 가까이 실제 연락·예약 한계 표시`,await disclosure(page));
       const input=page.locator('#request-input');
@@ -340,7 +347,8 @@ try {
       await page.waitForFunction(()=>document.querySelectorAll('.tool-record').length===15);
       await readConversation(page);
       const previewOk=preview.status()===200 && payload.isPreview===true && payload.events.length===15;
-      proof.fixedPreview ||= previewOk;
+      proof.fixedPreview ||= previewOk;interfaceSample.actualFixedFlow=previewOk&&await flow.getAttribute('aria-label')==='준비 흐름 체험'&&normalizedText(await flow.innerText())==='체험';
+      record(`${width}px 체험은 실제 고정 API를 실행하고 완료 뒤 같은 명칭으로 복귀`,interfaceSample.actualFixedFlow);
       record(`${width}px 고정 미리보기 실제 도구 15건`,previewOk && await page.locator('.example-label').count()===2 && /작성된 예시|고정.*미리보기/.test(await page.locator('#mode-notice').textContent()) && /LLM.*없음/.test(await page.locator('#mode-notice').textContent()));
       record(`${width}px 처리 기록은 기본 접힘·설정은 preview에 미적용`,await page.locator('.tool-records').evaluateAll(nodes=>nodes.length>0 && nodes.every(node=>!node.open)) && /적용하지/.test(await page.locator('#preferences-status').textContent()) && !Object.hasOwn(json(requests.at(-1)),'preferences'));
       record(`${width}px 실제 공개 기관·애월콜·공식 동행 경로`,payload.caseState.selectedHospital?.source.datasetId==='859' && payload.caseState.visitSupport.taxi.provider.name==='애월콜' && payload.caseState.visitSupport.taxi.provider.source.datasetId==='327' && payload.caseState.visitSupport.companion.provider.id==='areum-escort');
@@ -405,7 +413,10 @@ try {
       // 같은 context의 새 탭만 기기 설정을 공유하고 대화 원문은 공유하지 않는다.
       const reload=await context.newPage();await reload.goto(base.href,{waitUntil:'networkidle'});await reload.locator('#pref-taxi').waitFor({state:'attached'});
       record(`${width}px 같은 기기 재진입은 설정만 복원`,await reload.locator('#pref-taxi').inputValue()===chosen.taxiProviderId && !await reload.locator('#pref-companion').isChecked() && await reload.locator('.message.user').count()===0 && await reload.locator('#request-input').inputValue()==='');await reload.close();
+      let cachedRecords=await openPatientRecords(page);await recordsMatch(cachedRecords,createDemoCase());await closePatientRecords(page);const closedRecordsHtml=await page.locator('#patient-records-body').innerHTML();
       await send(page,'설정으로 어머니 택시 초안을 준비해 주세요.');
+      const closedRecordsUnchanged=await page.locator('#patient-records-dialog').evaluate(node=>!node.open)&&await page.locator('#patient-records-body').innerHTML()===closedRecordsHtml;
+      record(`${width}px 닫힌 환자 기록은 응답 적용마다 다시 그리지 않음`,closedRecordsUnchanged);
       const first=json(requests[0]);
       record(`${width}px 다음 일반 요청은 preferences·applyPreferences true 전송`,samePreferences(first.preferences,chosen) && first.applyPreferences===true && hashMatches(requests[0]));
       const answer=page.locator('.message.assistant:not(.greeting) .message-body').last();
@@ -417,7 +428,8 @@ try {
       await openVisitSummary(page);
       record(`${width}px fixture caseState와 방문 요약의 실제 상태 일치`,(await page.locator('[data-case-status="택시 이동"]').innerText()).includes(summary.taxi.label) && (await page.locator('[data-case-status="택시 이동"]').innerText()).includes(summary.taxi.providerName) && (await page.locator('[data-case-status="병원 동행"]').innerText()).includes(summary.companion.label));
       const panel=await openPatientRecords(page);
-      record(`${width}px 응답 fixture의 자료 갱신과 위험문자는 읽기 내용으로 표시`,await recordsMatch(panel,state) && await panel.locator('[data-record-source] b,[data-record-content] img,[data-record-content] script,[data-record-content] iframe').count()===0 && await page.evaluate(()=>window.__qaRecordXss===undefined));await closePatientRecords(page);
+      const reopenedRecordsLatest=await recordsMatch(panel,state);proof.lazyRecordScenarios.push({width,closedRecordsUnchanged,reopenedRecordsLatest});
+      record(`${width}px 지연 렌더한 기록은 열 때 최신 자료·출처·위험문자를 읽기 내용으로 표시`,reopenedRecordsLatest && await panel.locator('[data-record-source] b,[data-record-content] img,[data-record-content] script,[data-record-content] iframe').count()===0 && await page.evaluate(()=>window.__qaRecordXss===undefined));await closePatientRecords(page);
       await screenshot(page,`configured-${width}`);
       await send(page,'방문일은 11월 20일로 바꿔 주세요.');
       record(`${width}px 성공 뒤 applyPreferences false·대화 세션 유지`,json(requests[1]).applyPreferences===false && json(requests[1]).sessionId===fixtureSessionId && (await page.locator('#case-content').innerText()).includes('11월 20일') && (await page.locator('[data-case-status="택시 이동"]').innerText()).includes(getVisitSupportSummary(state).taxi.label));
@@ -640,6 +652,28 @@ try {
       proof.fixtureCoverage.cancellation=true;
     } finally {await context.close();}
   });
+  for(const width of [1440,390])await scenario(`${width}px 지원 실패 이유·현재 문의처 범위`,async()=>{
+    const conditions={taxiProviderId:'taxi327-6',wheelchair:false,companionNeeded:true},baseState=preparedState(conditions),at='2026-11-01T12:00:00.000Z',cases=[];
+    for(const [reason,pattern] of [['no_answer',/무응답/],['ai_declined',/AI.*거절/],['identity_required',/본인확인/],['missing_documents',/서류 부족/],['no_slots',/예약 불가/]])cases.push({id:reason,state:applyAction(baseState,{type:'CALL_RECORD_ATTEMPT',target:'taxi',outcome:reason,at}),pattern});
+    const declined=cases.find(item=>item.id==='ai_declined').state;
+    cases.push({id:'recipient-changed',state:applyAction(declined,{type:'SUPPORT_SELECT_PROVIDER',kind:'taxi',provider:supportData.providers.find(item=>item.id==='taxi327-14')}),pattern:/문의처 선택/});
+    cases.push({id:'not-needed',state:applyAction(declined,{type:'SUPPORT_UPDATE_REQUIREMENTS',values:{transportNeeded:false}}),pattern:/필요 없음/});
+    const recheck=structuredClone(declined);recheck.visitSupport.taxi.status='needs_recheck';cases.push({id:'needs-recheck',state:recheck,pattern:/재확인/});
+    let next=0;const {page,context,requests}=await open(width,844,{configured:true,onPost:request=>({body:fixtureResponse(request,cases[next++].state,'지원 실패 이유와 현재 문의처 범위를 읽는 합성 응답입니다. 실제 발신·예약·배차는 하지 않았습니다.')})});
+    try {
+      for(const item of cases){
+        await send(page,`합성 지원 상태 ${item.id}의 이유와 남은 일을 확인해 주세요.`);
+        const support=await page.evaluate(async state=>(await import('/visit-support.js')).getVisitSupportSummary(state),item.state),label=support.taxi.label;
+        await openVisitSummary(page);const summaryText=await page.locator('[data-case-status="택시 이동"]').textContent();
+        await reveal(page.locator('[data-stage-id="support"] [data-stage-facts]'));const facts=await page.locator('[data-stage-id="support"] [data-stage-facts]').textContent();
+        const accurate=item.pattern.test(label)&&summaryText.includes(label)&&facts.includes(label)&&(!['recipient-changed','not-needed','needs-recheck'].includes(item.id)||!/AI.*거절/.test(label))&&(item.id!=='ai_declined'||!/불통/.test(label));
+        record(`${width}px ${item.id} 지원 요약·단계 상세는 같은 이유와 수신처 범위를 표시`,accurate);
+        proof.supportReasonScenarios.push({width,id:item.id,label,accurate,fixtureOnly:true});
+      }
+      record(`${width}px 실패 이유 조회는 합성 응답 수와 일치하고 추가 자동 요청 없음`,requests.length===cases.length&&next===cases.length);
+    } finally {await context.close();}
+  });
+
   for(const width of [1440,390])for(const ending of ['failure','cancel'])await scenario(`${width}px ${ending} 뒤 최근 답변 접근`,async()=>{
     let count=0;
     const previous='# 이전에 성공한 합성 답변\n\n이미 확인한 준비와 기관·의료진에게 남은 일을 안내합니다. 실제 발신·예약·배차는 하지 않았습니다.';

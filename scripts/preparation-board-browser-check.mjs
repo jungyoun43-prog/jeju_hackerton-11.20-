@@ -10,7 +10,7 @@ const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const servedRoot=process.env.QA_SERVED_SOURCE_ROOT?resolve(process.env.QA_SERVED_SOURCE_ROOT):root;
 const base=new URL(process.env.BASE_URL||'http://127.0.0.1:4173');
 if(!['localhost','127.0.0.1','[::1]'].includes(base.hostname) || !['http:','https:'].includes(base.protocol) || base.username || base.password || base.pathname!=='/' || base.search || base.hash)throw new Error('BASE_URL은 키를 끈 localhost QA 서버의 루트 주소여야 합니다.');
-const directory='.impeccable/review/chat-rail/guided-visit/board',checks=[],errors=[];
+const directory='.impeccable/review/chat-rail/use-performance/board',checks=[],errors=[];
 const ids=['records','hospitals','support','plan'];
 const viewports=[[1800,1125],[1440,900],[1152,720],[960,600],[720,450],[1060,900],[390,844],[390,500],[320,500],[768,512]];
 const caps={llm:true,model:'gpt-6.1-sol',phone:'simulation',healthRecords:'demo',voiceInput:'browser',progress:'poll'};
@@ -19,7 +19,7 @@ const proof={
   result:'fail',checkedAt:new Date().toISOString(),url:base.href,sourceHash:await runtimeFingerprint(servedRoot),
   apiLive:false,modelInvoked:false,phoneInvoked:false,healthRecordsQueried:false,apiProgress:{unregistered:null,invalid:null},
   invokingSourceHash:await runtimeFingerprint(root),sourceHashScope:process.env.QA_SERVED_SOURCE_ROOT?'explicit QA_SERVED_SOURCE_ROOT; served UI assets compared below':'invoking checkout; served UI assets compared below',
-  checks,errors,screenshots:[],viewports:[],runtimeAssets:[],progressScenarios:[],guidedScenarios:[],motionScenarios:[],workspaceScenarios:[],viewportScope:'가용 CSS 크기80~200%대응 공간과 텍스트200%; 실제 브라우저 zoom·기기·가상 키보드는 미검증',
+  checks,errors,screenshots:[],viewports:[],runtimeAssets:[],progressScenarios:[],guidedScenarios:[],renderScenarios:[],motionScenarios:[],workspaceScenarios:[],viewportScope:'가용 CSS 크기80~200%대응 공간과 텍스트200%; 실제 브라우저 zoom·기기·가상 키보드는 미검증',
   scope:{localhostKeylessOnly:true,modelInvoked:false,phoneInvoked:false,healthRecordsQueried:false,unmockedNormalPostAttempts:0,blockedPostAttempts:0,actualProgressReads:0,actualPreviewRequests:0,fixtureMainRequests:0,fixtureProgressReads:0,microphone:'not exercised; conversation browser fixtures cover transcript review',progress:'fixed safe DTO/browser fetch fixtures; actual keyless endpoint read only'},
 };
 const hash=value=>createHash('sha256').update(value).digest('hex');
@@ -97,6 +97,12 @@ async function allStatus(page) {
 async function liveSummary(page,id) {
   const pane=page.locator('[data-stage-id="'+id+'"]'),activity=pane.locator('[data-stage-live]'),navigation=page.locator('#stage-navigation>button[data-open-stage="'+id+'"]');
   return await pane.getAttribute('data-live')==='true' && await navigation.getAttribute('data-live')==='true' && /확인 중|진행/.test(await activity.textContent()) && await page.locator('#cancel-request').isVisible() && await page.locator('#board-activity').evaluate(node=>!node.hidden && Boolean(node.textContent.trim()) && Boolean(node.closest('#composer-help')));
+}
+async function startBoardRenderObservation(page) {
+  return page.evaluate(()=>{const host=document.getElementById('preparation-board'),observation={writes:0,elements:host.querySelectorAll('[data-stage-status]').length};observation.observer=new MutationObserver(records=>{observation.writes+=records.length;});observation.observer.observe(host,{attributes:true,subtree:true,attributeFilter:['data-stage-status']});window.__qaBoardRender=observation;return observation.elements;});
+}
+async function stopBoardRenderObservation(page) {
+  return page.evaluate(()=>{const observation=window.__qaBoardRender;observation.writes+=observation.observer.takeRecords().length;observation.observer.disconnect();delete window.__qaBoardRender;return {writes:observation.writes,elements:observation.elements};});
 }
 async function readingPosition(page) {
   return page.evaluate(()=>{
@@ -328,7 +334,7 @@ try {
   record('실제 localhost 서버는 모델 미연결·전화/개인기록 합성 경계',keyless && preflight.headers.get('cache-control')==='no-store');
   if(!keyless)throw new Error('keyless 상태를 확인하지 못해 브라우저 POST 검사를 시작하지 않습니다.');
   proof.apiLive=true;
-  for(const path of ['conversation.js','conversation.css','preparation-board-view.js','preparation-stages.js','preparation-workflow.js','icons.js']) {
+  for(const path of ['conversation.js','conversation.css','preparation-board-view.js','preparation-stages.js','preparation-workflow.js','visit-support.js','icons.js']) {
     const served=await fetch(new URL('/'+path,base),{redirect:'error',signal:AbortSignal.timeout(8000)});
     const expected=await readFile(resolve(servedRoot,'app',path));
     const matching=served.status===200 && hash(await served.text())===hash(expected);
@@ -441,12 +447,13 @@ try {
       const caregiverQuestionOnly=question.currentStage && question.task && question.stages && question.oneSelected && task?.actor==='caregiver' && task.status==='needs_input' && Boolean(task.question) && await page.locator('#current-task-question').isVisible() && normalize(await page.locator('#current-task-question').textContent())===normalize(task.question) && await page.locator('#current-task-choices>button[data-workflow-choice]').count()===task.choices.length && missing.patient.nextVisit==='' && question.visitNotReady;
       record(width+'px 보호자 핵심 질문만 노출·모르는 날짜나 권한을 생성하지 않음',caregiverQuestionOnly);
       const inputNode=await input.elementHandle(),panes=await page.locator('#preparation-board>[data-stage-id]').elementHandles(),stageDraft='기관 대기를 보면서 작성한 다음 요청';await input.fill(stageDraft);
-      const beforeCalls=(await calls(page)).length,actualCurrent=question.workflow.currentStageId,selection=[];
+      const beforeCalls=(await calls(page)).length,actualCurrent=question.workflow.currentStageId,selection=[];await startBoardRenderObservation(page);
       for(const id of ids) {
         await readStage(page,id);const evidence=await guidedEvidence(page,missing);
         const sameDom=await Promise.all(panes.map(node=>node.evaluate(node=>node===document.querySelector('#preparation-board>[data-stage-id="'+node.dataset.stageId+'"]'))));
         const sample={id,selected:(await workspaceEvidence(page)).selectedStage===id,currentUnchanged:evidence.currentStage && await page.locator('#preparation-board').getAttribute('data-current-stage')===actualCurrent,oneStage:evidence.oneSelected,sameDom:sameDom.every(Boolean),draftPreserved:await inputNode.evaluate((node,text)=>node===document.getElementById('request-input')&&node.value===text,stageDraft)};selection.push(sample);
       }
+      const navigationRendering=await stopBoardRenderObservation(page),cachedNavigation=navigationRendering.writes===0;record(width+'px 읽기 전용 단계 탐색은 확정 준비 내용의 전체 렌더를 반복하지 않음',cachedNavigation,JSON.stringify(navigationRendering));
       const readOnlyNavigation=selection.every(sample=>sample.selected&&sample.currentUnchanged&&sample.oneStage&&sample.sameDom&&sample.draftPreserved)&&(await calls(page)).length===beforeCalls&&actualPosts.length===0;
       record(width+'px 읽는 단계와 실제 다음 업무는 분리·같은 DOM/초안·추가 POST0',readOnlyNavigation,JSON.stringify(selection));
       await reveal(page.locator('#return-to-current-task'));await page.locator('#return-to-current-task').click();
@@ -483,7 +490,7 @@ try {
         page.once('dialog',dialog=>dialog.accept());await button.click();draftOnly=cancelled && normalize(await input.inputValue())===normalize(requestDraft.trim().slice(0,1600)) && (await calls(page,'/api/agent')).length===3 && actualPosts.length===0;
       }
       record(width+'px 현재 업무의 후속 버튼은 보이는 초안만 제안·교체 취소·추가 POST0',draftOnly);
-      proof.guidedScenarios.push({id:'current-task-flow',width,naturalRequest,caregiverQuestionOnly,currentAndSelectedSeparated:readOnlyNavigation,readOnlyNavigation,historyOriginal,responseCountIndependent:readiness.same,observedIndependent:readiness.same,institutionWaitingPreserved,notNeededPreserved,planListMatches,visitNotReady:external.visitNotReady,draftOnly,normalPostAttempts:actualPosts.length});
+      proof.guidedScenarios.push({id:'current-task-flow',width,naturalRequest,caregiverQuestionOnly,currentAndSelectedSeparated:readOnlyNavigation,readOnlyNavigation,cachedNavigation,historyOriginal,responseCountIndependent:readiness.same,observedIndependent:readiness.same,institutionWaitingPreserved,notNeededPreserved,planListMatches,visitNotReady:external.visitNotReady,draftOnly,normalPostAttempts:actualPosts.length});
       await shot(page,width+'-guided-workflow');
     } finally {await context.close();}
   });
@@ -530,7 +537,8 @@ try {
       const currentReads=await calls(page,'/api/agent/progress');
       record('진행 읽기는2.5초 이상 간격·동시에 한 개',currentReads.every((item,index)=>index===0 || item.at-currentReads[index-1].at>=2500));
       record('진행 조회는 기존 일반 요청1건만 유지하며 모델 요청을 추가하지 않음',(await calls(page,'/api/agent')).length===1 && actualPosts.length===0);
-      await finish(page,call,createDemoCase(),'진행을 본 뒤 도착한 합성 최종 답변입니다.');
+      await startBoardRenderObservation(page);await finish(page,call,createDemoCase(),'진행을 본 뒤 도착한 합성 최종 답변입니다.');const finalRendering=await stopBoardRenderObservation(page),singleFinalRender=finalRendering.elements>0&&finalRendering.writes===finalRendering.elements;
+      record('최종 응답 적용은 같은 준비판을 한 번만 전체 갱신',singleFinalRender,JSON.stringify(finalRendering));proof.renderScenarios.push({id:'single-final-render',singleFinalRender,...finalRendering});
       const completedReads=(await calls(page,'/api/agent/progress')).length;
       await page.clock.runFor(9000);
       record('최종 응답 후 진행 조회 중단·대화 답변 유지',await page.locator('.message.assistant:not(.greeting)').count()===1 && (await page.locator('#message-list').textContent()).includes('진행을 본 뒤') && (await calls(page,'/api/agent/progress')).length===completedReads && actualPosts.length===0);
@@ -714,7 +722,7 @@ try {
       record(width+'px 표만 가로 스크롤·키보드 이름 제공',await answer.locator('.message-table-scroll table').count()===1 && await answer.locator('.message-table-scroll').evaluate(node=>node.tabIndex===0 && Boolean(node.getAttribute('aria-label')) && /auto|scroll/.test(getComputedStyle(node).overflowX)) && await noOverflow(page));
       const before=(await calls(page)).length;
       await page.locator('#expand-answer').click();
-      const dialog=page.locator('#answer-dialog');await dialog.waitFor();
+      const dialog=page.locator('#answer-dialog');await dialog.waitFor();await page.evaluate(()=>document.fonts.ready);
       record(width+'px 확대 답변은 이름·focus·원문·표를 가진 native dialog',await dialog.evaluate(node=>node instanceof HTMLDialogElement && node.open && node.matches(':modal') && node.contains(document.activeElement) && Boolean(document.getElementById(node.getAttribute('aria-labelledby'))?.textContent.trim())) && normalize(await dialog.innerText()).includes('마지막 확인: 실제 발신') && await dialog.locator('.message-table-scroll table').count()===1);
       const last=await accessible(dialog.locator('.message-body p').last()),close=await accessible(page.locator('#close-answer'));
       record(width+'px 확대 끝문장·닫기·가로 넘침 접근',last.reachable && close.reachable && await noOverflow(page));
@@ -885,7 +893,7 @@ try {
         return {tools:style('.workspace-tools'),nav:style('#care-rail'),selected:style('.rail-nav [aria-current]'),icon:style('.stage-topic-icon'),names:[...document.querySelectorAll('.patient-name')].map(node=>getComputedStyle(node).color),cards:[...document.querySelectorAll('.stage-pane')].map(node=>getComputedStyle(node).backgroundColor),identityRemoved:!document.querySelector('.chat-identity,.chat-role,#conversation-title'),chatNamed:Boolean(document.getElementById('chat-workspace').getAttribute('aria-label')),utilities:[...document.querySelectorAll('.workspace-tools button')].map(node=>{const r=node.getBoundingClientRect();return {id:node.id,native:node instanceof HTMLButtonElement,width:r.width,height:r.height};})};
       });
       if(width<=1050) {await page.locator('#close-care-menu').click();await nativeFinished(page.locator('#care-rail'));}
-      const utilityNames=await page.getByRole('button',{name:'넓게 읽기',exact:true}).count()===1 && await page.getByRole('button',{name:'예시 보기',exact:true}).count()===1;
+      const utilityNames=await page.getByRole('button',{name:'넓게 읽기',exact:true}).count()===1 && await page.getByRole('button',{name:'준비 흐름 체험',exact:true}).count()===1;
       evidence.greenSurfaces=surfaces.identityRemoved && surfaces.chatNamed && utilityNames && surfaces.utilities.length===2 && surfaces.utilities.every(item=>item.native && item.width>=44 && item.height>=44) && surfaces.nav.background==='rgb(244, 248, 244)' && surfaces.selected.background===soft && surfaces.selected.color===secondary && surfaces.icon.color===secondary && surfaces.cards.length===4 && surfaces.cards.every(color=>color==='rgb(255, 255, 255)');
       record(label+' 소개 블록 없이 이름 있는 대화·공통 도구·주변 초록 유지',evidence.greenSurfaces,JSON.stringify(surfaces));
       const previewButton=page.locator('#preview-button');

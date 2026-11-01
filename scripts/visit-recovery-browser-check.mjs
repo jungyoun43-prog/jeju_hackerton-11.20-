@@ -14,7 +14,7 @@ const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE||'
 const browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH||undefined,args:['--no-sandbox','--disable-dev-shm-usage']});
 const tokenKey='hondi-visit-token-v1',token='v'.repeat(43),sessionId='q'.repeat(43);
 const caps={llm:true,model:'gpt-6.1-sol',phone:'simulation',healthRecords:'demo',voiceInput:'browser',progress:'unavailable',visitRecovery:'token'};
-const directory='.impeccable/review/chat-rail/guided-visit/recovery';
+const directory='.impeccable/review/chat-rail/use-performance/recovery';
 await mkdir(resolve(root,directory),{recursive:true});await mkdir(resolve(root,'orchestration/runs'),{recursive:true});
 const checks=[],errors=[],proof={checkedAt:new Date().toISOString(),result:'fail',sourceHash:await runtimeFingerprint(servedRoot),checks,errors,guidedScenarios:[],viewports:[],fixturePosts:{agent:0,resume:0,preview:0},actualFixedPreviews:0,unmockedModelPosts:0,modelInvoked:false,phoneInvoked:false,recordsQueried:false,scope:'Actual local static assets; normal and recovery HTTP response fixtures. Successful fixed preview is a real keyless local endpoint; the preview-failure case is a separate fixture. No real model, database durability, phone, microphone or physical-device evidence.'};
 const record=(name,pass,detail='')=>{checks.push({name,status:pass?'pass':'fail',detail});console.log(`${pass?'PASS':'FAIL'} ${name}${detail?' · '+detail:''}`);};
@@ -77,7 +77,7 @@ async function openDetails(page){if(await page.locator('#workspace-tab-preparati
 try{
   const response=await fetch(new URL('/api/agent/capabilities',base));const actual=await response.json();
   if(!response.ok || actual.llm!==false || actual.phone==='connected' || actual.healthRecords==='connected')throw new Error('실제 서버가 keyless 합성 상태가 아니어서 검사를 중단합니다.');
-  for(const file of ['conversation.js','conversation.css','preparation-board-view.js','preparation-stages.js','preparation-workflow.js']){const response=await fetch(new URL('/'+file,base));record(`실제 ${file}는 검사 소스와 동일`,response.ok && Buffer.compare(Buffer.from(await response.arrayBuffer()),await readFile(resolve(servedRoot,'app',file)))===0);}
+  for(const file of ['conversation.js','conversation.css','preparation-board-view.js','preparation-stages.js','preparation-workflow.js','visit-support.js']){const response=await fetch(new URL('/'+file,base));record(`실제 ${file}는 검사 소스와 동일`,response.ok && Buffer.compare(Buffer.from(await response.arrayBuffer()),await readFile(resolve(servedRoot,'app',file)))===0);}
   for(const [width,height] of [[1440,900],[390,500]])await scenario(`${width}px 첫 응답 유실→새로고침`,async()=>{
     const {page,context,messages,resumes}=await open(width,height,{onMessage:(request,count)=>count===1?{abort:true}:{body:reply(request)},onResume:()=>({body:recovery('completed',state,JSON.parse(messages[0].postData()).requestId)})});
     try{

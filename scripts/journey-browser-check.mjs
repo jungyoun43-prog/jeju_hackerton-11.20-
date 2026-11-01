@@ -9,7 +9,7 @@ import { runtimeFingerprint } from '../orchestration/checks.mjs';
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const servedRoot=process.env.QA_SERVED_SOURCE_ROOT?resolve(process.env.QA_SERVED_SOURCE_ROOT):root;
 const require=createRequire(import.meta.url);
-const directory='.impeccable/review/chat-rail/guided-visit/journey';
+const directory='.impeccable/review/chat-rail/use-performance/journey';
 const scenarioIds=['missing_record','jeju_unavailable','time_changed'];
 const recoveryScenarioIds=['call_no_answer','call_ai_declined','call_identity_required','call_documents_or_schedule'];
 const allowedScenarioIds=[...scenarioIds,...recoveryScenarioIds];
@@ -19,7 +19,7 @@ const proof={
   result:'fail',checkedAt:new Date().toISOString(),url:'',sourceHash:'',checks,errors,
   apiLive:false,modelInvoked:false,phoneInvoked:false,healthRecordsQueried:false,scenarioIds,recoveryScenarioIds,
   desktop:{width:1440,height:900,noOverflow:false,screenshot:null},mobile:{width:390,height:844,noOverflow:false,screenshot:null},
-  scenarios:[],recoveryScenarios:[],recoveryCoverage:{desktop:false,mobile:false},screenshots:[],shortViewport:[],
+  continuationScenarios:[],lazyDialogScenarios:[],scenarios:[],recoveryScenarios:[],recoveryCoverage:{desktop:false,mobile:false},screenshots:[],shortViewport:[],
   scope:{localhostKeylessOnly:true,fixtures:false,modelInvoked:false,phone:false,externalRecords:false,normalAgentPostAttempts:0,previewRequests:0,retryGate:'고정 preview 상태·표시만 확인하며 시간/횟수 초과 gate는 별도 단위 검사 범위'},
   runtimeAssets:[],sourceHashScope:process.env.QA_SERVED_SOURCE_ROOT?'explicit QA_SERVED_SOURCE_ROOT; served UI assets compared below':'invoking checkout; served UI assets compared below',
 };
@@ -120,7 +120,7 @@ async function openJourney(page) {
   if(await page.locator('#open-care-menu').isVisible())await page.locator('#open-care-menu').click();
   await page.locator('#nav-care-journey').click();
   const panel=page.locator('#care-journey-dialog');
-  await panel.waitFor();
+  await panel.waitFor();await page.evaluate(()=>document.fonts.ready);
   return panel;
 }
 
@@ -135,7 +135,7 @@ async function closeJourney(page,{escape=false}={}) {
 async function openContact(page) {
   if(await page.locator('#open-care-menu').isVisible())await page.locator('#open-care-menu').click();
   await page.locator('#nav-contact-plan').click();
-  const panel=page.locator('#contact-plan-dialog');await panel.waitFor();return panel;
+  const panel=page.locator('#contact-plan-dialog');await panel.waitFor();await page.evaluate(()=>document.fonts.ready);return panel;
 }
 
 async function closeContact(page,{escape=false}={}) {
@@ -165,18 +165,25 @@ async function clickWithConfirm(page,locator,accept) {
   return dialogs;
 }
 
-async function verifyMainContinuation(page,summary,posts,prefix) {
+async function verifyMainContinuation(page,state,posts,prefix) {
   const input=page.locator('#request-input'),before=posts.length,existing='결과를 읽으며 직접 작성한 다음 요청입니다.';
   await input.fill(existing);
   await reveal(page.locator('#return-to-request'));await page.locator('#return-to-request').click();
   const focusedVisible=()=>input.evaluate(node=>{const r=node.getBoundingClientRect();return document.activeElement===node && r.top>=0 && r.bottom<=innerHeight && r.width>0;});
   record(`${prefix} 결과의 입력 복귀는 기존 초안·focus·viewport를 보존하며 POST 없음`,await input.inputValue()===existing && await focusedVisible() && posts.length===before);
-  const next=summary.nextActions?.[0],button=page.locator('#next-request-draft');
-  if(!next?.requestDraft)throw new Error('검사할 다음 문의 초안이 없습니다.');
-  const denied=await clickWithConfirm(page,button,false);
-  record(`${prefix} 메인 다음 문의 초안 교체 취소는 기존 입력과 요청 수 유지`,denied.length===1 && denied[0].type==='confirm' && await input.inputValue()===existing && posts.length===before);
-  const accepted=await clickWithConfirm(page,button,true);
-  record(`${prefix} 메인 다음 문의는 같은 nextAction 초안만 채우고 바로 입력 가능`,accepted.length===1 && accepted[0].type==='confirm' && normalized(await input.inputValue())===normalized(next.requestDraft.trim().slice(0,1600)) && await focusedVisible() && await input.isEditable() && posts.length===before);
+  const task=await page.evaluate(async state=>(await import('/preparation-workflow.js')).getPreparationWorkflow(state).currentTask,state),titles=await Promise.all(['#current-task-title','#care-journey-next'].map(selector=>page.locator(selector).textContent())),sameTitle=titles.every(title=>normalized(title)===normalized(task?.title||'현재 방문 준비와 남은 일을 확인해 주세요.'));
+  record(`${prefix} 중앙과 대화 기록의 다음 작업은 같은 workflow.currentTask`,sameTitle);
+  const samples=[];
+  for(const selector of ['#current-task-draft','#next-request-draft']){
+    const button=page.locator(selector);await input.fill(existing);
+    if(!task?.requestDraft){const hidden=await button.isHidden();record(`${prefix} ${selector}는 실행 가능한 초안이 없으면 숨김`,hidden&&posts.length===before);samples.push({selector,hidden,noExtraPost:posts.length===before});continue;}
+    const denied=await clickWithConfirm(page,button,false),cancelPreserved=denied.length===1&&denied[0].type==='confirm'&&await input.inputValue()===existing&&posts.length===before;
+    record(`${prefix} ${selector} 초안 교체 취소는 기존 입력과 요청 수 유지`,cancelPreserved);
+    const accepted=await clickWithConfirm(page,button,true),draftMatches=accepted.length===1&&accepted[0].type==='confirm'&&normalized(await input.inputValue())===normalized(task.requestDraft.trim().slice(0,1600))&&await focusedVisible()&&await input.isEditable()&&posts.length===before;
+    record(`${prefix} ${selector}는 같은 현재 작업 초안만 채우고 바로 입력 가능`,draftMatches);
+    samples.push({selector,cancelPreserved,draftMatches,noExtraPost:posts.length===before});
+  }
+  proof.continuationScenarios.push({prefix,sameTitle,buttons:samples});
 }
 
 async function readConversation(page) {
@@ -444,7 +451,7 @@ try {
   record('실제 localhost API의 모델 미연결·전화/개인기록 합성 경계',keyless && response.headers.get('cache-control')==='no-store');
   if(!keyless)throw new Error('keyless 상태를 확인하지 못해 preview 검사를 시작하지 않습니다.');
   proof.apiLive=true;
-  for(const path of ['conversation.js','conversation.css','preparation-board-view.js','preparation-stages.js','preparation-workflow.js','icons.js']) {
+  for(const path of ['conversation.js','conversation.css','preparation-board-view.js','preparation-stages.js','preparation-workflow.js','visit-support.js','icons.js']) {
     const response=await fetch(new URL('/'+path,base),{redirect:'error',signal:AbortSignal.timeout(8000)});
     const expected=await readFile(resolve(servedRoot,'app',path));
     const hash=value=>createHash('sha256').update(value).digest('hex');
@@ -464,10 +471,13 @@ try {
     try {
       let panel=await openJourney(page);
       record(`${prefix} 상황 버튼3개·열기만으로 요청 없음`,(await panel.locator('[data-journey-scenario]').evaluateAll(nodes=>nodes.map(node=>node.dataset.journeyScenario))).sort().join(',')===[...scenarioIds].sort().join(',') && posts.length===0);
+      const closedJourneyHtml=await page.locator('#care-journey-content').innerHTML();
       const {preview,data,summary}=await runPreview(page,panel.locator(`[data-journey-scenario="${id}"]`),id,posts,prefix);
+      const closedUnchanged=!await panel.isVisible()&&await page.locator('#care-journey-content').innerHTML()===closedJourneyHtml;
+      record(`${prefix} 닫힌 여정 상세는 응답 적용 중 다시 만들지 않음`,closedUnchanged);proof.lazyDialogScenarios.push({prefix,closedUnchanged});
       record(`${prefix} API 상태의 활성 상황·합성 안내가 화면에 반영`,summary.activeScenario?.id===id && data.caseState && /합성|시연/.test(data.reply) && /합성|예시|미리보기/.test(await page.locator('#conversation-status').innerText()));
       if(await panel.isVisible())await closeJourney(page);
-      if(id===scenarioIds[0])await verifyMainContinuation(page,summary,posts,prefix);
+      if(id===scenarioIds[0])await verifyMainContinuation(page,data.caseState,posts,prefix);
       panel=await openJourney(page);
       await verifySummary(page,panel,summary,prefix);
       verifyScenario(summary,data.caseState,await page.locator('#care-journey-content').innerText(),prefix,id);
@@ -505,7 +515,7 @@ try {
       const {preview,data,summary}=await runPreview(page,panel.locator(`[data-call-recovery-scenario="${id}"]`),id,posts,prefix);
       record(`${prefix} 인계는 실제 preview 상태의 합성 결과`,Array.isArray(summary.handoffs) && summary.handoffs.length>0 && /합성|시연/.test(data.reply) && /합성|예시|미리보기/.test(await page.locator('#conversation-status').innerText()));
       if(await panel.isVisible())await closeContact(page);
-      if(id===recoveryScenarioIds[0])await verifyMainContinuation(page,summary,posts,prefix);
+      if(id===recoveryScenarioIds[0])await verifyMainContinuation(page,data.caseState,posts,prefix);
       panel=await openContact(page);await expandDetails(panel);
       const rows=await handoffRows(panel);
       verifyHandoffs(summary,rows,prefix);
