@@ -86,7 +86,8 @@ export async function runAgentEvaluation(options) {
       }
     }
     flows.set(task.flow,flow);
-    const record={id:task.id,flow:task.flow,input:task.message,statusCode:result.statusCode,durationMs:Date.now()-start,checks,pass:checks.every(check=>check.pass),reply:safeText(result.data.reply || ''),errorCode:result.data.error?.code,toolNames:(result.data.events || []).map(event=>event.tool),toolObservations:caseTrace.map(({name,status,errorCode})=>({name,status,...(errorCode?{errorCode}:{})})),modelRequests:options.public?null:nativeModelRequests-modelStart,state:result.data.caseState,...(recovery?{recovery}:{})};
+    const events=(result.data.events || []).map(({tool,label,status,isSimulation,source})=>({tool,label,status,isSimulation,source}));
+    const record={id:task.id,flow:task.flow,input:task.message,statusCode:result.statusCode,durationMs:Date.now()-start,checks,pass:checks.every(check=>check.pass),reply:safeText(result.data.reply || ''),errorCode:result.data.error?.code,capabilities:result.data.capabilities,events,toolNames:events.map(event=>event.tool),toolObservations:caseTrace.map(({name,status,errorCode})=>({name,status,...(errorCode?{errorCode}:{})})),modelRequests:options.public?null:nativeModelRequests-modelStart,before,state:result.data.caseState,...(recovery?{recovery}:{})};
     report.cases.push(record);report.actualModelRequests=options.public?null:nativeModelRequests;
     console.log(`${record.pass?'PASS':'FAIL'} ${task.id} · HTTP ${record.statusCode} · ${record.durationMs}ms · ${record.checks.filter(c=>c.pass).length}/${record.checks.length}`);
     if(['MODEL_NOT_CONNECTED','MODEL_CONFIGURATION_INVALID','CLOUD_RUNTIME_UNAVAILABLE','DAILY_LIMIT'].includes(record.errorCode))break;

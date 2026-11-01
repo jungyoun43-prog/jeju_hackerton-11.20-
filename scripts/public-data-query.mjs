@@ -5,6 +5,7 @@ node scripts/public-data-query.mjs search --purpose hospital [--query 의료] [-
 node scripts/public-data-query.mjs analyze --analysis facility_compare --areas 제주시,서귀포시
 node scripts/public-data-query.mjs analyze --analysis support_candidates --area "제주시 애월읍" [--support-kind taxi|companion|both] [--wheelchair true|false]
 node scripts/public-data-query.mjs analyze --analysis travel_time --area "제주시 애월읍"
+node scripts/public-data-query.mjs analyze --analysis public_health_contacts --area "제주시 애월읍"
 node scripts/public-data-query.mjs evidence --purpose taxi --area "제주시 애월읍" [--wheelchair true|false]`;
 
 try {

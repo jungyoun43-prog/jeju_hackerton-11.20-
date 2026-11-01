@@ -1,11 +1,12 @@
 # Agent API 연결과 운영
 
-로컬은 `.env`의 `OPENAI_API_KEY`로 실행하고 AWS는 Secrets Manager에서 키를 읽습니다. 기본 `gpt-6.1-sol`, 선택 `gpt-6.1-terra`만 사용하며 자동 대체하지 않습니다. 2026-10-31 로컬5.5초·공개 AWS5.2초의 Sol→get_case→응답을 각각 확인했습니다. Terra·복합 요청·모델 전반 품질은 별도입니다. 전화·공단 기록·의료진 회신은 합성 시연입니다.
+로컬은 `.env`의 `OPENAI_API_KEY`로 실행하고 AWS는 Secrets Manager에서 키를 읽습니다. 기본 `gpt-6.1-sol`, 선택 `gpt-6.1-terra`만 사용하며 자동 대체하지 않습니다. 2026-10-31 로컬5.5초·공개 AWS5.2초의 Sol→get_case→응답을 각각 확인했습니다. Terra·모델 전반 품질은 별도입니다. 복합 과업의 최신 실제 평가와 수정 전후는 [검증 기록](../docs/implementation-results.md)을 따릅니다. 전화·공단 기록·의료진 회신은 합성 시연입니다.
 
 ## 경로와 실행
 
 - `GET /api/agent/capabilities`: capability 객체. llm:true는 어댑터 설정이며 요청 성공을 보장하지 않습니다. AWS의 첫 조회는 Secret을 준비하지만 모델 추론·세션/예산 DB는 호출하지 않습니다. 준비 실패 시 llm:false를 반환합니다.
-- `POST /api/agent`: `{message,requestId,sessionId?,history?,preferences?,applyPreferences?}`. OpenAI Responses API와 검증된 도구를 실행합니다. 로컬 키가 없으면 MODEL_NOT_CONNECTED/503, AWS 키/저장소 준비 실패는 CLOUD_RUNTIME_UNAVAILABLE/503입니다.
+- `POST /api/agent`: `{message,requestId,sessionId?,visitToken?,history?,preferences?,applyPreferences?}`. OpenAI Responses API와 검증된 도구를 실행합니다. 로컬 키가 없으면 MODEL_NOT_CONNECTED/503, AWS 키/저장소 준비 실패는 CLOUD_RUNTIME_UNAVAILABLE/503입니다.
+- `POST /api/agent/resume`: `{visitToken}`으로 미만료 방문의 확인된 상태·남은 일·복구 메타데이터만 읽습니다. 모델·Secret·budget·lease·새 세션·TTL 연장을 실행하지 않습니다.
 - `POST /api/agent/preview`: `{scenarioId:'aewol-parent-visit',requestId}`. 별도 고정 예시이며 모델·Secret·세션 DB를 호출하지 않습니다.
 
 로컬은 `.env.example`을 복사한 뒤 키를 채우고 `npm run dev`를 실행합니다. 기존 .env를 덮어쓰지 않습니다. `npm start`·`npm run preview`도 .env를 읽습니다. `OPENAI_MODEL=gpt-6.1-terra`는 Terra만 선택합니다. 키 없는 검사는 `OPENAI_API_KEY= PORT=4180 node scripts/server.mjs`로 실행합니다.
@@ -18,9 +19,9 @@
 
 ## 진료 준비용 공공데이터 스킬
 
-등록 도구는17개이며 그중 `search_public_data`·`analyze_public_data`는 읽기 전용입니다. 전자는 업무 목적(hospital/taxi/companion/travel)과200자 이내 검색어로 최대8개 메타데이터를 반환합니다. 후자는 두 지역의 관측 등록 현황, 지역·휠체어 조건의 문의 후보, 이동시간 원자료 접근 범위를 고정 함수로 계산합니다. 임의SQL·파일경로·URL·원자료 fetch를 모델 인자로 받지 않습니다.
+등록 도구는18개이며 그중 `search_public_data`·`analyze_public_data`는 읽기 전용입니다. 전자는 업무 목적(hospital/taxi/companion/travel)과200자 이내 검색어로 최대8개 메타데이터를 반환합니다. 후자는 두 지역의 관측 등록 현황, 지역·휠체어 조건의 문의 후보, 이동시간 원자료 접근 범위를 고정 함수로 계산합니다. 임의SQL·파일경로·URL·원자료 fetch를 모델 인자로 받지 않습니다.
 
-`app/data/public-data-catalog.json`은 기존 감사CSV의 허브1,259건·센터70건을 분류한 목록입니다. 별도 공식안내2건과 실제 보유3종 snapshot을 구별합니다. 카탈로그 갱신일은 원자료 기준일이 아닙니다. `app/public-data-skill.js`가 자료별 출처·기준일·수집일·관측 분모·폐업/중복 제외·주소 결측·조회 한계를 반환하고, `agent/public-data-tools.mjs`가 스키마·공식HTTPS출처를 검증합니다. 새 관리형 DB·운영 API·개인 기록 연결은 없습니다.
+`app/data/public-data-catalog.json`은 기존 감사CSV의 허브1,259건·센터70건을 분류한 목록입니다. 별도 공식안내2건과 실제 보유4종 snapshot을 구별합니다. 카탈로그 갱신일은 원자료 기준일이 아닙니다. `app/public-data-skill.js`가 자료별 출처·기준일·수집일·관측 분모·폐업/중복 제외·주소 결측·조회 한계를 반환하고, `agent/public-data-tools.mjs`가 스키마·공식HTTPS출처를 검증합니다. 새 관리형 DB·운영 API·개인 기록 연결은 없습니다. 공공보건1304의2026-03-23 기준35행은 공식 연결파일에서 최소 사실을 정제해 추가했습니다. `public_health_contacts`는 제주시의 등록 관할/소재지·연락처·질문을 읽기 전용으로 반환하며 서귀포·지역 미상은 기관 수null로 둡니다. 병원·택시·동행을 자동 선택하지 않습니다.
 
 병원은 공개20행→정상13행의 표본, 돌봄은2020년19개 등록 문의처입니다. 관측0행을 지역 시설 부재로 설명하지 않습니다. 읍면동·시를 섞으면 각 주소 해상도의 분모를 따로 보존합니다. 센터7/8/10은 명세만 있어 `travel_time`은 unavailable·수치 없음으로 반환합니다. LLM은 이 값을 설명하고 문의 질문으로 이어가며 ETA나 전체 분포를 만들지 않습니다.
 
@@ -30,13 +31,23 @@
 
 ## 보관과 한도
 
-로컬은 메모리, AWS는 `createDynamoSessionStore`입니다. AWS 저장 필드는 opaque sessionId·requestIds·턴 수·정규화된 합성 상태·TTL 및 처리 중 lease입니다. 원문·이력·모델 답변·reasoning·키는 저장하지 않습니다. 강한 읽기와65초 lease 소유권 조건으로 동시 저장을 보호하고, 애플리케이션에서도1시간 TTL 만료를 검사합니다. DynamoDB의 실제 삭제는 TTL 정책에 따라 지연될 수 있습니다.
+로컬은 메모리, AWS는 `createDynamoSessionStore`입니다. AWS 저장 필드는 opaque sessionId·requestIds·고정 receipt(요청 ID/본문 해시/상태/시각)·턴 수·정규화된 합성 상태·TTL 및 처리 중 lease입니다. 원문·이력·모델 답변·reasoning·키는 저장하지 않습니다. 강한 읽기와65초 lease 소유권 조건으로 동시 저장을 보호하고, 애플리케이션에서도1시간 TTL 만료를 검사합니다. DynamoDB의 실제 삭제는 TTL 정책에 따라 지연될 수 있습니다.
 
 기본 OpenAI 한도는 low reasoning·호출당 출력4,096토큰(추론 포함)·호출40초·처리 전체45초·최대8라운드/16도구·세션20턴입니다. 요청24KiB·message4,000자·최근이력8개/각2,000자이며 UI 입력은1,600자입니다. cloud 준비8초와 정리2.5초는 별도이고 브라우저는65초까지 기다립니다. Lambda·CloudFront origin은60초입니다.
 
 AWS는 UTC 하루80개 대화 요청을 모델 호출 전에 조건부 원자 갱신으로 차감합니다. 한 요청 내부 Responses 호출은 최대8회이며 API 호출80회나 금액 한도를 뜻하지 않습니다. 실패한 요청도 차감하고 DB 오류 시 모델을 실행하지 않습니다. AWS store 상한은1~80이고 로컬 메모리 한도는 인스턴스별입니다.
 
-중복 방지는 sessionId가 있는 세션 안에서만 적용합니다. 최초 응답 유실로 sessionId 없는 채 재시도하면 새 세션과 추가 유료 턴이 생길 수 있습니다. 실제 외부 작업은 아직 없고 전역80턴 한도는 유지됩니다. 이후 실제 발신·예약·결제를 붙이기 전에 최초 요청까지 포함한 영속 중복 방지가 필요합니다.
+새 브라우저는 첫 요청 전에32byte 방문 토큰을 만들고 같은 방문에서 유지합니다. 서버는 도메인을 구분한 해시로 같은 세션을 원자적으로 생성하고, receipt 저장 뒤에만 budget·모델·도구를 실행합니다. 같은 ID·다른 본문은409, 완료된 중복 요청은 저장 상태 재표시, 처리중/중단된 요청은 재실행·재차감 없이 확인/인계 상태입니다. DDB client의 SDK 자동 재시도는1회로 제한해 비멱등 budget ADD가 SDK 내부에서 반복되지 않게 합니다. Secret 조회의 재시도와 구분합니다.
+
+이 보장은 활성 방문의1시간 TTL 범위이며, 토큰 없는 레거시 API의 sessionId 없는 첫 요청은 기존 한계가 남습니다. receipt가 없는 이전v1 완료 요청은 과거 본문 지문을 소급 비교하지 못하므로 기존 저장 상태를 반환합니다. 불명확한 실패를 자동 재실행하지 않으며, 전역80턴 한도와 합성 외부 작업 범위를 유지합니다.
+
+## 방문 준비 이어하기
+
+capabilities의 `visitRecovery`는 `token` 또는 `unavailable`입니다. 브라우저는 sessionStorage에 opaque token 하나만 저장하고 대화·초안·환자정보·sessionId는 새로 저장하지 않습니다. 같은 탭의 새로고침 복구이며 계정 로그인·복수 가족 공유가 아닙니다. localStorage의 기존 이동 선호3항목은 그대로입니다.
+
+`POST /api/agent/resume`은 토큰으로 기존 세션만 읽어 `{sessionId,caseState,pendingActions,recovery:{savedAt,expiresAt,request}}`를 반환합니다. savedAt은 마지막 완료 상태의 ISO시각 또는null, expiresAt은epoch초입니다. request는null 또는 `{requestId,status:'running'|'completed'|'interrupted'}`입니다. 과거 모델 답변은 저장·복원하지 않습니다. 유효하지 않은 입력400, 없는/만료 상태404 SESSION_EXPIRED, 저장소 실패503을 구분합니다. 조회만으로 만료를 연장하거나 세션을 만들지 않습니다.
+
+화면은 정적 안내와 확인된 준비를 복원합니다. 새 대화·새 요청·preview를 시작한 뒤 늦은 복구가 초안/상태를 덮지 않게 보호합니다. preview는 성공적으로 모드가 바뀔 때만 복구 참조를 정리하고 실패/취소에서는 원래 방문을 유지합니다. 새 대화는 현재 탭의 참조를 정리할 뿐 서버 실행 취소·즉시 삭제가 아닙니다. 실제 외부 작업의 중단·철회·권한 처리는 별도입니다.
 
 ## 보호자 기본 설정과 복합 요청
 
@@ -54,7 +65,7 @@ AWS는 UTC 하루80개 대화 요청을 모델 호출 전에 조건부 원자 �
 
 사용자는 전화 사업자 계정이 없어 준비·시연을 먼저 선택했습니다. 실제 발신 어댑터를 거부하는 guard와 realDelegationVerified/realAdapterConfigured/actualCallPlaced/reservationConfirmed/clinicalAcceptanceConfirmed:false를 유지합니다. 합성 문의 허용은 실제 환자의 위임·민감정보 제공 동의가 아닙니다. 실제 녹음·전사·보관 정책 없이 ‘기록합니다’라고 말하지 않으며 구체 운영 전 처리 근거·수수료/국외 이전 검토가 필요합니다. [공통 계약](../docs/call-workflow-contract.md)을 따릅니다.
 
-클라이언트의 응답 대기 중지는 AbortController로 해당 화면의 기다림만 끝냅니다. 서버 실행·발신 중단 API가 아니며 완료된 중단으로 표시하지 않습니다. 원래 requestId/본문·설정 스냅샷을 재사용하되 최초 응답 전 중지는 sessionId가 없어 추가 실행·차감이 생길 수 있는 기존 한계를 유지합니다.
+클라이언트의 응답 대기 중지는 AbortController로 해당 화면의 기다림만 끝냅니다. 서버 실행·발신 중단 API가 아니며 완료된 중단으로 표시하지 않습니다. 원래 requestId/본문·설정 스냅샷을 재사용하되 새 visitToken 흐름에서는 최초 응답 전에도 같은 요청의 재실행을 막고 마지막 확인 상태를 복구합니다. 토큰 없는 레거시 요청은 sessionId 없는 재시도의 기존 한계가 남습니다.
 
 ## AWS 키와 배포
 
@@ -88,4 +99,4 @@ Lambda는 전용 `OPENAI_SECRET_ARN`·`SESSION_TABLE_NAME`을 함께 요구하�
 
 진행 DTO와 고정 도구 목록은 `app/preparation-stages.js`에서 한 번 정의하며 브라우저 수신·화면·서버 저장/조회가 같은 엄격 검증을 사용한다. 서버의 `normalizeProgressSnapshot`은 기존 오류 경계를 유지한다.
 
-화면은 중앙 채팅·하단 공통 입력과 오른쪽 자료·병원·이동·방문 계획 네 상태다. 모바일은 채팅 뒤 네 상태를 읽는다. 제목 아이콘·핵심 요약 뒤 상세를 펼치며 각 칸의 내부 세로 스크롤 없이 문서 높이를 늘린다. 전체 답변은 중앙 한 곳에만 표시한다. 진행 DTO는 최종 caseState가 아니다. 화면은 마지막 확인된 사실과 실제 실행 관측을 구분하고, 원래 응답을 받은 뒤 사례를 갱신한다. 중지·완료·새대화·재시도에서 늦은 진행도 무시하며 중지는 서버중단이 아니다. 요청id/원문/이력/설정은 재시도에 보존하고 비업무메타데이터인progressToken은 HTTP시도마다 새로 만든다. 이 토큰을 모델/세션/로그/URL/최종응답에 넣지 않는다. [고정 DTO와 범위](../docs/preparation-board-contract.md)를 따른다.
+화면은100dvh 작업 공간의 중앙 채팅·하단 공통 입력과 오른쪽 자료·병원·이동·방문 계획 네 상태다. 좁거나 낮은 창은 같은 대화/준비 패널을 전환한다. 제목 아이콘·핵심 요약 뒤 상세를 펼치며 중앙 대화와 전체 준비 영역에서 읽고 카드별 세로 스크롤은 만들지 않는다. 전체 답변은 중앙 한 곳에만 표시한다. 진행 DTO는 최종 caseState가 아니다. 화면은 마지막 확인된 사실과 실제 실행 관측을 구분하고, 원래 응답을 받은 뒤 사례를 갱신한다. 중지·완료·새대화·재시도에서 늦은 진행도 무시하며 중지는 서버중단이 아니다. 요청id/원문/이력/설정은 재시도에 보존하고 비업무메타데이터인progressToken은 HTTP시도마다 새로 만든다. 이 토큰을 모델/세션/로그/URL/최종응답에 넣지 않는다. [고정 DTO와 범위](../docs/preparation-board-contract.md)를 따른다.
