@@ -867,7 +867,10 @@ function mount() {
           <div class="mobile-case-summary" id="mobile-case-summary" aria-label="이번 방문 요약" hidden></div>
           <div class="conversation-layout">
             <section class="chat-workspace" aria-labelledby="conversation-title">
-              <div class="chat-toolbar"><h2 id="conversation-title">${icon('message')}혼디와 대화</h2><div class="chat-toolbar-actions"><button type="button" class="expand-answer" id="expand-answer" aria-haspopup="dialog" aria-controls="answer-dialog" disabled>${icon('expand')}<span>넓게 읽기</span></button><button type="button" id="preview-button" class="preview-button">예시 보기${icon('chevron')}</button></div></div>
+              <div class="chat-toolbar">
+                <div class="chat-identity"><img src="/assets/hondi-mark-v1.png" alt="" width="32" height="32"/><div class="chat-identity-copy"><h2 id="conversation-title">혼디</h2><p class="chat-role">진료 준비 도우미</p></div></div>
+                <div class="chat-toolbar-actions"><button type="button" class="expand-answer" id="expand-answer" aria-label="넓게 읽기" title="넓게 읽기" aria-haspopup="dialog" aria-controls="answer-dialog" disabled>${icon('expand')}<span>넓게 읽기</span></button><button type="button" id="preview-button" class="preview-button">예시 보기${icon('chevron')}</button></div>
+              </div>
               <p class="mode-notice" id="mode-notice">연결 범위를 확인하고 있어요.</p>
               ${chatContent}
               <div class="chat-composer">
