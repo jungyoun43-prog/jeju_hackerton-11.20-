@@ -565,8 +565,16 @@ try {
       const afterReply=await page.locator('.chat-workspace').evaluate(node=>({chatHeight:node.clientHeight,planHeight:document.querySelector('[data-stage-id="plan"]').clientHeight,answerHeight:node.querySelector('.message.assistant:not(.greeting) .message-body').clientHeight,documentHeight:document.scrollingElement.scrollHeight}));
       record(width+'x'+height+' 긴 답변은 중앙·문서를 늘려 첫 문장부터 끝까지 페이지로 읽음',start.reachable && end.reachable && endY>startY+100 && reading.flow && afterReply.chatHeight>beforeReply.chatHeight+100 && afterReply.planHeight<afterReply.answerHeight && afterReply.documentHeight>beforeReply.documentHeight+100,JSON.stringify({start,end,startY,endY,beforeReply,afterReply,reading}));
       const tableScroll=answer.locator('.message-table-scroll');
-      await tableScroll.focus();await tableScroll.press('ArrowRight');await page.clock.runFor(200);
-      record(width+'px 표는 키보드로 가로 스크롤 가능',await tableScroll.evaluate(node=>node.scrollWidth<=node.clientWidth+1 || node.scrollLeft>0));
+      await tableScroll.focus();
+      const tablePosition=()=>tableScroll.evaluate(node=>({focused:document.activeElement===node,left:node.scrollLeft,clientWidth:node.clientWidth,scrollWidth:node.scrollWidth}));
+      const beforeKey=await tablePosition(),scrollStarted=performance.now();
+      await tableScroll.press('ArrowRight');
+      let afterKey=await tablePosition();
+      // 모의 JS 시계와 독립인 브라우저 기본 키보드 스크롤을 Node 시계로 관측한다.
+      while(afterKey.focused && afterKey.scrollWidth>afterKey.clientWidth+1 && afterKey.left<=beforeKey.left && performance.now()-scrollStarted<2000) {
+        await new Promise(resolve=>setTimeout(resolve,20));afterKey=await tablePosition();
+      }
+      record(width+'x'+height+' 표는 키보드로 가로 스크롤 가능',beforeKey.focused && afterKey.focused && (afterKey.scrollWidth<=afterKey.clientWidth+1 || afterKey.left>beforeKey.left),JSON.stringify({beforeKey,afterKey,realWaitMs:Math.round(performance.now()-scrollStarted)}));
       record(width+'px 표만 가로 스크롤·키보드 이름 제공',await answer.locator('.message-table-scroll table').count()===1 && await answer.locator('.message-table-scroll').evaluate(node=>node.tabIndex===0 && Boolean(node.getAttribute('aria-label')) && /auto|scroll/.test(getComputedStyle(node).overflowX)) && await noOverflow(page));
       const before=(await calls(page)).length;
       await page.locator('#expand-answer').click();
