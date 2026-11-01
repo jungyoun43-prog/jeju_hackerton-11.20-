@@ -702,16 +702,20 @@ try {
       if(width<=1050)await page.locator('#open-care-menu').click();
       const surfaces=await page.evaluate(()=>{
         const style=selector=>{const node=document.querySelector(selector),css=getComputedStyle(node);return {background:css.backgroundColor,color:css.color};};
-        return {toolbar:style('.chat-toolbar'),nav:style('#care-rail'),selected:style('.rail-nav [aria-current]'),icon:style('.stage-topic-icon'),names:[...document.querySelectorAll('.patient-name')].map(node=>getComputedStyle(node).color),cards:[...document.querySelectorAll('.stage-pane')].map(node=>getComputedStyle(node).backgroundColor)};
+        const identity=document.querySelector('.chat-identity'),mark=identity?.querySelector(':scope>img'),title=document.getElementById('conversation-title'),role=identity?.querySelector('.chat-role'),actions=document.querySelector('.chat-toolbar-actions'),expand=document.getElementById('expand-answer'),a=identity?.getBoundingClientRect(),b=actions.getBoundingClientRect();
+        return {toolbar:style('.chat-toolbar'),title:style('#conversation-title'),role:style('.chat-role'),nav:style('#care-rail'),selected:style('.rail-nav [aria-current]'),icon:style('.stage-topic-icon'),names:[...document.querySelectorAll('.patient-name')].map(node=>getComputedStyle(node).color),cards:[...document.querySelectorAll('.stage-pane')].map(node=>getComputedStyle(node).backgroundColor),identity:{name:title.textContent.trim(),role:role?.textContent.trim(),mark:mark?.getAttribute('src'),decorative:mark?.alt==='',loaded:mark?.complete && mark.naturalWidth>0,visible:mark?.getBoundingClientRect().width>=24 && mark.getBoundingClientRect().height>=24,labelled:title.tagName==='H2' && document.querySelector('.chat-workspace').getAttribute('aria-labelledby')===title.id,static:!identity?.querySelector('[role="status"],[aria-live]'),separated:Boolean(a && (a.right<=b.left+1 || b.right<=a.left+1 || a.bottom<=b.top+1 || b.bottom<=a.top+1)),ids:document.querySelectorAll('#conversation-title,#expand-answer,#preview-button').length===3},utilities:[...actions.querySelectorAll('button')].map(node=>{const rect=node.getBoundingClientRect();return {id:node.id,native:node instanceof HTMLButtonElement && node.type==='button',width:rect.width,height:rect.height};}),reader:{label:expand.getAttribute('aria-label'),title:expand.title,popup:expand.getAttribute('aria-haspopup'),controls:expand.getAttribute('aria-controls'),collapsed:!expand.querySelector(':scope>span').checkVisibility()}};
       });
       if(width<=1050) {await page.locator('#close-care-menu').click();await nativeFinished(page.locator('#care-rail'));}
-      evidence.greenSurfaces=surfaces.toolbar.background==='rgb(28, 77, 54)' && surfaces.toolbar.color==='rgb(255, 255, 255)' && surfaces.nav.background==='rgb(244, 248, 244)' && surfaces.selected.background===soft && surfaces.selected.color===secondary && surfaces.icon.color===secondary && surfaces.cards.length===4 && surfaces.cards.every(color=>color==='rgb(255, 255, 255)');
-      record(label+' 대화 헤더·탐색·선택·보조 초록과 흰 네 상태면',evidence.greenSurfaces,JSON.stringify(surfaces));
+      const identity=surfaces.identity,reader=surfaces.reader,utilityNames=await page.getByRole('button',{name:'넓게 읽기',exact:true}).count()===1 && await page.getByRole('button',{name:'예시 보기',exact:true}).count()===1 && await page.getByRole('button',{name:'넓게 읽기',exact:true}).getAttribute('id')==='expand-answer' && await page.getByRole('button',{name:'예시 보기',exact:true}).getAttribute('id')==='preview-button';
+      const headerUsable=identity.name==='혼디' && identity.role==='진료 준비 도우미' && identity.mark==='/assets/hondi-mark-v1.png' && identity.decorative && identity.loaded && identity.visible && identity.labelled && identity.static && identity.separated && identity.ids && utilityNames && surfaces.utilities.length===2 && surfaces.utilities.every(item=>item.native && item.width>=44 && item.height>=44) && reader.label==='넓게 읽기' && reader.title==='넓게 읽기' && reader.popup==='dialog' && reader.controls==='answer-dialog' && reader.collapsed===(width<=900) && await noOverflow(page);
+      evidence.greenSurfaces=headerUsable && surfaces.toolbar.background==='rgb(255, 255, 255)' && surfaces.title.color===secondary && surfaces.role.color==='rgb(94, 108, 124)' && surfaces.nav.background==='rgb(244, 248, 244)' && surfaces.selected.background===soft && surfaces.selected.color===secondary && surfaces.icon.color===secondary && surfaces.cards.length===4 && surfaces.cards.every(color=>color==='rgb(255, 255, 255)');
+      record(label+' 흰 대화 상단·혼디 정체성·보조 행동 접근성과 주변 초록 유지',evidence.greenSurfaces,JSON.stringify({headerUsable,...surfaces}));
       const previewButton=page.locator('#preview-button');
       await previewButton.focus();await page.keyboard.press('Tab');await page.keyboard.press('Shift+Tab');
-      const toolbarColors=await contrast(page,'.chat-toolbar h2,.chat-toolbar h2>.icon,.chat-toolbar button:not(:disabled),.chat-toolbar button:not(:disabled)>.icon');
+      const toolbarSelector='#conversation-title,.chat-role,.chat-toolbar button:not(:disabled),.chat-toolbar button:not(:disabled)>.icon';
+      const toolbarColors=await contrast(page,toolbarSelector);
       const focus=(await contrast(page,'#preview-button'))[0];
-      const keyboardFocus=await previewButton.evaluate(node=>node.matches(':focus-visible')) && focus?.outlineVisible && focus.outlineRatio>=3;
+      const keyboardFocus=await previewButton.evaluate(node=>node.matches(':focus-visible') && ['rgb(168, 77, 22)','rgb(40, 92, 67)'].includes(getComputedStyle(node).outlineColor)) && focus?.outlineVisible && focus.outlineRatio>=3;
       const closedSummary=await feedback(summary),closedIcon=await feedback(summary.locator(':scope>.icon'));
       await example.hover();await nativeFinished(example);
       const exampleHover=await feedback(example),exampleIcon=await feedback(example.locator(':scope>.icon'));
@@ -753,13 +757,15 @@ try {
         readerQuiet &&=await page.locator('#answer-read-view .message.assistant:not(.greeting)>.message-meta').evaluateAll(nodes=>nodes.length===1 && nodes.every(node=>getComputedStyle(node).animationName==='none' && node.getAnimations().length===0)) && (await motionEvents()).length===afterFirst.length;
         await page.keyboard.press('Escape');await page.locator('#answer-dialog').waitFor({state:'hidden'});
       }
-      const statusColors=await contrast(page),toolbarAfter=await contrast(page,'.chat-toolbar h2,.chat-toolbar h2>.icon,.chat-toolbar button:not(:disabled),.chat-toolbar button:not(:disabled)>.icon,#next-request-draft');
+      await nativeFinished(page.locator('.chat-toolbar'));
+      const statusColors=await contrast(page),toolbarAfter=await contrast(page,toolbarSelector+',#next-request-draft');
       const preservedSignals={available:'rgb(38, 113, 73)',attention:'rgb(135, 86, 23)',blocked:'rgb(163, 61, 52)'};
       const signalPreserved=Object.entries(preservedSignals).every(([signal,color])=>statusColors.some(item=>item.signal===signal && item.color===color));
       const nextDraft=await feedback(page.locator('#next-request-draft'));
       evidence.greenSurfaces &&=userSoft;
-      evidence.contrastPassed=evidence.greenSurfaces && keyboardFocus && primaryPreserved && nextDraft.background==='rgb(255, 241, 231)' && nextDraft.color===orange && signalPreserved && toolbarColors.length>=4 && toolbarAfter.length>=4 && [...toolbarColors,...toolbarAfter,...statusColors].every(item=>item.ratio>=item.minimum) && [...toolbarColors,...toolbarAfter].filter(item=>!item.id.includes('next-request')).every(item=>item.color==='rgb(255, 255, 255)');
-      record(label+' toolbar 흰 글자·아이콘·밝은 키보드 focus 대비와 주황·○△×색 유지',evidence.contrastPassed,JSON.stringify({keyboardFocus,focus,primaryPreserved,signalPreserved,nextDraft,toolbarColors,toolbarAfter}));
+      const toolbarRoles=[...toolbarColors,...toolbarAfter].filter(item=>!item.id.includes('next-request')).every(item=>item.id==='chat-role'?item.color==='rgb(94, 108, 124)':item.id==='conversation-title'?item.color===secondary:[secondary,'rgb(27, 70, 49)'].includes(item.color));
+      evidence.contrastPassed=evidence.greenSurfaces && keyboardFocus && primaryPreserved && nextDraft.background==='rgb(255, 241, 231)' && nextDraft.color===orange && signalPreserved && toolbarColors.length>=4 && toolbarAfter.length>=4 && [...toolbarColors,...toolbarAfter,...statusColors].every(item=>item.ratio>=item.minimum) && toolbarRoles;
+      record(label+' 흰 상단의 초록·muted·주황/초록 키보드 focus 대비와 주황·○△×색 유지',evidence.contrastPassed,JSON.stringify({keyboardFocus,focus,toolbarRoles,primaryPreserved,signalPreserved,nextDraft,toolbarColors,toolbarAfter}));
       const second=await begin(page,'출처를 읽는 동안 다음 문의도 준비합니다.',1);
       await readStage(page,'hospitals');
       const log=page.locator('[data-stage-id="hospitals"] [data-stage-log]');if(!await log.evaluate(node=>node.open))await log.locator(':scope>summary').click();
