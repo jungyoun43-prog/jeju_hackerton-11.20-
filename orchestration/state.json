@@ -1,6 +1,6 @@
 {
   "baseCommit": "e1e7e44",
-  "updatedAt": "2026-11-01T08:02:03.908128+00:00",
+  "updatedAt": "2026-11-01T12:26:53.267209+00:00",
   "tasks": {
     "ui": {
       "phase": "verified",
@@ -480,6 +480,24 @@
         "70b2d9e"
       ],
       "note": "079b760/bf0307f/70b2d9e 통합. d1c68ae5 동일소스에서legacy47·con189·journey236·board359 전체pass/프로세스0·errors[]. 10크기/33workspace/4motion통과. con실HTTPagent6/preview3·초기미연결2·실모델0구분. 최초download/경계/leading실패·측정/대상증거보존. 전용worktree clean."
+    },
+    "recovery-backend": {
+      "phase": "implementing",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261101-recovery-backend",
+      "integrationCommits": [],
+      "note": "docs/reliable-visit-contract.md 기준;전용worktree분리·현재구현과미연동경계보존"
+    },
+    "recovery-ui": {
+      "phase": "implementing",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261101-recovery-ui",
+      "integrationCommits": [],
+      "note": "docs/reliable-visit-contract.md 기준;전용worktree분리·현재구현과미연동경계보존"
+    },
+    "data-reliability": {
+      "phase": "implementing",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261101-reliable-data",
+      "integrationCommits": [],
+      "note": "docs/reliable-visit-contract.md 기준;전용worktree분리·현재구현과미연동경계보존"
     }
   },
   "review": {

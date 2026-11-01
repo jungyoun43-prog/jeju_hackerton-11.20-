@@ -636,6 +636,54 @@
         "scripts/journey-browser-check.mjs",
         "scripts/preparation-board-browser-check.mjs"
       ]
+    },
+    {
+      "id": "recovery-backend",
+      "branch": "feature/reliable-visit-backend",
+      "baseCommit": "c8865affada217bd985b2a6f15397bf096123d3f",
+      "allow": [
+        "agent/service.mjs",
+        "agent/store.mjs",
+        "agent/dynamodb-store.mjs",
+        "agent/validation.mjs",
+        "agent/cloud-runtime.mjs",
+        "agent/visit-recovery.mjs",
+        "tests/agent.test.mjs",
+        "tests/dynamodb-store.test.mjs",
+        "tests/cloud-runtime.test.mjs",
+        "tests/agent-config.test.mjs",
+        "tests/server.test.mjs",
+        "tests/agent-infra.test.mjs",
+        "tests/visit-recovery.test.mjs"
+      ]
+    },
+    {
+      "id": "recovery-ui",
+      "branch": "feature/reliable-visit-ui",
+      "baseCommit": "c8865affada217bd985b2a6f15397bf096123d3f",
+      "allow": [
+        "app/conversation.js",
+        "app/conversation.css",
+        "scripts/conversation-browser-check.mjs",
+        "scripts/visit-recovery-browser-check.mjs"
+      ]
+    },
+    {
+      "id": "data-reliability",
+      "branch": "feature/verified-visit-data",
+      "baseCommit": "c8865affada217bd985b2a6f15397bf096123d3f",
+      "allow": [
+        "app/public-data-skill.js",
+        "agent/public-data-tools.mjs",
+        "tests/public-data-skill.test.mjs",
+        "tests/public-data-tools.test.mjs",
+        "tests/public-data-agent.test.mjs",
+        "app/data/public-health-contacts.json",
+        "scripts/public-health-data.mjs",
+        "tests/public-health-data.test.mjs",
+        "research/pickle-reference-2026-11-01.md",
+        "research/visit-data-update-2026-11-01.md"
+      ]
     }
   ],
   "rules": [
