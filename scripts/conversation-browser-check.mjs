@@ -17,7 +17,7 @@ catch {throw new Error('선택 QA 도구 Playwright가 필요합니다. README�
 const base=new URL(process.env.BASE_URL||'http://127.0.0.1:4173');
 // 이 검사는 실제 503/고정 preview와 주입 응답을 함께 쓴다. 공개 유료 서버에서는 실행하지 않는다.
 if(!['localhost','127.0.0.1','[::1]'].includes(base.hostname) || !['http:','https:'].includes(base.protocol) || base.username || base.password)throw new Error('BASE_URL은 키를 끈 localhost QA 서버여야 합니다.');
-const directory='.impeccable/review/task-first/conversation';
+const directory='.impeccable/review/chat-rail/conversation';
 const storageKey='jeju-care-preferences-v1';
 const fixtureSessionId='q'.repeat(43);
 const configuredCaps={llm:true,model:'gpt-6.1-sol',phone:'simulation',healthRecords:'demo',voiceInput:'browser'};
@@ -79,8 +79,8 @@ async function open(width,height,{configured=false,voice,storageSeed,onPost}={})
   await page.evaluate(()=>document.fonts.ready);
   return {page,context,requests,networkRequests};
 }
-async function readPlan(page) {
-  await page.locator('[data-stage-id="plan"] #conversation-scroll').waitFor({state:'visible'});
+async function readConversation(page) {
+  await page.locator('.chat-workspace #conversation-scroll').waitFor({state:'visible'});
 }
 async function openVisitSummary(page) {
   for(const id of ['visit-summary','case-summary']) {
@@ -93,7 +93,7 @@ async function send(page,text) {
   const response=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/agent' && r.request().method()==='POST');
   const [result]=await Promise.all([response,page.locator('#send-request').click()]);
   await page.waitForFunction(()=>document.querySelector('#conversation-form').getAttribute('aria-busy')==='false');
-  await readPlan(page);
+  await readConversation(page);
   await page.evaluate(()=>new Promise(done=>requestAnimationFrame(done)));
   return result;
 }
@@ -240,7 +240,7 @@ try {
   record('API 응답 캐시 금지',capResponse.headers.get('cache-control')==='no-store');
   if(!keyless)throw new Error('실제 모델이 연결됐거나 keyless 상태를 확인하지 못해 POST 검사를 중단합니다.');
   proof.apiLive=true;
-  for(const path of ['conversation.js','conversation.css','preparation-board-view.js','preparation-stages.js']) {
+  for(const path of ['conversation.js','conversation.css','preparation-board-view.js','preparation-stages.js','icons.js']) {
     const response=await fetch(new URL('/'+path,base),{redirect:'error',signal:AbortSignal.timeout(8000)});
     const expected=await readFile(resolve(servedRoot,'app',path));
     const hash=value=>createHash('sha256').update(value).digest('hex');
@@ -253,8 +253,15 @@ try {
       proof[label].noOverflow=await overflow(page);
       proof[label].screenshot=await screenshot(page,`initial-${label}`);
       const initialComposer=await page.locator('#request-input,#send-request').evaluateAll(nodes=>nodes.map(node=>{const r=node.getBoundingClientRect();return {id:node.id,top:r.top,bottom:r.bottom,inViewport:r.top>=0 && r.bottom<=innerHeight && r.width>0 && r.height>0};}));
-      record(`${width}px 가로 넘침 없이 입력·보내기가 첫 viewport에 표시`,proof[label].noOverflow && initialComposer.every(item=>item.inViewport),JSON.stringify(initialComposer));
-      record(`${width}px 네 작업칸·상태는 한 번씩 보이고 첫3 상세만 접힘`,await page.locator('#preparation-board>[data-stage-id]').evaluateAll(nodes=>nodes.length===4 && nodes.every(node=>node.checkVisibility())) && await page.locator('#stage-navigation').count()===0 && await page.locator('#preparation-board>.stage-pane>.stage-pane-header .signal-mark').count()===4 && await page.locator('[data-stage-details]').evaluateAll(nodes=>nodes.length===3 && nodes.every(node=>node instanceof HTMLDetailsElement && !node.open)) && await page.locator('[data-stage-id="plan"]').isVisible() && await page.locator('#preparation-details').count()===0 && await page.locator('[data-case-status]').count()===4);
+      const composerAccess=await accessSet(page,['#request-input','#send-request']);
+      record(`${width}px 가로 넘침 없이 대화 뒤 입력·보내기에 문서로 접근`,proof[label].noOverflow && Object.values(composerAccess).every(item=>item.reachable),JSON.stringify({initialComposer,composerAccess}));
+      proof[label].chatLayout=await page.evaluate(()=>{
+        const chat=document.querySelector('.chat-workspace'),rail=document.querySelector('.preparation-rail'),board=document.getElementById('preparation-board'),conversation=document.getElementById('conversation-scroll'),messages=document.getElementById('message-list'),examples=document.getElementById('starter-prompts'),form=document.getElementById('conversation-form');
+        const follows=(a,b)=>Boolean(a && b && a.compareDocumentPosition(b)&Node.DOCUMENT_POSITION_FOLLOWING);
+        return Boolean(chat && rail && chat.parentElement===rail.parentElement && chat.parentElement.matches('.conversation-layout') && rail.contains(board) && chat.contains(conversation) && conversation.contains(messages) && !board.contains(messages) && follows(conversation,examples) && follows(examples,form) && chat.contains(form) && document.querySelector('.chat-toolbar #expand-answer')?.closest('.chat-workspace')===chat && document.querySelectorAll('#message-list,#conversation-scroll,#conversation-form,#request-input').length===4 && !board.querySelector('.message,#conversation-form'));
+      });
+      record(`${width}px 중앙 대화1개→예시→단일 입력, 오른쪽 준비 요약과 분리`,proof[label].chatLayout);
+      record(`${width}px 네 작업칸·기호·제목 아이콘은 한 번씩 보이고 모든 상세는 접힘`,await page.locator('#preparation-board>[data-stage-id]').evaluateAll(nodes=>nodes.length===4 && nodes.every(node=>node.checkVisibility())) && await page.locator('#stage-navigation').count()===0 && await page.locator('#preparation-board>.stage-pane>.stage-pane-header .signal-mark').count()===4 && await page.locator('#preparation-board>.stage-pane>.stage-pane-header .stage-topic-icon').count()===4 && await page.locator('[data-stage-details]').evaluateAll(nodes=>nodes.length===4 && nodes.every(node=>node instanceof HTMLDetailsElement && !node.open)) && await page.locator('[data-stage-id="plan"]').isVisible() && await page.locator('#preparation-details').count()===0 && await page.locator('[data-case-status]').count()===4);
       record(`${width}px 로고·자가 호스팅 Pretendard·제주 배경, 인물사진 비노출`,await page.locator('.brand img').first().evaluate(e=>e.complete && e.naturalWidth>0) && await backgroundLoaded(page) && await page.locator('.welcome-photo').count()===0 && await page.evaluate(()=>getComputedStyle(document.body).fontFamily.includes('Pretendard') && [...document.fonts].some(font=>font.family.replaceAll('"','')==='Pretendard' && font.status==='loaded')));
       record(`${width}px 설정은 선택이며 준비 대화에 필수 수동 폼 없음`,await page.locator('#conversation-form select,#conversation-form input[type=checkbox]').count()===0 && await page.locator('#preferences-form [required]').count()===0 && await page.locator('#preferences-form select').count()===1);
       record(`${width}px 입력 가까이 실제 연락·예약 한계 표시`,await disclosure(page));
@@ -292,7 +299,7 @@ try {
       await page.locator('#preview-button').click();
       const preview=await previewResponse,payload=await preview.json();
       await page.waitForFunction(()=>document.querySelectorAll('.tool-record').length===15);
-      await readPlan(page);
+      await readConversation(page);
       const previewOk=preview.status()===200 && payload.isPreview===true && payload.events.length===15;
       proof.fixedPreview ||= previewOk;
       record(`${width}px 고정 미리보기 실제 도구 15건`,previewOk && await page.locator('.example-label').count()===2 && /작성된 예시|고정.*미리보기/.test(await page.locator('#mode-notice').textContent()) && /LLM.*없음/.test(await page.locator('#mode-notice').textContent()));
@@ -308,7 +315,7 @@ try {
       const mapLink=page.locator('#case-content a[href^="https://www.google.com/maps/"]');
       record(`${width}px 실제 공개 주소 지도 링크`,await mapLink.count()===1 && new URL(await mapLink.getAttribute('href')).searchParams.get('query').includes(payload.caseState.selectedHospital.address));
       await screenshot(page,`preview-${label}`);
-      await readPlan(page);
+      await readConversation(page);
       await page.locator('.tool-records').scrollIntoViewIfNeeded();await screenshot(page,`tools-${label}`);
       const downloadPromise=page.waitForEvent('download');await page.locator('#save-report').click();
       const download=await downloadPromise,report=await readFile(await download.path(),'utf8');
@@ -526,7 +533,7 @@ try {
     const {page,context,requests}=await open(width,500,{configured:true,onPost:request=>({body:fixtureResponse(request,createDemoCase(),reply)})});
     const controls=['#request-input','#send-request','#composer-disclosure','.privacy-note'];
     try {
-      await readPlan(page);
+      await readConversation(page);
       const initial=await accessSet(page,controls),conversation=await page.locator('#conversation-scroll').evaluate(node=>({height:node.clientHeight,documentFlow:getComputedStyle(node).overflowY==='visible' && node.scrollHeight<=node.clientHeight+2 && document.scrollingElement.scrollHeight>innerHeight}));
       record(`${width}x500 첫 화면은 문서 스크롤로 입력·고지 접근`,await overflow(page) && Object.values(initial).every(value=>value.reachable) && conversation.documentFlow,JSON.stringify(initial));
       const input=page.locator('#request-input'),multiline=Array.from({length:12},(_,index)=>`${index+1}번째 요청 내용: 진료 자료와 이동을 확인해 주세요.`).join('\n');

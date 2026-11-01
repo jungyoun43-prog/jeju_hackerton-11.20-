@@ -9,7 +9,7 @@ import { runtimeFingerprint } from '../orchestration/checks.mjs';
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const servedRoot=process.env.QA_SERVED_SOURCE_ROOT?resolve(process.env.QA_SERVED_SOURCE_ROOT):root;
 const require=createRequire(import.meta.url);
-const directory='.impeccable/review/task-first/journey';
+const directory='.impeccable/review/chat-rail/journey';
 const scenarioIds=['missing_record','jeju_unavailable','time_changed'];
 const recoveryScenarioIds=['call_no_answer','call_ai_declined','call_identity_required','call_documents_or_schedule'];
 const allowedScenarioIds=[...scenarioIds,...recoveryScenarioIds];
@@ -151,8 +151,8 @@ async function verifyMainContinuation(page,summary,posts,prefix) {
   record(`${prefix} 메인 다음 문의는 같은 nextAction 초안만 채우고 바로 입력 가능`,accepted.length===1 && accepted[0].type==='confirm' && normalized(await input.inputValue())===normalized(next.requestDraft.trim().slice(0,1600)) && await focusedVisible() && await input.isEditable() && posts.length===before);
 }
 
-async function readPlan(page) {
-  await page.locator('[data-stage-id="plan"] #conversation-scroll').waitFor({state:'visible'});
+async function readConversation(page) {
+  await page.locator('.chat-workspace #conversation-scroll').waitFor({state:'visible'});
 }
 
 async function runPreview(page,button,id,posts,prefix) {
@@ -167,9 +167,9 @@ async function runPreview(page,button,id,posts,prefix) {
   const actual=preview.status()===200 && data.isPreview===true && data.capabilities?.llm===false && body.scenarioId===id && request.headers()['x-amz-content-sha256']===hash && posts.length===1 && posts[0].path==='/api/agent/preview';
   record(`${prefix} 실제 keyless preview API·정확한 scenarioId·요청 해시`,actual,`HTTP ${preview.status()} · 응답 fixture 없음`);
   if(!actual)throw new Error('실제 preview 응답 계약이 맞지 않습니다.');
-  await readPlan(page);
-  const answer=page.locator('[data-stage-id="plan"] #conversation-scroll .message.assistant:not(.greeting)').last();
-  record(`${prefix} 미리보기 답변칸은 내부 스크롤 없이 문서로 읽음`,await answer.isVisible() && includes(await answer.innerText(),data.reply) && await page.locator('#conversation-scroll').evaluate(node=>node.closest('[data-stage-id]')?.dataset.stageId==='plan' && getComputedStyle(node).overflowY==='visible' && node.scrollHeight<=node.clientHeight+2));
+  await readConversation(page);
+  const answer=page.locator('.chat-workspace #conversation-scroll .message.assistant:not(.greeting)');
+  record(`${prefix} 미리보기 전체 답변1개는 중앙에서 문서로 읽고 오른쪽 계획과 분리`,await answer.count()===1 && await answer.isVisible() && includes(await answer.innerText(),data.reply) && await page.locator('#conversation-scroll').evaluate(node=>node.closest('.chat-workspace')!==null && !node.closest('#preparation-board') && getComputedStyle(node).overflowY==='visible' && node.scrollHeight<=node.clientHeight+2) && await page.locator('#preparation-board .message,#preparation-board #message-list').count()===0 && !includes(await page.locator('[data-stage-id="plan"]').innerText(),data.reply));
   const summary=await page.evaluate(async state=>(await import('/care-journey.js')).getCareJourneySummary(state),data.caseState);
   return {preview,data,summary};
 }
@@ -410,7 +410,7 @@ try {
   record('실제 localhost API의 모델 미연결·전화/개인기록 합성 경계',keyless && response.headers.get('cache-control')==='no-store');
   if(!keyless)throw new Error('keyless 상태를 확인하지 못해 preview 검사를 시작하지 않습니다.');
   proof.apiLive=true;
-  for(const path of ['conversation.js','conversation.css','preparation-board-view.js','preparation-stages.js']) {
+  for(const path of ['conversation.js','conversation.css','preparation-board-view.js','preparation-stages.js','icons.js']) {
     const response=await fetch(new URL('/'+path,base),{redirect:'error',signal:AbortSignal.timeout(8000)});
     const expected=await readFile(resolve(servedRoot,'app',path));
     const hash=value=>createHash('sha256').update(value).digest('hex');
