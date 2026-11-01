@@ -103,10 +103,10 @@ try{
       await page.locator('#stage-navigation>button[data-open-stage="support"]').click();if(await page.locator('#workspace-tab-chat').isVisible())await page.locator('#workspace-tab-chat').click();
       const details=page.locator('[data-stage-id="support"] [data-stage-details]');if(!await details.evaluate(node=>node.open))await details.locator(':scope>summary').click();
       const source=page.locator('[data-stage-id="support"] [data-stage-sources] a').first();await source.scrollIntoViewIfNeeded();await source.focus();
-      const before=await source.evaluate(node=>{window.__recoverySource=node;return {top:node.getBoundingClientRect().top,scroll:document.getElementById('conversation-scroll').scrollTop};});
+      const before=await source.evaluate(node=>{window.__recoverySource=node;const r=node.getBoundingClientRect(),scroller=document.getElementById('conversation-scroll'),frame=scroller.getBoundingClientRect();return {top:r.top,scroll:scroller.scrollTop,href:node.href,visible:node.checkVisibility()&&r.top>=frame.top-2&&r.bottom<=frame.bottom+2,bodyY:scrollY};});
       held.release({body:recovery()});await page.waitForFunction(()=>document.getElementById('resume-visit').getAttribute('aria-busy')==='false');
-      const after=await source.evaluate(node=>({same:node===window.__recoverySource,connected:node.isConnected,focused:document.activeElement===node,top:node.getBoundingClientRect().top,scroll:document.getElementById('conversation-scroll').scrollTop}));
-      record('같은 상태의 수동 복구는 출처 DOM·focus·펼침·읽기 위치 유지',resumes.length===2 && after.same && after.connected && after.focused && Math.abs(after.top-before.top)<=2 && Math.abs(after.scroll-before.scroll)<=2 && await details.evaluate(node=>node.open),JSON.stringify({before,after}));
+      const after=await source.evaluate(node=>{const r=node.getBoundingClientRect(),scroller=document.getElementById('conversation-scroll'),frame=scroller.getBoundingClientRect();return {same:node===window.__recoverySource,connected:node.isConnected,focused:document.activeElement===node,top:r.top,scroll:scroller.scrollTop,href:node.href,visible:node.checkVisibility()&&r.top>=frame.top-2&&r.bottom<=frame.bottom+2,bodyY:scrollY};});
+      record('같은 상태의 수동 복구는 출처 DOM·focus·펼침·읽기 위치 유지',resumes.length===2 && after.same && after.connected && after.focused && Math.abs(after.top-before.top)<=2 && after.href===before.href && before.visible && after.visible && before.bodyY===0 && after.bodyY===0 && await details.evaluate(node=>node.open),JSON.stringify({before,after}));
       record('수동 복구는 입력 초안 유지',await page.locator('#request-input').inputValue()==='확인하는 동안 유지할 초안');
     }finally{held.release({body:recovery()});await context.close();}
   });
