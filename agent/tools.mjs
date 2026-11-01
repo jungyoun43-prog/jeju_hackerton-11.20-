@@ -116,7 +116,7 @@ function supportCandidates(state,kind) { return getSupportCandidates(registry,{k
 function publicProvider(item) { return {...item,source:{...item.source,url:assertSourceUrl(item.source.url)}}; }
 
 function explicitJourneyDemo(message, scenarioId) {
-  const request = typeof message === 'string' ? message.normalize('NFKC').replace(/\s+/g,' ') : '';
+  const request = typeof message === 'string' ? message.normalize('NFKC').replace(/\s+/g,' ').replace(/합성\s*상황/g,'합성 시연') : '';
   if (/(?:시연|데모|미리\s*보기)(?:은|는|을|를)?\s*(?:하지|말|없이|금지|아니|원치)|(?:실제|진짜)로만/.test(request)) return false;
   // 실패 상황의 "받지 않는다"와 사용자의 "시연하지 말라"는 서로 다른 뜻이다.
   if (/(?:시연|데모|미리\s*보기)[^.!?;\n]{0,40}(?:보여(?:\s*(?:줘|주어|주))?|(?:실행|진행|재현|시작)(?:해(?:\s*(?:줘|주어|주))?|하)?)(?:지\s*(?:마|말)|(?:면|도|서는|선)\s*안\s*(?:돼|되))/.test(request)

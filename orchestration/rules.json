@@ -654,7 +654,8 @@
         "tests/agent-config.test.mjs",
         "tests/server.test.mjs",
         "tests/agent-infra.test.mjs",
-        "tests/visit-recovery.test.mjs"
+        "tests/visit-recovery.test.mjs",
+        "scripts/visit-recovery-integration-check.mjs"
       ]
     },
     {

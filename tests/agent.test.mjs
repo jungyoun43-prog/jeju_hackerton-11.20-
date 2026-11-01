@@ -585,6 +585,7 @@ const naturalDemoRequests=[
   ['missing_record','run_journey_demo','필요한 자료가 없는 상황의 합성 시연을 보여줘.'],
   ['jeju_unavailable','run_journey_demo','제주 기관이 요청을 받지 않는 상황을 합성 시연으로 보여줘.'],
   ['jeju_unavailable','run_journey_demo','제주 병원이 접수 요청을 안 받는 합성 시연을 보여줘.'],
+  ['jeju_unavailable','run_journey_demo','제주 기관이 접수를 받지 않는 합성 상황을 보여 주세요. 거절 뒤 남은 일과 기존 병원에 물어볼 내용을 정리해 주세요.'],
   ['time_changed','run_journey_demo',liveTimeChangeRequest],
   ['time_changed','run_journey_demo','진료 시각이 바뀐 상황을 합성 시연으로 보여줘.'],
   ['time_changed','run_journey_demo','일정이 변경된 상황의 합성 시연을 보여줘.'],
@@ -647,7 +648,7 @@ test('자연형 상황을 알아도 일반 요청·설명만 요청·부정한 �
   ];
   for(const [scenarioId,context] of contexts) {
     const name=scenarioId.startsWith('call_')?'run_call_recovery_demo':'run_journey_demo';
-    for(const userMessage of [`${context} 상황에서 남은 준비를 정리해줘.`,`${context} 상황의 합성 시연이 무엇인지 설명해줘.`,`${context} 상황을 시연하지 말아줘.`,`${context} 상황의 합성 시연을 보여주지 마.`,`${context} 상황의 합성 시연을 실행하면 안 돼.`,`${context} 상황의 합성 시연을 보여줘도 안 돼.`,`${context} 상황의 합성 시연을 보여줘선 안 돼.`,`${context} 상황의 합성 시연을 실행해도 안 돼.`,`${context} 상황을 시연해도 안 돼.`]) {
+    for(const userMessage of [`${context} 상황에서 남은 준비를 정리해줘.`,`${context} 상황의 합성 시연이 무엇인지 설명해줘.`,`${context} 합성 상황이 무엇인지 설명해줘.`,`${context} 합성 상황을 보여주지 마.`,`${context} 상황을 시연하지 말아줘.`,`${context} 상황의 합성 시연을 보여주지 마.`,`${context} 상황의 합성 시연을 실행하면 안 돼.`,`${context} 상황의 합성 시연을 보여줘도 안 돼.`,`${context} 상황의 합성 시연을 보여줘선 안 돼.`,`${context} 상황의 합성 시연을 실행해도 안 돼.`,`${context} 상황을 시연해도 안 돼.`]) {
       const state=createDemoCase(),before=structuredClone(state);
       await assert.rejects(dispatch({name,input:{scenarioId},state,userMessage}),e=>e.code==='EXPLICIT_DEMO_REQUIRED',userMessage);assert.deepEqual(state,before);
     }
