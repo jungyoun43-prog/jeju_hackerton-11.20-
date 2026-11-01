@@ -586,8 +586,12 @@ try {
       });
       await input.fill(multiline);await input.press('Control+End');
       const enlarged=await accessSet(page,[`${answer} h3`,`${answer} p:last-child`,...controls]);
-      record(`${width}x500 텍스트 200%에서 대화·입력·전송·고지 접근`,await page.locator(answer).last().evaluate(node=>parseFloat(getComputedStyle(node).fontSize))>=before*1.95 && await input.evaluate(node=>parseFloat(getComputedStyle(node).fontSize)>=31 && node.value.split('\n').length===12 && node.scrollTop+node.clientHeight>=node.scrollHeight-3) && Object.values(enlarged).every(value=>value.reachable) && await overflow(page),JSON.stringify(enlarged));
-      proof.shortViewport.push({width,height:500,textScale:2,initial,multiple,longAnswer,enlarged,...await workspaceEvidence(page)});
+      const answerSize=await page.locator(answer).last().evaluate(node=>parseFloat(getComputedStyle(node).fontSize));
+      const inputMetrics=await input.evaluate(node=>{const style=getComputedStyle(node),fontSize=parseFloat(style.fontSize),lineHeight=parseFloat(style.lineHeight);return {fontSize,lineHeight,lines:node.value.split('\n').length,caretAtEnd:node.selectionStart===node.value.length && node.selectionEnd===node.value.length,scrollTop:node.scrollTop,clientHeight:node.clientHeight,scrollHeight:node.scrollHeight,bottomGap:node.scrollHeight-node.scrollTop-node.clientHeight,trailingLeading:Math.max(0,(lineHeight-fontSize)/2)};});
+      // Ctrl+End는 마지막 글자 아래의 빈 leading 일부를 화면 밖에 남길 수 있다.
+      const text200={answerDoubled:answerSize>=before*1.95,inputDoubled:inputMetrics.fontSize>=31,twelveLines:inputMetrics.lines===12,caretAtEnd:inputMetrics.caretAtEnd,lastGlyphVisible:inputMetrics.bottomGap<=Math.max(3,inputMetrics.trailingLeading),controlsReachable:Object.values(enlarged).every(value=>value.reachable),noOverflow:await overflow(page)};
+      record(`${width}x500 텍스트 200%에서 대화·입력·전송·고지 접근`,Object.values(text200).every(value=>value===true),JSON.stringify({text200,inputMetrics,answerBefore:before,answerSize,enlarged}));
+      proof.shortViewport.push({width,height:500,textScale:2,initial,multiple,longAnswer,enlarged,text200,inputMetrics,...await workspaceEvidence(page)});
       await screenshot(page,`short-${width}-text-200`);proof.fixtureCoverage.shortViewport=true;
     } finally {await context.close();}
   });
