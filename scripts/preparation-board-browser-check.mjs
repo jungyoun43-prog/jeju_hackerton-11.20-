@@ -663,7 +663,13 @@ try {
       if(id==='aewol-parent-visit')record('○·△·×는 세 가지 다른 상태색과 뜻을 함께 제공',new Set(['available','attention','blocked'].map(signal=>colors.find(item=>item.signal===signal)?.color)).size===3 && ['available','attention','blocked'].every(signal=>colors.some(item=>item.signal===signal)) && /실제 진료.*예약.*배차.*확정.*아닙니다/.test(await page.locator('.preparation-note').innerText()));
       if(id==='aewol-parent-visit')record('기본 preview의 병원·공개 택시·동행 실패는 올바른 창에 표시',hospitals.includes(data.caseState.patient.localHospital) && support.includes('애월콜') && /연락|인계|확인/.test(support) && await statusOf(page,'support')==='needs_input' && /진료 수락.*미확인/.test(hospitals));
       if(id==='time_changed')record('진료 시각 변경은 휠체어 이동·동행 재확인',await statusOf(page,'support')==='needs_recheck' && ['휠체어','10:00','14:00'].every(term=>(records+' '+support).includes(term)) && /재확인/.test(support) && ['taxi','companion'].every(kind=>data.caseState.visitSupport[kind].status==='needs_recheck'));
-      if(id==='call_ai_declined')record('AI 응대 거절은 이동 창의 보호자 인계·자동 반복 중단',await statusOf(page,'support')==='needs_input' && ['AI','거절','보호자'].every(term=>support.includes(term)) && /중단|이어/.test(support) && /발신|예약|배차/.test(plan));
+      if(id==='call_ai_declined') {
+        const journey=await page.evaluate(async state=>(await import('/care-journey.js')).getCareJourneySummary(state),data.caseState);
+        const handoff=journey.handoffs.find(item=>item.reason==='ai_declined');
+        record('AI 응대 거절은 이동 창의 보호자 인계·자동 반복 중단',await statusOf(page,'support')==='needs_input' && ['AI','거절','보호자'].every(term=>support.includes(term)) && /자동 반복 문의를 중단/.test(support) && handoff?.owner==='보호자' && handoff.status==='handed_off' && handoff.stopAutomatic===true && normalize(support).includes(normalize(handoff.detail)));
+        const answer=normalize(await page.locator('.chat-workspace #message-list .message.assistant:not(.greeting) .message-body').innerText()),disclosure=normalize(await page.locator('#composer-disclosure').innerText());
+        record('AI 거절의 실제 실행 미수행 경계는 중앙 API 답변·공통 고지·상태에 일치',answer===normalize(data.reply) && ['개인 기록 조회','전화','예약','배차','환자 수락'].every(term=>answer.includes(term)) && /실제.*수행하지 않았습니다/.test(answer) && /가상 사례/.test(disclosure) && /실제.*연락.*예약.*없음/.test(disclosure) && handoff?.actualCallPlaced===false && ['actualCallPlaced','reservationConfirmed','clinicalAcceptanceConfirmed','externalRecordsConnected'].every(key=>journey.boundary[key]===false));
+      }
       const links=page.locator('#preparation-board a[href]');
       record(id+' 공개 출처는 HTTPS·별도 창·44px',await links.evaluateAll(nodes=>nodes.length>0 && nodes.every(node=>node.href.startsWith('https://') && node.target==='_blank' && node.rel.includes('noopener') && (node.getBoundingClientRect().width===0 || node.getBoundingClientRect().height>=44))));
       await shot(page,'preview-'+id);
