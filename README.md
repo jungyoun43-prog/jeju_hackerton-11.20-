@@ -167,6 +167,7 @@ npm run package
 Lambda 빌드와 ZIP 패키징에는 Python 3가 필요합니다. Lambda ZIP은 `index.mjs`·`deployment.json`으로 구성하며 제출용 `output/jeju-care-compass-mvp.zip`과 구분합니다. 제출 ZIP은 개발 스냅샷이며 이번 버전의 재생성·독립 설치·최종 제출 확인은 [추적표](docs/submission-checklist.md)를 따릅니다. 센터 PC의 GPU·로컬 모델은 요구하지 않지만 센터 실기기 검증은 별도입니다.
 
 - [PRD v0.19](docs/prd.md): 중앙 채팅·오른쪽 준비 현황 UX, 전화 협진·휠체어 이동 준비와 내부 공공데이터 스킬, 실제·시연·후속 기능과 대회 요구사항.
+- [다음 구현 우선순위](docs/next-steps.md): 현재 완료 범위, 실제 LLM 평가·데이터 보강·중복 방지·이어하기와 외부 연동의 완료 기준. Research-Wiki에서도 이 문서를 참조합니다.
 - [기능 파이프라인](docs/agent-pipeline.md): 요청부터 도구·처리 기록·재확인까지.
 - [외부 의존성](THIRD_PARTY.md): AWS SDK3.1161.0·esbuild0.28.2·라이선스·모델·이미지 기록.
 - [AGENTS.md](AGENTS.md): 조사 방식·데이터·병렬 개발 지침.
