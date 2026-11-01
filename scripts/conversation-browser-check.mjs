@@ -26,7 +26,7 @@ await mkdir(resolve(root,'orchestration/runs'),{recursive:true});
 const browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH||undefined,args:['--no-sandbox','--disable-dev-shm-usage']});
 const checks=[],errors=[];
 const record=(name,ok,detail='')=>{checks.push({name,status:ok?'pass':'fail',detail});console.log(`${ok?'PASS':'FAIL'} ${name}${detail?' · '+detail:''}`);};
-const proof={result:'fail',checkedAt:new Date().toISOString(),url:base.href,sourceHash:await runtimeFingerprint(servedRoot),invokingSourceHash:await runtimeFingerprint(root),checks,errors,apiLive:false,modelInvoked:false,phoneInvoked:false,healthRecordsQueried:false,microphone:'permission-denied, transcript-review and delayed-abort fixtures only',fixedPreview:false,normalInputDisconnected:false,keylessDisconnectedPosts:0,desktop:{width:1440,height:900,noOverflow:false},mobile:{width:390,height:844,noOverflow:false},fixtureCoverage:{preferences:false,markdown:false,recovery:false,voiceReview:false,voiceCancellation:false,exampleDrafts:false,cancellation:false,contactPlan:false,shortViewport:false},shortViewport:[],runtimeAssets:[],sourceHashScope:process.env.QA_SERVED_SOURCE_ROOT?'explicit QA_SERVED_SOURCE_ROOT; served UI assets compared below':'invoking checkout; served UI assets compared below'};
+const proof={result:'fail',checkedAt:new Date().toISOString(),url:base.href,sourceHash:await runtimeFingerprint(servedRoot),invokingSourceHash:await runtimeFingerprint(root),checks,errors,apiLive:false,modelInvoked:false,phoneInvoked:false,healthRecordsQueried:false,microphone:'permission-denied, transcript-review and delayed-abort fixtures only',fixedPreview:false,normalInputDisconnected:false,keylessDisconnectedInitialCheckCount:0,actualHttpPostCounts:{agent:0,preview:0},desktop:{width:1440,height:900,noOverflow:false},mobile:{width:390,height:844,noOverflow:false},fixtureCoverage:{preferences:false,markdown:false,recovery:false,voiceReview:false,voiceCancellation:false,exampleDrafts:false,cancellation:false,contactPlan:false,shortViewport:false},shortViewport:[],runtimeAssets:[],sourceHashScope:process.env.QA_SERVED_SOURCE_ROOT?'explicit QA_SERVED_SOURCE_ROOT; served UI assets compared below':'invoking checkout; served UI assets compared below'};
 const overflow=page=>page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1 && document.documentElement.scrollHeight<=innerHeight+1 && scrollY===0);
 const json=request=>JSON.parse(request.postData());
 const hashMatches=request=>request.headers()['x-amz-content-sha256']===createHash('sha256').update(request.postDataBuffer()).digest('hex');
@@ -75,7 +75,11 @@ async function open(width,height,{configured=false,voice,storageSeed,onPost}={})
   const requests=[],networkRequests=[];
   page.on('request',request=>{
     if(['fetch','xhr'].includes(request.resourceType()))networkRequests.push(request);
-    if(request.method()==='POST' && new URL(request.url()).origin===base.origin && new URL(request.url()).pathname.startsWith('/api/agent'))requests.push(request);
+    if(request.method()==='POST' && new URL(request.url()).origin===base.origin && new URL(request.url()).pathname.startsWith('/api/agent')) {
+      requests.push(request);const path=new URL(request.url()).pathname;
+      if(path==='/api/agent' && !onPost)proof.actualHttpPostCounts.agent++;
+      if(path==='/api/agent/preview')proof.actualHttpPostCounts.preview++;
+    }
   });
   if(storageSeed!==undefined)await page.addInitScript(({key,value})=>localStorage.setItem(key,value),{key:storageKey,value:storageSeed});
   if(voice)await page.addInitScript(mode=>{
@@ -310,7 +314,7 @@ try {
       const normal=await send(page,'모델 연결 전 자유 입력입니다.');
       await page.locator('.request-error').waitFor();
       const normalPayload=await normal.json(),disconnected=normal.status()===503 && normalPayload.error?.code==='MODEL_NOT_CONNECTED';
-      proof.normalInputDisconnected ||= disconnected;if(disconnected)proof.keylessDisconnectedPosts++;
+      proof.normalInputDisconnected ||= disconnected;if(disconnected)proof.keylessDisconnectedInitialCheckCount++;
       record(`${width}px 자유 입력은 실제 503·입력 보존·가짜 응답 없음`,disconnected && await input.inputValue()==='모델 연결 전 자유 입력입니다.' && await page.locator('.message.assistant:not(.greeting)').count()===0 && await page.locator('.message.user').count()===1 && await page.locator('.tool-record').count()===0);
       const first=requests.at(-1);
       record(`${width}px 동일 JSON UTF-8 SHA256`,hashMatches(first));
@@ -345,8 +349,9 @@ try {
       await screenshot(page,`preview-${label}`);
       await readConversation(page);
       await page.locator('.tool-records').scrollIntoViewIfNeeded();await screenshot(page,`tools-${label}`);
-      const downloadPromise=page.waitForEvent('download');await page.locator('#save-report').click();
-      const download=await downloadPromise,report=await readFile(await download.path(),'utf8');
+      await openVisitSummary(page);await reveal(page.locator('#save-report'));
+      const [download]=await Promise.all([page.waitForEvent('download'),page.locator('#save-report').click()]);
+      const report=await readFile(await download.path(),'utf8');
       record(`${width}px 보고서 시연·데이터 출처`,download.suggestedFilename().endsWith('.md') && /고정 시나리오/.test(report) && ['859','327','애월콜'].every(term=>report.includes(term)));
       await send(page,'미리보기 이후 새 자유 요청');await page.locator('.request-error').waitFor();
       const fresh=json(requests.at(-1));
