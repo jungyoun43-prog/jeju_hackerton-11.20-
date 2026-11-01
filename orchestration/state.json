@@ -1,6 +1,6 @@
 {
   "baseCommit": "e1e7e44",
-  "updatedAt": "2026-11-01T05:22:57.257340+00:00",
+  "updatedAt": "2026-11-01T05:39:30.388639+00:00",
   "tasks": {
     "ui": {
       "phase": "verified",
@@ -421,6 +421,12 @@
         "f0e948497a2f85f173408e7c1d06d4b77cc0d2f5"
       ],
       "note": "중앙 채팅/하단입력·오른쪽310px 4상태/4SVG/4상세·단일답변·읽기focus보존. 동결940234dc34fac2f70709f2aa085fa0ca6f2c2c3622f7f57156abb98c78e25f94 에서단위360/360·대화189/189·여정236/236(실preview14/일반POST0)·수동47/47·준비판229/229·규칙62/62·Lambda빌드모두종료0. AI거절구배치단언/모바일native표시점실패증거보존→각각대상25/25·125/125후영향받은준비판만전체재검증. UI소스변화없음/독립A새차단0. 공개/ZIP은최신runs기준, 실모델은9fc11bc기존증거로구분/재호출없음."
+    },
+    "orange-ui": {
+      "phase": "implementing",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261101-orange-ui",
+      "integrationCommits": [],
+      "note": "환자 이름·주 행동의 주황 포인트만. 기존 UI/의미색/Agent동작 유지,새영구테스트/라이브러리없음."
     }
   },
   "review": {

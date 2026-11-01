@@ -573,6 +573,15 @@
         "scripts/journey-browser-check.mjs",
         "scripts/preparation-board-browser-check.mjs"
       ]
+    },
+    {
+      "id": "orange-ui",
+      "branch": "design/orange-accents",
+      "baseCommit": "ebe9e43bfe5ffea37e2788273a48d47db32961bf",
+      "allow": [
+        "app/conversation.js",
+        "app/conversation.css"
+      ]
     }
   ],
   "rules": [
