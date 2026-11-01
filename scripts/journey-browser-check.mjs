@@ -41,6 +41,7 @@ const summaryText=summary=>[
 ].join(' ');
 
 async function showView(page,view) {
+  for(const id of ['request-examples','composer-help']){const details=page.locator('#'+id);if(await details.evaluate(node=>node.open))await details.locator(':scope>summary').click();}
   const tab=page.locator('#workspace-tab-'+view);
   if(await tab.isVisible() && await tab.getAttribute('aria-selected')!=='true')await tab.click();
 }

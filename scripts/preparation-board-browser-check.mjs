@@ -28,6 +28,7 @@ const normalize=value=>String(value??'').replace(/\s+/g,' ').trim();
 const noOverflow=page=>page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1 && document.documentElement.scrollHeight<=innerHeight+1 && scrollY===0);
 let browser,previewEvidence;
 async function showView(page,view) {
+  for(const id of ['request-examples','composer-help']){const details=page.locator('#'+id);if(await details.evaluate(node=>node.open))await details.locator(':scope>summary').click();}
   const tab=page.locator('#workspace-tab-'+view);
   if(await tab.isVisible() && await tab.getAttribute('aria-selected')!=='true')await tab.click();
 }
