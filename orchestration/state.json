@@ -1,6 +1,6 @@
 {
   "baseCommit": "e1e7e44",
-  "updatedAt": "2026-11-01T13:57:32.778256+00:00",
+  "updatedAt": "2026-11-01T16:35:33.289381+00:00",
   "tasks": {
     "ui": {
       "phase": "verified",
@@ -507,18 +507,28 @@
         "3e732f2"
       ],
       "note": "1304 공식CSV35행 재취득·관할우선공공보건문의·범위밖null·45/45. 실제Sol해당과업+독립답변검토pass. 허브계보4종/공식안내2건/카탈로그1329 구분."
+    },
+    "guided-backend": {
+      "phase": "implementing",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261101-guided-backend",
+      "note": "현재 할 일 중심 흐름 계약 docs/guided-visit-contract.md. 실모델 호출 금지, fixture와 keyless 시연 검증. 이전 실제 모델 증거를 새 로직 검증으로 대체하지 않음."
+    },
+    "guided-ui": {
+      "phase": "implementing",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261101-guided-ui",
+      "note": "현재 할 일 중심 흐름 계약 docs/guided-visit-contract.md. 실모델 호출 금지, fixture와 keyless 시연 검증. 이전 실제 모델 증거를 새 로직 검증으로 대체하지 않음."
+    },
+    "guided-qa": {
+      "phase": "implementing",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261101-guided-qa",
+      "note": "현재 할 일 중심 흐름 계약 docs/guided-visit-contract.md. 실모델 호출 금지, fixture와 keyless 시연 검증. 이전 실제 모델 증거를 새 로직 검증으로 대체하지 않음."
     }
   },
   "review": {
-    "phase": "verified",
-    "role": "서버 독립 결함 재현·실제Sol12답변 의미 검토·UI-only 범위/12페이지 문서 검토·실제HTTP/확대 대조",
-    "findings": [
-      "판독문 미보유 정정 도구 누락과 합성 상황 실행 gate의 false-negative 수정",
-      "DynamoDB budget의 SDK 비멱등 재시도와 메모리 busy 만료 반환을 독립 재현 후 수정",
-      "실제 native 확대에서 출처 위치 이탈/EOF caret 가림을 기존 읽기 보존으로 보완",
-      "최종42 native 확대검사 통과. 과도한 병렬 브라우저 QA timeout은 별도 보존하고 작업수를 줄여 영향 검사 진행"
-    ],
-    "resolution": "root최종db4에서수동47/대화189/여정236/보드359/이어하기68/실HTTP32/native42 모두pass·종료0·errors[]. Sol12/91검사/46Responses+독립의미검토는963/0544원실행귀속, 이후conversation.js27추가1삭제만Git/독립SHA대조. 전체단위/자동규칙·최종공개/CI/ZIP은최신runs결과기준. 실환자/전화/기록/임상/보호자·실기기/센터PC별도. 최종단위409/409·자동규칙78/78 종료0."
+    "phase": "implementing",
+    "role": "공통 projection·안전한 자동 초안·현재 할 일 UI 독립 통합검토",
+    "findings": [],
+    "resolution": "새 소스 검증 전. 기존 모델 평가·규칙 통과를 새 변경에 귀속하지 않는다."
   },
   "awsDeployment": {
     "phase": "verified",

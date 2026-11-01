@@ -687,6 +687,47 @@
         "research/visit-data-update-2026-11-01.md",
         "app/public-health-data.js"
       ]
+    },
+    {
+      "id": "guided-backend",
+      "branch": "feature/guided-visit-backend",
+      "baseCommit": "46d364b",
+      "allow": [
+        "app/preparation-workflow.js",
+        "app/preparation-stages.js",
+        "agent/service.mjs",
+        "agent/tools.mjs",
+        "agent/validation.mjs",
+        "agent/visit-recovery.mjs",
+        "prompts/caregiver-system.mjs",
+        "tests/preparation-workflow.test.mjs",
+        "tests/preparation-stages.test.mjs",
+        "tests/agent.test.mjs",
+        "tests/visit-recovery.test.mjs"
+      ]
+    },
+    {
+      "id": "guided-ui",
+      "branch": "design/guided-visit-ui",
+      "baseCommit": "46d364b",
+      "allow": [
+        "app/conversation.js",
+        "app/conversation.css",
+        "app/preparation-board-view.js",
+        "app/icons.js"
+      ]
+    },
+    {
+      "id": "guided-qa",
+      "branch": "test/guided-visit-flow",
+      "baseCommit": "46d364b",
+      "allow": [
+        "scripts/conversation-browser-check.mjs",
+        "scripts/journey-browser-check.mjs",
+        "scripts/preparation-board-browser-check.mjs",
+        "scripts/visit-recovery-browser-check.mjs",
+        "scripts/visit-recovery-integration-check.mjs"
+      ]
     }
   ],
   "rules": [
