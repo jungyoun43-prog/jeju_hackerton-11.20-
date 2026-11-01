@@ -1,6 +1,6 @@
 {
   "baseCommit": "e1e7e44",
-  "updatedAt": "2026-11-01T05:57:07.114969+00:00",
+  "updatedAt": "2026-11-01T06:08:12.639678+00:00",
   "tasks": {
     "ui": {
       "phase": "verified",
@@ -431,27 +431,31 @@
       "note": "UI2파일7추가/7삭제:이름/활성send/focus#A84D16·hover#873A10·nextdraft#FFF1E7. 의미색/보조파랑/배치/동작유지. 대상31/normalPOST0/keylesspreview1/fixture2·독립색차단0. 동결efc749933e063752b02a904c3a0ee56618253b8bc6c62e5dc36309d49b1075ba 에서기존하네스한번fresh실행:수동47/대화189/여정236(실preview14/일반POST0)/보드229·단위360·규칙63 전부pass/종료0. 새영구테스트/라이브러리없음. 공개/ZIP은최신runs,실모델은9fc11bc이전증거로구분/재호출0."
     },
     "green-ui": {
-      "phase": "implementing",
+      "phase": "verified",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261101-green-ui",
-      "integrationCommits": [],
-      "note": "초록의영역/보조행동색·짧은CSS피드백·reduced motion. CSS와기존보드검사파일을각각분리소유. source/DOM/권한/모델/시연경계유지."
+      "integrationCommits": [
+        "8e39435"
+      ],
+      "note": "CSS1파일33추가/9삭제. 초록 대화/탐색·짧은 CSS 피드백·reduce 대안. 동결15f지문에서 수동47/대화189/여정236/보드249와 단위360/규칙65 종료0. 독립 소스/캡처·모바일 재검토 새 차단0. 실기기 성능 별도."
     },
     "green-qa": {
-      "phase": "implementing",
+      "phase": "verified",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261101-green-qa",
-      "integrationCommits": [],
-      "note": "초록의영역/보조행동색·짧은CSS피드백·reduced motion. CSS와기존보드검사파일을각각분리소유. source/DOM/권한/모델/시연경계유지."
+      "integrationCommits": [
+        "d0b8540"
+      ],
+      "note": "기존 보드 검사1파일137추가/8삭제. 새 PC/모바일 normal·reduce4조합은 모든5boolean true/normalPOST0. targeted29/29 뒤 root전체보드249/249·errors[]·동일15f/finalhash. 첫2회 검사기 가정/이벤트관측 실패를 보존하고 수정. 위임/호출 경계 유지."
     }
   },
   "review": {
     "phase": "verified",
-    "role": "이름·주 행동의 주황 포인트에 대한 독립 색 검토와 실제 PC/모바일 상태 대조",
+    "role": "초록과 짧은 인터랙션의 독립 디자인 재검토 및 root 브라우저 대조",
     "findings": [
-      "이름 부분/주 보내기/다음 초안만 주황, 본문/보조파랑/의미색 유지",
-      "소스·6캡처 독립색검토에서새차단0,대비white5.62/peach5.08/hover7.95",
-      "UI대상31개확인·keylesspreview1/fixture2/일반POST0,실기기전체검증과구분"
+      "대화/탐색 초록·주 행동 주황·흰 상태 카드/○△× 의미색 분리",
+      "흰 toolbar focus와 초록 면 글자의 실제 대비, 줄인 동작의 정적 구분 유지",
+      "최신 실제 응답 노드 메타240ms1회·인사/과거/reader 제외, 출처 DOM/focus/읽기 위치 보존"
     ],
-    "resolution": "현재efc74993지문으로기존4종·360단위·63규칙을한번fresh실행/종료0. 공개배포색/버전은최신runs증거기준. context126을직접문맥읽기로보완/자동디자인합격아님."
+    "resolution": "동일15f지문에서 네 브라우저47/189/236/249·단위360·규칙65 모두 pass/종료0. 독립 재검토 새 차단0. 대상 fixture와 keyless preview·실모델/실기기 경계를 구분. 공개배포는 최신 runs 증거를 따른다."
   },
   "awsDeployment": {
     "phase": "verified",

@@ -390,3 +390,14 @@ plan도 이제 오른쪽 정보이므로 이전 selectedStageId===plan의 답변
 실제PC/모바일의initial/active/hover/keyboard focus/disabled/답변후초안과특수문자이름을 임시검사31건으로 확인했다. 실제keyless preview1건·저장응답/특수문자fixture2건·일반모델POST0·errors[]다. 독립색검토도소스와6캡처에서새차단문제가없었다. 주황대비는흰면5.62:1·바탕5.14:1·peach5.08:1·hover흰면7.95:1이다. 기존disabled4.24:1은변경하지않은비활성제어이며활성대비와구분한다. UI담당의context126실패는직접문맥읽기로보완했으며자동디자인합격으로설명하지않는다. 증거는 `.impeccable/review/chat-rail/color/`다.
 
 실행 지문은 `efc749933e063752b02a904c3a0ee56618253b8bc6c62e5dc36309d49b1075ba`다. 동일지문에서기존하네스수동47/47·대화189/189·여정236/236(실제keyless preview14/일반POST0)·준비판229/229가한번의fresh실행으로모두종료0이었다. 각proof의pass/errors[]·sourceHash·준비판finalSourceHash도별도종료0으로대조했다. 단위·서버360/360·자동규칙63/63도종료0이며등록worktree49개중이번개발은1개다. CI·공개정적/APIrevision과실제고정preview·배포후이름/활성send/hover/focus/상태색은최신runs와deployed/layout.json을따른다. 유료모델·실전화·개인기록은호출하지않으며이전9fc11bc실모델/DynamoDB증거는원revision에유지한다. 실제휴대폰·표시장치색상/실마이크·스크린리더·임상/법률·센터실기기/최종PDF/대회제출은별도다.
+
+
+## 3.16 초록 영역 구분과 짧은 인터랙션
+
+사용자가 색과 인터랙션을 더 요청해 짙은 초록 대화 헤더, 옅은 민트 탐색·선택 메뉴·사용자 말풍선과 초록 보조 행동을 적용했다. 주황 이름·주 행동, 오른쪽 흰 상태 카드와 기존 ○·△·× 및 상태 문장은 보존한다. 헤더의 흰 글자 대비는 9.70:1, 초록 보조 글자는 흰 면 7.77:1·민트 면 7.04:1이며 보조 본문도 민트 면에서 4.86:1이다. 로고와 시각적으로 맞춘 색이며 PNG에서 정확한 색을 추출했다는 뜻은 아니다.
+
+보내기 누름 1px, 화살표 hover 2px, 펼침의 면·경계·방향 변화와 최신 실제 assistant 답변 메타의 240ms 1회 피드백을 CSS로 구현했다. 인사·이전 답변·넓게 읽기 복사본에는 새 답변 효과를 적용하지 않는다. 본문·상태 카드 위치와 글자 가시성은 유지하며 가짜 진행·추가 타이머·라이브러리는 없다. reduced motion에서는 새 공간 이동과 답변 애니메이션을 없애고 초점·열림의 정적 구분은 남긴다. 어두운 헤더 위 키보드 초점은 흰 테두리로 구분한다.
+
+UI와 기존 준비판 검사 파일은 두 전용 worktree로 나눴다. UI 변경은 `app/conversation.css` 1파일 33줄 추가·9줄 삭제이며 Controller·API·데이터·권한·전화/기록 경계는 바꾸지 않았다. UI 담당의 PC 1440·1060/모바일 390 × normal/reduce 6개 관측, 실제 keyless preview 1건·저장 응답 fixture 12건·일반 모델 POST 0건과 독립 재검토의 POST 0건을 구분한다. 독립 검토는 소스·대표 캡처 및 별도 모바일 상세 읽기에서 새 차단 문제를 발견하지 않았다. 캡처·별도 보고서는 `.impeccable/review/chat-rail/green/`이다.
+
+실행 지문은 `15f5053ae46d56bdcce16399dec06c9b1f9ad4b456cec10731ba7921b5862c53`다. 동일 지문의 네 통합 브라우저 프로세스가 모두 종료0이며 수동47/47·대화189/189·여정236/236·준비판249/249, pass/errors[]와 sourceHash·보드 finalSourceHash를 대조했다. 신규 normal/reduce×PC1440/모바일390의 4조합에서 색·대비·누름/펼침·최신 답변·읽기 보존은 모두 참이고 실제 일반 POST는0이다. 단위·서버360/360·자동 규칙65/65도 종료0이다. 등록 worktree는 누적51개, 이번 개발은2개다. 공개 CI·고정 preview·정적/API revision·초록/주황/네 상태의 실제 화면은 최신 `orchestration/runs/{preparation-board-deployed,aws-deployment}.json`과 `.impeccable/review/chat-rail/deployed/layout.json`, 독립 설치·최종 ZIP은 `release.json`·`output/final-archive-check.json`을 따른다. 유료 모델·실발신·개인기록을 이번 색/모션 검증에서 호출하지 않으며 이전 `9fc11bc` 실모델/DynamoDB 증거를 새 실행으로 바꾸지 않는다. 실제 휴대폰·센터 PC의 프레임 성능, Safari/Firefox·스크린리더·실마이크·임상/법률·15페이지 PDF/대회 제출은 미검증이다.

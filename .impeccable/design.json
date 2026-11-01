@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "name": "혼디 · 보호자 진료 준비",
   "mode": "operate",
-  "direction": "중앙 단일 채팅→다음 행동→예시/공통 텍스트·음성 입력, 오른쪽 세로4칸의 아이콘/준비상태/펼치는 상세. 모바일은 채팅 뒤 네 상태. 혼디브랜드/제주배경/○△×와 페이지 읽기 유지.",
+  "direction": "중앙 채팅과 오른쪽4상태는 유지. 주황 이름/주행동, forest 대화헤더·mint 탐색/선택·초록 보조행동으로 구분하며 실제 최신 답변의 메타와 클릭/펼침에 짧은 CSS 피드백을 제공한다.",
   "seedReference": "seed:a25f97f1d883646c",
   "layoutAuthority": {
     "contract": "docs/chat-rail-contract.md",
@@ -11,23 +11,26 @@
   },
   "colors": {
     "background": "#F3F5F8",
-    "navigation": "#FFFFFF",
+    "navigation": "#F4F8F4",
     "surface": "#FFFFFF",
     "text": "#24354B",
     "muted": "#5E6C7C",
     "primary": "#A84D16",
     "primaryHover": "#873A10",
-    "secondary": "#345D86",
+    "secondary": "#285C43",
     "border": "#DBE1E8",
     "paneBorder": "#DBE1E8",
     "divider": "#C8D3DF",
-    "soft": "#EDF2F8",
+    "soft": "#EDF6EF",
     "signalGood": "#267149",
     "warning": "#875617",
     "danger": "#A33D34",
     "focus": "#305D91",
     "primarySoft": "#FFF1E7",
-    "secondaryHover": "#254A75"
+    "secondaryHover": "#1B4631",
+    "selected": "#EDF6EF",
+    "chatHeader": "#1C4D36",
+    "chatHeaderText": "#FFFFFF"
   },
   "typography": {
     "display": "Pretendard, sans-serif",
@@ -139,7 +142,8 @@
     "확정 이력·출처의 DOM과 진행 목록을 분리하고 동일한 내용의 출처 링크를 진행 갱신만으로 다시 만들지 않음",
     "중앙 대화의 답변·다음 문의 초안과 하단 입력을 같은 흐름에 두고 입력·전체 답변은 복제하지 않음",
     "전체 누락건수와 펼친 목록 일치·같은 문의처 선택 상태 중복 없음",
-    "환자 이름 부분·활성 보내기는 짙은 주황, 다음 문의 초안은 옅은 peach. 전체soft/탐색/보조링크/아이콘과 상태의미색은 유지."
+    "환자 이름 부분·활성 보내기는 짙은 주황, 다음 문의 초안은 옅은 peach. 전체soft/탐색/보조링크/아이콘과 상태의미색은 유지.",
+    "브랜드 초록은 toolbar·탐색/선택/말풍선·보조행동 역할이며 상태good/warning/danger·흰상태카드는유지. 최신답변metadata만240ms1회,reduce에서는이동/새답변animation없고정적상태남음."
   ],
   "spacing": {
     "mainTopPx": 24,
@@ -177,13 +181,17 @@
   "focus": {
     "controls": "3px solid var(--primary); outline-offset:3px",
     "preparationSection": "2px solid var(--secondary); outline-offset:3px",
-    "composer": "border-color:var(--primary); outline:2px solid var(--primary); outline-offset:1px"
+    "composer": "border-color:var(--primary); outline:2px solid var(--primary); outline-offset:1px",
+    "chatToolbar": "밝은 outline으로 어두운 green 위3:1이상; orange/body focus는기존대로"
   },
   "motion": {
     "controlTransition": "background-color 150ms ease, color 150ms ease, border-color 150ms ease",
     "drawerTransition": "transform 220ms cubic-bezier(.16,1,.3,1), visibility 220ms",
     "pendingIndicator": "working 1.1s linear infinite",
-    "reducedMotion": "transition:none; animation:none; scroll-behavior:auto"
+    "reducedMotion": "공간이동/답변animation 제거,정적open방향/면/focus·실제pending은유지",
+    "reply": "최신 assistant/non-greeting의 metadata에만240ms/1회,본문/과거/reader복사본 제외",
+    "feedback": "누름1px·hoverarrow2px·native chevron/면 변화,카드/본문/높이이동없음",
+    "budget": "긴답변전체 아닌좁은metadata영역,JS타이머/가짜진행/라이브러리 없음"
   },
   "responsive": {
     "railNarrowMaxWidthPx": 1150,
@@ -302,14 +310,14 @@
     ],
     "captures": ".impeccable/review/chat-rail/: current central chat/right rail renders",
     "geometryRecord": "orchestration/runs/preparation-board-browser.json",
-    "observations": "동일efc74993지문에서수동47/대화189/여정236/보드229·단위360·규칙63 전부pass/종료0. 대상색확인31/독립색재검토차단0. 공개색/배포는별도최신증거.",
+    "observations": "동일15f5053a 지문에서 수동47/대화189/여정236/보드249·단위360·규칙65 pass/종료0. normal/reduce×1440/390 색/대비/피드백/읽기 보존4조합, 독립 재검토 새 차단0. 공개배포는 최신 runs 증거.",
     "previousCaptures": ".impeccable/review/task-first/, grid/, reading/, board/: 이전 배치 이력",
     "limits": "layout detector전후126로자동결과없음. 실제모델·DynamoDB는이전9fc11bc 증거로구분/새호출0. 실제휴대폰·마이크/다른브라우저/스크린리더·센터PC·전화/개인기록·의료법률은미검증.",
     "progressDomSource": "app/preparation-board-view.js의 확정/진행 목록 분리와 WeakMap 문자열 guard를 소스로 대조. 최종 root 브라우저 QA 결과와 구분.",
     "uxAuditBefore": "docs/reviews/2026-11-01-chat-rail.md",
     "uxAuditAfter": "docs/reviews/2026-11-01-chat-rail.md",
     "cliDetector": "이번 layout detect 실제126 Permission denied; 자동발견/합격 아님.",
-    "uiSourceRevision": "8fa9cdd",
+    "uiSourceRevision": "8e39435",
     "orangeAccent": {
       "scope": "환자 이름 부분·활성보내기·포커스·다음문의초안만. 의미색/배치/보조파랑유지.",
       "captures": ".impeccable/review/chat-rail/color/",
@@ -324,6 +332,35 @@
       "realKeylessPreviews": 1,
       "fixtures": 2,
       "independentColorReview": "source와6개캡처에서새차단0;실기기전체검증아님"
+    },
+    "greenFeedback": {
+      "captures": ".impeccable/review/chat-rail/green/",
+      "source": "CSS1파일33추가/9삭제,Controller/API변경0",
+      "uiCases": 6,
+      "uiCaseWidths": [
+        1440,
+        1060,
+        390
+      ],
+      "motion": [
+        "no-preference",
+        "reduce"
+      ],
+      "realKeylessPreview": 1,
+      "normalPostAttempts": 0,
+      "fixtures": 12,
+      "reply": "hondi-reply-ready metadata 240ms/1회",
+      "limits": "실제 센터 PC·휴대폰 프레임 성능/다른 브라우저·스크린리더 별도. 실제 모델·기관/전화·개인기록 호출 없음.",
+      "rootMotionProof": "orchestration/runs/preparation-board-browser.json: motionScenarios4개 all true",
+      "rootBrowserChecks": {
+        "workspace": 47,
+        "conversation": 189,
+        "journey": 236,
+        "board": 249
+      },
+      "targetedChecks": 29,
+      "independentReview": ".impeccable/review/chat-rail/green/independent-review.md",
+      "sourceHash": "15f5053ae46d56bdcce16399dec06c9b1f9ad4b456cec10731ba7921b5862c53"
     }
   },
   "references": {

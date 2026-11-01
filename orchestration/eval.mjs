@@ -136,6 +136,7 @@ await check('preparation-board-browser-evidence','verification',async()=>{
  requireThat(proof.viewports.every(view=>view.documentFlow===true && view.initialSignalSummary===true),'모든 viewport에서 문서 흐름·내부 세로 스크롤 없음·기호 요약 검사가 필요합니다.');
  requireThat(proof.viewports.every(view=>view.layout===(view.width>900?'chat-right-rail':'chat-then-status') && view.chatLayout===true),'실제 좌표와 DOM으로 중앙 대화·입력과 오른쪽/모바일 아래4칸 검사가 필요합니다.');
  requireThat(proof.viewports.every(view=>view.categoryIcons===true && view.compactSummary===true),'네 제목 아이콘과 핵심/상세 분리의 실제 viewport 검사가 필요합니다.');
+ requireThat(proof.motionScenarios?.length===4 && ['no-preference','reduce'].every(mode=>[1440,390].every(width=>proof.motionScenarios.some(item=>item.width===width && item.reducedMotion===mode))) && proof.motionScenarios.every(item=>item.greenSurfaces && item.contrastPassed && item.interactionFeedback && item.replyFeedback && item.readingStable && item.normalPostAttempts===0),'초록 대비와 일반/줄인동작의 PC·모바일 피드백/읽기 보존 검사가 필요합니다.');
  for(const view of proof.viewports){const bytes=await readFile(resolve(root,view.screenshot));requireThat(bytes.readUInt32BE(0)===0x89504e47,'읽기 UI PNG 증거가 필요합니다.');}
  return `${proof.checks.length}개 중앙 채팅·오른쪽 준비 현황·문서 스크롤·기호/아이콘·실제 keyless 진행 API·진행/취소 fixture와6개viewport. 실제모델·DDB 진행은 별도공개증거.`;
 });
