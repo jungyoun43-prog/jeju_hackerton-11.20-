@@ -63,18 +63,30 @@ export function preservePreparationReading() {
   };
 }
 
-export function renderPreparationBoard(board,{unreadAnswer=false,progress=null,selectedStageId,reviewing=false,disableDrafts=false}={}) {
+export function renderPreparationView(board,{unreadAnswer=false,selectedStageId,reviewing=false}={}) {
   const workflow=board.workflow;
   const selected=PREPARATION_STAGES.some(stage=>stage.id===selectedStageId)?selectedStageId:workflow.currentStageId;
+  document.getElementById('preparation-board').dataset.selectedStage=selected;
+  document.getElementById('answer-ready-notice').hidden=board.pending || !unreadAnswer;
+  document.getElementById('return-to-current-task').hidden=!reviewing&&selected===workflow.currentStageId;
+  document.getElementById('stage-reading-label').textContent=selected===workflow.currentStageId?'현재 단계 상세':'선택한 단계 상세 · 읽기 전용';
+  for(const stage of PREPARATION_STAGES) {
+    const pane=document.querySelector(`[data-stage-id="${stage.id}"]`);
+    pane.hidden=stage.id!==selected;pane.inert=pane.hidden;
+    document.querySelector(`#stage-navigation [data-open-stage="${stage.id}"]`).setAttribute('aria-pressed',String(stage.id===selected));
+  }
+}
+
+export function renderPreparationBoard(board,{unreadAnswer=false,progress=null,selectedStageId,reviewing=false,disableDrafts=false}={}) {
+  const workflow=board.workflow;
   const realProgress=board.pending && progress?.status==='running' && board.progressAvailable && PREPARATION_STAGES.some(stage=>stage.id===progress.currentStage);
   const boardNode=document.getElementById('preparation-board');
   const restoreReading=preservePreparationReading();
   boardNode.dataset.activeStage=realProgress?board.activeStageId:'';
-  boardNode.dataset.currentStage=workflow.currentStageId;boardNode.dataset.selectedStage=selected;
+  boardNode.dataset.currentStage=workflow.currentStageId;
   boardNode.dataset.pending=String(board.pending);
   const activity=document.getElementById('board-activity');
   activity.hidden=!board.pending;activity.textContent=board.overallLabel;
-  document.getElementById('answer-ready-notice').hidden=board.pending || !unreadAnswer;
   document.getElementById('expand-answer').disabled=!board.hasResponse;
   document.getElementById('workflow-summary').textContent=workflow.summary.label;
   const initial=!board.hasResponse;
@@ -96,13 +108,10 @@ export function renderPreparationBoard(board,{unreadAnswer=false,progress=null,s
   document.getElementById('workflow-draft-note').hidden=draft.hidden&&choices.hidden;
   const waiting=document.getElementById('current-task-waiting');waiting.hidden=!board.pending;
   if(waiting.textContent!==board.overallLabel)waiting.textContent=board.overallLabel;
-  document.getElementById('return-to-current-task').hidden=!reviewing&&selected===workflow.currentStageId;
-  document.getElementById('stage-reading-label').textContent=selected===workflow.currentStageId?'현재 단계 상세':'선택한 단계 상세 · 읽기 전용';
   for(const stage of board.stages) {
     const workStage=workflow.stages.find(item=>item.id===stage.id);
     const signal=stage.signal;
     const pane=document.querySelector(`[data-stage-id="${stage.id}"]`);
-    pane.hidden=stage.id!==selected;pane.inert=pane.hidden;
     pane.dataset.stageStatus=stage.status;pane.dataset.workflowStatus=workStage.status;
     pane.dataset.signal=signal;pane.dataset.live=String(realProgress && stage.live);
     const status=pane.querySelector('.stage-status');
@@ -111,7 +120,6 @@ export function renderPreparationBoard(board,{unreadAnswer=false,progress=null,s
     const nav=document.querySelector(`#stage-navigation [data-open-stage="${stage.id}"]`);
     nav.dataset.workflowStatus=workStage.status;nav.dataset.signal=signal;
     nav.dataset.current=String(stage.id===workflow.currentStageId);nav.dataset.live=String(realProgress&&stage.live);
-    nav.setAttribute('aria-pressed',String(stage.id===selected));
     if(stage.id===workflow.currentStageId)nav.setAttribute('aria-current','step');else nav.removeAttribute('aria-current');
     nav.querySelector('[data-nav-label]').textContent=workStage.label+(workStage.remainingCount?` · 남은 ${workStage.remainingCount}건`:'');
     replaceMarkup(nav.querySelector('[data-nav-signal]'),signalMarkup(signal));
@@ -141,5 +149,6 @@ export function renderPreparationBoard(board,{unreadAnswer=false,progress=null,s
     replaceMarkup(eventHost.querySelector('[data-stage-live-events]'),liveEvents.map(event=>`<li class="stage-live-event" data-progress-sequence="${event.sequence}"><p>${escape(progressActivity(event))}</p></li>`).join(''));
     eventHost.querySelector('.stage-log-empty').hidden=count>0;
   }
+  renderPreparationView(board,{unreadAnswer,selectedStageId,reviewing});
   restoreReading?.();
 }
