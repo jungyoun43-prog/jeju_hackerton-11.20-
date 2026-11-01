@@ -449,9 +449,9 @@ try {
       record(width+'px 읽는 단계와 실제 다음 업무는 분리·같은 DOM/초안·추가 POST0',readOnlyNavigation,JSON.stringify(selection));
       await reveal(page.locator('#return-to-current-task'));await page.locator('#return-to-current-task').click();
       record(width+'px 현재 업무로 복귀도 업무 상태·초안·POST 수를 보존',(await workspaceEvidence(page)).selectedStage===actualCurrent && await input.inputValue()===stageDraft && (await calls(page)).length===beforeCalls);
-      await readConversation(page);
+      const answerLink=page.locator('#current-task-answer'),answerLinkAccess=await accessible(answerLink);await answerLink.click();await flush(page);
       const historyAnswer=page.locator('#message-list>.message.assistant:not(.greeting)').last(),historyAccess=await accessible(historyAnswer);
-      const historyOriginal=historyAccess.reachable && /방문 날짜만 확인/.test(await historyAnswer.innerText()) && await page.locator('#conversation-history').evaluate(node=>node instanceof HTMLDetailsElement && node.open) && await page.locator('#expand-answer').isEnabled() && (await calls(page)).length===beforeCalls;
+      const historyOriginal=answerLinkAccess.reachable && historyAccess.reachable && /방문 날짜만 확인/.test(await historyAnswer.innerText()) && await page.locator('#conversation-history').evaluate(node=>node instanceof HTMLDetailsElement && node.open) && await page.locator('#expand-answer').isEnabled() && (await calls(page)).length===beforeCalls;
       record(width+'px 보조 대화 기록은 원문 답변·처리 기록·넓게 읽기를 보존',historyOriginal);
       const readiness=await page.evaluate(async state=>{
         const {getPreparationBoard}=await import('/preparation-stages.js'),before=getPreparationBoard(state,{responseCount:0}),after=getPreparationBoard(state,{responseCount:7}),progress={version:1,status:'completed',sequence:4,updatedAt:'2026-11-01T12:00:00.000Z',currentStage:'plan',stages:['records','hospitals','support','plan'].map(id=>({id,status:'observed',lastTool:null})),events:[]},observed=getPreparationBoard(state,{responseCount:7,pending:true,progress});
@@ -469,6 +469,9 @@ try {
       record(width+'px 기관/의료진 대기는 보호자 질문을 반복하지 않고 미확보 자료 보존',institutionWaitingPreserved);
       const notNeededPreserved=external.workflow.stages.find(stage=>stage.id==='support').status==='not_needed' && await statusOf(page,'support')==='not_needed' && external.visitNotReady && (await calls(page,'/api/agent')).length===2 && actualPosts.length===0;
       record(width+'px 필요 없는 이동·동행은 해당 없음·방문 준비 완료는 false',notNeededPreserved);
+      await readStage(page,'plan');
+      const planRows=await page.locator('#workflow-remaining-list>li').evaluateAll(nodes=>nodes.map(node=>({id:node.dataset.workflowTask,status:node.dataset.workflowStatus,text:node.textContent}))),planListMatches=await page.locator('[data-stage-id="plan"] [data-stage-gaps] ol,[data-stage-id="plan"] [data-stage-gaps] ul').count()===1 && planRows.length===external.workflow.remainingTasks.length && external.workflow.remainingTasks.every(task=>planRows.some(row=>row.id===task.id&&row.status===task.status&&[task.title,task.owner,task.detail].every(text=>normalize(row.text).includes(normalize(text)))));
+      record(width+'px 준비표는 남은 일 한 목록에 담당·상태·상세를 모두 보존',planListMatches,JSON.stringify({rendered:planRows.length,expected:external.workflow.remainingTasks.length}));
       const safe=applyAction(waiting,{type:'SUPPORT_UPDATE_REQUIREMENTS',values:{transportNeeded:true,companionNeeded:true}}),third=await begin(page,'가족 이동 대신 공개 문의처로 이동·동행 문의 초안을 준비해 주세요.',2);
       await finish(page,third,safe,'합성 응답: 공개 문의처로 이동·동행 초안을 준비할 수 있으며 실제 발신은 하지 않았습니다.');
       const followup=await guidedEvidence(page,safe),requestDraft=followup.workflow.currentTask?.requestDraft;let draftOnly=false;
@@ -478,7 +481,7 @@ try {
         page.once('dialog',dialog=>dialog.accept());await button.click();draftOnly=cancelled && normalize(await input.inputValue())===normalize(requestDraft.trim().slice(0,1600)) && (await calls(page,'/api/agent')).length===3 && actualPosts.length===0;
       }
       record(width+'px 현재 업무의 후속 버튼은 보이는 초안만 제안·교체 취소·추가 POST0',draftOnly);
-      proof.guidedScenarios.push({id:'current-task-flow',width,naturalRequest,caregiverQuestionOnly,currentAndSelectedSeparated:readOnlyNavigation,readOnlyNavigation,historyOriginal,responseCountIndependent:readiness.same,observedIndependent:readiness.same,institutionWaitingPreserved,notNeededPreserved,visitNotReady:external.visitNotReady,draftOnly,normalPostAttempts:actualPosts.length});
+      proof.guidedScenarios.push({id:'current-task-flow',width,naturalRequest,caregiverQuestionOnly,currentAndSelectedSeparated:readOnlyNavigation,readOnlyNavigation,historyOriginal,responseCountIndependent:readiness.same,observedIndependent:readiness.same,institutionWaitingPreserved,notNeededPreserved,planListMatches,visitNotReady:external.visitNotReady,draftOnly,normalPostAttempts:actualPosts.length});
       await shot(page,width+'-guided-workflow');
     } finally {await context.close();}
   });
@@ -869,6 +872,7 @@ try {
     if(!previewEvidence)throw new Error('motion 검사에 사용할 실제 keyless preview 근거가 없습니다.');
     const {page,context,actualPosts}=await open(width,844,{fixture:true,reducedMotion});
     try {
+      let motionState=previewEvidence.caseState;for(const findingId of ['report_issuance','report_submission'])motionState=applyAction(motionState,{type:'JOURNEY_RECORD_FINDING',findingId});
       const label=width+'px '+reducedMotion,reduce=reducedMotion==='reduce',soft='rgb(237, 246, 239)',secondary='rgb(40, 92, 67)',orange='rgb(168, 77, 22)';
       const input=page.locator('#request-input'),send=page.locator('#send-request'),example=page.locator('[data-example]').first(),details=page.locator('[data-stage-id="records"] [data-stage-details]'),summary=details.locator(':scope>summary');
       const disabled=await send.isDisabled() && await page.locator('#expand-answer').isDisabled();
@@ -915,7 +919,7 @@ try {
       const poll=await advancePoll(page,0);await release(page,poll,progress('hospitals',4));
       const beforeFinal=await page.evaluate(()=>window.__boardMotion.length===0 && document.querySelectorAll('#message-list>.message.assistant:not(.greeting)').length===0);
       const userSoft=await page.locator('#message-list>.message.user>.message-body').evaluate(node=>getComputedStyle(node).backgroundColor=== 'rgb(237, 246, 239)');
-      await release(page,first,{...response(first,previewEvidence.caseState,previewEvidence.reply),events:previewEvidence.events,pendingActions:previewEvidence.pendingActions});
+      await release(page,first,{...response(first,motionState,previewEvidence.reply),events:previewEvidence.events,pendingActions:previewEvidence.pendingActions});
       await page.waitForFunction(()=>document.querySelector('#conversation-form').getAttribute('aria-busy')==='false');
       await readConversation(page);
       const motionEvents=()=>page.evaluate(()=>window.__boardMotion);
@@ -953,7 +957,7 @@ try {
       const before=await snapshot(),pastQuiet=await page.locator('#message-list>.message.assistant>.message-meta').evaluateAll(nodes=>nodes.every(node=>getComputedStyle(node).animationName==='none' && node.getAnimations().length===0));
       const deferredReplyFeedback=await page.locator('#conversation-history').evaluate(node=>!node.open || Boolean(node.closest('[hidden],[inert]')));
       const reply='# 읽던 출처를 유지하는 최종 답변\n\n'+Array.from({length:8},()=> '자료와 문의를 준비하는 합성 응답입니다. 실제 발신·예약·배차는 하지 않았습니다.').join('\n\n');
-      await release(page,second,{...response(second,previewEvidence.caseState,reply),events:previewEvidence.events,pendingActions:previewEvidence.pendingActions});
+      await release(page,second,{...response(second,motionState,reply),events:previewEvidence.events,pendingActions:previewEvidence.pendingActions});
       await page.waitForFunction(()=>document.querySelector('#conversation-form').getAttribute('aria-busy')==='false');
       const readingSamples=[];observedAt=performance.now();
       await nativeUntil(async()=>{readingSamples.push(await snapshot());return motionEvents();},()=>performance.now()-observedAt>=300);
@@ -988,7 +992,7 @@ try {
       const colors=[];for(const stage of ids){await readStage(page,stage);colors.push(...await contrast(page));}
       await showView(page,'preparation');colors.push(...await contrast(page));
       record(id+' 준비 기호·설명·본문·고지 대비 유지',colors.length>0 && colors.every(item=>item.ratio>=item.minimum),JSON.stringify(colors));
-      if(id==='aewol-parent-visit')record('○·△·×는 세 가지 다른 상태색과 뜻을 함께 제공',new Set(['available','attention','blocked'].map(signal=>colors.find(item=>item.signal===signal)?.color)).size===3 && ['available','attention','blocked'].every(signal=>colors.some(item=>item.signal===signal)) && /실제 진료.*예약.*배차.*미확정/.test(await page.locator('.preparation-boundary').innerText()));
+      if(id==='aewol-parent-visit'){const observed=await page.evaluate(async state=>(await import('/preparation-stages.js')).getPreparationBoard(state).stages.map(stage=>stage.signal),data.caseState),signals=[...new Set(observed)];record('실제 preview 기호는 남은 업무 상태와 서로 다른 색·뜻을 표시',signals.every(signal=>colors.some(item=>item.signal===signal)) && new Set(signals.map(signal=>colors.find(item=>item.signal===signal)?.color)).size===signals.length && /실제 진료.*예약.*배차.*미확정/.test(await page.locator('.preparation-boundary').innerText()));}
       if(id==='aewol-parent-visit')record('기본 preview의 병원·공개 택시·동행 실패는 올바른 창에 표시',hospitals.includes(data.caseState.patient.localHospital) && support.includes('애월콜') && /연락|인계|확인/.test(support) && await statusOf(page,'support')==='handoff' && /진료 수락.*미확인/.test(hospitals));
       if(id==='time_changed')record('진료 시각 변경은 휠체어 이동·동행 재확인',await statusOf(page,'support')==='needs_recheck' && ['휠체어','10:00','14:00'].every(term=>(records+' '+support).includes(term)) && /재확인/.test(support) && ['taxi','companion'].every(kind=>data.caseState.visitSupport[kind].status==='needs_recheck'));
       if(id==='call_ai_declined') {
