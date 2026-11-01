@@ -84,7 +84,7 @@ function renderBoard() {
   document.getElementById('care-journey-summary').hidden=responseCount===0;
   document.getElementById('return-to-request').hidden=responseCount===0;
   renderPreparationBoard(board,{unreadAnswer,progress});
-  document.getElementById('request-problem-notice').hidden=!(requestProblem || previewProblem);
+  document.getElementById('request-problem-notice').hidden=pending || !(requestProblem || previewProblem);
   document.getElementById('request-examples').hidden=document.getElementById('starter-prompts').hidden;
 }
 
@@ -434,7 +434,8 @@ function renderSnapshot() {
   const patient = caseState.patient;
   const confirmed = Object.values(caseState.inquiries).filter(item => item.status === 'confirmed').length;
   const time = caseState.visitSupport?.requirements?.appointmentTime;
-  document.getElementById('case-heading').innerHTML = `<span class="patient-name">${escape(patient.name)}</span> 님의 진료 준비`;
+  document.getElementById('case-heading').innerHTML = `<span class="patient-name">${escape(patient.name)}</span><span class="case-heading-context"> 님의 진료 준비</span>`;
+  document.getElementById('case-heading').setAttribute('aria-label',`${patient.name} 님의 진료 준비`);
   document.getElementById('case-caption').textContent = `${patient.area} · 보호자 ${patient.caregiver} · 합성 사례`;
   document.getElementById('rail-patient').innerHTML = `<span class="patient-name">${escape(patient.name)}</span> 님`;
   document.getElementById('rail-caregiver').textContent = `보호자 ${patient.caregiver}의 가상 가족 사례`;
@@ -533,7 +534,7 @@ function requestIsCurrent(request) {
 function beginRequest(kind,values,timeout) {
   const request={...values,kind,version:conversationVersion,controller:new AbortController()};
   activeRequest=request;
-  requestProblem='';previewProblem=false;
+  requestProblem='';previewProblem=false;unreadAnswer=false;clearInputFeedback();
   request.timer=setTimeout(()=>{if(requestIsCurrent(request))cancelRequest({timedOut:true});},timeout);
   setPending(true);
   return request;
@@ -544,7 +545,7 @@ function finishRequest(request) {
   stopProgress(request);
   if(!requestIsCurrent(request))return false;
   activeRequest=undefined;setPending(false);
-  if(request.kind==='preview')document.getElementById('preview-button').textContent='예시 보기';
+  if(request.kind==='preview'){const button=document.getElementById('preview-button');button.textContent='예시';button.setAttribute('aria-label','예시 보기');}
   return true;
 }
 
@@ -684,7 +685,7 @@ async function showPreview(scenarioId='aewol-parent-visit') {
   let restoreReading;
   const button=document.getElementById('preview-button');
   const notice=document.getElementById('mode-notice');
-  button.textContent='미리보기 불러오는 중';
+  button.textContent='예시';button.setAttribute('aria-label','미리보기 불러오는 중');
   try {
     const data=await callAgent(API+'/preview',request.body,request.controller.signal);
     if(!requestIsCurrent(request))return;
@@ -765,8 +766,14 @@ async function sendRequest(text,retryId) {
   }
 }
 
+function clearInputFeedback() {
+  const hint=document.getElementById('voice-help');hint.hidden=true;hint.textContent='';
+  document.getElementById('composer-help').open=false;
+}
+
 function voiceMessage(text,error=false) {
   const hint=document.getElementById('voice-help');hint.hidden=false;hint.textContent=text;hint.classList.toggle('error',error);
+  document.getElementById('composer-help').open=true;
 }
 
 function resetVoiceButton() {
@@ -832,7 +839,7 @@ function resetConversation({focus=true,force=false}={}) {
   welcomeMessage();document.getElementById('starter-prompts').hidden=false;
   document.getElementById('request-input').value='';resizeInput();renderSnapshot();updateCapabilities();
   document.getElementById('conversation-status').textContent='새 가상 사례로 대화를 시작합니다.';
-  document.getElementById('voice-help').hidden=true;
+  clearInputFeedback();
   if(focus){setWorkspaceView('chat');document.getElementById('request-input').focus({preventScroll:true});}
   return true;
 }
@@ -896,8 +903,8 @@ function mount() {
           </header>
           <div class="mobile-case-summary" id="mobile-case-summary" aria-label="이번 방문 요약" hidden></div>
           <div class="workspace-controls">
-            <div class="workspace-tabs" role="tablist" aria-label="작업 영역"><button type="button" id="workspace-tab-chat" role="tab" aria-controls="chat-workspace" aria-selected="true">대화</button><button type="button" id="workspace-tab-preparation" role="tab" aria-controls="preparation-rail" aria-selected="false" tabindex="-1">준비 현황</button></div>
-            <div class="workspace-tools"><button type="button" class="expand-answer" id="expand-answer" aria-label="넓게 읽기" title="넓게 읽기" aria-haspopup="dialog" aria-controls="answer-dialog" disabled>${icon('expand')}<span>넓게 읽기</span></button><button type="button" id="preview-button" class="preview-button">예시 보기${icon('chevron')}</button></div>
+            <div class="workspace-tabs" role="tablist" aria-label="작업 영역"><button type="button" id="workspace-tab-chat" role="tab" aria-controls="chat-workspace" aria-selected="true">대화</button><button type="button" id="workspace-tab-preparation" role="tab" aria-controls="preparation-rail" aria-selected="false" aria-label="준비 현황" title="준비 현황" tabindex="-1">준비</button></div>
+            <div class="workspace-tools"><button type="button" class="expand-answer" id="expand-answer" aria-label="넓게 읽기" title="넓게 읽기" aria-haspopup="dialog" aria-controls="answer-dialog" disabled>${icon('expand')}<span>넓게 읽기</span></button><button type="button" id="preview-button" class="preview-button" aria-label="예시 보기" title="예시 보기">예시${icon('chevron')}</button></div>
           </div>
           <div class="conversation-layout" data-active-view="chat">
             <section class="chat-workspace" id="chat-workspace" role="tabpanel" aria-label="진료 준비 대화">${chatContent}</section>
@@ -912,19 +919,15 @@ function mount() {
             </aside></details>
             </aside>
             <div class="chat-composer" id="chat-composer">
-              <div id="answer-ready-notice" class="answer-ready-notice" hidden><button type="button" data-open-stage="plan">새 답변이 도착했어요. 대화에서 보기${icon('arrow')}</button></div>
-              <div id="request-problem-notice" class="request-problem-notice" hidden><button type="button">요청 결과를 확인해 주세요. 대화에서 보기${icon('arrow')}</button></div>
-              <div class="pending-message" id="pending-message" hidden><div class="pending-summary"><span class="working-mark"></span><p class="board-activity" id="board-activity" role="status" aria-live="polite"></p></div><button type="button" id="cancel-request" class="cancel-request">응답 대기 중지</button></div>
               <form id="conversation-form" class="conversation-form" aria-busy="false">
                 <label for="request-input" class="visually-hidden">진료 준비 요청</label>
-                <textarea id="request-input" name="message" rows="2" maxlength="${MAX_MESSAGE}" placeholder="예: 어머니 진료 자료와 이동·동행을 준비해줘." autocomplete="off" aria-describedby="composer-disclosure privacy-note voice-help" required></textarea>
-                <div class="composer-actions"><button type="button" id="voice-request" class="voice-button" aria-label="음성으로 요청하기" aria-pressed="false" aria-describedby="voice-help" ${SpeechRecognition?'':'disabled'}>${micIcon}<span>말로 요청</span></button><span class="keyboard-hint">Enter로 전송 · Shift+Enter 줄바꿈</span><span class="character-count" id="character-count">0/${MAX_MESSAGE}</span><button type="submit" class="send-button" id="send-request" aria-label="요청 보내기" disabled>${icon('arrow')}<span>보내기</span></button></div>
+                <textarea id="request-input" name="message" rows="2" maxlength="${MAX_MESSAGE}" placeholder="예: 어머니 진료 자료와 이동·동행을 준비해줘." autocomplete="off" aria-describedby="composer-disclosure composer-boundary privacy-note voice-help" required></textarea>
+                <div class="composer-actions"><button type="button" id="voice-request" class="voice-button" aria-label="음성으로 요청하기" aria-pressed="false" aria-describedby="voice-help" ${SpeechRecognition?'':'disabled'}>${micIcon}<span>말로 요청</span></button><span class="keyboard-hint">Enter로 전송 · Shift+Enter 줄바꿈</span><span class="character-count" id="character-count">0/${MAX_MESSAGE}</span><div id="answer-ready-notice" class="answer-ready-notice" hidden><button type="button" data-open-stage="plan" aria-label="새 답변이 도착했어요. 대화에서 보기" title="새 답변이 도착했어요. 대화에서 보기">새 답변</button></div><div id="request-problem-notice" class="request-problem-notice" hidden><button type="button" aria-label="요청 결과를 확인해 주세요. 대화에서 보기" title="요청 결과를 확인해 주세요. 대화에서 보기">오류 보기</button></div><div class="pending-message" id="pending-message" hidden><button type="button" id="cancel-request" class="cancel-request" aria-label="응답 대기 중지" title="응답 대기 중지"><span class="working-mark" aria-hidden="true"></span>중지</button></div><button type="submit" class="send-button" id="send-request" aria-label="요청 보내기" title="요청 보내기" disabled>${icon('arrow')}<span>보내기</span></button></div>
               </form>
-              <p class="voice-help" id="voice-help" role="status" hidden></p>
-              <div class="composer-notes"><p class="composer-disclosure" id="composer-disclosure">${icon('info')}가상 사례 · 실제 연락·예약 없음</p>
+              <div class="composer-notes"><p class="composer-disclosure" id="composer-disclosure">${icon('info')}시연 · 실행 없음</p>
                 <div class="composer-extras">
-                  <details class="request-examples" id="request-examples"><summary>요청 예시${icon('chevron')}</summary><div class="starter-prompts composer-detail-body" id="starter-prompts"><p>이렇게 요청해 보세요</p><button type="button" data-example="저는 동행이 어려워요. 자료와 이동도 준비해 주세요."><span>저는 동행이 어려워요. 자료와 이동도 준비해 주세요.</span>${icon('arrow')}</button><button type="button" class="secondary-prompt" data-example="어머니가 휠체어를 이용하세요. 무엇을 확인해야 할까요?"><span>어머니가 휠체어를 이용하세요. 무엇을 확인해야 할까요?</span>${icon('arrow')}</button></div></details>
-                  <details class="composer-help" id="composer-help"><summary aria-label="개인정보 입력 금지 안내">개인정보 입력 금지${icon('chevron')}</summary><div class="composer-detail-body"><p>${SpeechRecognition?'음성은 인식한 내용을 확인한 뒤 보내요.':'음성 미지원 브라우저예요. 텍스트로 요청해 주세요.'}</p><p class="privacy-note" id="privacy-note">주민번호·인증정보·실제 의료기록 입력 금지 · 대화는 새로고침하면 사라져요.</p><p class="pending-note">이 화면의 대기만 중지해요. 서버 처리는 계속될 수 있습니다.</p></div></details>
+                  <details class="request-examples" id="request-examples"><summary aria-label="요청 예시" title="요청 예시">예시${icon('chevron')}</summary><div class="starter-prompts composer-detail-body" id="starter-prompts"><p>이렇게 요청해 보세요</p><button type="button" data-example="저는 동행이 어려워요. 자료와 이동도 준비해 주세요."><span>저는 동행이 어려워요. 자료와 이동도 준비해 주세요.</span>${icon('arrow')}</button><button type="button" class="secondary-prompt" data-example="어머니가 휠체어를 이용하세요. 무엇을 확인해야 할까요?"><span>어머니가 휠체어를 이용하세요. 무엇을 확인해야 할까요?</span>${icon('arrow')}</button></div></details>
+                  <details class="composer-help" id="composer-help"><summary aria-label="개인정보 입력 금지 안내" title="개인정보 입력 금지 안내">안내${icon('chevron')}</summary><div class="composer-detail-body"><p class="voice-help" id="voice-help" role="status" hidden></p><p id="composer-boundary">가상 사례 · 실제 연락·예약 없음</p><p class="board-activity" id="board-activity" role="status" aria-live="polite" hidden></p><p>${SpeechRecognition?'음성은 인식한 내용을 확인한 뒤 보내요.':'음성 미지원 브라우저예요. 텍스트로 요청해 주세요.'}</p><p class="privacy-note" id="privacy-note">주민번호·인증정보·실제 의료기록 입력 금지 · 대화는 새로고침하면 사라져요.</p><p class="pending-note">이 화면의 대기만 중지해요. 서버 처리는 계속될 수 있습니다.</p></div></details>
                 </div>
               </div>
             </div>
@@ -960,7 +963,7 @@ function mount() {
   welcomeMessage();renderSnapshot();updateCapabilities();
   const form=document.getElementById('conversation-form'),input=document.getElementById('request-input');
   form.addEventListener('submit',event=>{event.preventDefault();if(!composing)sendRequest();});
-  input.addEventListener('input',resizeInput);
+  input.addEventListener('input',()=>{if(!activeRecognition)clearInputFeedback();resizeInput();});
   input.addEventListener('compositionstart',()=>{composing=true;});input.addEventListener('compositionend',()=>{composing=false;resizeInput();});
   input.addEventListener('keydown',event=>{if(event.key==='Enter' && !event.shiftKey && !event.isComposing && !composing && event.keyCode!==229){event.preventDefault();if(!pending)sendRequest();}});
   document.getElementById('voice-request').addEventListener('click',startVoice);

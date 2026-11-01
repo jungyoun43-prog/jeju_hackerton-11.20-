@@ -52,7 +52,7 @@ export function renderPreparationBoard(board,{unreadAnswer=false,progress=null}=
   boardNode.dataset.pending=String(board.pending);
   const activity=document.getElementById('board-activity');
   activity.hidden=!board.pending;activity.textContent=board.overallLabel;
-  document.getElementById('answer-ready-notice').hidden=!unreadAnswer;
+  document.getElementById('answer-ready-notice').hidden=board.pending || !unreadAnswer;
   document.getElementById('expand-answer').disabled=!board.hasResponse;
   for(const stage of board.stages) {
     const pane=document.querySelector(`[data-stage-id="${stage.id}"]`);
