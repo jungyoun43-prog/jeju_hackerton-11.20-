@@ -2,6 +2,7 @@ import { readFile, writeFile, mkdir, access } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createHash } from 'node:crypto';
 import { scanProject, sourceFiles, runtimeFingerprint } from './checks.mjs';
 
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
@@ -14,7 +15,10 @@ const checks=[];
 const git=(...args)=>execFileSync('git',args,{cwd:root,encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();
 async function check(id, rule, run) {
  try { const evidence=await run(); checks.push({id,rule,status:'pass',evidence}); }
- catch(error) { checks.push({id,rule,status:'fail',evidence:error.message.slice(0,2200)}); }
+ catch(error) {
+  const tests=String(error.stdout || '').split('\n').filter(line=>/^not ok |^# (tests|pass|fail) /.test(line)).join('\n');
+  checks.push({id,rule,status:'fail',evidence:(tests ? tests+'\n'+error.message : error.message).slice(0,2200)});
+ }
 }
 const requireThat=(value,message)=>{if(!value) throw new Error(message);};
 await check('worktree-isolation','isolation',()=>{
@@ -78,7 +82,18 @@ await check('visit-support-data-boundary','provenance',async()=>{
  requireThat(getSupportCandidates(registry,{kind:'taxi',area:'제주시 애월읍'})[0]?.name==='애월콜','출발 지역이 실제 후보를 바꿔야 합니다.');
  requireThat(getSupportCandidates(registry,{kind:'taxi',area:'제주시 애월읍',wheelchair:true})[0]?.serviceType==='accessible_transport','휠체어 요청은 별도 차량·자격 문의 경로로 이어져야 합니다.');
  requireThat(registry.providers.filter(p=>p.source.scope==='official-service-page').length===2,'공식 서비스2건을 허브 자료와 구분합니다.');
- return '허브계보3종·택시최신34/돌봄과거19/공식보완2·지역/휠체어 분기 확인 (실제 배차·동행 가능 확인 아님)';
+ return '지원 자료의 택시최신34/돌봄과거19/공식보완2·지역/휠체어 분기 확인 (실제 배차·동행 가능 확인 아님)';
+});
+await check('public-health-contact-data-boundary','provenance',async()=>{
+ const {validatePublicHealthSnapshot,getPublicHealthContacts}=await import('../app/public-health-data.js');
+ const snapshot=validatePublicHealthSnapshot(JSON.parse(await readFile(resolve(root,'app/data/public-health-contacts.json'),'utf8')));
+ requireThat(snapshot.dataset.id==='1304' && snapshot.dataset.rowCount===35 && snapshot.dataset.asOf==='2026-03-23','제주시 공식 연결파일35행과 기준일을 확인해야 합니다.');
+ requireThat(snapshot.dataset.fileSha256==='e2ac77a972f8cde38ee4cfb46c149f9f495fe5739eff0d8343563ddb93aab510','재취득한 파일의 출처 해시를 보존해야 합니다.');
+ requireThat(getPublicHealthContacts(snapshot,'제주시 애월읍').some(item=>item.phone==='064-728-1514') && getPublicHealthContacts(snapshot,'제주시 조천읍').some(item=>item.phone==='064-728-1516'),'관할에 따라 실제 문의처가 달라져야 합니다.');
+ const {analyzePublicData}=await import('../app/public-data-skill.js');
+ const outside=analyzePublicData({analysis:'public_health_contacts',area:'서귀포시'});
+ requireThat(outside.status==='unavailable' && outside.metrics[0].value===null,'제주시 자료 밖의 지역을 기관0개로 단정하면 안 됩니다.');
+ return '허브 계보4종 중1304의35개 등록 문의처·관할 분기·범위 밖null 확인. 현재 운영·진료 수용의 검증 아님';
 });
 await check('secret-pattern-scan','privacy',async()=>{
  const findings=await scanProject(root);
@@ -143,6 +158,81 @@ await check('preparation-board-browser-evidence','verification',async()=>{
  for(const view of proof.viewports){const bytes=await readFile(resolve(root,view.screenshot));requireThat(bytes.readUInt32BE(0)===0x89504e47,'읽기 UI PNG 증거가 필요합니다.');}
  return `${proof.checks.length}개 한 화면 작업 공간·공통 입력·공유 스크롤·준비 요약·기호/아이콘·실제 keyless 진행 API·진행/취소 fixture와10개 가용 CSS 크기. 실제 browser zoom·기기·모델/DDB는 별도증거.`;
 });
+await check('actual-model-task-evidence','verification',async()=>{
+ const proof=JSON.parse(await readFile(resolve(root,'orchestration/runs/agent-evaluation.json'),'utf8'));
+ const {AGENT_EVAL_CASES}=await import('../scripts/agent-eval-cases.mjs');
+ const definitionHash=createHash('sha256').update(await readFile(resolve(root,'scripts/evaluate-agent.mjs'))).update(await readFile(resolve(root,'scripts/agent-eval-cases.mjs'))).digest('hex');
+ requireThat(proof.result==='pass' && proof.mode==='local-model' && proof.model==='gpt-6.1-sol' && proof.actualModelRequests>0,'실제 Sol 과업 실행 증거가 필요합니다.');
+ const currentSourceHash=await runtimeFingerprint(root),changedRuntimeFiles=[];
+ requireThat(proof.finalSourceHash===proof.sourceHash && proof.definitionHash===definitionHash && proof.finalDefinitionHash===definitionHash,'실행 중 소스 또는 평가 정의가 바뀌었습니다.');
+ if(proof.sourceHash!==currentSourceHash){
+  requireThat(/^[a-f0-9]{40}$/.test(proof.revision),'실제 모델 증거의 고정 커밋이 필요합니다.');
+  const runtimePath=path=>path.startsWith('app/') || path.startsWith('agent/') || path.startsWith('prompts/') || ['scripts/server.mjs','package.json','package-lock.json'].includes(path);
+  const currentPaths=(await sourceFiles(root)).filter(runtimePath).sort();
+  const previousPaths=git('ls-tree','-r','--name-only',proof.revision).split('\n').filter(runtimePath).sort();
+  requireThat(JSON.stringify(currentPaths)===JSON.stringify(previousPaths),'모델 실행 이후 런타임 파일 구성이 바뀌었습니다.');
+  const previousHash=createHash('sha256');
+  for(const path of currentPaths){
+   const oldBytes=execFileSync('git',['show',`${proof.revision}:${path}`],{cwd:root,maxBuffer:32*1024*1024});
+   previousHash.update(path+'\0');previousHash.update(oldBytes);
+   if(!oldBytes.equals(await readFile(resolve(root,path))))changedRuntimeFiles.push(path);
+  }
+  requireThat(previousHash.digest('hex')===proof.sourceHash,'원래 모델 실행 커밋과 증거의 지문이 다릅니다.');
+  requireThat(changedRuntimeFiles.length>0 && changedRuntimeFiles.every(path=>path==='app/conversation.js'),'모델/도구/데이터 코드가 바뀌어 실제 모델 재평가가 필요합니다.');
+  const audit=JSON.parse(await readFile(resolve(root,'orchestration/runs/ui-only-scope-compare.json'),'utf8'));
+  requireThat(audit.oldRevision===proof.revision && audit.baselineSourceHash===proof.sourceHash && audit.currentSourceHash===currentSourceHash && audit.finalSourceHash===currentSourceHash && audit.runtimePathsEqual===true && audit.modelCalls===0 && audit.sourceEdits===0,'같은 UI 변경의 독립 코드 비교가 필요합니다.');
+  requireThat(audit.changedRuntimeFiles.length===changedRuntimeFiles.length && audit.changedRuntimeFiles.every(file=>changedRuntimeFiles.includes(file.path) && file.newSha256===createHash('sha256').update(execFileSync('git',['show',`HEAD:${file.path}`],{cwd:root})).digest('hex')),'독립 검토 이후 UI 파일이 바뀌었습니다.');
+ }
+ requireThat(proof.cases.length===AGENT_EVAL_CASES.length && AGENT_EVAL_CASES.every(task=>proof.cases.some(item=>item.id===task.id && item.pass && item.checks.every(check=>check.pass) && item.recovery?.stateMatches===true && item.recovery?.requestStatus==='completed')),'필수 과업·상태 검사와 실제 읽기 복구가 모두 필요합니다.');
+ requireThat(proof.actualCallsPlaced===false && proof.realRecordsConnected===false && proof.semanticReview==='required-separately','합성 과업을 실제 기관/기록·의미 검토 완료로 확장하지 않습니다.');
+ const reviewBytes=await readFile(resolve(root,'orchestration/runs/agent-semantic-review.json'));
+ const review=JSON.parse(reviewBytes);
+ requireThat(review.result==='pass' && review.sourceHash===proof.sourceHash && review.definitionHash===definitionHash && review.reviewerModelCalls===0 && review.sourceEdits===0,'동일 결과의 읽기 전용 독립 의미 검토가 필요합니다.');
+ requireThat(review.evidenceSha256===createHash('sha256').update(await readFile(resolve(root,'orchestration/runs/agent-evaluation.json'))).digest('hex') && review.reviewedCases.length===proof.cases.length && proof.cases.every(item=>review.reviewedCases.some(c=>c.id===item.id && c.result==='pass')),'독립 검토는 현재 실제 응답과 모든 과업을 대조해야 합니다.');
+ const scope={checkedAt:new Date().toISOString(),result:'pass',sourceHash:currentSourceHash,modelEvidenceSourceHash:proof.sourceHash,modelEvidenceRevision:proof.revision,modelEvidenceSha256:review.evidenceSha256,changedRuntimeFiles,modelToolDataCodeUnchanged:true,modelReinvokedForUiOnlyChange:false,scope:'실제 모델 결과는 원래 실행 지문으로 보존. 이후 conversation.js의 브라우저 읽기 위치 처리만 바뀐 경우 전체 런타임 파일을 Git 바이트 대조한다. 최신 UI/HTTP 검증은 별도 현재 지문 증거.'};
+ await writeFile(resolve(root,'orchestration/runs/agent-evaluation-scope.json'),JSON.stringify(scope,null,2)+'\n');
+ return `${proof.cases.length}개 고정 합성 과업·실제 Responses ${proof.actualModelRequests}회·정규 상태/복구·독립 답변 검토. 이후 UI 변경${changedRuntimeFiles.length}개와 모델/도구/데이터 불변은 Git 대조. 임상/실사용/일반 성능 검증은 아님`;
+});
+await check('visit-recovery-browser-evidence','verification',async()=>{
+ const proof=JSON.parse(await readFile(resolve(root,'orchestration/runs/visit-recovery-browser.json'),'utf8'));
+ requireThat(proof.result==='pass' && proof.errors.length===0 && proof.checks.length>=1 && proof.checks.every(item=>item.status==='pass'),'방문 복구 UI 검사가 필요합니다.');
+ requireThat(proof.sourceHash===await runtimeFingerprint(root) && proof.finalSourceHash===proof.sourceHash,'방문 복구 UI의 실행 지문이 다릅니다.');
+ requireThat(proof.modelInvoked===false && proof.phoneInvoked===false && proof.recordsQueried===false && proof.unmockedModelPosts===0 && proof.actualFixedPreviews===1,'복구 UI fixture와 실제 keyless preview 범위를 구분합니다.');
+ requireThat(proof.viewports.length===10 && proof.viewports.every(view=>view.viewportFit && view.sharedComposer && view.scrollRegions && view.compactPanels),'복구 안내의 가용 크기10종·초안·공통 입력 검사가 필요합니다.');
+ for(const view of proof.viewports){const bytes=await readFile(resolve(root,view.screenshot));requireThat(bytes.readUInt32BE(0)===0x89504e47,'복구 UI PNG 증거가 필요합니다.');}
+ return `${proof.checks.length}개 실제 정적 UI/응답 fixture·실패/만료/late·입력/초점/읽기 보존. 실제 서비스 통합은 별도 증거`;
+});
+await check('proposal-pdf-evidence','verification',async()=>{
+ const proof=JSON.parse(await readFile(resolve(root,'orchestration/runs/proposal-pdf.json'),'utf8'));
+ const pdf=await readFile(resolve(root,'docs/submission-proposal.pdf'));
+ const info=execFileSync('pdfinfo',[resolve(root,'docs/submission-proposal.pdf')],{encoding:'utf8'});
+ requireThat(proof.result==='pass' && proof.sourceHash===await runtimeFingerprint(root) && proof.pages===12 && Number(info.match(/^Pages:\s+(\d+)/m)?.[1])===12 && proof.screenshotIncluded===true,'같은 구현과 실제 캡처를 포함한12페이지 기획서가 필요합니다.');
+ requireThat(proof.pdfHash===createHash('sha256').update(pdf).digest('hex') && pdf.subarray(0,5).toString()==='%PDF-','기획서 PDF 바이트와 기록이 다릅니다.');
+ return '실제 PDF12페이지·동일 실행 지문의 PC 캡처·파일 SHA 확인. 권리 최종 검토/영상/대회 업로드/센터 실기기와 구분';
+});
+await check('visit-recovery-http-integration-evidence','verification',async()=>{
+ const proof=JSON.parse(await readFile(resolve(root,'orchestration/runs/visit-recovery-integration.json'),'utf8'));
+ requireThat(proof.result==='pass' && proof.errors.length===0 && proof.checks.length>0 && proof.checks.every(item=>item.status==='pass'),'실제 HTTP 응답 유실·복구 통합 검사가 필요합니다.');
+ requireThat(proof.sourceHash===await runtimeFingerprint(root) && proof.finalSourceHash===proof.sourceHash,'통합 HTTP/UI의 실행 지문이 다릅니다.');
+ requireThat(proof.modelInvoked===false && proof.realModelCalls===0 && proof.realAwsCalls===0 && proof.externalHttpAttempts===0 && proof.fixtureProviderRespondCalls>0 && proof.actualHttpPostCounts.agent>0 && proof.actualHttpPostCounts.resume>0,'실제 HTTP/서비스와 고정 provider fixture를 구분합니다.');
+ const fields=['completedResponseLost','sameTokenRestored','transcriptNotReplayed','actualResumeReadOnly','firstRequestReplayedWithoutEffects','bodyConflictRejected','nextRequestChangedVisit','draftPreserved','identifiersAbsent'];
+ requireThat(proof.viewports.length===2 && [1440,390].every(width=>proof.viewports.some(view=>view.width===width)) && proof.viewports.every(view=>fields.every(field=>view[field]===true)),'PC/모바일 응답 유실→복구→중복/409→후속 변경을 확인해야 합니다.');
+ requireThat(proof.staticFiles.length>0 && proof.staticFiles.every(item=>item.matches===true),'실제 제공한 정적 모듈 바이트 대조가 필요합니다.');
+ for(const view of proof.viewports)for(const path of view.screenshots){const bytes=await readFile(resolve(root,path));requireThat(bytes.readUInt32BE(0)===0x89504e47,'통합 복구 PNG 증거가 필요합니다.');}
+ return `${proof.checks.length}개 실제 HTTP/현재 서비스·저장소·dispatcher/UI 통합. provider fixture만 사용하며 실모델/AWS 지속성/전화 증거와 구분`;
+});
+await check('native-tab-zoom-browser-evidence','verification',async()=>{
+ const proof=JSON.parse(await readFile(resolve(root,'orchestration/runs/native-zoom-browser.json'),'utf8'));
+ requireThat(proof.result==='pass' && proof.errors.length===0 && proof.checks.length>0 && proof.checks.every(item=>item.status==='pass'),'실제 탭 확대·읽기/초안/초점 보존 검사가 필요합니다.');
+ requireThat(proof.sourceHash===await runtimeFingerprint(root) && proof.finalSourceHash===proof.sourceHash,'실제 확대 검사의 소스 지문이 다릅니다.');
+ requireThat(proof.zoomMethod?.playwrightViewport===null && /setZoom/.test(proof.zoomMethod.api),'CSS 크기 에뮬레이션과 실제 MV3 탭 확대를 구분해야 합니다.');
+ requireThat(proof.zoomScenarios.length===5 && [.8,1,1.25,1.5,2].every(zoom=>proof.zoomScenarios.some(view=>view.requestedZoom===zoom && Math.abs(view.actualZoom-zoom)<.01 && Math.abs(view.dpr-zoom)<.01)),'80/100/125/150/200% 실제 getZoom·DPR 관측이 필요합니다.');
+ requireThat(proof.zoomScenarios.every(view=>view.rootZoom==='1' && view.bodyTransform==='none' && view.viewportFit && view.noOverflow && view.sharedComposer && view.scrollRegions && view.compactPanels && view.targets44),'확대를 CSS 축소로 상쇄하거나 입력/읽기 접근을 제거하면 안 됩니다.');
+ requireThat(proof.normalModelPostAttempts===0 && proof.otherPostAttempts===0 && proof.modelInvoked===false && proof.fixtureResponses===false && proof.fixedPreviewRequests>0,'실제 keyless preview와 GET·native 확대만 사용하는 범위를 지켜야 합니다.');
+ requireThat(proof.cleanup?.contextClosed && proof.cleanup?.xvfbStopped && proof.cleanup?.temporaryProfileRemoved,'격리 브라우저·화면·임시 프로필 정리가 필요합니다.');
+ for(const view of proof.zoomScenarios){const bytes=await readFile(resolve(root,view.screenshot));requireThat(bytes.readUInt32BE(0)===0x89504e47,'실제 native 확대 PNG 캡처가 필요합니다.');}
+ return `${proof.checks.length}개 격리 Chromium/Xvfb·MV3 탭 확대와 초안/출처 읽기/고지 확인. 툴바 직접조작·실제 휴대폰/하드웨어 검증은 아님`;
+});
 await check('rollback-boundary','rollback',()=>{
  for(const task of rules.tasks) {
   const integrated=state.tasks[task.id].integrationCommits;
@@ -153,7 +243,7 @@ await check('rollback-boundary','rollback',()=>{
 });
 const passed=checks.filter(c=>c.status==='pass').length;
 const result={evaluatedAt:new Date().toISOString(),commit:git('rev-parse','HEAD'),automated:{passed,total:checks.length,rate:Math.round(passed/checks.length*1000)/10},checks,
- manualUnverified:['전체 운영 데이터 API·최신성·전체 원자료 재배포 조건 (허브계보3종 최소 사실은 실제 사용)','실제 전화·기관 접수·공단 기록 연계·의료진 참여','OpenAI Sol 단일 도구 실호출 외 복합 요청·Terra·모델 품질 및 실제 마이크 인식 (공개 Sol/DB 검증은 별도 증거)','임상 유효성·실서비스 개인정보 처리·정책 검토','기획서 최종 PDF 15페이지 이내 및 센터 실기기 실행'],submissionReady:false};
+ manualUnverified:['전체 운영 데이터 API·최신성·전체 원자료 재배포 조건 (허브계보4종 최소 사실은 실제 사용)','실제 전화·기관 접수·공단 기록 연계·의료진 참여','Terra·일반 과업 품질·실제 휴대폰 키보드/마이크·보호자 참여 평가 (Sol12개 합성 과업과 별도)','임상 유효성·실서비스 개인정보 처리·정책 검토','최종 공지/발표·영상/권리 확인·대회 업로드 및 센터 실기기 실행'],submissionReady:false};
 await mkdir(resolve(root,'orchestration/runs'),{recursive:true});
 await writeFile(resolve(root,'orchestration/runs/latest-eval.json'),JSON.stringify(result,null,2)+'\n');
 for(const item of checks) console.log(`${item.status==='pass'?'PASS':'FAIL'} ${item.id} · ${item.evidence}`);

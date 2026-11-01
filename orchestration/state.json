@@ -1,6 +1,6 @@
 {
   "baseCommit": "e1e7e44",
-  "updatedAt": "2026-11-01T12:26:53.267209+00:00",
+  "updatedAt": "2026-11-01T13:57:32.778256+00:00",
   "tasks": {
     "ui": {
       "phase": "verified",
@@ -482,34 +482,43 @@
       "note": "079b760/bf0307f/70b2d9e 통합. d1c68ae5 동일소스에서legacy47·con189·journey236·board359 전체pass/프로세스0·errors[]. 10크기/33workspace/4motion통과. con실HTTPagent6/preview3·초기미연결2·실모델0구분. 최초download/경계/leading실패·측정/대상증거보존. 전용worktree clean."
     },
     "recovery-backend": {
-      "phase": "implementing",
+      "phase": "verified",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261101-recovery-backend",
-      "integrationCommits": [],
-      "note": "docs/reliable-visit-contract.md 기준;전용worktree분리·현재구현과미연동경계보존"
+      "integrationCommits": [
+        "4f965808d4f792eeee39cf984dfb317d61c07b51",
+        "e13a738d3db3cc4dfe52e6ec8a391558a8766c51"
+      ],
+      "note": "토큰/receipt·resume·SDKbudget재시도1·만료 통합. backend389/389·독립118/118·root실제HTTP32/32. native가아닌provider만fixture·외부0. 실제AWS복구는최종공개증거기준."
     },
     "recovery-ui": {
-      "phase": "implementing",
+      "phase": "verified",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261101-recovery-ui",
-      "integrationCommits": [],
-      "note": "docs/reliable-visit-contract.md 기준;전용worktree분리·현재구현과미연동경계보존"
+      "integrationCommits": [
+        "306b4f4",
+        "fe0983e4c100fedf3ee9c84dabc8d37ae1441502",
+        "3c87a6800bd175256738574d5f593fa6237cc147"
+      ],
+      "note": "이어하기68/68·전체대화189/189·실제native확대42/42. UI27추가1삭제/CSS0. 실제시계/가시성/왕복QA보완뒤보드359/359. 현db4지문. physical/실한글/마이크는별도."
     },
     "data-reliability": {
-      "phase": "implementing",
+      "phase": "verified",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261101-reliable-data",
-      "integrationCommits": [],
-      "note": "docs/reliable-visit-contract.md 기준;전용worktree분리·현재구현과미연동경계보존"
+      "integrationCommits": [
+        "3e732f2"
+      ],
+      "note": "1304 공식CSV35행 재취득·관할우선공공보건문의·범위밖null·45/45. 실제Sol해당과업+독립답변검토pass. 허브계보4종/공식안내2건/카탈로그1329 구분."
     }
   },
   "review": {
     "phase": "verified",
-    "role": "한 화면 작업 공간의 독립 사용 흐름·출처/focus/안내 키보드 검토와 root 통합 렌더/브라우저 대조",
+    "role": "서버 독립 결함 재현·실제Sol12답변 의미 검토·UI-only 범위/12페이지 문서 검토·실제HTTP/확대 대조",
     "findings": [
-      "초기720x450 footer누적으로준비20px·큰글자24px축소를발견해50cb00d로수정",
-      "동결d1c에서복합큰글자32px·공통163px입력/44px보내기·읽기92/142/142px와전체안내키보드끝도달",
-      "반응형왕복같은출처DOM/focus/rail379→379·위치392.6875px유지",
-      "선택권고:720x450큰글자에서읽기공간92px는좁아보조도구행합침/실사용성후속검토"
+      "판독문 미보유 정정 도구 누락과 합성 상황 실행 gate의 false-negative 수정",
+      "DynamoDB budget의 SDK 비멱등 재시도와 메모리 busy 만료 반환을 독립 재현 후 수정",
+      "실제 native 확대에서 출처 위치 이탈/EOF caret 가림을 기존 읽기 보존으로 보완",
+      "최종42 native 확대검사 통과. 과도한 병렬 브라우저 QA timeout은 별도 보존하고 작업수를 줄여 영향 검사 진행"
     ],
-    "resolution": "네로컬suite47/189/236/359 pass/종료0·errors[]·동일d1c, 10viewport/33workspace/4motion true. 독립범위새차단0. 실제browserzoomUI·실기기/키보드·다른브라우저/스크린리더·실모델/기관/전화/기록/의료법률과구분. 단위360/360·자동규칙69/69도종료0. 현재CI·공개배포는최신runs를따른다."
+    "resolution": "root최종db4에서수동47/대화189/여정236/보드359/이어하기68/실HTTP32/native42 모두pass·종료0·errors[]. Sol12/91검사/46Responses+독립의미검토는963/0544원실행귀속, 이후conversation.js27추가1삭제만Git/독립SHA대조. 전체단위/자동규칙·최종공개/CI/ZIP은최신runs결과기준. 실환자/전화/기록/임상/보호자·실기기/센터PC별도. 최종단위409/409·자동규칙78/78 종료0."
   },
   "awsDeployment": {
     "phase": "verified",

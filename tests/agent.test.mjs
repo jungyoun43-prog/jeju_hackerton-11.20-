@@ -179,8 +179,8 @@ test('도구는 실제 발신 어댑터를 거절하고 전화 위임을 우회�
 
 test('get_case는 기존 도구와 새 여정·인계 도구를 함께 제공하고 작은 전화 준비 요약을 유지한다',async () => {
   const {data,state} = await createToolDispatcher()({name:'get_case',input:{},state:createDemoCase()});
-  assert.equal(AGENT_TOOLS.length,17);
-  for(const name of ['get_case','update_visit','request_hospital_contact','request_support_contact','get_care_journey','run_journey_demo','update_call_retry_policy','run_call_recovery_demo','search_public_data','analyze_public_data']) assert.ok(AGENT_TOOLS.some(tool=>tool.name===name));
+  assert.equal(AGENT_TOOLS.length,18);
+  for(const name of ['get_case','update_visit','mark_document_missing','request_hospital_contact','request_support_contact','get_care_journey','run_journey_demo','update_call_retry_policy','run_call_recovery_demo','search_public_data','analyze_public_data']) assert.ok(AGENT_TOOLS.some(tool=>tool.name===name));
   assert.deepEqual(data.callPlans.map(plan => plan.target),['mainland','jeju','taxi','companion']);
   assert.ok(JSON.stringify(data.callPlans).length < 1800);
   for (const plan of data.callPlans) {

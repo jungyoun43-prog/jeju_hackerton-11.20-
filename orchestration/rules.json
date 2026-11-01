@@ -666,7 +666,8 @@
         "app/conversation.js",
         "app/conversation.css",
         "scripts/conversation-browser-check.mjs",
-        "scripts/visit-recovery-browser-check.mjs"
+        "scripts/visit-recovery-browser-check.mjs",
+        "scripts/preparation-board-browser-check.mjs"
       ]
     },
     {

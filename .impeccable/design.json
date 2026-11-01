@@ -482,5 +482,11 @@
       "mavenclinic.com"
     ],
     "limits": "공개 페이지와 공개 제품 이미지 관측. 로그인 서비스 내부는 미확인."
+  },
+  "visitRecovery": {
+    "contract": "docs/reliable-visit-contract.md",
+    "presentation": "기존 대화 스크롤의 정적 안내·방문 상세의 읽기 복구. 과거 답변 재생이나 새 큰 헤더 없음. 기존 CSS·색·공통 입력·읽기 초점을 유지.",
+    "evidence": "orchestration/runs/visit-recovery-browser.json",
+    "nativeZoomEvidence": "orchestration/runs/native-zoom-browser.json"
   }
 }

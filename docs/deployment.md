@@ -89,7 +89,9 @@ production environment는 main만 허용한다. CI 역할은 전용 S3·CloudFro
 
 DynamoDB는 합성 준비 상태 TTL1시간, 강한 읽기·65초 lease 소유권·조건부 저장을 사용한다. 실제 TTL 삭제가 늦어져도 앱이 만료 항목을 거절한다. UTC 날짜 budget 항목의 조건부 ADD로 하루80개 요청을 모델 호출 전에 차감하고 실패도 차감한다. 요청 내부 Responses는 최대8회라서 API 호출80회·원화 비용 상한을 뜻하지 않는다. DB 실패는 모델 실행 전 안전한 오류로 처리한다.
 
-같은 sessionId 안의 requestId 중복은 재실행/재차감하지 않는다. 첫 응답 유실로 sessionId 없이 재시도하면 새 세션과 유료 턴이 생길 수 있다. 실제 발신·예약·결제 전에는 초기 요청까지 포함한 영속 중복 방지가 필요하다. 로컬 메모리 한도는 분산 전역 한도가 아니다.
+새 visitToken 흐름은 첫 요청부터 안정 sessionId와 요청 지문/receipt로 중복 실행·차감을 방지한다. 같은 ID·다른 본문은409, 처리중/실패/완료 receipt는 자동 재실행하지 않는다. 토큰 없는 레거시 API의 sessionId 없는 첫 응답 유실 재시도에는 기존 한계가 남는다. 보장은1시간 유효 세션 범위이며 실제 전화의 실행 보장이 아니다. 로컬 메모리 한도는 분산 전역 한도가 아니다.
+
+`POST /api/agent/resume`는 visitToken으로 저장된 확인 상태·남은 일·처리/완료/중단·확인/만료 시각만 읽는다. Secret/모델/도구/budget/lease/TTL 연장 없이 cold runtime에서도 동작한다. 토큰은 URL·로그·모델·DB 원문에 넣지 않는다. 비멱등 budget ADD의 SDK 내부 재시도로 이중 차감하지 않도록 DynamoDB maxAttempts는1, 읽기 전용 Secret GET은2다. 기존 테이블/IAM/인프라 변경은 없다.
 
 ## 6. 롤백
 
