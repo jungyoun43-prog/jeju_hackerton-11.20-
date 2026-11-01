@@ -364,3 +364,20 @@ QA 서버가 종료된 첫 실행의 마지막 모바일 단계 실패는 전체
 첫 대화 검사에서 초기 인사말을 assistant 답변 수에 포함하던 기존 단언5개가 실패했다. 해당 실행은 소유 TTY에서130으로 중지하고 로그를 보존했다. 실제 답변 `:not(.greeting)`·고유 fixture 원문·요청 본문/ID/SHA 확인으로 단언을 강화해 focused35/35 후 영향받은 대화만 전체 재실행했다. 같은 실행 지문에서 이미 통과한 다른 세 브라우저 검사는 반복하지 않았다. 누락 목록 회귀는 수정 전11통과/1실패, 수정 후12/12였다.
 
 Impeccable detector·slug는 각각 권한 오류126으로 실행되지 않았으므로 발견0건/자동 디자인 합격으로 표시하지 않았다. 직접 브라우저·독립 검토로 보완했으며 실기기·실마이크·Safari/Firefox·스크린리더·실환자/임상·법률·센터 PC·15페이지 PDF/대회 제출은 미검증이다. 이번 UI 수정은 유료 모델을 재호출하지 않는다. 이전9fc11bc의 실제 Sol/DynamoDB 증거는 원래 revision과 지문을 유지한다. 새 공개 고정 preview·소스/revision·첫 화면/그리드 증거는 `preparation-board-deployed.json`·`aws-deployment.json`·`.impeccable/review/task-first/deployed/layout.json`, 독립 ZIP 설치/검사·최종 CRC와 지문은 `release.json`·`output/final-archive-check.json`을 따른다. 배포 검증은 shared stage 모듈이 감사한 화면 표시3곳만 달라졌는지도 대조한다.
+
+
+## 3.14 중앙 채팅·오른쪽 세로4칸과 아이콘
+
+2026-11-01 사용자가2×2를 중앙 채팅과 오른쪽 세로4칸으로 바꾸고 아이콘을 넣도록 요청했다. [현재 화면 계약](chat-rail-contract.md)이 과거 배치보다 우선한다. 두 전용 worktree에서 UI/검사를 분리하고, 격리된 배치 평가 A와 root의 기계/소스 대조 B를 수행한 뒤 구현했다. [같은 A의 구현 후 실제 흐름 재검토](reviews/2026-11-01-chat-rail.md)에서 차단 문제가 없었다. detector는 구현 전후 모두126 Permission denied여서 자동 발견0/디자인 합격으로 설명하지 않는다.
+
+중앙에는 단일 대화·현재/다음 행동→예시→공통 텍스트/음성 입력과 고지를 둔다. 넓게 읽기와 입력 복귀도 중앙에 있다. 오른쪽310px 패널은 요청·자료/병원·협진/이동·동행/방문 계획을 한 열로 보여 준다. 네 제목에 folder/hospital/car/calendar SVG를 재사용하고 기존 ○△×·중립대시/텍스트/의미 색은 유지한다. 전체 답변은 중앙 한 곳에만 있으며 plan은 summary/facts/events다. 네 칸 모두 핵심 요약 뒤 native 자세히 보기를 제공하고 고정 높이·내부Y스크롤은 없다. 900px 이하는 채팅 다음 네 상태를 모두 표시한다. 본문과 입력은 문서 흐름으로 읽고 고정 입력 덮개를 만들지 않았다.
+
+PC1440에서는 중앙810px·오른쪽310px,1060에서는 중앙448px·오른쪽310px로 실제 렌더를 확인했다. 901/900 경계도 UI 담당이 관측했다. 모바일390×844는 입력과 보내기가 첫 화면에 보였고390×500은 문서 스크롤로 접근했다. 별도 A는4viewport에서 실제 keyless preview1건/일반POST0으로 예시·후속 초안의 비발송·입력focus 복귀와 전체 상세/큰 글자 읽기를 확인했다. 실제 환자/휴대폰 사용성 시험과 구분한다.
+
+plan도 이제 오른쪽 정보이므로 이전 selectedStageId===plan의 답변 자동 이동 예외를 제거했다. 실제 fixture에서 새 답변 안내 삽입이 PC의 읽던 summary를54px 밀었다. 기존 출처 위치 보존을10줄 함수로 재사용해 렌더와 응답 전후 같은 focus 노드를 보정했고 PC0px/모바일0.031px로 유지했다. root 통합 검사에서도 같은 노드·초점·펼침·위치±2px와 새 답변 알림을 확인했다. production UI4파일은105줄 추가·88줄 삭제, 아이콘 registry의 새 경로는message/expand2개뿐이다. 의존성·이미지·API·모델·권한/전화/기록 경계와 공통 진행 정규화는 바꾸지 않았다.
+
+최종 실행 지문은 `940234dc34fac2f70709f2aa085fa0ca6f2c2c3622f7f57156abb98c78e25f94`다. 네 브라우저 프로세스는 모두 종료0이고 pass/errors[]·동일sourceHash·준비판finalSourceHash를 별도 검증했다. 수동47/47·대화189/189·여정236/236(실제keyless preview14/일반모델POST0)·준비판229/229다. 준비판은6viewport의 실제 chat/rail 좌표·단일 중앙 답변/입력·4아이콘·4native상세·전체누락·문서 읽기·장문/표/200%글자·취소/late·출처DOM/focus를 포함한다. Lambda bundle 생성도 종료0이다. 단위·서버360/360과 자동 규칙62/62도 종료0이다. 등록 worktree는누적48개이며 이번 개발은2개다. 자동 규칙 수치를 실제 사용자 경험의 합격이나 임상/법률 검증으로 확대하지 않는다.
+
+첫 준비판227/228의 유일 실패는 경계 고지를 예전 plan 답변에서 찾던 단언이었다. 실제 support의5조건은 모두 참이고 oldPlanBoundary만 거짓이었다. 중앙 실제 API reply/공통 고지/false 경계로 옮기고 handoff detail/담당/status/자동반복중단을 강화했다. 부분3preview25/25 뒤 준비판만 전체 재실행했다. 두 번째227/229는 모바일 native 표 키보드 관측2건이었다. mock200ms와 별개로 실제시간20~28ms에는left0, 같은 키가51~66ms 뒤4~6px 이동했다. 6viewport×2 측정의 기존 관측5실패를 보존하고 Node 실제 조건 대기로 고쳐 대상125/125 뒤 최종 전체229/229를 확인했다. UI 소스는 처음부터 끝까지같았으며 이미 통과한 다른 세 suite는 반복하지 않았다. 실패·진단·대상 증거는 orchestration/runs/chat-rail/에 남긴다.
+
+현재 캡처는 `.impeccable/review/chat-rail/{board,conversation,journey,independent}/`다. 공개 고정 preview·동일 정적/API revision·배포 소스/실제배치/아이콘은 `preparation-board-deployed.json`·`aws-deployment.json`·`chat-rail/deployed/layout.json`을 따른다. 이번 UI에서는 유료 모델을 재호출하지 않으며 이전9fc11bc의 실제 Sol/DynamoDB 증거는 원래 revision/sourceHash에 남긴다. archive의 독립 설치·검사/빌드·최종 CRC/지문은 release.json과 output/final-archive-check.json을 따른다. 실기기/실마이크·Safari/Firefox·스크린리더·임상/법률·실발신/개인기록/예약·센터PC·15페이지PDF/대회업로드는 미검증이다.

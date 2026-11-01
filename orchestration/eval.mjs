@@ -127,17 +127,17 @@ await check('journey-browser-evidence','verification',async()=>{
 });
 await check('preparation-board-browser-evidence','verification',async()=>{
  const proof=JSON.parse(await readFile(resolve(root,'orchestration/runs/preparation-board-browser.json'),'utf8'));
- requireThat(proof.result==='pass' && proof.errors.length===0 && proof.checks.length>0 && proof.checks.every(item=>item.status==='pass'),'PC2×2·모바일네칸·문서스크롤·준비요약·진행검사가 필요합니다.');
+ requireThat(proof.result==='pass' && proof.errors.length===0 && proof.checks.length>0 && proof.checks.every(item=>item.status==='pass'),'중앙 채팅·오른쪽4칸·문서스크롤·준비요약·진행검사가 필요합니다.');
  requireThat(proof.modelInvoked===false && proof.phoneInvoked===false && proof.healthRecordsQueried===false,'보드 fixture를 실제 모델/전화/기록 검증으로 표시하지 않습니다.');
  requireThat(proof.sourceHash===await runtimeFingerprint(root) && proof.finalSourceHash===proof.sourceHash,'읽기 UI 증거와 현재 실행 소스 지문이 다릅니다.');
  requireThat(proof.apiLive===true && proof.apiProgress?.unregistered?.status===200 && proof.apiProgress.unregistered.available===false && proof.apiProgress?.invalid?.status===400,'실제 keyless 진행 조회의 미등록200·잘못된입력400 검사가 필요합니다.');
  requireThat(proof.scope?.unmockedNormalPostAttempts===0 && proof.scope?.blockedPostAttempts===0,'보드 검증에서 실제 일반 모델 요청을 보내지 않습니다.');
  requireThat(proof.viewports?.length>=6 && proof.viewports.every(view=>view.noOverflow) && proof.viewports.some(view=>view.width>=1280) && proof.viewports.some(view=>view.width===390&&view.height===500),'PC/모바일/짧은화면의 접근·넘침 검사가 필요합니다.');
  requireThat(proof.viewports.every(view=>view.documentFlow===true && view.initialSignalSummary===true),'모든 viewport에서 문서 흐름·내부 세로 스크롤 없음·기호 요약 검사가 필요합니다.');
- requireThat(proof.viewports.every(view=>view.gridLayout===(view.width>900?'2x2':'1x4')),'실제 좌표로 PC2×2·모바일1열4칸 검사가 필요합니다.');
- requireThat(proof.viewports.every(view=>view.composerFirst===true && view.compactSummary===true),'첫 요청 접근과 각 칸 핵심/상세 분리의 실제 viewport 검사가 필요합니다.');
+ requireThat(proof.viewports.every(view=>view.layout===(view.width>900?'chat-right-rail':'chat-then-status') && view.chatLayout===true),'실제 좌표와 DOM으로 중앙 대화·입력과 오른쪽/모바일 아래4칸 검사가 필요합니다.');
+ requireThat(proof.viewports.every(view=>view.categoryIcons===true && view.compactSummary===true),'네 제목 아이콘과 핵심/상세 분리의 실제 viewport 검사가 필요합니다.');
  for(const view of proof.viewports){const bytes=await readFile(resolve(root,view.screenshot));requireThat(bytes.readUInt32BE(0)===0x89504e47,'읽기 UI PNG 증거가 필요합니다.');}
- return `${proof.checks.length}개 2×2·문서 스크롤·기호 요약·실제 keyless 진행 API·진행/취소 fixture와6개viewport. 실제모델·DDB 진행은 별도공개증거.`;
+ return `${proof.checks.length}개 중앙 채팅·오른쪽 준비 현황·문서 스크롤·기호/아이콘·실제 keyless 진행 API·진행/취소 fixture와6개viewport. 실제모델·DDB 진행은 별도공개증거.`;
 });
 await check('rollback-boundary','rollback',()=>{
  for(const task of rules.tasks) {
