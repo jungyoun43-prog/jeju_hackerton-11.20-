@@ -598,6 +598,23 @@
       "allow": [
         "scripts/preparation-board-browser-check.mjs"
       ]
+    },
+    {
+      "id": "chat-identity-ui",
+      "branch": "design/chat-identity",
+      "baseCommit": "de2381de9b1a473c9ab3e624da00fef9990dad42",
+      "allow": [
+        "app/conversation.js",
+        "app/conversation.css"
+      ]
+    },
+    {
+      "id": "chat-identity-qa",
+      "branch": "test/chat-identity",
+      "baseCommit": "de2381de9b1a473c9ab3e624da00fef9990dad42",
+      "allow": [
+        "scripts/preparation-board-browser-check.mjs"
+      ]
     }
   ],
   "rules": [

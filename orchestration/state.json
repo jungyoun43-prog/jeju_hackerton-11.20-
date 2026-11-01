@@ -1,6 +1,6 @@
 {
   "baseCommit": "e1e7e44",
-  "updatedAt": "2026-11-01T06:08:12.639678+00:00",
+  "updatedAt": "2026-11-01T06:15:10.142044+00:00",
   "tasks": {
     "ui": {
       "phase": "verified",
@@ -445,6 +445,18 @@
         "d0b8540"
       ],
       "note": "기존 보드 검사1파일137추가/8삭제. 새 PC/모바일 normal·reduce4조합은 모든5boolean true/normalPOST0. targeted29/29 뒤 root전체보드249/249·errors[]·동일15f/finalhash. 첫2회 검사기 가정/이벤트관측 실패를 보존하고 수정. 위임/호출 경계 유지."
+    },
+    "chat-identity-ui": {
+      "phase": "implementing",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261101-chat-identity-ui",
+      "integrationCommits": [],
+      "note": "혼디 대화 상단의 기존 심볼/이름·흰 면/보조 행동·접근성 개선. 구현과 검사 소유권 분리, 기존 진행/권한/Agent 동작 유지."
+    },
+    "chat-identity-qa": {
+      "phase": "implementing",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261101-chat-identity-qa",
+      "integrationCommits": [],
+      "note": "혼디 대화 상단의 기존 심볼/이름·흰 면/보조 행동·접근성 개선. 구현과 검사 소유권 분리, 기존 진행/권한/Agent 동작 유지."
     }
   },
   "review": {
