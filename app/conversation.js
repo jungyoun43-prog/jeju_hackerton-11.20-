@@ -107,7 +107,7 @@ function renderBoard() {
 function showLatestAnswer() {
   setWorkspaceView('chat');
   manualStageSelection=true;unreadAnswer=false;renderBoard();
-  scrollToMessage(document.querySelector('#message-list .message.assistant:last-child'));
+  scrollToMessage([...document.querySelectorAll('#message-list .message.assistant:not(.greeting)')].at(-1));
 }
 
 function showCurrentTask({focus=true}={}) {
