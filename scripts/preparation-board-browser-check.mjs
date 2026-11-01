@@ -19,7 +19,7 @@ const proof={
   result:'fail',checkedAt:new Date().toISOString(),url:base.href,sourceHash:await runtimeFingerprint(servedRoot),
   apiLive:false,modelInvoked:false,phoneInvoked:false,healthRecordsQueried:false,apiProgress:{unregistered:null,invalid:null},
   invokingSourceHash:await runtimeFingerprint(root),sourceHashScope:process.env.QA_SERVED_SOURCE_ROOT?'explicit QA_SERVED_SOURCE_ROOT; served UI assets compared below':'invoking checkout; served UI assets compared below',
-  checks,errors,screenshots:[],viewports:[],runtimeAssets:[],progressScenarios:[],
+  checks,errors,screenshots:[],viewports:[],runtimeAssets:[],progressScenarios:[],motionScenarios:[],
   scope:{localhostKeylessOnly:true,modelInvoked:false,phoneInvoked:false,healthRecordsQueried:false,unmockedNormalPostAttempts:0,blockedPostAttempts:0,actualProgressReads:0,actualPreviewRequests:0,fixtureMainRequests:0,fixtureProgressReads:0,microphone:'not exercised; conversation browser fixtures cover transcript review',progress:'fixed safe DTO/browser fetch fixtures; actual keyless endpoint read only'},
 };
 const hash=value=>createHash('sha256').update(value).digest('hex');
@@ -91,12 +91,12 @@ async function checkSignals(page,state,{responseCount=0,events=[]}={}) {
     });
   },{state,responseCount,events});
 }
-async function contrast(page) {
-  return page.locator('.stage-status,.stage-status .signal-mark,#composer-disclosure,.privacy-note,.message-body').evaluateAll(nodes=>{
+async function contrast(page,selector='.stage-status,.stage-status .signal-mark,#composer-disclosure,.privacy-note,.message-body') {
+  return page.locator(selector).evaluateAll(nodes=>{
     const rgba=value=>(value.match(/[\d.]+/g)||[]).map(Number);
     const luminance=color=>color.slice(0,3).map(value=>{value/=255;return value<=.04045?value/12.92:((value+.055)/1.055)**2.4;}).reduce((sum,value,index)=>sum+value*[.2126,.7152,.0722][index],0);
     return nodes.filter(node=>node.checkVisibility()).map(node=>{
-      const foreground=rgba(getComputedStyle(node).color);let background=[255,255,255],layers=[];
+      const style=getComputedStyle(node),foreground=rgba(style.color);let background=[255,255,255],layers=[];
       for(let parent=node;parent;parent=parent.parentElement) {
         const color=rgba(getComputedStyle(parent).backgroundColor);
         if(color.length<4)color.push(1);
@@ -104,8 +104,8 @@ async function contrast(page) {
         if(color[3]===1)break;
       }
       for(const color of layers.reverse())background=background.map((value,index)=>color[index]*color[3]+value*(1-color[3]));
-      const a=luminance(foreground),b=luminance(background),ratio=(Math.max(a,b)+.05)/(Math.min(a,b)+.05);
-      return {id:node.id||node.className.baseVal||node.className,signal:node.dataset.signal||null,color:getComputedStyle(node).color,ratio,minimum:node.matches('.signal-mark')?3:4.5};
+      const ratioFor=color=>{const a=luminance(color),b=luminance(background);return (Math.max(a,b)+.05)/(Math.min(a,b)+.05);};
+      return {id:node.id||node.className.baseVal||node.className,signal:node.dataset.signal||null,color:style.color,ratio:ratioFor(foreground),minimum:node.matches('.signal-mark,.icon')?3:4.5,outlineRatio:ratioFor(rgba(style.outlineColor)),outlineVisible:style.outlineStyle!=='none' && parseFloat(style.outlineWidth)>=2};
     });
   });
 }
@@ -113,6 +113,24 @@ async function confirmedFacts(page) {
   return page.locator('#preparation-board [data-stage-facts],#patient-records-dialog [data-patient-field],#patient-records-dialog [data-record-status],#patient-records-dialog [data-record-source],#patient-records-dialog [data-record-content]').evaluateAll(nodes=>nodes.map(node=>({text:node.textContent,status:node.dataset.status??null})));
 }
 async function flush(page) {await page.clock.runFor(40);}
+// CSS compositor는 fixture JS 시계와 독립이므로 Node 시계로 실제 조건을 기다린다.
+async function nativeUntil(read,ready,timeout=2500) {
+  const started=performance.now();let value;
+  do {
+    value=await read();if(ready(value))return value;
+    await new Promise(resolve=>setTimeout(resolve,20));
+  } while(performance.now()-started<timeout);
+  throw new Error('브라우저 native 피드백 관측 시간 초과: '+JSON.stringify(value));
+}
+async function nativeFinished(locator) {
+  await locator.evaluate(async node=>{await Promise.all(node.getAnimations({subtree:true}).filter(animation=>animation.effect?.getTiming().iterations!==Infinity).map(animation=>animation.finished.catch(()=>{})));});
+}
+async function feedback(locator) {
+  return locator.evaluate(node=>{
+    const rect=node.getBoundingClientRect(),style=getComputedStyle(node),matrix=new DOMMatrix(style.transform==='none'?undefined:style.transform);
+    return {width:rect.width,height:rect.height,x:matrix.e,y:matrix.f,rotation:Math.round(Math.atan2(matrix.b,matrix.a)*180/Math.PI),background:style.backgroundColor,color:style.color};
+  });
+}
 async function calls(page,path) {
   return page.evaluate(path=>window.__boardFixture.calls.filter(call=>!path || call.path===path),path);
 }
@@ -145,8 +163,8 @@ function response(call,state=createDemoCase(),reply='브라우저 fixture의 합
     events:[{id:'board-records',tool:'get_case',label:'합성 사례 확인',status:'completed',detail:'브라우저 응답 fixture이며 실제 환자 기록 조회가 아닙니다.',isSimulation:true}],
     pendingActions:[],capabilities:caps,needsInput:true};
 }
-async function open(width,height,{fixture=false,capabilities=fixture?caps:null}={}) {
-  const context=await browser.newContext({viewport:{width,height},locale:'ko-KR',reducedMotion:'reduce',serviceWorkers:'block'});
+async function open(width,height,{fixture=false,capabilities=fixture?caps:null,reducedMotion='reduce'}={}) {
+  const context=await browser.newContext({viewport:{width,height},locale:'ko-KR',reducedMotion,serviceWorkers:'block'});
   const actualPosts=[];
   await context.route('**/*',async route=>{
     const request=route.request(),url=new URL(request.url());
@@ -178,6 +196,20 @@ async function open(width,height,{fixture=false,capabilities=fixture?caps:null}=
   });
   if(fixture)await page.addInitScript(()=>{
     const original=window.fetch.bind(window),calls=[],pending=[];
+    window.__boardMotion=[];
+    const observedAnimations=new WeakMap();
+    // compositor가 먼저 끝나 start/end가 함께 배달돼도 추가 직후의 native 참조를 보존한다.
+    new MutationObserver(records=>{
+      for(const record of records)for(const added of record.addedNodes)if(added instanceof Element) {
+        const nodes=added.matches('.message-meta')?[added]:added.querySelectorAll('.message-meta');
+        for(const node of nodes) {const animations=node.getAnimations();if(animations.length)observedAnimations.set(node,animations);}
+      }
+    }).observe(document,{childList:true,subtree:true});
+    for(const type of ['animationstart','animationiteration','animationend','animationcancel'])document.addEventListener(type,event=>{
+      const node=event.target,message=node.closest?.('.message');if(!message)return;
+      const animation=[...node.getAnimations(),...(observedAnimations.get(node)||[])].find(item=>item.animationName===event.animationName),timing=animation?.effect?.getTiming();
+      window.__boardMotion.push({type,name:event.animationName,replyIndex:[...message.parentElement.querySelectorAll(':scope>.message.assistant:not(.greeting)')].indexOf(message),direct:message.parentElement.id==='message-list',latest:message===document.querySelector('#message-list')?.lastElementChild,greeting:message.classList.contains('greeting'),reader:Boolean(message.closest('#answer-read-view')),meta:node.matches('.message-meta'),duration:timing?.duration,iterations:timing?.iterations,frames:animation?.effect?.getKeyframes().map(frame=>({background:frame.backgroundColor,clip:frame.clipPath,opacity:frame.opacity,transform:frame.transform}))});
+    },true);
     window.__boardFixture={calls,settle(index,status,body,errorName){
       const item=pending[index];
       if(!item || item.settled)throw new Error('알 수 없거나 완료한 fixture');
@@ -655,6 +687,103 @@ try {
       await finish(page,second,previewEvidence.caseState,'출처를 읽은 뒤 받은 합성 최종 답변입니다.');
       record(width+'px 출처 focus 회귀는 일반 실제 POST 없이 기존 답변 경로 유지',actualPosts.length===0 && (await calls(page,'/api/agent')).length===2 && (await page.locator('#message-list').innerText()).includes('출처를 읽은 뒤'));
       proof.progressScenarios.push({id:'static-source-focus-'+width,mainRequests:(await calls(page,'/api/agent')).length,progressReads:(await calls(page,'/api/agent/progress')).length-previousProgressReads,sourceIdentityAndFocus:focusPreserved,rawTokensStored:false});
+    } finally {await context.close();}
+  });
+
+  for(const width of [1440,390])for(const reducedMotion of ['no-preference','reduce'])await scenario(width+'px '+reducedMotion+' 초록·상호작용',async()=>{
+    const evidence={width,reducedMotion,greenSurfaces:false,contrastPassed:false,interactionFeedback:false,replyFeedback:false,readingStable:false,normalPostAttempts:0};
+    proof.motionScenarios.push(evidence);
+    if(!previewEvidence)throw new Error('motion 검사에 사용할 실제 keyless preview 근거가 없습니다.');
+    const {page,context,actualPosts}=await open(width,844,{fixture:true,reducedMotion});
+    try {
+      const label=width+'px '+reducedMotion,reduce=reducedMotion==='reduce',soft='rgb(237, 246, 239)',secondary='rgb(40, 92, 67)',orange='rgb(168, 77, 22)';
+      const input=page.locator('#request-input'),send=page.locator('#send-request'),example=page.locator('[data-example]').first(),details=page.locator('[data-stage-id="records"] [data-stage-details]'),summary=details.locator(':scope>summary');
+      const disabled=await send.isDisabled() && await page.locator('#expand-answer').isDisabled();
+      if(width<=1050)await page.locator('#open-care-menu').click();
+      const surfaces=await page.evaluate(()=>{
+        const style=selector=>{const node=document.querySelector(selector),css=getComputedStyle(node);return {background:css.backgroundColor,color:css.color};};
+        return {toolbar:style('.chat-toolbar'),nav:style('#care-rail'),selected:style('.rail-nav [aria-current]'),icon:style('.stage-topic-icon'),names:[...document.querySelectorAll('.patient-name')].map(node=>getComputedStyle(node).color),cards:[...document.querySelectorAll('.stage-pane')].map(node=>getComputedStyle(node).backgroundColor)};
+      });
+      if(width<=1050) {await page.locator('#close-care-menu').click();await nativeFinished(page.locator('#care-rail'));}
+      evidence.greenSurfaces=surfaces.toolbar.background==='rgb(28, 77, 54)' && surfaces.toolbar.color==='rgb(255, 255, 255)' && surfaces.nav.background==='rgb(244, 248, 244)' && surfaces.selected.background===soft && surfaces.selected.color===secondary && surfaces.icon.color===secondary && surfaces.cards.length===4 && surfaces.cards.every(color=>color==='rgb(255, 255, 255)');
+      record(label+' 대화 헤더·탐색·선택·보조 초록과 흰 네 상태면',evidence.greenSurfaces,JSON.stringify(surfaces));
+      const previewButton=page.locator('#preview-button');
+      await previewButton.focus();await page.keyboard.press('Tab');await page.keyboard.press('Shift+Tab');
+      const toolbarColors=await contrast(page,'.chat-toolbar h2,.chat-toolbar h2>.icon,.chat-toolbar button:not(:disabled),.chat-toolbar button:not(:disabled)>.icon');
+      const focus=(await contrast(page,'#preview-button'))[0];
+      const keyboardFocus=await previewButton.evaluate(node=>node.matches(':focus-visible')) && focus?.outlineVisible && focus.outlineRatio>=3;
+      const closedSummary=await feedback(summary),closedIcon=await feedback(summary.locator(':scope>.icon'));
+      await example.hover();await nativeFinished(example);
+      const exampleHover=await feedback(example),exampleIcon=await feedback(example.locator(':scope>.icon'));
+      const draft=await example.getAttribute('data-example');await example.click();await page.mouse.move(1,1);await nativeFinished(page.locator('#conversation-form'));
+      const draftOnly=await input.inputValue()===draft && (await calls(page)).length===0;
+      const inputFocus=await page.locator('#conversation-form').evaluate(node=>node.matches(':focus-within') && getComputedStyle(node).backgroundColor==='rgb(244, 248, 244)' && getComputedStyle(node).outlineStyle!=='none');
+      await nativeFinished(send);const sendIdle=await feedback(send);
+      await send.hover();await nativeFinished(send);const sendHover=await feedback(send),sendIcon=await feedback(send.locator(':scope>.icon'));
+      await page.mouse.down();
+      const pressed=await nativeUntil(()=>feedback(send),value=>Math.abs(value.y-(reduce?0:1))<.02);
+      await page.mouse.move(1,1);await page.mouse.up();await nativeFinished(send);
+      let nativeDetails=closedIcon.rotation===0;
+      for(const expanded of [true,false,true,false,true]) {
+        await summary.focus();await page.keyboard.press('Enter');await nativeFinished(summary);
+        const icon=await feedback(summary.locator(':scope>.icon')),surface=await feedback(summary);
+        nativeDetails &&=await details.evaluate((node,expanded)=>node instanceof HTMLDetailsElement && node.open===expanded,expanded) && icon.rotation===(expanded?90:0) && surface.width>=44 && surface.height>=44 && (!expanded || surface.background===soft);
+      }
+      const opened=await feedback(summary),drawerSafe=width>1050 || await page.locator('#care-rail').evaluate(node=>{const style=getComputedStyle(node);return style.visibility==='hidden' && new DOMMatrix(style.transform).e<=-node.getBoundingClientRect().width;});
+      evidence.interactionFeedback=disabled && draftOnly && inputFocus && nativeDetails && opened.background!==closedSummary.background && drawerSafe && exampleHover.color==='rgb(27, 70, 49)' && exampleHover.background===soft && exampleHover.width>=44 && exampleHover.height>=44 && exampleIcon.x===(reduce?0:2) && sendIcon.x===(reduce?0:2) && pressed.width===sendIdle.width && pressed.height===sendIdle.height && pressed.width>=44 && pressed.height>=44 && await input.inputValue()===draft && (await calls(page)).length===0;
+      record(label+' 실제 hover·누름·44px·반복 native 펼침·입력 초안은 POST 없이 유지',evidence.interactionFeedback,JSON.stringify({exampleHover,exampleIcon,sendIdle,sendHover,sendIcon,pressed,nativeDetails,inputFocus,drawerSafe}));
+      const primaryPreserved=surfaces.names.length===2 && surfaces.names.every(color=>color===orange) && sendIdle.background===orange && sendIdle.color==='rgb(255, 255, 255)' && sendHover.background==='rgb(135, 58, 16)';
+      const greetingQuiet=await page.locator('#message-list>.greeting>.message-meta').evaluate(node=>getComputedStyle(node).animationName==='none' && node.getAnimations().length===0);
+      const first=await begin(page,'초록 화면에서 자료와 문의 준비를 확인합니다.');
+      const poll=await advancePoll(page,0);await release(page,poll,progress('hospitals',4));
+      const beforeFinal=await page.evaluate(()=>window.__boardMotion.length===0 && document.querySelectorAll('#message-list>.message.assistant:not(.greeting)').length===0);
+      const userSoft=await page.locator('#message-list>.message.user>.message-body').evaluate(node=>getComputedStyle(node).backgroundColor=== 'rgb(237, 246, 239)');
+      await release(page,first,{...response(first,previewEvidence.caseState,previewEvidence.reply),events:previewEvidence.events,pendingActions:previewEvidence.pendingActions});
+      await page.waitForFunction(()=>document.querySelector('#conversation-form').getAttribute('aria-busy')==='false');
+      const motionEvents=()=>page.evaluate(()=>window.__boardMotion);
+      let observedAt=performance.now();
+      await nativeUntil(motionEvents,events=>reduce?performance.now()-observedAt>=300:events.some(event=>event.type==='animationend' && event.replyIndex===0));
+      await nativeFinished(page.locator('#message-list>.message.assistant:last-child>.message-meta'));
+      const afterFirst=await motionEvents();
+      let readerQuiet=true;
+      for(let visit=0;visit<2;visit++) {
+        await page.locator('#expand-answer').click();await page.locator('#answer-dialog').waitFor();
+        const readerStarted=performance.now();
+        await nativeUntil(motionEvents,()=>performance.now()-readerStarted>=280);
+        readerQuiet &&=await page.locator('#answer-read-view .message.assistant:not(.greeting)>.message-meta').evaluateAll(nodes=>nodes.length===1 && nodes.every(node=>getComputedStyle(node).animationName==='none' && node.getAnimations().length===0)) && (await motionEvents()).length===afterFirst.length;
+        await page.keyboard.press('Escape');await page.locator('#answer-dialog').waitFor({state:'hidden'});
+      }
+      const statusColors=await contrast(page),toolbarAfter=await contrast(page,'.chat-toolbar h2,.chat-toolbar h2>.icon,.chat-toolbar button:not(:disabled),.chat-toolbar button:not(:disabled)>.icon,#next-request-draft');
+      const preservedSignals={available:'rgb(38, 113, 73)',attention:'rgb(135, 86, 23)',blocked:'rgb(163, 61, 52)'};
+      const signalPreserved=Object.entries(preservedSignals).every(([signal,color])=>statusColors.some(item=>item.signal===signal && item.color===color));
+      const nextDraft=await feedback(page.locator('#next-request-draft'));
+      evidence.greenSurfaces &&=userSoft;
+      evidence.contrastPassed=evidence.greenSurfaces && keyboardFocus && primaryPreserved && nextDraft.background==='rgb(255, 241, 231)' && nextDraft.color===orange && signalPreserved && toolbarColors.length>=4 && toolbarAfter.length>=4 && [...toolbarColors,...toolbarAfter,...statusColors].every(item=>item.ratio>=item.minimum) && [...toolbarColors,...toolbarAfter].filter(item=>!item.id.includes('next-request')).every(item=>item.color==='rgb(255, 255, 255)');
+      record(label+' toolbar 흰 글자·아이콘·밝은 키보드 focus 대비와 주황·○△×색 유지',evidence.contrastPassed,JSON.stringify({keyboardFocus,focus,primaryPreserved,signalPreserved,nextDraft,toolbarColors,toolbarAfter}));
+      const second=await begin(page,'출처를 읽는 동안 다음 문의도 준비합니다.',1);
+      await readStage(page,'hospitals');
+      const log=page.locator('[data-stage-id="hospitals"] [data-stage-log]');if(!await log.evaluate(node=>node.open))await log.locator(':scope>summary').click();
+      const source=await page.locator('[data-stage-id="hospitals"] [data-stage-events] [data-tool-status="completed"] a[href^="https://"]').first().elementHandle();
+      if(!source)throw new Error('motion 응답의 병원 출처 노드가 없습니다.');
+      await source.scrollIntoViewIfNeeded();await source.focus();
+      const snapshot=()=>source.evaluate(node=>{const rect=node.getBoundingClientRect();return {connected:node.isConnected,focused:document.activeElement===node,top:rect.top,left:rect.left,open:node.closest('[data-stage-log]').open && node.closest('[data-stage-details]').open,unmoved:[...document.querySelectorAll('.stage-pane,.message,.message-body')].every(item=>getComputedStyle(item).transform==='none')};});
+      const before=await snapshot(),pastQuiet=await page.locator('#message-list>.message.assistant>.message-meta').evaluateAll(nodes=>nodes.every(node=>getComputedStyle(node).animationName==='none' && node.getAnimations().length===0));
+      const reply='# 읽던 출처를 유지하는 최종 답변\n\n'+Array.from({length:8},()=> '자료와 문의를 준비하는 합성 응답입니다. 실제 발신·예약·배차는 하지 않았습니다.').join('\n\n');
+      await release(page,second,{...response(second,previewEvidence.caseState,reply),events:previewEvidence.events,pendingActions:previewEvidence.pendingActions});
+      await page.waitForFunction(()=>document.querySelector('#conversation-form').getAttribute('aria-busy')==='false');
+      const readingSamples=[];observedAt=performance.now();
+      const finalEvents=await nativeUntil(async()=>{readingSamples.push(await snapshot());return motionEvents();},events=>reduce?performance.now()-observedAt>=300:events.filter(event=>event.type==='animationend').length>=2);
+      await nativeFinished(page.locator('#message-list>.message.assistant:last-child>.message-meta'));
+      const after=await snapshot();readingSamples.push(after);
+      evidence.readingStable=before.connected && before.focused && before.open && before.unmoved && readingSamples.every(item=>item.connected && item.focused && item.open && item.unmoved && Math.abs(item.top-before.top)<=2 && Math.abs(item.left-before.left)<=1);
+      const starts=finalEvents.filter(event=>event.type==='animationstart'),ends=finalEvents.filter(event=>event.type==='animationend');
+      const onePerReply=starts.length===2 && ends.length===2 && [0,1].every(index=>starts.filter(event=>event.replyIndex===index).length===1 && ends.filter(event=>event.replyIndex===index).length===1) && finalEvents.length===4;
+      const metadataOnly=starts.every(event=>event.name==='hondi-reply-ready' && event.direct && event.latest && !event.greeting && !event.reader && event.meta && event.duration>=200 && event.duration<=300 && event.iterations===1 && event.frames?.some(frame=>frame.background===soft) && new Set(event.frames.map(frame=>frame.clip)).size>1 && event.frames.every(frame=>frame.opacity!=='0' && (!frame.transform || frame.transform==='none')));
+      evidence.replyFeedback=greetingQuiet && beforeFinal && readerQuiet && pastQuiet && (reduce?finalEvents.length===0:onePerReply && metadataOnly) && await page.locator('#message-list>.message.assistant:last-child>.message-meta').evaluate(node=>getComputedStyle(node).visibility==='visible' && getComputedStyle(node).opacity==='1' && node.checkVisibility());
+      evidence.normalPostAttempts=actualPosts.filter(item=>item.path==='/api/agent').length;
+      record(label+' 최종 응답 전/인사/과거/넓게 읽기는 재생 없이 최신 메타만1회',evidence.replyFeedback,JSON.stringify({greetingQuiet,beforeFinal,readerQuiet,pastQuiet,events:finalEvents}));
+      record(label+' 응답 피드백 중 같은 출처 노드·focus·읽기 위치·카드/본문 고정·일반 POST0',evidence.readingStable && evidence.normalPostAttempts===0 && actualPosts.length===0,JSON.stringify({before,after,samples:readingSamples.length,normalPostAttempts:evidence.normalPostAttempts}));
+      await shot(page,width+'-'+reducedMotion+'-green-feedback');
     } finally {await context.close();}
   });
 
