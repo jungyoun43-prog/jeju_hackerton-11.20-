@@ -682,7 +682,8 @@
         "scripts/public-health-data.mjs",
         "tests/public-health-data.test.mjs",
         "research/pickle-reference-2026-11-01.md",
-        "research/visit-data-update-2026-11-01.md"
+        "research/visit-data-update-2026-11-01.md",
+        "app/public-health-data.js"
       ]
     }
   ],

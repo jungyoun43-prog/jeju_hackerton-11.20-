@@ -23,7 +23,8 @@
     "test:journey": "node scripts/journey-browser-check.mjs",
     "data:catalog": "node scripts/public-data-catalog.mjs",
     "data:query": "node scripts/public-data-query.mjs",
-    "test:board": "node scripts/preparation-board-browser-check.mjs"
+    "test:board": "node scripts/preparation-board-browser-check.mjs",
+    "eval:agent": "node --env-file-if-exists=.env scripts/evaluate-agent.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-bedrock-runtime": "3.1161.0",

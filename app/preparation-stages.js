@@ -9,7 +9,7 @@ export const PREPARATION_STAGES=Object.freeze([
 ]);
 export const PREPARATION_STAGE_IDS=Object.freeze(PREPARATION_STAGES.map(stage=>stage.id));
 const TOOL_STAGE=Object.freeze({
-  apply_care_preferences:'records',get_case:'records',update_visit:'records',request_records:'records',
+  apply_care_preferences:'records',get_case:'records',update_visit:'records',request_records:'records',mark_document_missing:'records',
   search_hospital_contacts:'hospitals',select_hospital_contact:'hospitals',request_hospital_contact:'hospitals',
   find_support:'support',prepare_inquiries:'support',request_support_contact:'support',update_call_retry_policy:'support',
   prepare_review:'plan',get_care_journey:'plan',build_report:'plan',summarize_preparation:'plan',
@@ -24,7 +24,7 @@ export function getToolStage(name,input={}) {
   return Object.hasOwn(TOOL_STAGE,name)?TOOL_STAGE[name]:null;
 }
 const TOOL_LABELS=Object.freeze({
-  apply_care_preferences:'기본 이동 조건',get_case:'현재 준비 상태',update_visit:'방문 조건',request_records:'자료 연결·보유 현황',
+  apply_care_preferences:'기본 이동 조건',get_case:'현재 준비 상태',update_visit:'방문 조건',request_records:'자료 연결·보유 현황',mark_document_missing:'자료 미보유 정정',
   search_hospital_contacts:'공개 병원 문의 후보',select_hospital_contact:'지정한 병원 문의처',request_hospital_contact:'병원 접수 절차 시연',
   find_support:'공개 이동·동행 문의처',prepare_inquiries:'이동·동행 문의 초안',request_support_contact:'이동·동행 응답 시연',
   update_call_retry_policy:'허용한 재시도 범위',prepare_review:'자료·검토 준비',get_care_journey:'진료 준비의 다음 할 일',build_report:'방문 준비 보고서',

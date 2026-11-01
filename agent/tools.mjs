@@ -50,6 +50,7 @@ export const AGENT_TOOLS = Object.freeze([
   {name:'search_hospital_contacts', description:'허브859 공개13개 기관의 등록 사실을 검색한다. 현재 수용·협진·환자 적합성을 판단하지 않는다.', inputSchema:objectSchema({name:shortText(100),department:shortText(100),area:shortText(100)})},
   {name:'select_hospital_contact', description:'보호자가 현재 요청에서 이름을 명시한 공개 기관을 문의 대상으로 설정한다. 임상 장소 추천은 하지 않는다.', inputSchema:objectSchema({hospitalId:{type:'string',pattern:'^hospital-[0-9]{1,2}$',maxLength:20}}, ['hospitalId'])},
   {name:'request_records', description:'demo는 서버의 고정 합성 자료만 정리한다. nhis는 승인된 기록 연계가 미설정인 상태를 반환한다. 진찰 소견을 작성하지 않는다.', inputSchema:objectSchema({source:{type:'string',enum:['demo','nhis']}}, ['source'])},
+  {name:'mark_document_missing', description:'보호자가 이번 요청에서 치료 이력·판독문·의뢰서 파일을 없거나 미보유라고 명시한 경우에만 합성 준비 목록을 미보유로 정정한다. 이전 제출·검토를 무효화한다. 문서 삭제나 실제 의료기록 조회가 아니며 미시행 진찰 상태는 변경하지 않는다.', inputSchema:objectSchema({documentId:{type:'string',enum:['history','report','referral']}}, ['documentId'])},
   {name:'request_hospital_contact', description:'제주 또는 기존 도외 병원 역할에 협진·의뢰/회송 창구와 접수·자료 절차를 묻는 합성 전화 시연. 공통 위임·최소정보·AI·기록 처리 계획을 포함하며 실제 발신·진료 수락·예약이 아니다.', inputSchema:objectSchema({target:{type:'string',enum:['mainland','jeju']}}, ['target'])},
   {name:'find_support', description:'택시327·돌봄254·별도 공식서비스에서 현재 행정지역과 지원 유형의 문의 후보를 찾는다. 가능 시간·예약은 미확인이다.', inputSchema:objectSchema({kind:kindSchema}, ['kind'])},
   {name:'prepare_inquiries', description:'공개 문의처 선택과 문의 초안을 함께 준비한다. providerId 생략 시 지역·휠체어 조건과 검증한 선호 택시를 반영한다. find_support 선행은 필수가 아니며 의료기록은 포함하지 않는다.', inputSchema:objectSchema({kind:kindSchema,providerId:{type:'string',maxLength:100,pattern:'^[a-z0-9_-]+$'}}, ['kind'])},
@@ -190,6 +191,13 @@ function authorizationClauses(message,state) {
     }
   }
   return clauses;
+}
+function explicitMissingDocument(message,state,id) {
+  const labels={history:/(?:치료|진료)\s*이력|병력\s*요약/,report:/판독문/,referral:/의뢰서/};
+  const absent='없(?:어|어요|습니다|다|음|어서|고)|미보유|분실|발급\\s*전|준비(?:가)?\\s*(?:안|않|못)|보유(?:하고)?\\s*있지\\s*않';
+  const related=new RegExp(`(?:${labels[id].source})(?:(?!판독문|의뢰서|(?:치료|진료)\\s*이력|병력\\s*요약).){0,36}(?:${absent})`);
+  return authorizationClauses(message,state).some(({clause})=>related.test(clause)
+    && !/없(?:진|지|는\s*(?:것|건|게))\s*않|미보유.{0,5}아니|분실.{0,6}아니|(?:지우|해제하|제외하|삭제하)지|없어(?:지|도)|(?:만약|가정|경우)|(?:없|분실).{0,15}(?:으면|하면|라면|다면|더라도)|(?:없|미보유|분실).{0,12}(?:나요|까요|을까|는지|여부|인지)/.test(clause));
 }
 function targetAuthorization(message,state,target,kind,positive) {
   let permitted=false;
@@ -379,6 +387,15 @@ export function createToolDispatcher({phoneAdapter = createPhoneSimulationAdapte
           events.push(event(name,'합성 자료 정리','서버의 고정 합성 치료 이력·판독문 보유 예시를 정리했습니다. 대면 진찰 소견과 의뢰서는 의료진 확인이 필요합니다.',{isSimulation:true,source:'서버 고정 합성 자료'}));
         }
         break;
+      case 'mark_document_missing': {
+        fail(explicitMissingDocument(userMessage,next,input.documentId),'EXPLICIT_DOCUMENT_UPDATE_REQUIRED','이번 요청에서 해당 자료를 보유하지 않는다는 내용을 확인해 주세요. 질문·인용·가정만으로 보유 상태를 바꾸지 않습니다.');
+        const document=next.documents.find(item=>item.id===input.documentId);
+        if(document.status!=='missing')next=applyAction(next,{type:'REMOVE_DOCUMENT',id:input.documentId});
+        data={isSimulation:true,document:next.documents.find(item=>item.id===input.documentId),actualRecordDeleted:false,physicianExamCreated:false};
+        events.push(event(name,'자료 미보유 반영','보호자가 명시한 자료 미보유를 합성 준비 목록과 후속 할 일에 반영했습니다. 실제 의료기록을 삭제하거나 발급한 것은 아닙니다.',{isSimulation:true,source:'보호자 요청 · 합성 보유 현황'}));
+        pendingActions.push(pending('document-issuance','미보유 자료 발급·제출 절차 확인','기존 병원의 발급 창구·본인/대리 절차와 제주 기관의 제출 형식·수신 방법을 확인해 주세요.'));
+        break;
+      }
       case 'request_hospital_contact': {
         const plan = buildCallPlan(next,input.target);
         if (!phoneAdapter) {

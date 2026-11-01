@@ -28,7 +28,7 @@
 | recovery-backend | agent/service.mjs, agent/store.mjs, agent/dynamodb-store.mjs, agent/validation.mjs, agent/cloud-runtime.mjs, 새 agent/visit-recovery.mjs, 해당 기존 단위 tests 및 tests/visit-recovery.test.mjs |
 | recovery-ui | app/conversation.js, app/conversation.css, 기존 scripts/conversation-browser-check.mjs, 필요한 독립 scripts/visit-recovery-browser-check.mjs |
 | data-reliability | 승인된 공공자료 snapshot/수집 스크립트, app/public-data-skill.js·agent/public-data-tools.mjs와 해당 tests, research/pickle-reference-2026-11-01.md·research/visit-data-update-2026-11-01.md. 구체 새 파일은 조사 결과 뒤 고정 |
-| root | prompts/caregiver-system.mjs·agent/openai-provider.mjs·agent/tools.mjs의 실제 평가로 필요한 최소 수정, 평가 CLI/fixtures/tests, 문서·하네스·빌드/배포/제출물·최종 통합 |
+| root | prompts/caregiver-system.mjs·agent/openai-provider.mjs·agent/tools.mjs의 실제 평가로 필요한 최소 수정, 평가 CLI/fixtures/tests, 문서·하네스·빌드/배포/제출물·최종 통합. 실제 평가에서 확인한 자료 미보유 정정에는 기존 REMOVE_DOCUMENT와 app/preparation-stages.js의 고정 표시 목록을 재사용 |
 
 각 담당자는 전용 worktree·브랜치에서 커밋하며 root만 통합/게시한다. 인터페이스 변경은 먼저 공유한다. 데이터 담당은 기존859의20행/13후보와 기존 정규화 상태를 바꾸지 않고 새 자료를 독립 출처로 연결한다. 원자료 없는 ETA·등록정보로 실제 수용/운행 확인을 만들지 않는다.
 
