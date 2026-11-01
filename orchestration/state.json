@@ -1,6 +1,6 @@
 {
   "baseCommit": "e1e7e44",
-  "updatedAt": "2026-11-01T18:59:08.076162+00:00",
+  "updatedAt": "2026-11-01T19:04:24.438718+00:00",
   "tasks": {
     "ui": {
       "phase": "verified",
@@ -560,10 +560,16 @@
       "note": "실사용/폰트/렌더 측정에 근거한 계약 docs/usability-performance-contract.md. 기존 흐름/브랜드/실제시연 경계 보존, 실모델0. 현재검증전."
     },
     "support-reason": {
-      "phase": "implementing",
+      "phase": "integrating",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261101-support-reason",
       "integrationCommits": [],
       "note": "실사용/폰트/렌더 측정에 근거한 계약 docs/usability-performance-contract.md. 기존 흐름/브랜드/실제시연 경계 보존, 실모델0. 현재검증전."
+    },
+    "use-qa": {
+      "phase": "implementing",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261101-use-qa",
+      "integrationCommits": [],
+      "note": "실사용의버튼이름·공통다음행동·정확한실패이유·공식분할폰트·새렌더의기존보호조건검증. 실모델0/현재검증전."
     }
   },
   "review": {

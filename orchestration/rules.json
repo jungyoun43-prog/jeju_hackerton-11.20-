@@ -761,6 +761,18 @@
         "tests/visit-support.test.mjs",
         "tests/call-recovery.test.mjs"
       ]
+    },
+    {
+      "id": "use-qa",
+      "branch": "test/use-performance",
+      "baseCommit": "bb53b40",
+      "allow": [
+        "scripts/conversation-browser-check.mjs",
+        "scripts/journey-browser-check.mjs",
+        "scripts/preparation-board-browser-check.mjs",
+        "scripts/visit-recovery-browser-check.mjs",
+        "scripts/visit-recovery-integration-check.mjs"
+      ]
     }
   ],
   "rules": [
