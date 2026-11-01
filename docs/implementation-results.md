@@ -381,3 +381,12 @@ plan도 이제 오른쪽 정보이므로 이전 selectedStageId===plan의 답변
 첫 준비판227/228의 유일 실패는 경계 고지를 예전 plan 답변에서 찾던 단언이었다. 실제 support의5조건은 모두 참이고 oldPlanBoundary만 거짓이었다. 중앙 실제 API reply/공통 고지/false 경계로 옮기고 handoff detail/담당/status/자동반복중단을 강화했다. 부분3preview25/25 뒤 준비판만 전체 재실행했다. 두 번째227/229는 모바일 native 표 키보드 관측2건이었다. mock200ms와 별개로 실제시간20~28ms에는left0, 같은 키가51~66ms 뒤4~6px 이동했다. 6viewport×2 측정의 기존 관측5실패를 보존하고 Node 실제 조건 대기로 고쳐 대상125/125 뒤 최종 전체229/229를 확인했다. UI 소스는 처음부터 끝까지같았으며 이미 통과한 다른 세 suite는 반복하지 않았다. 실패·진단·대상 증거는 orchestration/runs/chat-rail/에 남긴다.
 
 현재 캡처는 `.impeccable/review/chat-rail/{board,conversation,journey,independent}/`다. 공개 고정 preview·동일 정적/API revision·배포 소스/실제배치/아이콘은 `preparation-board-deployed.json`·`aws-deployment.json`·`chat-rail/deployed/layout.json`을 따른다. 이번 UI에서는 유료 모델을 재호출하지 않으며 이전9fc11bc의 실제 Sol/DynamoDB 증거는 원래 revision/sourceHash에 남긴다. archive의 독립 설치·검사/빌드·최종 CRC/지문은 release.json과 output/final-archive-check.json을 따른다. 실기기/실마이크·Safari/Firefox·스크린리더·임상/법률·실발신/개인기록/예약·센터PC·15페이지PDF/대회업로드는 미검증이다.
+
+
+## 3.15 이름·주 행동의 주황 포인트
+
+사용자 요청에 따라 상단/왼쪽의 환자 이름 부분만 주황으로 구분하고 제목 나머지는 본문색으로 유지했다. 활성 보내기와 포커스는#A84D16,보내기hover는#873A10,다음문의초안은#FFF1E7 면과 주황 글자다. 전체soft/보조파랑·아이콘·○△×의 의미색·배치/동작은 유지했다. 이름은 기존escape로 처리한인라인span이며 접근성 이름/원문은 같다. 전용worktree의UI2파일7줄추가/7줄삭제이고 새 라이브러리·자산·설정·영구 테스트는 없다.
+
+실제PC/모바일의initial/active/hover/keyboard focus/disabled/답변후초안과특수문자이름을 임시검사31건으로 확인했다. 실제keyless preview1건·저장응답/특수문자fixture2건·일반모델POST0·errors[]다. 독립색검토도소스와6캡처에서새차단문제가없었다. 주황대비는흰면5.62:1·바탕5.14:1·peach5.08:1·hover흰면7.95:1이다. 기존disabled4.24:1은변경하지않은비활성제어이며활성대비와구분한다. UI담당의context126실패는직접문맥읽기로보완했으며자동디자인합격으로설명하지않는다. 증거는 `.impeccable/review/chat-rail/color/`다.
+
+실행 지문은 `efc749933e063752b02a904c3a0ee56618253b8bc6c62e5dc36309d49b1075ba`다. 동일지문에서기존하네스수동47/47·대화189/189·여정236/236(실제keyless preview14/일반POST0)·준비판229/229가한번의fresh실행으로모두종료0이었다. 각proof의pass/errors[]·sourceHash·준비판finalSourceHash도별도종료0으로대조했다. 단위·서버360/360·자동규칙63/63도종료0이며등록worktree49개중이번개발은1개다. CI·공개정적/APIrevision과실제고정preview·배포후이름/활성send/hover/focus/상태색은최신runs와deployed/layout.json을따른다. 유료모델·실전화·개인기록은호출하지않으며이전9fc11bc실모델/DynamoDB증거는원revision에유지한다. 실제휴대폰·표시장치색상/실마이크·스크린리더·임상/법률·센터실기기/최종PDF/대회제출은별도다.
