@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {createDemoCase,applyAction} from '../app/domain.js';
 import {getPreparationWorkflow,PREPARATION_STAGES} from '../app/preparation-workflow.js';
 import {getPreparationBoard,PREPARATION_STAGES as boardStages} from '../app/preparation-stages.js';
-import {createToolDispatcher,getGuidedPreparationKinds} from '../agent/tools.mjs';
+import {createToolDispatcher,getGuidedPreparationKinds,getGuidedPreparationChanges} from '../agent/tools.mjs';
 import {buildFixedPreview} from '../agent/preview.mjs';
 
 const preview=scenarioId=>buildFixedPreview({scenarioId,requestId:'workflow-fixture-0001',capabilities:{llm:false}});
@@ -102,9 +102,20 @@ test('명시적인 현재 준비 범위만 쓰고 대상 제한·읽기·인용�
     ['방문 준비를 도와줘. 택시는 준비하지 말아 줘.',['companion']],
     ['택시와 동행 초안 준비해줘.',['taxi','companion']],
     ['택시를 준비하지 말아 줘. 동행 초안을 준비해줘.',['companion']],
+    ['동행은 빼고 방문 준비해줘',['taxi']],
+    ['동행을 제외한 방문 준비해줘',['taxi']],
+    ['동행은 제외하고 택시 초안을 준비해줘',['taxi']],
+    ['택시만 빼고 동행 초안을 준비해줘',['companion']],
+    ['택시와 동행은 빼고 방문 준비해줘',[]],
     ['자료만 정리해줘',[]],['방문 준비 현황을 보여줘',[]],['택시 후보를 비교해줘',[]],
     ['택시 초안을 준비할 수 있나요?',[]],['만약 택시 초안을 준비해줘',[]],
     ['"택시 초안을 준비해줘"',[]],['동행은 준비 안 해줘',[]],['방문 준비하지 말아줘',[]],
   ];
   for(const [message,expected] of cases)assert.deepEqual(getGuidedPreparationKinds(message,state),expected,message);
+});
+
+test('목록 밖의 명시 병원·의료원도 미반영 조건으로 잡고 병원동행 표현은 제외한다',()=>{
+  const state=createDemoCase();
+  for(const message of ['제주대학교병원에서 방문 준비해줘','서귀포의료원에서 방문 준비해줘'])assert.ok(getGuidedPreparationChanges(message,state).includes('hospital'),message);
+  for(const message of ['병원동행 문의 초안을 준비해줘','병원 동행을 준비해줘','기존 도외 병원 문의와 방문 준비해줘'])assert.ok(!getGuidedPreparationChanges(message,state).includes('hospital'),message);
 });

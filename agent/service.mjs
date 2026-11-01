@@ -123,7 +123,6 @@ export function createAgentService({provider = createDisconnectedProvider(),stor
       if (visitPreferencesApplied) {
         const {wheelchair,companionNeeded} = request.preferences;
         state = applyAction(state,{type:'SUPPORT_UPDATE_REQUIREMENTS',values:{wheelchair,companionNeeded}});
-        appliedConditions.add('wheelchair');appliedConditions.add('companionNeeded');
         events.push({id:'care-preferences-applied',tool:'apply_care_preferences',label:'기본 이동 조건 반영',status:'completed',detail:'기기의 휠체어·동행 필요 설정을 합성 사례에 반영했습니다. 이번 요청에서 조건을 바꿀 수 있으며 문의·정보 공유 동의는 변경하지 않았습니다.',isSimulation:true,source:'기기 기본 설정'});
         progress.finished('apply_care_preferences');
       }

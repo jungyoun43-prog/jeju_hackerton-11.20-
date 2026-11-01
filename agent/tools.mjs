@@ -203,10 +203,13 @@ export function getGuidedPreparationKinds(message,state) {
   const requested=new Set(),blocked=new Set(),exclusive=new Set();
   for(const part of authorizationClauses(message,state)){
     // 실발신 금지는 그대로 지키면서, 별도로 요청한 내부 초안까지 금지로 바꾸지 않는다.
-    const clause=part.clause.replace(/(?:실제\s*(?:전화|발신|통화)|실발신)(?:는|은|를|을)?\s*(?:하지|걸지)\s*(?:말아(?:\s*(?:줘(?:요)?|주세요))?|말고|마(?:세요|라)?)/g,'').trim();
+    let clause=part.clause.replace(/(?:실제\s*(?:전화|발신|통화)|실발신)(?:는|은|를|을)?\s*(?:하지|걸지)\s*(?:말아(?:\s*(?:줘(?:요)?|주세요))?|말고|마(?:세요|라)?)/g,'').trim();
+    clause=clause.replace(/((?:택시|이동|교통|(?:병원\s*)?동행)(?:\s*(?:와|과|및|·)\s*(?:택시|이동|교통|(?:병원\s*)?동행))*)(?:은|는|을|를|만|도)?\s*(?:빼고|제외(?:하고|한))/g,phrase=>{
+      if(/택시|이동|교통/.test(phrase))blocked.add('taxi');if(/동행/.test(phrase))blocked.add('companion');return '';
+    });
     const kinds=[...(/택시|이동|교통/.test(clause)?['taxi']:[]),...(/동행/.test(clause)?['companion']:[])];
     const broad=!kinds.length&&/(?:방문|진료|협진)(?:을|를)?\s*(?:전체\s*)?준비/.test(clause)&&!/(?:만|뿐)(?:\s|을|은|해|알|준|정)/.test(clause);
-    if(/하지|말아|마세요|마라|금지|불허|않|필요\s*없|원치|원하지|(?:빼|제외)\s*(?:줘|주세요|하고|해)|(?:^|\s)안\s*(?:준비|정리|문의|알아)|준비\s*안/.test(clause)){
+    if(/하지|말아|마세요|마라|금지|불허|않|필요\s*없|원치|원하지|(?:빼|제외)\s*(?:줘|주세요|하고|해|고|한)|(?:^|\s)안\s*(?:준비|정리|문의|알아)|준비\s*안/.test(clause)){
       for(const kind of kinds.length?kinds:['taxi','companion'])blocked.add(kind);continue;
     }
     if(/(?:택시|이동|교통)(?:\s*지원)?\s*만/.test(clause))exclusive.add('taxi');
@@ -225,7 +228,8 @@ export function getGuidedPreparationChanges(message,state) {
   const area=state.patient.area.replace(/\s+/g,''),compact=text.replace(/\s+/g,'');
   if(ADMIN_AREAS.some(value=>{const name=value.split(' ').at(-1).replace(/[읍면시]$/,'');return new RegExp(`${regexText(name)}(?:에서|으로|로|(?:출발|거주|지역))`).test(compact)&&!area.includes(name);})||/(?:출발지|출발\s*지역).{0,12}(?:바꾸|변경|수정)/.test(text))fields.push('area');
   const hospital=state.selectedHospital?.companyName||state.patient.localHospital;
-  if(hospitalData.records.some(item=>text.includes(item.companyName)&&item.companyName!==hospital)||/(?:다른|새로운|새)\s*(?:제주|도내)?\s*병원|(?:병원|기관).{0,12}(?:바꾸|변경|수정)/.test(text))fields.push('hospital');
+  const namedHospital=[...text.matchAll(/[가-힣A-Za-z0-9·]+(?:병원|의료원)(?=에서|으로|로|에|을|를|은|는|의|이|가|[\s,.!?]|$)/g)].some(([name])=>!authorizationTargets(state,name).length);
+  if(namedHospital||hospitalData.records.some(item=>text.includes(item.companyName)&&item.companyName!==hospital)||/(?:다른|새로운|새)\s*(?:제주|도내)?\s*병원|(?:병원|기관).{0,12}(?:바꾸|변경|수정)/.test(text))fields.push('hospital');
   if(/휠체어/.test(text))fields.push('wheelchair');
   for(const [field,subject] of [['transportNeeded','(?:택시|이동)'],['companionNeeded','동행']])if(new RegExp(`${subject}.{0,12}(?:필요\\s*없|불필요|필요해|필요하|추가|제외)`).test(text))fields.push(field);
   return fields;

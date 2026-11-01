@@ -128,6 +128,49 @@ test('명시한 새 날짜·시각·지역·기관·휠체어 조건이 미반�
   }
 });
 
+test('UI 기본 설정 적용을 이번 메시지의 휠체어·동행 조건 반영으로 세지 않는다',async()=>{
+  for(const [message,preferences] of [
+    ['휠체어가 필요하니 방문 준비해줘',{taxiProviderId:'auto',wheelchair:false,companionNeeded:true}],
+    ['동행이 필요하니 방문 준비해줘',{taxiProviderId:'auto',wheelchair:false,companionNeeded:false}],
+  ]){
+    const provider=scripted([done('준비 요청을 확인했습니다.')]);
+    const result=await post(createAgentService({provider}),req({message,preferences,applyPreferences:true,guidedPreparation:true})),body=json(result);
+    assert.equal(result.statusCode,200);assert.equal(provider.calls.length,1);
+    assert.deepEqual(body.events.map(item=>item.tool),['apply_care_preferences']);
+    assert.equal(body.caseState.visitSupport.taxi.status,'not_selected');assert.equal(body.caseState.visitSupport.companion.status,'not_selected');
+    assert.match(body.reply,/조건.*반영하지 못해/);
+  }
+  const provider=scripted([use(call('update_visit',{wheelchair:true})),done('휠체어 조건을 반영했습니다.')]);
+  const result=await post(createAgentService({provider}),req({message:'휠체어가 필요하니 방문 준비해줘',preferences:{taxiProviderId:'auto',wheelchair:false,companionNeeded:true},applyPreferences:true,guidedPreparation:true}));
+  assert.equal(result.statusCode,200);assert.equal(json(result).caseState.visitSupport.taxi.status,'prepared');
+  assert.equal(json(result).caseState.visitSupport.requirements.wheelchair,true);
+  assert.equal(json(result).caseState.visitSupport.taxi.provider.serviceType,'accessible_transport');
+});
+
+test('목록 밖 명시 병원에서 준비하라는 요청은 기존 가상 병원 초안으로 진행하지 않는다',async()=>{
+  for(const hospital of ['제주대학교병원','서귀포의료원']){
+    const provider=scripted([done('방문 준비를 확인했습니다.')]);
+    const response=await post(createAgentService({provider}),req({message:`${hospital}에서 방문 준비해줘`,preferences:{taxiProviderId:'auto',wheelchair:false,companionNeeded:true},guidedPreparation:true}));
+    assert.equal(response.statusCode,200);assert.equal(provider.calls.length,1);
+    assert.ok(json(response).events.every(item=>item.tool!=='prepare_inquiries'));
+    assert.equal(json(response).caseState.visitSupport.taxi.status,'not_selected');assert.match(json(response).reply,/기관 변경을 반영하지 못해/);
+  }
+  const ordinary=await post(createAgentService({provider:scripted([done('동행 준비를 확인합니다.')])}),req({message:'병원동행 문의 초안을 준비해줘',guidedPreparation:true}));
+  assert.equal(ordinary.statusCode,200);assert.equal(json(ordinary).caseState.visitSupport.companion.status,'prepared');
+});
+
+test('빼고·제외한 대상은 같은 절의 방문/독립 지원 요청에서도 자동 초안에 포함하지 않는다',async()=>{
+  for(const message of ['동행은 빼고 방문 준비해줘','동행은 빼고 택시 문의 초안을 준비해줘','택시만 빼고 동행 문의 초안을 준비해줘','동행을 제외한 방문 준비해줘']){
+    const provider=scripted([done('범위를 확인했습니다.')]);
+    const response=await post(createAgentService({provider}),req({message,guidedPreparation:true}));
+    assert.equal(response.statusCode,200,message);
+    const excluded=message.startsWith('택시')?'taxi':'companion';
+    assert.equal(json(response).caseState.visitSupport[excluded].status,'not_selected',message);
+    assert.ok(json(response).events.every(item=>item.tool!=='prepare_inquiries'||!item.label.includes(excluded==='taxi'?'택시':'동행')),message);
+    if(message.includes('빼고'))assert.equal(json(response).caseState.visitSupport[excluded==='taxi'?'companion':'taxi'].status,'prepared',message);
+  }
+});
+
 test('기존 초안·가능/실패 응답·인계와 시각 변경은 자동 초안으로 덮거나 재시도하지 않는다',async()=>{
   for(const scenarioId of ['missing_record','call_ai_declined','call_no_answer','time_changed']){
     const seed=json(await post(createAgentService(),{scenarioId,requestId:'guided-seed-preview-0001'},'/api/agent/preview'));
