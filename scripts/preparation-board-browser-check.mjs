@@ -461,6 +461,7 @@ try {
       record(width+'px 답변 수·관측 완료는 업무 readiness를 바꾸지 않음',Object.values(readiness).every(Boolean),JSON.stringify(readiness));
       let waiting=applyAction(createDemoCase(),{type:'SUPPORT_UPDATE_REQUIREMENTS',values:{appointmentTime:'10:00',transportNeeded:false,companionNeeded:false}});
       for(const target of ['mainland','jeju'])waiting=applyAction(waiting,{type:'RECORD_CALL',target,outcome:'documents'});
+      for(const findingId of ['report_issuance','report_submission'])waiting=applyAction(waiting,{type:'JOURNEY_RECORD_FINDING',findingId});
       const second=await begin(page,'방문은 2026년 11월 12일 오전 10시입니다. 이동과 동행은 가족이 맡습니다. 기관에서 받아야 하는 자료와 다음 일을 정리해 주세요.',1);
       await finish(page,second,waiting,'합성 응답: 미확보 판독문과 의료진 진찰 기록은 기관 확인 대기로 남겼습니다. 이동·동행은 이번 조건에서 필요 없습니다.');
       const external=await guidedEvidence(page,waiting),externalTask=external.workflow.currentTask,externalStage=external.workflow.stages.find(stage=>stage.id==='records');
