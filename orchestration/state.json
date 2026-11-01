@@ -1,6 +1,6 @@
 {
   "baseCommit": "e1e7e44",
-  "updatedAt": "2026-11-01T17:17:43.120392+00:00",
+  "updatedAt": "2026-11-01T18:59:08.076162+00:00",
   "tasks": {
     "ui": {
       "phase": "verified",
@@ -546,16 +546,37 @@
         "1436659",
         "1a747aa"
       ]
+    },
+    "use-polish-ui": {
+      "phase": "implementing",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261101-use-polish-ui",
+      "integrationCommits": [],
+      "note": "실사용/폰트/렌더 측정에 근거한 계약 docs/usability-performance-contract.md. 기존 흐름/브랜드/실제시연 경계 보존, 실모델0. 현재검증전."
+    },
+    "load-performance": {
+      "phase": "implementing",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261101-font-loading",
+      "integrationCommits": [],
+      "note": "실사용/폰트/렌더 측정에 근거한 계약 docs/usability-performance-contract.md. 기존 흐름/브랜드/실제시연 경계 보존, 실모델0. 현재검증전."
+    },
+    "support-reason": {
+      "phase": "implementing",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261101-support-reason",
+      "integrationCommits": [],
+      "note": "실사용/폰트/렌더 측정에 근거한 계약 docs/usability-performance-contract.md. 기존 흐름/브랜드/실제시연 경계 보존, 실모델0. 현재검증전."
     }
   },
   "review": {
-    "phase": "verified",
-    "role": "공통 projection·안전한 자동 초안·현재 할 일 UI 독립 통합검토",
+    "phase": "implementing",
+    "role": "독립 실사용·성능 측정 뒤 통합/보호조건 교차검토",
     "findings": [
-      "기본 설정과 명시 조건의 구분·목록 밖 기관·빼고/제외한 범위를 교차 검토해 수정",
-      "후속 실패/중지 뒤 최근 답변 접근·상태 기호·단일 준비표·출처 읽기 보존 보완"
+      "모바일 새 대화 이름 누락",
+      "공통 다음 작업 우선순위 불일치",
+      "실패 사유의 불통 축약",
+      "예시 두 버튼 동작 혼동",
+      "전체 폰트 preload와 반복 DOM 갱신"
     ],
-    "resolution": "교차소스검토에서발견한기본설정/조건갱신·목록밖기관명전체일치·제외대상범위·최근답변선택을수정. 동일1e470지문의현재fixture/keyless/HTTP/native증거통과. 초기브라우저실패원본보존후읽기위치/안내닫기/선택단계/transition관측수정. 새차단발견0이며현재실모델/보호자/기관/실기기품질과구분. 공개배포/패키지상태는최신runs증거."
+    "resolution": "수정/현재소스 검증 전. 실제 모델 품질 미검증 유지."
   },
   "awsDeployment": {
     "phase": "verified",

@@ -728,6 +728,39 @@
         "scripts/visit-recovery-browser-check.mjs",
         "scripts/visit-recovery-integration-check.mjs"
       ]
+    },
+    {
+      "id": "use-polish-ui",
+      "branch": "polish/caregiver-use",
+      "baseCommit": "bb53b40",
+      "allow": [
+        "app/conversation.js",
+        "app/preparation-board-view.js"
+      ]
+    },
+    {
+      "id": "load-performance",
+      "branch": "perf/font-loading",
+      "baseCommit": "bb53b40",
+      "allow": [
+        "app/index.html",
+        "app/conversation.css",
+        "app/assets/pretendard/**",
+        "app/assets/PretendardVariable.woff2",
+        "scripts/prepare-fonts.py",
+        "tests/font-assets.test.mjs",
+        "tests/static-hosting.test.mjs"
+      ]
+    },
+    {
+      "id": "support-reason",
+      "branch": "fix/support-reason-label",
+      "baseCommit": "bb53b40",
+      "allow": [
+        "app/visit-support.js",
+        "tests/visit-support.test.mjs",
+        "tests/call-recovery.test.mjs"
+      ]
     }
   ],
   "rules": [
