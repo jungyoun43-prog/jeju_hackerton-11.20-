@@ -74,10 +74,11 @@
   },
   "assets": {
     "logo": "/assets/hondi-logo-v1.png",
-    "bodyFont": "/assets/PretendardVariable.woff2",
+    "bodyFont": "/assets/pretendard/pretendardvariable-dynamic-subset.css",
     "workspaceBackground": "/assets/jeju-workspace-background-v1.webp",
     "agentMark": "/assets/hondi-mark-v1.png",
-    "iconRegistry": "app/icons.js (기존 SVG 체계; message/expand 경로 추가)"
+    "iconRegistry": "app/icons.js (기존 SVG 체계; message/expand 경로 추가)",
+    "bodyFontManifest": "app/assets/pretendard/manifest.json"
   },
   "viewports": [
     "1800x1125",
@@ -541,5 +542,18 @@
     "reading": "same single stage DOM, hidden/inert inactive details; keep source focus and draft",
     "automation": "explicit guided POST only; bounded public-data inquiry drafting; navigation/resume read-only",
     "modelQuality": "new server/prompt actual-model evaluation unverified after credit exhaustion; old evidence historical"
+  },
+  "usabilityPerformance": {
+    "contract": "docs/usability-performance-contract.md",
+    "structure": "existing current task and right four stages preserved",
+    "controls": {
+      "fixedPreview": "체험",
+      "requestExamples": "요청 예시",
+      "mobileNewConversation": "새 대화"
+    },
+    "nextAction": "one workflow.currentTask for both visible action paths",
+    "fontDelivery": "self-hosted official Pretendard1.3.9 unicode-range CSS + 92 unmodified WOFF2; existing OFL; no font preload",
+    "rendering": "read-only view uses current board; final response one full board render; closed dialog details built on open",
+    "measurement": "orchestration/runs/use-performance.json: startup n3/interaction n3, baseline interaction n1; controlled CPU/network/cache, different HTTP server and LCP target; observed font body85.4% reduction, not field INP/TBT or live-model quality"
   }
 }

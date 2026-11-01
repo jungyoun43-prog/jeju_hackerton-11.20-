@@ -127,6 +127,9 @@ await check('conversation-browser-evidence','verification',async()=>{
  requireThat(proof.desktop.noOverflow && proof.mobile.noOverflow,'PC·모바일 대화 화면에 가로 넘침이 있습니다.');
  requireThat(proof.sourceHash===await runtimeFingerprint(root),'대화 화면 증거 이후 실행 소스가 변경됐습니다. 다시 캡처하세요.');
  requireThat(proof.lastAnswerRecovery?.length===4 && [1440,390].every(width=>['failure','cancel'].every(ending=>proof.lastAnswerRecovery.some(item=>item.width===width && item.ending===ending && item.reachesPreviousAnswer && item.noExtraPost && item.draftPreserved))),'성공 뒤 실패·중지에서도 최근 실제 답변과 초안·읽기 전용 접근이 필요합니다.');
+ requireThat(proof.interfaceScenarios?.length===2 && proof.interfaceScenarios.every(item=>['newChatNamed','distinctExamples','draftExamplesReadOnly','actualFixedFlow'].every(field=>item[field]===true)),'PC·모바일 버튼 이름과 체험/초안 예시의 구분이 필요합니다.');
+ requireThat(proof.loadingScenarios?.length===2 && proof.loadingScenarios.every(item=>['subsetFonts','oldWholeFontAbsent','maruDeferred','wholeFontPreloadsAbsent','inputFamily'].every(field=>item[field]===true) && item.inputFontPx>=16),'자체 분할 폰트·전체 preload 제거·지연 폰트와 입력16px 관측이 필요합니다.');
+ requireThat(proof.lazyRecordScenarios?.length===2 && proof.lazyRecordScenarios.every(item=>item.closedRecordsUnchanged && item.reopenedRecordsLatest) && proof.supportReasonScenarios?.length===16 && proof.supportReasonScenarios.every(item=>item.accurate && item.fixtureOnly),'닫힌 기록의 지연 갱신·열 때 최신값·실패5종/수신처/해당없음/재확인 문구가 필요합니다.');
  for(const path of [proof.desktop.screenshot,proof.mobile.screenshot]) {const bytes=await readFile(resolve(root,path));requireThat(bytes.readUInt32BE(0)===0x89504e47,'유효한 PNG 대화 화면 증거가 아닙니다.');}
  return `${proof.checks.length}개 실제 API/화면 검사·고정 예시·일반503·입력복원·출처 확인. 실제 모델·음성·발신 품질 검증은 아님`;
 });
@@ -138,6 +141,8 @@ await check('journey-browser-evidence','verification',async()=>{
  requireThat(['call_no_answer','call_ai_declined','call_identity_required','call_documents_or_schedule'].every(id=>proof.recoveryScenarioIds?.includes(id)) && (proof.normalAgentPostAttempts ?? proof.scope?.normalAgentPostAttempts)===0,'전화 실패4종의 인계와 모델 비발송 검사가 필요합니다.');
  requireThat(proof.desktop.noOverflow && proof.mobile.noOverflow,'진료 연결 여정 화면에 가로 넘침이 있습니다.');
  requireThat(proof.sourceHash===await runtimeFingerprint(root),'여정 증거 이후 실행 소스가 변경됐습니다. 다시 캡처하세요.');
+ requireThat(proof.continuationScenarios?.length===4 && proof.continuationScenarios.every(item=>item.sameTitle && item.buttons.length===2 && item.buttons.every(button=>button.cancelPreserved && button.draftMatches && button.noExtraPost)),'PC·모바일 자료 누락/무응답에서 두 다음 행동과 초안·취소 보존이 일치해야 합니다.');
+ requireThat(proof.lazyDialogScenarios?.length===6 && proof.lazyDialogScenarios.every(item=>item.closedUnchanged),'닫힌 전화·여정 창의 반복 생성을 줄여야 합니다.');
  for(const path of [proof.desktop.screenshot,proof.mobile.screenshot]) {const bytes=await readFile(resolve(root,path));requireThat(bytes.readUInt32BE(0)===0x89504e47,'유효한 여정 PNG 증거가 아닙니다.');}
  return `${proof.checks.length}개 실제 preview/여정 검사. 실제 의료진·전화·환자기록·효과 검증은 별도`;
 });
@@ -158,6 +163,7 @@ await check('preparation-board-browser-evidence','verification',async()=>{
  requireThat(proof.motionScenarios?.length===4 && ['no-preference','reduce'].every(mode=>[1440,390].every(width=>proof.motionScenarios.some(item=>item.width===width && item.reducedMotion===mode))) && proof.motionScenarios.every(item=>item.greenSurfaces && item.contrastPassed && item.interactionFeedback && item.replyFeedback && item.readingStable && item.normalPostAttempts===0),'초록 대비와 일반/줄인동작의 PC·모바일 피드백/읽기 보존 검사가 필요합니다.');
  const guidedFields=['naturalRequest','caregiverQuestionOnly','currentAndSelectedSeparated','readOnlyNavigation','historyOriginal','responseCountIndependent','observedIndependent','institutionWaitingPreserved','notNeededPreserved','visitNotReady','draftOnly','planListMatches'];
  requireThat(proof.guidedScenarios?.length===2 && [1440,390].every(width=>proof.guidedScenarios.some(item=>item.id==='current-task-flow' && item.width===width && item.normalPostAttempts===0 && guidedFields.every(field=>item[field]===true))),'현재 작업·선택 단계 분리, 질문 담당자, 조회/초안 무발신과 응답/관측 독립 검사가 필요합니다.');
+ requireThat(proof.guidedScenarios.every(item=>item.cachedNavigation===true) && proof.renderScenarios?.length===1 && proof.renderScenarios[0].singleFinalRender===true,'읽기 전용 탐색은 현재 보드를 재사용하고 최종 응답은 준비판에 한번 반영해야 합니다.');
  for(const view of proof.viewports){const bytes=await readFile(resolve(root,view.screenshot));requireThat(bytes.readUInt32BE(0)===0x89504e47,'읽기 UI PNG 증거가 필요합니다.');}
  return `${proof.checks.length}개 한 화면 작업 공간·공통 입력·공유 스크롤·준비 요약·기호/아이콘·실제 keyless 진행 API·진행/취소 fixture와10개 가용 CSS 크기. 실제 browser zoom·기기·모델/DDB는 별도증거.`;
 });
@@ -232,6 +238,22 @@ await check('native-tab-zoom-browser-evidence','verification',async()=>{
  const guidedImage=await readFile(proof.guidedPreviewScreenshot);requireThat(guidedImage.readUInt32BE(0)===0x89504e47,'현재 작업 PNG 캡처가 필요합니다.');
  for(const view of proof.zoomScenarios){const bytes=await readFile(resolve(root,view.screenshot));requireThat(bytes.readUInt32BE(0)===0x89504e47,'실제 native 확대 PNG 캡처가 필요합니다.');}
  return `${proof.checks.length}개 격리 Chromium/Xvfb·MV3 탭 확대와 초안/출처 읽기/고지 확인. 툴바 직접조작·실제 휴대폰/하드웨어 검증은 아님`;
+});
+await check('usability-performance-evidence','verification',async()=>{
+ const proof=JSON.parse(await readFile(resolve(root,'orchestration/runs/use-performance.json'),'utf8'));
+ const current=await runtimeFingerprint(root);
+ requireThat(proof.result==='pass' && proof.sourceHash===current && proof.finalSourceHash===current,'실사용 성능 관측은 현재 실행 소스와 같아야 합니다.');
+ for(const artifact of proof.artifacts) requireThat(createHash('sha256').update(await readFile(resolve(root,artifact.path))).digest('hex')===artifact.sha256,'성능 원자료/스크립트가 달라졌습니다: '+artifact.path);
+ const summary=JSON.parse(await readFile(resolve(root,proof.summary),'utf8'));
+ const raw=JSON.parse(await readFile(resolve(root,proof.raw),'utf8'));
+ requireThat(raw.begin.sourceHash===current && raw.end.sourceHash===current && raw.begin.assets.length===101 && raw.end.assets.length===101 && [...raw.begin.assets,...raw.end.assets].every(asset=>asset.servedMatches),'실제 제공된 UI·분할 폰트101개와 시작/종료 소스 대조가 필요합니다.');
+ requireThat(summary.source.manifestSha256===createHash('sha256').update(await readFile(resolve(root,'app/assets/pretendard/manifest.json'))).digest('hex'),'측정한 폰트 명세와 현재 파일이 다릅니다.');
+ requireThat(summary.conditions.samples.startup===3 && summary.conditions.samples.interaction===3 && summary.conditions.cpuThrottlingRate===6 && summary.conditions.network.latencyMs===150 && summary.conditions.network.downloadBytesPerSecond===200000 && raw.startups.length===3 && raw.interactions.length===3,'동일 관측 조건·표본 수를 보존해야 합니다.');
+ requireThat(summary.startup.beforeOverlay.fontBodyBytes===2524196 && summary.startup.afterActual4196.fontBodyBytes===369436 && summary.startup.afterActual4196.fontRequests===14,'전체 폰트와 초기14개 분할 파일의 실제 전송량 관측을 보존해야 합니다.');
+ requireThat(summary.preview.afterThreeObserved.runs.every(run=>run.fullBoardCallsAfterJSON===1 && run.recordDialogRenderCalls===0 && run.contactDialogRenderCalls===0) && summary.stageClicks.afterFifteenObserved.samples===15 && summary.stageClicks.afterFifteenObserved.rows.every(row=>row.fullBoardCalls===0 && row.APIRequests===0),'최종1회 갱신·닫힌 창 지연과 탐색 시 무발신 관측이 필요합니다.');
+ requireThat(summary.lifecycle.browserClosed && summary.lifecycle.normalAgentPosts===0 && summary.lifecycle.previewPosts===3 && summary.lifecycle.modelCalls===0 && summary.lifecycle.realCalls===0 && summary.lifecycle.personalRecords===0 && summary.lifecycle.violations.length===0,'성능 검사의 정리·실모델/전화/개인기록 비호출 범위가 필요합니다.');
+ requireThat(summary.limits.length===7 && /서버구현/.test(summary.limits[0]) && /LCP/.test(summary.limits[1]) && /표본/.test(summary.limits[3]),'서버·LCP 대상·표본 차이와 현장 지표가 아니라는 한계를 보존해야 합니다.');
+ return '원자료/스크립트10개 SHA·현재101개 제공 자산·3회 관측·폰트 본문85.4%감소·최종1회 반영 확인. LCP 대상/서버 차이·실기기/현장 지표/모델 미검증 유지';
 });
 await check('rollback-boundary','rollback',()=>{
  for(const task of rules.tasks) {

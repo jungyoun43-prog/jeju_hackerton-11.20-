@@ -25,6 +25,13 @@
 - `guidedPreparation:true`의 명시적 요청 범위 안에서 공개자료 기반 이동/동행 초안을 최대2개 이어 준비한다. 기존 dispatcher·요청/도구/시간 한도 안에서만 실행하고 조회/부정 요청·기존 실패/인계/재확인을 존중한다. 새로고침·탐색·초안 선택은 실행하지 않는다. 기존 DB/실발신/개인기록·동의 경계를 보존한다.
 - API 크레딧 소진으로 추가 유료 모델 호출을 하지 않는다. 서버/Prompt 변경 후 이전 UI-only 실모델 불변 예외를 재사용하지 않고 현재 fixture/keyless 검증과 미검증된 모델 품질을 분리한다.
 
+## 실사용·로딩 보완
+
+- [실사용·성능 계약](docs/usability-performance-contract.md)을 따른다. 고정 준비 흐름은 ‘체험’, 입력을 채우는 문구는 ‘요청 예시’로 구분한다. 다음 행동/초안은 현재 workflow.currentTask를 공유하고 모바일 버튼에도 이름을 둔다.
+- 공식 Pretendard1.3.9 unicode-range CSS·92개 원본 WOFF2를 app/assets/pretendard/에서 자체 호스팅한다. 바이너리/Unicode 범위와 기존 OFL을 보존하고 CSS family 별칭만 유지한다. 전체 폰트 preload/삭제된 전체 WOFF2 경로를 다시 추가하지 않는다. 폰트 명세·재현 도구는 manifest.json과 scripts/prepare-fonts.py다.
+- 읽기 전용 단계 이동은 현재 board의 표시만 바꾸고 최종 응답의 중복 렌더를 줄인다. 닫힌 창은 열 때 최신 내용으로 구성하며 열린 창·취소/late·source/초점/초안·복구를 보존한다. 데이터/권한 캐시나 상태 변경은 추가하지 않는다.
+- getVisitSupportSummary의 실패 문구는 call-recovery와 현재 수신처 범위를 재사용한다. AI 거절과 무응답을 불통 하나로 축약하거나 이전 기관의 거절을 새 문의처에 붙이지 않는다.
+
 ## 최신 UI: 한 화면 작업 공간
 
 - 최신 사용자 요청은 혼디 소개 블록 삭제와 한 화면 작업 공간이다. [한 화면 작업 공간 계약](docs/viewport-workspace-contract.md)이 과거 identity·문서 스크롤·모바일 전체 세로 쌓기보다 우선한다. 일정한 여백/100dvh, 중앙 대화 스크롤/하단 공통 입력, PC 오른쪽4요약과 좁거나 낮은 창의 패널 전환을 사용한다.

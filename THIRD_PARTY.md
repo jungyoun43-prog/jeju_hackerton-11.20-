@@ -12,7 +12,7 @@
 | 브라우저 음성 인식 | `SpeechRecognition` / `webkitSpeechRecognition`, `ko-KR` | 지원 브라우저에서 음성을 텍스트로 전환·요청 전송. 별도 STT 계정 미설정. 브라우저 정책·네트워크 의존 가능, 실제 마이크 품질 미검증 |
 | Leaflet | 1.9.4 · BSD-2-Clause | 지도 UI. `package-lock.json` 고정. 빌드에 원 라이선스 포함 |
 | 마루 부리 SemiBold | NAVER 공식 배포 · SIL Open Font License 1.1 | 제목용 자가 호스팅 `app/assets/MaruBuri-SemiBold.woff2`. 공식 TTF의 글리프·이름을 유지하고 fontTools 4.60.1·Brotli로 WOFF2 재포장. 저작권·OFL 원문은 `app/assets/MaruBuri-LICENSE.txt` |
-| Pretendard Variable | 1.3.9 · SIL Open Font License 1.1 | 공식 npm pretendard 배포물의 Variable WOFF2·license를 자체 호스팅. 본문·설정·대화 가독성. 파일 app/assets/PretendardVariable.woff2·Pretendard-LICENSE.txt |
+| Pretendard Variable | 1.3.9 · SIL Open Font License 1.1 | 공식 npm pretendard1.3.9의 unicode-range 분할 CSS·WOFF2 92개를 app/assets/pretendard/에 자체 호스팅. font 바이너리/범위는 원본이며 CSS family 별칭만 Pretendard로 적용. 기존 Pretendard-LICENSE.txt 보존. 버전·원패키지/개별 파일 해시와 변환은 manifest.json, 재현은 scripts/prepare-fonts.py. 전체 파일은 제거하고 MaruBuri는 dialog가 필요할 때 로드 |
 | OpenStreetMap | 지도 데이터 ODbL, 표준 타일 정책 별도 | 개발용 수동 화면의 지도 배경. 기본 타일은 외부 인터넷 의존. 출처 표시·Referer 유지·브라우저 캐시 준수. 대량 수집·오프라인 타일 ZIP 미제공 |
 | Google Maps URLs | 공식 URL 링크, API key 불필요 | 사용자가 누르는 외부 지도/길찾기 링크. 소요시간·경로 계산 결과를 앱에서 조회한 것은 아님 |
 | Google Maps Embed API | 향후 검토 대상 | 현재 미구현. 키 설정으로 활성화되는 기능이 아님. 현재는 OSM 지도와 Google Maps URLs만 제공 |
