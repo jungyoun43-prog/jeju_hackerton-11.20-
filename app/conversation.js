@@ -6,7 +6,7 @@ import { formatMessage } from './message-format.js';
 import { buildCallPlan, CALL_TARGETS } from './call-policy.js';
 import { getCareJourneySummary, JOURNEY_SCENARIOS, CALL_RECOVERY_SCENARIOS } from './care-journey.js';
 import { getPreparationBoard, normalizePreparationProgress } from './preparation-stages.js';
-import { preparationBoardMarkup, preparationNavigationMarkup, renderPreparationBoard, preservePreparationReading } from './preparation-board-view.js';
+import { preparationBoardMarkup, preparationNavigationMarkup, renderPreparationBoard, renderPreparationSources, preservePreparationReading } from './preparation-board-view.js';
 
 const API = '/api/agent';
 const MAX_MESSAGE = 1600;
@@ -97,7 +97,8 @@ function renderBoard() {
   document.getElementById('care-journey-summary').hidden=responseCount===0;
   document.getElementById('return-to-request').hidden=responseCount===0;
   renderPreparationBoard(board,{unreadAnswer,progress,selectedStageId,disableDrafts:pending||Boolean(activeRecognition)});
-  document.getElementById('conversation-history-count').textContent=responseCount?`${responseCount}회 응답`:'';
+  const replyCount=document.querySelectorAll('#message-list .message.assistant:not(.greeting)').length;
+  document.getElementById('conversation-history-count').textContent=replyCount?`${replyCount}회 응답`:'';
   document.getElementById('request-problem-notice').hidden=pending || !(requestProblem || previewProblem);
   document.getElementById('request-examples').hidden=document.getElementById('starter-prompts').hidden;
 }
@@ -586,7 +587,9 @@ function renderSnapshot() {
     const provider = caseState.visitSupport?.[kind]?.provider;
     if (provider) sourceItems.push({label:kind==='taxi'?'이동 문의처':'동행 문의처',source:provider.source?.url});
   }
-  document.getElementById('case-sources').innerHTML = sourceItems.length ? sourceItems.map(item=>`<div><strong>${escape(item.label)}</strong>${safeSource(item.source)}</div>`).join('') : '<p>Agent가 자료를 조회하면 사용한 출처를 처리 기록과 함께 보여드립니다.</p>';
+  const sourcesHost=document.getElementById('case-sources');
+  renderPreparationSources(sourcesHost,sourceItems.map(item=>({url:item.source,label:`${item.label} · 사용한 출처`})));
+  if(!sourcesHost.children.length)sourcesHost.innerHTML='<p>Agent가 자료를 조회하면 사용한 출처를 처리 기록과 함께 보여드립니다.</p>';
   document.getElementById('save-report').disabled = responseCount === 0;
   renderBoard();
 }
@@ -910,7 +913,7 @@ async function sendRequest(text,retryId) {
     updateCapabilities(/MODEL_NOT_CONFIGURED|MODEL_DISABLED|LLM_NOT_CONFIGURED|MODEL_NOT_CONNECTED/.test(code)?{llm:false}:undefined);
   } finally {
     if(finishRequest(request)) {
-      if(!replyNode)scrollToMessage(messageNode);
+      if(!replyNode && !manualStageSelection)scrollToMessage(messageNode);
       else if(!manualStageSelection)showCurrentTask();
       else restoreReading?.();
     }

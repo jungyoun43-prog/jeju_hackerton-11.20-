@@ -39,6 +39,18 @@ function sourceMarkup(source) {
   } catch {return '';}
 }
 
+export function renderPreparationSources(node,sources) {
+  const urls=new Set();
+  for(const source of sources) {
+    const markup=sourceMarkup(source);if(!markup)continue;
+    const url=new URL(source.url).href;if(urls.has(url))continue;urls.add(url);
+    const existing=[...node.children].find(child=>child.tagName==='A'&&child.href===url);
+    if(existing)existing.firstChild.textContent=source.label||'사용한 출처';
+    else node.insertAdjacentHTML('beforeend',markup);
+  }
+  for(const child of [...node.children])if(child.tagName!=='A'||!urls.has(child.href))child.remove();
+}
+
 export function preservePreparationReading() {
   const anchor=document.activeElement;
   const scroller=['conversation-scroll','preparation-rail'].map(id=>document.getElementById(id)).find(node=>node?.contains(anchor) && node.checkVisibility());
@@ -99,7 +111,7 @@ export function renderPreparationBoard(board,{unreadAnswer=false,progress=null,s
     nav.dataset.current=String(stage.id===workflow.currentStageId);nav.dataset.live=String(realProgress&&stage.live);
     nav.setAttribute('aria-pressed',String(stage.id===selected));
     if(stage.id===workflow.currentStageId)nav.setAttribute('aria-current','step');else nav.removeAttribute('aria-current');
-    nav.querySelector('[data-nav-label]').textContent=workStage.label;
+    nav.querySelector('[data-nav-label]').textContent=workStage.label+(workStage.remainingCount?` · 남은 ${workStage.remainingCount}건`:'');
     replaceMarkup(nav.querySelector('[data-nav-signal]'),signalMarkup(signal));
     const navLive=nav.querySelector('[data-nav-live]');navLive.hidden=!(realProgress&&stage.live);navLive.textContent=stage.liveActivity||'확인 중';
     pane.querySelector('[data-stage-summary]').textContent=stage.summary;
@@ -112,7 +124,7 @@ export function renderPreparationBoard(board,{unreadAnswer=false,progress=null,s
     brief.hidden=!stage.gapCount;brief.textContent=stage.gapCount?`확인할 내용 ${stage.gapCount}건`:'';
     replaceMarkup(pane.querySelector('[data-stage-facts]'),stage.facts.map(fact=>`<div><dt>${escape(fact.label)}</dt><dd>${escape(fact.value||'확인 전')}</dd></div>`).join(''));
     replaceMarkup(pane.querySelector('[data-stage-gaps]'),stage.gaps.length?`<h3>확인할 내용 <span>${stage.gapCount??stage.gaps.length}건</span></h3><ul>${stage.gaps.map(gap=>`<li>${escape(gap)}</li>`).join('')}</ul>`:'');
-    replaceMarkup(pane.querySelector('[data-stage-sources]'),stage.sources.map(sourceMarkup).join(''));
+    renderPreparationSources(pane.querySelector('[data-stage-sources]'),stage.sources);
     const liveEvents=board.pending?(progress?.events??[]).filter(event=>event.stage===stage.id):[];
     const count=stage.events.length+liveEvents.length;
     pane.querySelector('[data-stage-log]').hidden=count===0;
