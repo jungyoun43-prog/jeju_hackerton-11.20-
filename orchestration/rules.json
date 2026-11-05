@@ -802,6 +802,15 @@
         "scripts/visit-recovery-browser-check.mjs",
         "scripts/visit-recovery-integration-check.mjs"
       ]
+    },
+    {
+      "id": "product-surface-docs",
+      "branch": "docs/product-surface-system",
+      "baseCommit": "4837e3f1685246c883b19b652c7fae57b7c43886",
+      "allow": [
+        "DESIGN.md",
+        ".impeccable/design.json"
+      ]
     }
   ],
   "rules": [

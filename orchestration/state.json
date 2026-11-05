@@ -1,6 +1,6 @@
 {
   "baseCommit": "e1e7e44",
-  "updatedAt": "2026-11-05T15:58:19.229410+00:00",
+  "updatedAt": "2026-11-05T16:26:57.083906+00:00",
   "tasks": {
     "ui": {
       "phase": "verified",
@@ -596,6 +596,12 @@
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261105-product-surface-qa",
       "integrationCommits": [],
       "note": "새 제품면/짧은초안피드백/전체안내접근성/실행없는탐색 검증. 과거증거원본보존/실모델0/현재검증전."
+    },
+    "product-surface-docs": {
+      "phase": "implementing",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261105-product-surface-docs",
+      "integrationCommits": [],
+      "note": "실제제품면의토큰/상태/반응형명세. 독립리뷰수정점검후문서화;실모델0/현재작성전."
     }
   },
   "review": {
