@@ -218,6 +218,8 @@ components:
 
 버튼·링크·summary·선택·입력의 기본 초점은 `primary` outline(3px / offset 3px), 단계 읽기와 표 스크롤은 `secondary` outline(2px)다. 조작 상태 전환(150ms), 접기 화살표(180ms), 서랍(220ms), 최신 답변 메타의 한 번 피드백(240ms)에 `cubic-bezier(.16,1,.3,1)`을 사용한다. 대기 표식만(1.1s linear) 반복하며 응답 전체는 움직이지 않는다. reduced motion에서는 transition·animation·부드러운 스크롤과 누름/hover 이동을 제거한다. 답변 피드백은 native 종료/취소 표식을 유지해 탭 재방문 때 반복하지 않는다.
 
+**The 서랍 초점 Rule.** 설정 서랍을 열어 둔 채 확대·축소해 초점이 있는 조작이 표시 프레임 밖으로 나가면, 같은 초점을 유지하며 `scrollIntoView({block:'nearest',inline:'nearest'})`로 드러낸다.
+
 ## Do's and Don'ts
 
 ### Do:
@@ -234,6 +236,8 @@ components:
 - **Don't** 작은 창을 맞추려고 글자를 자동 축소하거나 출처·긴 표·고지·닫기·중지를 잘라낸다.
 - **Don't** 공개 문의처·합성 응답·준비 결과를 실제 연락·예약·배차·임상 수락으로 표시한다.
 
-검증 범위: 2026-11-05 `functional-final`의 PC 초기/초안과 모바일 체험/전화 원본 4장을 `view_image(detail: original)`로 직접 확인했다. [14뷰 실행 기록](.impeccable/review/chat-rail/product-redesign/functional-final/look.json)은 시작/최종 지문 `bce38fc6312378f397bd87186d74a44cd06a2e2c27b9417f9ab8da55cc35b9bb`에서 pass/오류0/고정 preview2/일반 POST0/모델0을 보고한다. 앞선 round-2의 대표 원본 9장 확인과 구분한다. 독립 ship은 최종 지문의 입력 하단 고정과 상태 메타 이동 두 수정의 해결 판정이며 전체 표면 재심사가 아니다. 비동기 응답·취소·복구 회귀와 실제 확대는 각 실행의 소스 지문·시각을 확인해 [최신 구현 기록](docs/implementation-results.md)에서 별도로 읽는다.
+이전 검증: 2026-11-05 `functional-final`의 PC 초기/초안과 모바일 체험/전화 원본 4장을 `view_image(detail: original)`로 직접 확인했다. [14뷰 실행 기록](.impeccable/review/chat-rail/product-redesign/functional-final/look.json)은 시작/최종 지문 `bce38fc6312378f397bd87186d74a44cd06a2e2c27b9417f9ab8da55cc35b9bb`에서 pass/오류0/고정 preview2/일반 POST0/모델0을 보고한다. 앞선 round-2의 대표 원본 9장 확인과 구분한다. 당시 독립 ship은 입력 하단 고정과 상태 메타 이동 두 수정의 해결 판정이며 전체 표면 재심사가 아니다.
+
+최신 검증: 2026-11-05 `release-capture`의 PC 초기/초안과 모바일 체험/전화 원본 4장을 같은 original 방식으로 직접 확인했다. [릴리스 14뷰 기록](.impeccable/review/chat-rail/product-redesign/release-capture/look.json)은 시작/최종 지문 `83ba34ae6d299935b2626087639473d7c501f9bb4d50b97a4420573399022184`에서 pass/오류0/고정 preview2/일반 POST0/모델0을 보고한다. 같은 지문의 [native 확대 기록](orchestration/runs/native-zoom-browser.json)은 43/43 통과이며, 문서화 담당이 브라우저나 검사를 재실행한 것은 아니다. [릴리스 독립 검토](.impeccable/review/chat-rail/product-redesign/review/release.md)의 ship도 지정 원본 7장의 입력 하단 고정·상태 메타 위치 두 수정 유지에 한정한다. 비동기 응답·취소·복구 회귀와 다른 기능 검사는 각 실행의 지문·시각을 확인해 [최신 구현 기록](docs/implementation-results.md)에서 별도로 읽는다.
 
 이번에 규칙으로 채택하지 않은 것: 과거 seed·청회색/파란 초점 토큰·미사용 인사 스타일·코드에 없는 합성 tonal ramp. launcher context는 권한126으로 실패했고 detector·seed·roll은 이번 실행에서 미수행이므로 전체 Impeccable 절차 통과를 주장하지 않는다. 실기기·마이크·스크린리더·현재 자유 입력 모델 품질도 이 캡처/문서화의 검증 범위가 아니다.
