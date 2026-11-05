@@ -103,7 +103,8 @@ details>summary:focus-visible { background:var(--soft); color:var(--secondary-ho
 .preparation-boundary { margin:14px 8px; color:var(--muted); font-size:13px; line-height:1.75; }
 .mode-notice { padding:0; margin:0 0 20px; border:0; background:transparent; color:var(--muted); font-size:13px; line-height:1.65; }
 .mode-notice.is-preview { color:var(--warning); }
-.current-preparation-task { padding:0 0 28px; min-width:0; }
+/* 숨긴 접근성 제목도 대화 스크롤 안의 배치 기준을 사용한다. */
+.current-preparation-task { position:relative; padding:0 0 28px; min-width:0; }
 #current-task-title { margin:0; font-size:28px; line-height:1.4; font-weight:650; letter-spacing:-.035em; max-width:32ch; text-wrap:pretty; }
 .current-task-heading { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:8px 16px; margin-top:12px; }
 .current-task-meta { display:grid; gap:3px; min-width:0; color:var(--muted); font-size:13px; line-height:1.65; }
