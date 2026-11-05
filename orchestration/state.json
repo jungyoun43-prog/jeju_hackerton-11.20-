@@ -1,6 +1,6 @@
 {
   "baseCommit": "e1e7e44",
-  "updatedAt": "2026-11-05T15:55:30.581086+00:00",
+  "updatedAt": "2026-11-05T15:58:19.229410+00:00",
   "tasks": {
     "ui": {
       "phase": "verified",
@@ -590,6 +590,12 @@
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261105-product-surface-behavior",
       "integrationCommits": [],
       "note": "사용자 현재시각거부/제품레퍼런스리디자인. docs/product-ui-redesign-contract.md 범위. 실모델/실발신0; 현재검증전."
+    },
+    "product-surface-qa": {
+      "phase": "implementing",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261105-product-surface-qa",
+      "integrationCommits": [],
+      "note": "새 제품면/짧은초안피드백/전체안내접근성/실행없는탐색 검증. 과거증거원본보존/실모델0/현재검증전."
     }
   },
   "review": {

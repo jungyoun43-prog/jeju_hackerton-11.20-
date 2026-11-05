@@ -790,6 +790,18 @@
         "app/conversation.js",
         "app/preparation-board-view.js"
       ]
+    },
+    {
+      "id": "product-surface-qa",
+      "branch": "test/product-surface",
+      "baseCommit": "732860227d2d7361fcbd7d0691b939e2ec2c0b4c",
+      "allow": [
+        "scripts/conversation-browser-check.mjs",
+        "scripts/journey-browser-check.mjs",
+        "scripts/preparation-board-browser-check.mjs",
+        "scripts/visit-recovery-browser-check.mjs",
+        "scripts/visit-recovery-integration-check.mjs"
+      ]
     }
   ],
   "rules": [
