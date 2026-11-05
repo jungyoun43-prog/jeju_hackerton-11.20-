@@ -130,6 +130,9 @@ await check('conversation-browser-evidence','verification',async()=>{
  requireThat(proof.interfaceScenarios?.length===2 && proof.interfaceScenarios.every(item=>['newChatNamed','distinctExamples','draftExamplesReadOnly','actualFixedFlow'].every(field=>item[field]===true)),'PC·모바일 버튼 이름과 체험/초안 예시의 구분이 필요합니다.');
  requireThat(proof.loadingScenarios?.length===2 && proof.loadingScenarios.every(item=>['subsetFonts','oldWholeFontAbsent','maruDeferred','wholeFontPreloadsAbsent','inputFamily'].every(field=>item[field]===true) && item.inputFontPx>=16),'자체 분할 폰트·전체 preload 제거·지연 폰트와 입력16px 관측이 필요합니다.');
  requireThat(proof.lazyRecordScenarios?.length===2 && proof.lazyRecordScenarios.every(item=>item.closedRecordsUnchanged && item.reopenedRecordsLatest) && proof.supportReasonScenarios?.length===16 && proof.supportReasonScenarios.every(item=>item.accurate && item.fixtureOnly),'닫힌 기록의 지연 갱신·열 때 최신값·실패5종/수신처/해당없음/재확인 문구가 필요합니다.');
+ const draftFields=['exampleInline','exampleCancelPreserves','populatedFeedbackCancelPreserves','exampleAcceptDraftOnly','typingClears','currentTaskInline','currentTaskCancelPreserves','currentTaskAcceptDraftOnly','explicitHelpReachable','sendClears','resetClears','sameEditableInput'];
+ requireThat(proof.textDraftScenarios?.length===2 && [1440,390].every(width=>proof.textDraftScenarios.some(item=>item.width===width && draftFields.every(field=>item[field]===true))),'텍스트 초안은 같은 입력·교체 취소/확인·전송 없는 짧은 안내·전체 도움말·초안/초점/clear를 보존해야 합니다.');
+ requireThat(proof.voiceFeedbackScenarios?.length===2 && proof.voiceFeedbackScenarios.every(item=>item.autoOpen && item.permissionErrorVisible && item.noDraftFeedback && item.textRecovery && item.postCount===0),'실제 음성 이벤트 fixture의 안내 자동 열기·권한 오류·텍스트 복구와 미전송을 보존해야 합니다.');
  for(const path of [proof.desktop.screenshot,proof.mobile.screenshot]) {const bytes=await readFile(resolve(root,path));requireThat(bytes.readUInt32BE(0)===0x89504e47,'유효한 PNG 대화 화면 증거가 아닙니다.');}
  return `${proof.checks.length}개 실제 API/화면 검사·고정 예시·일반503·입력복원·출처 확인. 실제 모델·음성·발신 품질 검증은 아님`;
 });
@@ -249,11 +252,24 @@ await check('usability-performance-evidence','verification',async()=>{
  requireThat(raw.begin.sourceHash===current && raw.end.sourceHash===current && raw.begin.assets.length===101 && raw.end.assets.length===101 && [...raw.begin.assets,...raw.end.assets].every(asset=>asset.servedMatches),'실제 제공된 UI·분할 폰트101개와 시작/종료 소스 대조가 필요합니다.');
  requireThat(summary.source.manifestSha256===createHash('sha256').update(await readFile(resolve(root,'app/assets/pretendard/manifest.json'))).digest('hex'),'측정한 폰트 명세와 현재 파일이 다릅니다.');
  requireThat(summary.conditions.samples.startup===3 && summary.conditions.samples.interaction===3 && summary.conditions.cpuThrottlingRate===6 && summary.conditions.network.latencyMs===150 && summary.conditions.network.downloadBytesPerSecond===200000 && raw.startups.length===3 && raw.interactions.length===3,'동일 관측 조건·표본 수를 보존해야 합니다.');
- requireThat(summary.startup.beforeOverlay.fontBodyBytes===2524196 && summary.startup.afterActual4196.fontBodyBytes===369436 && summary.startup.afterActual4196.fontRequests===14,'전체 폰트와 초기14개 분할 파일의 실제 전송량 관측을 보존해야 합니다.');
+ const fonts=summary.startup.afterActual4196;
+ requireThat(summary.startup.beforeOverlay.fontBodyBytes===2524196 && fonts.fontBodyBytes>0 && fonts.fontBodyBytes<summary.startup.beforeOverlay.fontBodyBytes && fonts.fontRequests>0,'같은 원본 전체 폰트보다 작은 실제 초기 분할 파일 전송량과 요청 수 관측이 필요합니다.');
  requireThat(summary.preview.afterThreeObserved.runs.every(run=>run.fullBoardCallsAfterJSON===1 && run.recordDialogRenderCalls===0 && run.contactDialogRenderCalls===0) && summary.stageClicks.afterFifteenObserved.samples===15 && summary.stageClicks.afterFifteenObserved.rows.every(row=>row.fullBoardCalls===0 && row.APIRequests===0),'최종1회 갱신·닫힌 창 지연과 탐색 시 무발신 관측이 필요합니다.');
  requireThat(summary.lifecycle.browserClosed && summary.lifecycle.normalAgentPosts===0 && summary.lifecycle.previewPosts===3 && summary.lifecycle.modelCalls===0 && summary.lifecycle.realCalls===0 && summary.lifecycle.personalRecords===0 && summary.lifecycle.violations.length===0,'성능 검사의 정리·실모델/전화/개인기록 비호출 범위가 필요합니다.');
  requireThat(summary.limits.length===7 && /서버구현/.test(summary.limits[0]) && /LCP/.test(summary.limits[1]) && /표본/.test(summary.limits[3]),'서버·LCP 대상·표본 차이와 현장 지표가 아니라는 한계를 보존해야 합니다.');
- return '원자료/스크립트10개 SHA·현재101개 제공 자산·3회 관측·폰트 본문85.4%감소·최종1회 반영 확인. LCP 대상/서버 차이·실기기/현장 지표/모델 미검증 유지';
+ return `원자료/스크립트 SHA·현재101개 제공 자산·3회 관측·초기 폰트 본문${Math.round((1-fonts.fontBodyBytes/summary.startup.beforeOverlay.fontBodyBytes)*1000)/10}%감소·최종1회 반영 확인. LCP 대상/서버 차이·실기기/현장 지표/모델 미검증 유지`;
+});
+await check('product-design-review-evidence','verification',async()=>{
+ const proof=JSON.parse(await readFile(resolve(root,'orchestration/runs/product-design-review.json'),'utf8'));
+ const current=await runtimeFingerprint(root);
+ requireThat(proof.result==='pass' && proof.disposition==='ship' && proof.sourceHash===current && proof.finalSourceHash===current,'현재 제품면의 독립 수정 판정이 필요합니다.');
+ requireThat(proof.scope==='listed-material-fixes-only' && proof.fullImpeccableWorkflowVerified===false && proof.reviewedCaptureCount===7 && Object.values(proof.fixes).every(value=>value==='resolved'),'두 수정의 판정을 전체 스킬 절차/표면 인증으로 확대하면 안 됩니다.');
+ for(const artifact of proof.artifacts)requireThat(createHash('sha256').update(await readFile(resolve(root,artifact.path))).digest('hex')===artifact.sha256,'디자인 원본/정정/판정/캡처가 변경됐습니다: '+artifact.path);
+ const look=JSON.parse(await readFile(resolve(root,proof.look),'utf8'));
+ requireThat(look.result==='pass' && look.sourceHash===current && look.finalSourceHash===current && look.views.length===14 && look.errors.length===0 && look.browserClosed && look.normalPosts===0 && look.previews===2,'동일 소스의 실제 keyless 화면14개·무발신·브라우저 정리 관측이 필요합니다.');
+ requireThat(look.views.filter(view=>['initial','preview','draft','stages'].includes(view.name)).every(view=>view.metrics.noOverflow && view.metrics.inputVisible && Math.abs(view.metrics.composerBottom-view.metrics.mainBottom)<=1),'초기/체험/초안/준비의 공통 입력이 하단에 유지돼야 합니다.');
+ requireThat(look.views.filter(view=>view.name==='draft').every(view=>!view.metrics.helpOpen && view.metrics.draftFeedbackVisible),'텍스트 초안이 전체 고지를 자동으로 열지 않고 짧게 안내해야 합니다.');
+ return '원본/정정/최종 판정 SHA와14개 현재 캡처 확인. 독립 ship은 입력 하단·상태 위치2수정/직접 본7원본에 한정; 전체 Impeccable·실기기·실모델 인증 아님';
 });
 await check('rollback-boundary','rollback',()=>{
  for(const task of rules.tasks) {
@@ -266,7 +282,7 @@ await check('rollback-boundary','rollback',()=>{
 const passed=checks.filter(c=>c.status==='pass').length,failed=checks.filter(c=>c.status==='fail').length,unverified=checks.filter(c=>c.status==='unverified').length;
 requireThat(passed+failed+unverified===checks.length,'검증 상태를 누락할 수 없습니다.');
 const result={evaluatedAt:new Date().toISOString(),commit:git('rev-parse','HEAD'),automated:{passed,failed,unverified,total:checks.length,rate:Math.round(passed/checks.length*1000)/10},checks,
- manualUnverified:['현재 guided 서버/Prompt의 실제 모델 과업 품질 (크레딧 소진으로 미검증; 과거12과업과 별도)','전체 운영 데이터 API·최신성·전체 원자료 재배포 조건 (허브계보4종 최소 사실은 실제 사용)','실제 전화·기관 접수·공단 기록 연계·의료진 참여','Terra·일반 과업 품질·실제 휴대폰 키보드/마이크·보호자 참여 평가 (Sol12개 합성 과업과 별도)','임상 유효성·실서비스 개인정보 처리·정책 검토','최종 공지/발표·영상/권리 확인·대회 업로드 및 센터 실기기 실행'],submissionReady:false};
+ manualUnverified:['현재 guided 서버/Prompt의 실제 모델 과업 품질 (크레딧 소진으로 미검증; 과거12과업과 별도)','전체 운영 데이터 API·최신성·전체 원자료 재배포 조건 (허브계보4종 최소 사실은 실제 사용)','실서비스 확장: 실제 전화·기관 접수·공단 기록 연계·의료진 참여 (해커톤 합성 시연의 필수 조건 아님)','Terra·일반 과업 품질·실제 휴대폰 키보드/마이크·보호자 참여 평가 (Sol12개 합성 과업과 별도)','임상 유효성·실서비스 개인정보 처리·정책 검토','최종 공지/발표·영상/권리 확인·대회 업로드 및 센터 실기기 실행'],submissionReady:false};
 await mkdir(resolve(root,'orchestration/runs'),{recursive:true});
 await writeFile(resolve(root,'orchestration/runs/latest-eval.json'),JSON.stringify(result,null,2)+'\n');
 for(const item of checks) console.log(`${item.status==='pass'?'PASS':item.status==='unverified'?'UNVERIFIED':'FAIL'} ${item.id} · ${item.evidence}`);

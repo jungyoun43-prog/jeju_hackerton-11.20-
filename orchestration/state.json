@@ -580,41 +580,54 @@
       "note": "동일 실행 지문57ea8657에서 서버442/442·수동47·대화221·여정268·준비판374·복구UI74·HTTP36·native확대43 전부pass/exit0. 독립 연결 코드 검토 문제없음. 폰트/렌더3회 제한관측은 use-performance.json 참조. 실모델·발신·개인기록0, 현재 모델 품질 미검증 유지."
     },
     "product-surface-ui": {
-      "phase": "implementing",
+      "phase": "verified",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261105-product-surface-ui",
-      "integrationCommits": [],
-      "note": "사용자 현재시각거부/제품레퍼런스리디자인. docs/product-ui-redesign-contract.md 범위. 실모델/실발신0; 현재검증전."
+      "integrationCommits": [
+        "25dca0c",
+        "4837e3f",
+        "1e98f71"
+      ],
+      "note": "최종83ba34ae 실행 지문에서5개 suite994·수동47·실제 native확대43 총1084/1084. 새 제품 작업면/짧은 초안 안내/입력 하단·같은DOM/초안·출처·복구 보존. 독립7원본의 지정2수정 resolved/limited ship·전체Impeccable미검증. 최종성능·규칙·공개·ZIP은 해당runs를 따름. 실모델/발신/개인기록0·현재모델품질미검증 유지."
     },
     "product-surface-behavior": {
-      "phase": "implementing",
+      "phase": "verified",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261105-product-surface-behavior",
-      "integrationCommits": [],
-      "note": "사용자 현재시각거부/제품레퍼런스리디자인. docs/product-ui-redesign-contract.md 범위. 실모델/실발신0; 현재검증전."
+      "integrationCommits": [
+        "7b2a620",
+        "6d037d1",
+        "17b2b87"
+      ],
+      "note": "최종83ba34ae 실행 지문에서5개 suite994·수동47·실제 native확대43 총1084/1084. 새 제품 작업면/짧은 초안 안내/입력 하단·같은DOM/초안·출처·복구 보존. 독립7원본의 지정2수정 resolved/limited ship·전체Impeccable미검증. 최종성능·규칙·공개·ZIP은 해당runs를 따름. 실모델/발신/개인기록0·현재모델품질미검증 유지."
     },
     "product-surface-qa": {
-      "phase": "implementing",
+      "phase": "verified",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261105-product-surface-qa",
-      "integrationCommits": [],
-      "note": "새 제품면/짧은초안피드백/전체안내접근성/실행없는탐색 검증. 과거증거원본보존/실모델0/현재검증전."
+      "integrationCommits": [
+        "06732f6",
+        "55a4bb1"
+      ],
+      "note": "최종83ba34ae 실행 지문에서5개 suite994·수동47·실제 native확대43 총1084/1084. 새 제품 작업면/짧은 초안 안내/입력 하단·같은DOM/초안·출처·복구 보존. 독립7원본의 지정2수정 resolved/limited ship·전체Impeccable미검증. 최종성능·규칙·공개·ZIP은 해당runs를 따름. 실모델/발신/개인기록0·현재모델품질미검증 유지."
     },
     "product-surface-docs": {
-      "phase": "implementing",
+      "phase": "verified",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261105-product-surface-docs",
-      "integrationCommits": [],
-      "note": "실제제품면의토큰/상태/반응형명세. 독립리뷰수정점검후문서화;실모델0/현재작성전."
+      "integrationCommits": [
+        "8a00b37",
+        "aaf4c7d"
+      ],
+      "note": "최종83ba34ae 실행 지문에서5개 suite994·수동47·실제 native확대43 총1084/1084. 새 제품 작업면/짧은 초안 안내/입력 하단·같은DOM/초안·출처·복구 보존. 독립7원본의 지정2수정 resolved/limited ship·전체Impeccable미검증. 최종성능·규칙·공개·ZIP은 해당runs를 따름. 실모델/발신/개인기록0·현재모델품질미검증 유지."
     }
   },
   "review": {
     "phase": "verified",
-    "role": "독립 실사용·성능 측정·연결 코드 교차검토",
+    "role": "독립 시각 수정 검토와 동일 소스 기능 검증",
     "findings": [
-      "모바일 새 대화 이름 누락",
-      "공통 다음 작업 우선순위 불일치",
-      "실패 사유의 불통 축약",
-      "예시 두 버튼 동작 혼동",
-      "전체 폰트 preload와 반복 DOM 갱신"
+      "현재 작업보다 강한 반복 프레임과 제목",
+      "텍스트 초안 선택 후 전체 고지 자동 펼침",
+      "PC 입력 하단의 불필요한 여백",
+      "작은 창 접근성 제목과 확대 후 설정 초점 가시성"
     ],
-    "resolution": "이름·현재 할 일·현재 수신처 사유 공유와 공식 분할 폰트/지연 렌더 적용. 동일 소스442개 서버 및1,063개 브라우저/HTTP 검사 통과. 독립 교차검토 결함없음. 현재 모델 품질 미검증 및 기존 보호조건 유지."
+    "resolution": "연속 흰 작업면·정렬된 단계 행·작업 제목 위계와 짧은 초안 안내 적용. 실제14뷰·독립7원본의 지정2수정 해결 확인(전체스킬인증아님). 동일83 지문1084개 브라우저/HTTP 검사 통과. 전화 닫기 첫 지적은 원본 PNG/DOM 근거로 철회하고 원문/정정 보존. 실모델·실기기·보호자 참여 평가는 별도."
   },
   "awsDeployment": {
     "phase": "verified",
