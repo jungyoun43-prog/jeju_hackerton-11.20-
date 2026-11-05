@@ -773,6 +773,23 @@
         "scripts/visit-recovery-browser-check.mjs",
         "scripts/visit-recovery-integration-check.mjs"
       ]
+    },
+    {
+      "id": "product-surface-ui",
+      "branch": "design/product-surface",
+      "baseCommit": "d4f46e4a2719131ba9320780a1be997b322d8667",
+      "allow": [
+        "app/conversation.css"
+      ]
+    },
+    {
+      "id": "product-surface-behavior",
+      "branch": "design/product-interaction",
+      "baseCommit": "d4f46e4a2719131ba9320780a1be997b322d8667",
+      "allow": [
+        "app/conversation.js",
+        "app/preparation-board-view.js"
+      ]
     }
   ],
   "rules": [

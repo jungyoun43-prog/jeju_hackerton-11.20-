@@ -1,6 +1,6 @@
 {
   "baseCommit": "e1e7e44",
-  "updatedAt": "2026-11-01T19:23:56.366843+00:00",
+  "updatedAt": "2026-11-05T15:55:30.581086+00:00",
   "tasks": {
     "ui": {
       "phase": "verified",
@@ -578,6 +578,18 @@
         "c4bd609ea52d2678d99bfb9475db9ad7112fd0b6"
       ],
       "note": "동일 실행 지문57ea8657에서 서버442/442·수동47·대화221·여정268·준비판374·복구UI74·HTTP36·native확대43 전부pass/exit0. 독립 연결 코드 검토 문제없음. 폰트/렌더3회 제한관측은 use-performance.json 참조. 실모델·발신·개인기록0, 현재 모델 품질 미검증 유지."
+    },
+    "product-surface-ui": {
+      "phase": "implementing",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261105-product-surface-ui",
+      "integrationCommits": [],
+      "note": "사용자 현재시각거부/제품레퍼런스리디자인. docs/product-ui-redesign-contract.md 범위. 실모델/실발신0; 현재검증전."
+    },
+    "product-surface-behavior": {
+      "phase": "implementing",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261105-product-surface-behavior",
+      "integrationCommits": [],
+      "note": "사용자 현재시각거부/제품레퍼런스리디자인. docs/product-ui-redesign-contract.md 범위. 실모델/실발신0; 현재검증전."
     }
   },
   "review": {
