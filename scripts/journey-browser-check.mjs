@@ -9,7 +9,7 @@ import { runtimeFingerprint } from '../orchestration/checks.mjs';
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const servedRoot=process.env.QA_SERVED_SOURCE_ROOT?resolve(process.env.QA_SERVED_SOURCE_ROOT):root;
 const require=createRequire(import.meta.url);
-const directory='.impeccable/review/chat-rail/use-performance/journey';
+const directory='.impeccable/review/chat-rail/product-redesign/journey';
 const scenarioIds=['missing_record','jeju_unavailable','time_changed'];
 const recoveryScenarioIds=['call_no_answer','call_ai_declined','call_identity_required','call_documents_or_schedule'];
 const allowedScenarioIds=[...scenarioIds,...recoveryScenarioIds];

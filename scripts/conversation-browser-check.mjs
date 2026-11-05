@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { runtimeFingerprint } from '../orchestration/checks.mjs';
 import { createDemoCase, applyAction } from '../app/domain.js';
 import { getVisitSupportSummary } from '../app/visit-support.js';
+import { getPreparationWorkflow } from '../app/preparation-workflow.js';
 import supportData from '../app/data/visit-support-providers.json' with {type:'json'};
 
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
@@ -17,7 +18,7 @@ catch {throw new Error('선택 QA 도구 Playwright가 필요합니다. README�
 const base=new URL(process.env.BASE_URL||'http://127.0.0.1:4173');
 // 이 검사는 실제 503/고정 preview와 주입 응답을 함께 쓴다. 공개 유료 서버에서는 실행하지 않는다.
 if(!['localhost','127.0.0.1','[::1]'].includes(base.hostname) || !['http:','https:'].includes(base.protocol) || base.username || base.password)throw new Error('BASE_URL은 키를 끈 localhost QA 서버여야 합니다.');
-const directory='.impeccable/review/chat-rail/use-performance/conversation';
+const directory='.impeccable/review/chat-rail/product-redesign/conversation';
 const storageKey='jeju-care-preferences-v1';
 const fixtureSessionId='q'.repeat(43);
 const configuredCaps={llm:true,model:'gpt-6.1-sol',phone:'simulation',healthRecords:'demo',voiceInput:'browser'};
@@ -26,7 +27,7 @@ await mkdir(resolve(root,'orchestration/runs'),{recursive:true});
 const browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH||undefined,args:['--no-sandbox','--disable-dev-shm-usage']});
 const checks=[],errors=[];
 const record=(name,ok,detail='')=>{checks.push({name,status:ok?'pass':'fail',detail});console.log(`${ok?'PASS':'FAIL'} ${name}${detail?' · '+detail:''}`);};
-const proof={result:'fail',checkedAt:new Date().toISOString(),url:base.href,sourceHash:await runtimeFingerprint(servedRoot),invokingSourceHash:await runtimeFingerprint(root),checks,errors,apiLive:false,modelInvoked:false,phoneInvoked:false,healthRecordsQueried:false,microphone:'permission-denied, transcript-review and delayed-abort fixtures only',fixedPreview:false,normalInputDisconnected:false,keylessDisconnectedInitialCheckCount:0,actualHttpPostCounts:{agent:0,preview:0},desktop:{width:1440,height:900,noOverflow:false},mobile:{width:390,height:844,noOverflow:false},interfaceScenarios:[],loadingScenarios:[],lazyRecordScenarios:[],supportReasonScenarios:[],lastAnswerRecovery:[],fixtureCoverage:{lastAnswerRecovery:false,preferences:false,markdown:false,recovery:false,voiceReview:false,voiceCancellation:false,exampleDrafts:false,cancellation:false,contactPlan:false,shortViewport:false},shortViewport:[],runtimeAssets:[],sourceHashScope:process.env.QA_SERVED_SOURCE_ROOT?'explicit QA_SERVED_SOURCE_ROOT; served UI assets compared below':'invoking checkout; served UI assets compared below'};
+const proof={result:'fail',checkedAt:new Date().toISOString(),url:base.href,sourceHash:await runtimeFingerprint(servedRoot),invokingSourceHash:await runtimeFingerprint(root),checks,errors,apiLive:false,modelInvoked:false,phoneInvoked:false,healthRecordsQueried:false,microphone:'permission-denied, transcript-review and delayed-abort fixtures only',fixedPreview:false,normalInputDisconnected:false,keylessDisconnectedInitialCheckCount:0,actualHttpPostCounts:{agent:0,preview:0},desktop:{width:1440,height:900,noOverflow:false},mobile:{width:390,height:844,noOverflow:false},interfaceScenarios:[],loadingScenarios:[],lazyRecordScenarios:[],supportReasonScenarios:[],lastAnswerRecovery:[],textDraftScenarios:[],voiceFeedbackScenarios:[],fixtureCoverage:{lastAnswerRecovery:false,preferences:false,markdown:false,recovery:false,voiceReview:false,voiceCancellation:false,exampleDrafts:false,cancellation:false,contactPlan:false,shortViewport:false},shortViewport:[],runtimeAssets:[],sourceHashScope:process.env.QA_SERVED_SOURCE_ROOT?'explicit QA_SERVED_SOURCE_ROOT; served UI assets compared below':'invoking checkout; served UI assets compared below'};
 const overflow=page=>page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1 && document.documentElement.scrollHeight<=innerHeight+1 && scrollY===0);
 const json=request=>JSON.parse(request.postData());
 const hashMatches=request=>request.headers()['x-amz-content-sha256']===createHash('sha256').update(request.postDataBuffer()).digest('hex');
@@ -195,6 +196,11 @@ async function recordsMatch(panel,state) {
 }
 const highwayDisconnected=async panel=>(await panel.locator('#health-highway-status').innerText()).trim()==='미연결' && /불러온 기록 없음/.test(await panel.locator('#health-highway-last-sync').innerText());
 const normalizedText=value=>value.replace(/\s+/g,' ').trim();
+const previewNotice=text=>/작성된 예시/.test(text) && /합성/.test(text) && /실제.*(?:연락|발신).*예약.*없음/.test(text);
+const draftFeedbackState=(page,originalInput)=>page.evaluate(original=>{
+  const input=document.getElementById('request-input'),feedback=document.getElementById('draft-feedback'),help=document.getElementById('composer-help'),voice=document.getElementById('voice-help');
+  return {sameInput:input===original && document.querySelectorAll('#request-input').length===1,editable:!input.disabled&&!input.readOnly,inputFocused:document.activeElement===input,helpClosed:!help.open,voiceQuiet:voice.hidden&&voice.textContent==='',inlineVisible:feedback.checkVisibility({visibilityProperty:true})&&!feedback.hidden&&Boolean(feedback.textContent.trim()),inlineStatus:feedback.getAttribute('role')==='status'&&feedback.classList.contains('draft-feedback'),inlinePlacement:feedback.previousElementSibling?.id==='conversation-form'&&feedback.nextElementSibling?.classList.contains('composer-notes'),text:feedback.textContent,cleared:feedback.hidden&&feedback.textContent===''};
+},originalInput);
 const settleUI=page=>page.evaluate(()=>new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(done))));
 // 화면 아래에 있는 문구는 사용자가 스크롤할 수 있으면 접근 가능하다.
 // overflow:hidden 조상을 프로그램으로 움직여서만 보인 경우는 통과시키지 않는다.
@@ -346,10 +352,10 @@ try {
       const preview=await previewResponse,payload=await preview.json();
       await page.waitForFunction(()=>document.querySelectorAll('.tool-record').length===15);
       await readConversation(page);
-      const previewOk=preview.status()===200 && payload.isPreview===true && payload.events.length===15;
+      const previewOk=preview.status()===200 && payload.isPreview===true && payload.capabilities.llm===false && payload.events.length===15;
       proof.fixedPreview ||= previewOk;interfaceSample.actualFixedFlow=previewOk&&await flow.getAttribute('aria-label')==='준비 흐름 체험'&&normalizedText(await flow.innerText())==='체험';
       record(`${width}px 체험은 실제 고정 API를 실행하고 완료 뒤 같은 명칭으로 복귀`,interfaceSample.actualFixedFlow);
-      record(`${width}px 고정 미리보기 실제 도구 15건`,previewOk && await page.locator('.example-label').count()===2 && /작성된 예시|고정.*미리보기/.test(await page.locator('#mode-notice').textContent()) && /LLM.*없음/.test(await page.locator('#mode-notice').textContent()));
+      record(`${width}px 작성된 합성 예시·실제 연락/예약 없음과 고정 미리보기 도구 15건`,previewOk && await page.locator('.example-label').count()===2 && previewNotice(await page.locator('#mode-notice').textContent()));
       record(`${width}px 처리 기록은 기본 접힘·설정은 preview에 미적용`,await page.locator('.tool-records').evaluateAll(nodes=>nodes.length>0 && nodes.every(node=>!node.open)) && /적용하지/.test(await page.locator('#preferences-status').textContent()) && !Object.hasOwn(json(requests.at(-1)),'preferences'));
       record(`${width}px 실제 공개 기관·애월콜·공식 동행 경로`,payload.caseState.selectedHospital?.source.datasetId==='859' && payload.caseState.visitSupport.taxi.provider.name==='애월콜' && payload.caseState.visitSupport.taxi.provider.source.datasetId==='327' && payload.caseState.visitSupport.companion.provider.id==='areum-escort');
       record(`${width}px 공단 미연결·진찰 미수행·동행 불통 유지`,payload.events.some(e=>e.tool==='request_records' && e.status==='not_connected') && payload.pendingActions.some(a=>a.kind==='physician-exam') && payload.caseState.visitSupport.companion.status==='unreachable_demo');
@@ -384,7 +390,7 @@ try {
       const actual=await response,payload=await actual.json();
       await page.waitForFunction(()=>document.querySelectorAll('.tool-record').length===15);
       record('연결 설정 fixture에서도 실제 preview 15건만 실행',actual.status()===200 && payload.isPreview===true && payload.capabilities.llm===false && payload.events.length===15 && requests.length===1 && new URL(requests[0].url()).pathname==='/api/agent/preview','GET 연결 설정만 fixture·preview는 실제 keyless API·모델 POST 없음');
-      record('고정 예시의 llm:false는 전역 연결 설정을 덮어쓰지 않음',await page.locator('#connection-state').textContent()==='대화 연결 설정됨' && /실제 응답은 요청을 보낼 때/.test(await page.locator('#connection-details').textContent()) && /작성된 예시|고정.*미리보기/.test(await page.locator('#mode-notice').textContent()) && /LLM.*없음/.test(await page.locator('#mode-notice').textContent()));
+      record('고정 예시의 llm:false는 전역 연결 설정을 덮어쓰지 않음',payload.isPreview===true && payload.capabilities.llm===false && await page.locator('#connection-state').textContent()==='대화 연결 설정됨' && /실제 응답은 요청을 보낼 때/.test(await page.locator('#connection-details').textContent()) && /체험은 작성된 예시이며 실제 AI 모델의 응답이 아닙니다/.test(await page.locator('#connection-details').textContent()) && previewNotice(await page.locator('#mode-notice').textContent()));
       panel=await openPatientRecords(page);
       record('일반 기록 연계 connected fixture는 특정 건강정보 고속도로 성공으로 표시하지 않음',highwayBefore && await highwayDisconnected(panel));await closePatientRecords(page);
     } finally {await context.close();}
@@ -502,9 +508,17 @@ try {
       record(`${width}px 서랍 닫기는 대화·포커스 복원, POST 없음`,await page.evaluate(()=>document.activeElement.id==='open-care-menu' && document.querySelector('#care-rail').inert && !document.querySelector('#workspace-shell').inert) && requests.length===0 && await disclosure(page));
     } finally {await context.close();}
   });
-  await scenario('음성 거절 fixture',async()=>{
-    const {page,context,requests}=await open(390,844,{voice:'denied'});
-    try {await page.locator('#voice-request').click();await page.waitForFunction(()=>document.querySelector('#voice-help').textContent.includes('권한'));await page.locator('#request-input').fill('텍스트로 이어가기');record('음성 권한 거절 fixture는 미전송·텍스트 복구',requests.length===0 && await page.locator('#send-request').isEnabled() && await page.locator('#voice-request').getAttribute('aria-pressed')==='false','브라우저 이벤트 fixture·실제 마이크 인식 아님');}
+  for(const [width,height] of [[1440,900],[390,844]])await scenario(`${width}px 음성 거절 fixture`,async()=>{
+    const {page,context,requests}=await open(width,height,{voice:'denied'});
+    try {
+      await page.locator('#voice-request').click();await page.waitForFunction(()=>document.querySelector('#voice-help').textContent.includes('권한'));
+      const autoOpen=await page.locator('#composer-help').evaluate(node=>node.open),hint=page.locator('#voice-help'),permissionErrorVisible=await hint.isVisible() && await hint.evaluate(node=>node.getAttribute('role')==='status' && node.classList.contains('error')) && (await reachable(hint)).reachable,noDraftFeedback=await page.locator('#draft-feedback').evaluate(node=>node.hidden&&node.textContent==='');
+      record(`${width}px 실제 음성 오류 피드백 경로는 전체 안내를 자동 열고 권한 오류 표시`,autoOpen && permissionErrorVisible && noDraftFeedback && requests.length===0,'브라우저 이벤트 fixture·실제 마이크 인식 아님');
+      await page.locator('#request-input').fill('텍스트로 이어가기');
+      const textRecovery=requests.length===0 && await page.locator('#send-request').isEnabled() && await page.locator('#voice-request').getAttribute('aria-pressed')==='false';
+      record(`${width}px 음성 권한 거절 fixture는 미전송·텍스트 복구`,textRecovery,'브라우저 이벤트 fixture·실제 마이크 인식 아님');
+      proof.voiceFeedbackScenarios.push({width,autoOpen,permissionErrorVisible,noDraftFeedback,textRecovery,postCount:requests.length});
+    }
     finally {await context.close();}
   });
   await scenario('음성 인식 검토 fixture',async()=>{
@@ -514,7 +528,7 @@ try {
       await page.locator('#voice-request').click();
       record('음성을 듣는 동안 기존 초안도 자동 전송하지 않음',requests.length===0 && await page.locator('#send-request').isDisabled() && await page.locator('#voice-request').getAttribute('aria-pressed')==='true');
       await page.evaluate(()=>window.__qaFinishSpeech());await page.waitForFunction(()=>document.querySelector('#request-input').value.includes('11월 12일'));
-      record('음성 인식 fixture는 검토 가능한 초안으로 남고 자동 전송하지 않음',requests.length===0 && /확인|고친/.test(await page.locator('#voice-help').textContent()) && await page.locator('#send-request').isEnabled());
+      record('음성 인식 fixture는 열린 안내와 검토 가능한 초안으로 남고 자동 전송하지 않음',requests.length===0 && await page.locator('#composer-help').evaluate(node=>node.open) && await page.locator('#voice-help').isVisible() && /확인|고친/.test(await page.locator('#voice-help').textContent()) && await page.locator('#send-request').isEnabled());
       await send(page,'11월 20일 어머니 이동을 준비해 주세요.');
       record('인식 내용을 수정한 뒤 보내야 요청됨',requests.length===1 && json(requests[0]).message==='11월 20일 어머니 이동을 준비해 주세요.' && hashMatches(requests[0]),'실제 음성 서비스·모델 호출 아님');proof.fixtureCoverage.voiceReview=true;
       await page.locator('#return-to-request').click();await page.locator('#voice-request').click();
@@ -561,22 +575,61 @@ try {
   for(const [width,height] of [[1440,900],[390,844]])await scenario(`${width}px 예시 초안 fixture`,async()=>{
     const {page,context,requests}=await open(width,height,{configured:true,onPost:request=>({body:fixtureResponse(request,createDemoCase())})});
     try {
-      const input=page.locator('#request-input'),example=page.locator('[data-example]').first();await reveal(example);
+      const input=page.locator('#request-input'),originalInput=await input.elementHandle(),example=page.locator('[data-example]').first(),sample={width,exampleInline:false,exampleCancelPreserves:false,populatedFeedbackCancelPreserves:false,exampleAcceptDraftOnly:false,typingClears:false,currentTaskInline:false,currentTaskCancelPreserves:false,currentTaskAcceptDraftOnly:false,explicitHelpReachable:false,sendClears:false,resetClears:false,sameEditableInput:false};proof.textDraftScenarios.push(sample);await reveal(example);
       const visible=normalizedText(await example.locator('span').innerText());
       await example.click();
       record(`${width}px 예시는 보이는 문구만 초안으로 채우고 POST 없음`,requests.length===0 && normalizedText(await input.inputValue())===visible && !/11월\s*12|오전\s*10/.test(await input.inputValue()) && await page.locator('.message.user').count()===0);
+      const exampleState=await draftFeedbackState(page,originalInput);
+      sample.exampleInline=exampleState.sameInput&&exampleState.editable&&exampleState.inputFocused&&exampleState.helpClosed&&exampleState.voiceQuiet&&exampleState.inlineVisible&&exampleState.inlineStatus&&exampleState.inlinePlacement&&(await reachable(page.locator('#draft-feedback'))).reachable;
+      record(`${width}px 텍스트 예시는 같은 입력창에 초점을 두고 작은 상태 문구만 표시·전체 안내 닫힘`,sample.exampleInline,JSON.stringify(exampleState));
       const examples=page.locator('[data-example]');
       for(let index=1;index<await examples.count();index++) {
         await input.fill('');const other=examples.nth(index);await reveal(other);const copy=normalizedText(await other.locator('span').innerText());await other.click();
-        record(`${width}px 추가 예시 ${index+1}도 보이는 초안만 입력`,requests.length===0 && normalizedText(await input.inputValue())===copy && !/11월\s*12|오전\s*10/.test(await input.inputValue()));
+        const state=await draftFeedbackState(page,originalInput);
+        record(`${width}px 추가 예시 ${index+1}도 보이는 초안·작은 피드백만 입력`,requests.length===0 && normalizedText(await input.inputValue())===copy && !/11월\s*12|오전\s*10/.test(await input.inputValue()) && state.sameInput&&state.editable&&state.inputFocused&&state.helpClosed&&state.inlineVisible);
       }
+      const populatedDraft=await input.inputValue(),populatedFeedback=(await draftFeedbackState(page,originalInput)).text;await reveal(example);await example.focus();
+      const keepPopulated=await confirmAction(page,example,false),keptState=await draftFeedbackState(page,originalInput);
+      sample.populatedFeedbackCancelPreserves=keepPopulated.confirmed&&await input.inputValue()===populatedDraft&&keptState.inlineVisible&&keptState.text===populatedFeedback&&keptState.helpClosed&&await example.evaluate(node=>document.activeElement===node)&&requests.length===0;
+      record(`${width}px 교체 취소는 이미 보이는 짧은 피드백·기존 초안·초점도 보존`,sample.populatedFeedbackCancelPreserves);
       const existing='직접 쓰던 요청은 예시를 눌러도 먼저 보호해야 합니다.';await input.fill(existing);
+      const typedState=await draftFeedbackState(page,originalInput);await reveal(example);await example.focus();
       const cancelled=await confirmAction(page,example,false);
-      record(`${width}px 예시 교체 취소는 기존 초안 보존`,cancelled.confirmed && await input.inputValue()===existing && requests.length===0);
+      const cancelledState=await draftFeedbackState(page,originalInput);
+      sample.exampleCancelPreserves=cancelled.confirmed && await input.inputValue()===existing && requests.length===0 && cancelledState.text===typedState.text&&cancelledState.cleared&&cancelledState.helpClosed&&await example.evaluate(node=>document.activeElement===node);
+      record(`${width}px 예시 교체 취소는 기존 초안·피드백·선택 버튼 초점 보존`,sample.exampleCancelPreserves);
       const accepted=await confirmAction(page,example);
-      record(`${width}px 예시 교체 확인도 전송 없이 초안만 변경`,accepted.confirmed && normalizedText(await input.inputValue())===visible && requests.length===0);
-      const edited=visible+' 방문 날짜와 희망 시간은 아직 미정입니다.';await send(page,edited);
+      const acceptedState=await draftFeedbackState(page,originalInput);
+      sample.exampleAcceptDraftOnly=accepted.confirmed && normalizedText(await input.inputValue())===visible && requests.length===0&&acceptedState.sameInput&&acceptedState.editable&&acceptedState.inputFocused&&acceptedState.helpClosed&&acceptedState.inlineVisible;
+      record(`${width}px 예시 교체 확인도 전송 없이 같은 입력창·초안·작은 피드백만 변경`,sample.exampleAcceptDraftOnly);
+      const edited=visible+' 방문 날짜와 희망 시간은 아직 미정입니다.';await input.fill(edited);
+      sample.typingClears=typedState.cleared&&(await draftFeedbackState(page,originalInput)).cleared;
+      record(`${width}px 직접 입력을 고치면 지난 초안 피드백을 지움`,sample.typingClears);
+      await send(page,edited);
       record(`${width}px 예시를 고친 뒤 보내야 수정한 본문 1건 전송`,requests.length===1 && json(requests[0]).message===edited && hashMatches(requests[0]) && await page.locator('.message.user').count()===1);
+      const requestDraft=getPreparationWorkflow(createDemoCase()).currentTask?.requestDraft;if(!requestDraft)throw new Error('현재 업무 초안이 있는 합성 조건이 필요합니다.');
+      const taskButton=page.locator('#current-task-draft'),existingTaskDraft='현재 업무 초안을 고르기 전 직접 작성한 요청';await reveal(taskButton);await input.fill(existingTaskDraft);await taskButton.focus();
+      const taskCancelled=await confirmAction(page,taskButton,false),taskCancelledState=await draftFeedbackState(page,originalInput);
+      sample.currentTaskCancelPreserves=taskCancelled.confirmed&&await input.inputValue()===existingTaskDraft&&requests.length===1&&taskCancelledState.cleared&&taskCancelledState.helpClosed&&await taskButton.evaluate(node=>document.activeElement===node);
+      record(`${width}px 현재 업무 초안 교체 취소도 내용·선택 버튼 초점·POST 수 보존`,sample.currentTaskCancelPreserves);
+      const taskAccepted=await confirmAction(page,taskButton),taskState=await draftFeedbackState(page,originalInput);
+      sample.currentTaskInline=taskState.sameInput&&taskState.editable&&taskState.inputFocused&&taskState.helpClosed&&taskState.voiceQuiet&&taskState.inlineVisible&&taskState.inlineStatus&&taskState.inlinePlacement&&(await reachable(page.locator('#draft-feedback'))).reachable;
+      sample.currentTaskAcceptDraftOnly=taskAccepted.confirmed&&await input.inputValue()===requestDraft.trim().slice(0,1600)&&requests.length===1&&sample.currentTaskInline;
+      record(`${width}px 현재 업무 초안도 같은 수정 가능한 입력·작은 상태 문구·전체 안내 닫힘·추가 POST0`,sample.currentTaskAcceptDraftOnly,JSON.stringify(taskState));
+      sample.capture=await screenshot(page,`text-draft-${width}`);
+      await page.locator('#composer-help>summary').click();
+      const explicitHelpOpen=await page.locator('#composer-help').evaluate(node=>node.open),boundary=await reachable(page.locator('#composer-boundary')),privacy=await reachable(page.locator('#privacy-note')),end=await reachable(page.locator('#composer-help .pending-note'));
+      const paragraphs=[];for(const paragraph of await page.locator('#composer-help .composer-detail-body>p').all())if(await paragraph.isVisible())paragraphs.push(await reachable(paragraph));
+      sample.explicitHelpReachable=explicitHelpOpen&&boundary.reachable&&privacy.reachable&&end.reachable&&paragraphs.length>=4&&paragraphs.every(item=>item.reachable)&&/가상 사례.*실제 연락·예약 없음/.test(await page.locator('#composer-boundary').innerText())&&/음성은 인식한 내용을 확인한 뒤 보내요|음성 미지원 브라우저예요. 텍스트로 요청해 주세요/.test(await page.locator('#composer-help').innerText())&&/주민번호·인증정보·실제 의료기록 입력 금지.*대화 원문은 새로고침하면 사라져요/.test(await page.locator('#privacy-note').innerText())&&/이 화면의 대기만 중지해요.*서버 처리는 계속될 수 있습니다/.test(await page.locator('#composer-help .pending-note').innerText())&&await input.inputValue()===requestDraft.trim().slice(0,1600)&&requests.length===1;
+      record(`${width}px 전체 안내를 명시적으로 열면 경계·개인정보·중지 원문 끝까지 접근·초안 보존`,sample.explicitHelpReachable,JSON.stringify({boundary,privacy,end,paragraphs}));
+      await page.locator('#composer-help>summary').click();
+      const response=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/agent'&&r.request().method()==='POST');await page.locator('#send-request').click();await response;await page.waitForFunction(()=>document.querySelector('#conversation-form').getAttribute('aria-busy')==='false');
+      sample.sendClears=(await draftFeedbackState(page,originalInput)).cleared&&requests.length===2&&json(requests[1]).message===requestDraft.trim().slice(0,1600)&&hashMatches(requests[1]);
+      record(`${width}px 채운 초안을 직접 보내면 피드백을 지우고 확인한 본문 한 건만 추가`,sample.sendClears);
+      await reveal(taskButton);await taskButton.click();const beforeReset=await draftFeedbackState(page,originalInput),reset=await confirmAction(page,'#new-conversation'),afterReset=await draftFeedbackState(page,originalInput);
+      sample.resetClears=beforeReset.inlineVisible&&reset.confirmed&&afterReset.cleared&&afterReset.helpClosed&&await input.inputValue()===''&&requests.length===2;
+      sample.sameEditableInput=[exampleState,acceptedState,taskState,afterReset].every(state=>state.sameInput&&state.editable);
+      record(`${width}px 새 대화도 초안 피드백을 지우고 같은 단일 입력창 유지·추가 POST0`,sample.resetClears&&sample.sameEditableInput);
       proof.fixtureCoverage.exampleDrafts=true;
     } finally {await context.close();}
   });

@@ -7,7 +7,7 @@ import {fileURLToPath,pathToFileURL} from 'node:url';
 import {execFileSync} from 'node:child_process';
 
 const root=resolve(process.env.QA_SERVED_SOURCE_ROOT||resolve(dirname(fileURLToPath(import.meta.url)),'..'));
-const directory='.impeccable/review/chat-rail/use-performance/integration',tokenKey='hondi-visit-token-v1';
+const directory='.impeccable/review/chat-rail/product-redesign/integration',tokenKey='hondi-visit-token-v1';
 const firstText='합성 방문을 2026년 11월 19일 오후 2시로 바꾸고 남은 준비를 알려 주세요.';
 const nextText='합성 방문을 2026년 11월 26일 오전 11시로 바꾸고 남은 준비를 알려 주세요.';
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');

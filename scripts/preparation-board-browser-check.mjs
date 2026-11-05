@@ -10,7 +10,7 @@ const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const servedRoot=process.env.QA_SERVED_SOURCE_ROOT?resolve(process.env.QA_SERVED_SOURCE_ROOT):root;
 const base=new URL(process.env.BASE_URL||'http://127.0.0.1:4173');
 if(!['localhost','127.0.0.1','[::1]'].includes(base.hostname) || !['http:','https:'].includes(base.protocol) || base.username || base.password || base.pathname!=='/' || base.search || base.hash)throw new Error('BASE_URL은 키를 끈 localhost QA 서버의 루트 주소여야 합니다.');
-const directory='.impeccable/review/chat-rail/use-performance/board',checks=[],errors=[];
+const directory='.impeccable/review/chat-rail/product-redesign/board',checks=[],errors=[];
 const ids=['records','hospitals','support','plan'];
 const viewports=[[1800,1125],[1440,900],[1152,720],[960,600],[720,450],[1060,900],[390,844],[390,500],[320,500],[768,512]];
 const caps={llm:true,model:'gpt-6.1-sol',phone:'simulation',healthRecords:'demo',voiceInput:'browser',progress:'poll'};
@@ -756,7 +756,8 @@ try {
       const {result,data}=await preview(page,'aewol-parent-visit');
       await page.clock.runFor(9000);
       record('poll capabilities에서도 preview는 실제 고정 API1건·진행0건',result.status()===200 && data.isPreview===true && (await calls(page)).length===0 && actualPosts.length===1 && actualPosts[0].path==='/api/agent/preview');
-      record('preview의 llm:false가 연결 설정을 덮어쓰지 않음',await page.locator('#connection-state').innerText()==='대화 연결 설정됨' && /LLM.*없음/.test(await page.locator('#mode-notice').innerText()));
+      const notice=await page.locator('#mode-notice').innerText();
+      record('preview의 llm:false가 연결 설정을 덮어쓰지 않음',data.isPreview===true && data.capabilities.llm===false && await page.locator('#connection-state').innerText()==='대화 연결 설정됨' && /작성된 예시/.test(notice) && /합성/.test(notice) && /실제.*(?:연락|발신).*예약.*없음/.test(notice) && /체험은 작성된 예시이며 실제 AI 모델의 응답이 아닙니다/.test(await page.locator('#connection-details').innerText()));
       if(result.status()===200 && data.isPreview===true)previewEvidence=data;
     } finally {await context.close();}
   });

@@ -14,7 +14,7 @@ const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE||'
 const browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH||undefined,args:['--no-sandbox','--disable-dev-shm-usage']});
 const tokenKey='hondi-visit-token-v1',token='v'.repeat(43),sessionId='q'.repeat(43);
 const caps={llm:true,model:'gpt-6.1-sol',phone:'simulation',healthRecords:'demo',voiceInput:'browser',progress:'unavailable',visitRecovery:'token'};
-const directory='.impeccable/review/chat-rail/use-performance/recovery';
+const directory='.impeccable/review/chat-rail/product-redesign/recovery';
 await mkdir(resolve(root,directory),{recursive:true});await mkdir(resolve(root,'orchestration/runs'),{recursive:true});
 const checks=[],errors=[],proof={checkedAt:new Date().toISOString(),result:'fail',sourceHash:await runtimeFingerprint(servedRoot),checks,errors,guidedScenarios:[],viewports:[],fixturePosts:{agent:0,resume:0,preview:0},actualFixedPreviews:0,unmockedModelPosts:0,modelInvoked:false,phoneInvoked:false,recordsQueried:false,scope:'Actual local static assets; normal and recovery HTTP response fixtures. Successful fixed preview is a real keyless local endpoint; the preview-failure case is a separate fixture. No real model, database durability, phone, microphone or physical-device evidence.'};
 const record=(name,pass,detail='')=>{checks.push({name,status:pass?'pass':'fail',detail});console.log(`${pass?'PASS':'FAIL'} ${name}${detail?' · '+detail:''}`);};
