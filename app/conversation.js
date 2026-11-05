@@ -552,11 +552,11 @@ function updateCapabilities(next) {
   connection.textContent = capabilityState === 'connected' ? '대화 연결 설정됨' : capabilityState === 'checking' ? '연결 확인 중' : 'AI 모델 미연결';
   const copy = capabilityCopy();
   document.getElementById('mode-label').textContent = `가상 사례 · ${capabilities.phone === 'connected' ? '연결 상태 확인' : '실제 발신 없음'}`;
-  document.getElementById('connection-details').innerHTML = `<dl><div><dt>대화</dt><dd>${capabilities.llm === true ? '모델 연결을 설정했습니다. 실제 응답은 요청을 보낼 때 확인합니다.' : capabilityState === 'checking' ? '대화 API 연결 상태를 확인하고 있습니다.' : 'AI 모델은 아직 연결하지 않았습니다. 자유 입력은 대화 API로 전송하며, 모델 연결 뒤 작동합니다.'}</dd></div><div><dt>기록</dt><dd>${escape(copy.records)}</dd></div><div><dt>문의</dt><dd>${escape(copy.phone)}</dd></div><div><dt>음성</dt><dd>${SpeechRecognition ? '브라우저에서 한국어 요청을 텍스트로 바꿉니다.' : '이 브라우저는 음성 입력을 지원하지 않습니다. 텍스트로 요청하세요.'}</dd></div></dl><p>실제 기록 조회에는 본인인증·동의와 연계 서비스가 필요합니다. 연결 설정과 실제 처리 완료는 구분합니다.</p>`;
+  document.getElementById('connection-details').innerHTML = `<dl><div><dt>대화</dt><dd>${capabilities.llm === true ? '모델 연결을 설정했습니다. 실제 응답은 요청을 보낼 때 확인합니다.' : capabilityState === 'checking' ? '대화 API 연결 상태를 확인하고 있습니다.' : 'AI 모델은 아직 연결하지 않았습니다. 자유 입력은 대화 API로 전송하며, 모델 연결 뒤 작동합니다.'}</dd></div><div><dt>기록</dt><dd>${escape(copy.records)}</dd></div><div><dt>문의</dt><dd>${escape(copy.phone)}</dd></div><div><dt>음성</dt><dd>${SpeechRecognition ? '브라우저에서 한국어 요청을 텍스트로 바꿉니다.' : '이 브라우저는 음성 입력을 지원하지 않습니다. 텍스트로 요청하세요.'}</dd></div></dl><p>체험은 작성된 예시이며 실제 AI 모델의 응답이 아닙니다. 공개 자료와 합성 사례로 준비 흐름을 보여 줍니다.</p><p>실제 기록 조회에는 본인인증·동의와 연계 서비스가 필요합니다. 연결 설정과 실제 처리 완료는 구분합니다.</p>`;
   const notice = document.getElementById('mode-notice');
   notice.hidden = !previewMode && capabilities.llm === true;
   notice.classList.toggle('is-preview',previewMode);
-  notice.textContent = previewMode ? '작성된 예시 · 환자·회신은 합성, LLM·실제 발신 없음' : capabilityState === 'checking' ? '연결 범위를 확인하고 있어요.' : 'AI 모델 미연결 · ‘체험’으로 준비 흐름을 볼 수 있어요.';
+  notice.textContent = previewMode ? '작성된 예시 · 합성 사례, 실제 연락·예약 없음' : capabilityState === 'checking' ? '연결 범위를 확인하고 있어요.' : 'AI 모델 미연결 · ‘체험’으로 준비 흐름을 볼 수 있어요.';
   renderVisitRecovery();
 }
 
@@ -650,7 +650,8 @@ function fillRequestDraft(text,{source='요청 예시',focus=true}={}) {
   if(!draft)return false;
   if(input.value.trim() && input.value.trim()!==draft && !window.confirm('입력창에 작성 중인 요청이 있어요. 선택한 문구로 바꿀까요? 취소하면 기존 초안을 유지합니다.'))return false;
   input.value=draft;resizeInput();
-  voiceMessage(`${source}를 입력창에 넣었어요. 날짜·대상을 확인하고 고친 뒤 보내 주세요.`);
+  const feedback=document.getElementById('draft-feedback');
+  feedback.hidden=false;feedback.textContent=`${source} · 입력창에 넣었어요. 확인 후 보내 주세요.`;
   if(focus)input.focus({preventScroll:true});
   return true;
 }
@@ -930,6 +931,7 @@ async function sendRequest(text,retryId) {
 }
 
 function clearInputFeedback() {
+  const feedback=document.getElementById('draft-feedback');feedback.hidden=true;feedback.textContent='';
   const hint=document.getElementById('voice-help');hint.hidden=true;hint.textContent='';
   document.getElementById('composer-help').open=false;
 }
@@ -1034,20 +1036,20 @@ function mount() {
       <aside class="care-rail" id="care-rail" aria-label="가상 가족 사례와 기본 설정" tabindex="-1">
         <div class="rail-brand-row"><a class="brand" href="/" aria-label="혼디 홈">${brand}</a><button type="button" id="close-care-menu" class="close-menu" aria-label="설정 닫기">${icon('close')}</button></div>
         <section class="rail-case" aria-labelledby="rail-patient">
-          <span class="case-person">${icon('user')}</span><h2 id="rail-patient"></h2>
+          <h2 id="rail-patient"></h2>
           <p id="rail-area"></p><p id="rail-caregiver"></p>
           <span class="case-demo">가상 사례 체험 중</span>
         </section>
         <nav class="rail-nav" aria-label="준비 화면 이동">
-          <a href="#main" id="nav-preparation" class="active" aria-current="location">${icon('compass')}<span>진료 준비</span>${icon('chevron')}</a>
-          <a href="#care-journey-dialog" id="nav-care-journey" aria-haspopup="dialog" aria-controls="care-journey-dialog">${icon('file')}<span>진료 연결 여정</span>${icon('chevron')}</a>
-          <a href="#patient-records-dialog" id="nav-patient-records" aria-haspopup="dialog" aria-controls="patient-records-dialog">${icon('folder')}<span>환자 정보·건강 기록</span>${icon('chevron')}</a>
-          <a href="#contact-plan-dialog" id="nav-contact-plan" aria-haspopup="dialog" aria-controls="contact-plan-dialog">${icon('phone')}<span>전화·협진 준비</span>${icon('chevron')}</a>
-          <a href="#care-preferences" id="nav-preferences">${icon('car')}<span>이동·동행 설정</span>${icon('chevron')}</a>
+          <a href="#main" id="nav-preparation" class="active" aria-current="location">${icon('compass')}<span>진료 준비</span></a>
+          <a href="#care-journey-dialog" id="nav-care-journey" aria-haspopup="dialog" aria-controls="care-journey-dialog">${icon('file')}<span>진료 연결 여정</span></a>
+          <a href="#patient-records-dialog" id="nav-patient-records" aria-haspopup="dialog" aria-controls="patient-records-dialog">${icon('folder')}<span>환자 정보·건강 기록</span></a>
+          <a href="#contact-plan-dialog" id="nav-contact-plan" aria-haspopup="dialog" aria-controls="contact-plan-dialog">${icon('phone')}<span>전화·협진 준비</span></a>
+          <a href="#care-preferences" id="nav-preferences">${icon('car')}<span>이동·동행 설정</span></a>
         </nav>
         <section class="preference-panel" id="care-preferences" aria-labelledby="preferences-heading" tabindex="-1">
           <h2 id="preferences-heading">이동·동행 기본 설정</h2>
-          <p class="preference-intro">매번 말씀하지 않아도 되도록.<br>필요한 조건만 정해 두세요.</p>
+          <p class="preference-intro">자주 쓰는 이동 조건을 정해 두세요.</p>
           <form id="preferences-form">
             <label class="select-label" for="pref-taxi">선호 택시 문의처</label>
             <select id="pref-taxi" name="taxiProviderId" aria-describedby="taxi-preference-note"></select>
@@ -1056,7 +1058,7 @@ function mount() {
             <label class="preference-toggle" for="pref-companion"><span>병원 동행 필요</span><input type="checkbox" id="pref-companion" name="companionNeeded"/></label>
           </form>
           <p class="preference-feedback" id="preferences-status" role="status" aria-live="polite"></p>
-          <p class="field-note">설정은 선택이에요. 대화에서 말씀하신 조건을 먼저 따릅니다.</p>
+          <p class="field-note">선택 설정 · 요청에서 말한 조건이 우선해요.</p>
         </section>
         <p class="rail-note">${icon('lock')}기본 설정과 이 탭의 이어하기 참조만 저장해요. 대화와 의료기록은 저장하지 않습니다.</p>
       </aside>
@@ -1064,12 +1066,11 @@ function mount() {
         <main id="main" class="page-main" tabindex="-1">
           <header class="workspace-header">
             <div class="case-header"><h1 id="case-heading"></h1><p id="case-caption"></p></div>
-            <div class="header-actions"><span class="connection-state checking" id="connection-state">연결 확인 중</span><button type="button" class="header-button" id="new-conversation" aria-label="새 대화" title="새 대화">${icon('plus')}<span>새 대화</span></button></div>
+            <div class="header-actions"><span class="connection-state checking" id="connection-state">연결 확인 중</span><div class="workspace-tools"><button type="button" class="expand-answer" id="expand-answer" aria-label="넓게 읽기" title="넓게 읽기" aria-haspopup="dialog" aria-controls="answer-dialog" disabled>${icon('expand')}<span>넓게 읽기</span></button><button type="button" id="preview-button" class="preview-button" aria-label="준비 흐름 체험" title="준비 흐름 체험">체험${icon('chevron')}</button></div><button type="button" class="header-button" id="new-conversation" aria-label="새 대화" title="새 대화">${icon('plus')}<span>새 대화</span></button></div>
           </header>
           <div class="mobile-case-summary" id="mobile-case-summary" aria-label="이번 방문 요약" hidden></div>
           <div class="workspace-controls">
             <div class="workspace-tabs" role="tablist" aria-label="작업 영역"><button type="button" id="workspace-tab-chat" role="tab" aria-controls="chat-workspace" aria-selected="true">할 일</button><button type="button" id="workspace-tab-preparation" role="tab" aria-controls="preparation-rail" aria-selected="false" aria-label="준비 단계" title="준비 단계" tabindex="-1">준비 단계</button></div>
-            <div class="workspace-tools"><button type="button" class="expand-answer" id="expand-answer" aria-label="넓게 읽기" title="넓게 읽기" aria-haspopup="dialog" aria-controls="answer-dialog" disabled>${icon('expand')}<span>넓게 읽기</span></button><button type="button" id="preview-button" class="preview-button" aria-label="준비 흐름 체험" title="준비 흐름 체험">체험${icon('chevron')}</button></div>
           </div>
           <div class="conversation-layout" data-active-view="chat">
             <section class="chat-workspace" id="chat-workspace" role="tabpanel" aria-label="지금 준비할 일과 단계 상세">${chatContent}</section>
@@ -1090,6 +1091,7 @@ function mount() {
                 <textarea id="request-input" name="message" rows="2" maxlength="${MAX_MESSAGE}" placeholder="예: 어머니 진료 자료와 이동·동행을 준비해줘." autocomplete="off" aria-describedby="composer-disclosure composer-boundary privacy-note voice-help" required></textarea>
                 <div class="composer-actions"><button type="button" id="voice-request" class="voice-button" aria-label="음성으로 요청하기" aria-pressed="false" aria-describedby="voice-help" ${SpeechRecognition?'':'disabled'}>${micIcon}<span>말로 요청</span></button><span class="keyboard-hint">Enter로 전송 · Shift+Enter 줄바꿈</span><span class="character-count" id="character-count">0/${MAX_MESSAGE}</span><div id="answer-ready-notice" class="answer-ready-notice" hidden><button type="button" aria-label="새 답변이 도착했어요. 대화에서 보기" title="새 답변이 도착했어요. 대화에서 보기">새 답변</button></div><div id="request-problem-notice" class="request-problem-notice" hidden><button type="button" aria-label="요청 결과를 확인해 주세요. 대화에서 보기" title="요청 결과를 확인해 주세요. 대화에서 보기">오류 보기</button></div><div class="pending-message" id="pending-message" hidden><button type="button" id="cancel-request" class="cancel-request" aria-label="응답 대기 중지" title="응답 대기 중지"><span class="working-mark" aria-hidden="true"></span>중지</button></div><button type="submit" class="send-button" id="send-request" aria-label="요청 보내기" title="요청 보내기" disabled>${icon('arrow')}<span>보내기</span></button></div>
               </form>
+              <p class="draft-feedback" id="draft-feedback" role="status" aria-atomic="true" hidden></p>
               <div class="composer-notes"><p class="composer-disclosure" id="composer-disclosure">${icon('info')}시연 · 실행 없음</p>
                 <div class="composer-extras">
                   <details class="request-examples" id="request-examples"><summary aria-label="요청 예시" title="요청 예시">요청 예시${icon('chevron')}</summary><div class="starter-prompts composer-detail-body" id="starter-prompts"><p>이렇게 요청해 보세요</p><button type="button" data-example="저는 동행이 어려워요. 자료와 이동도 준비해 주세요."><span>저는 동행이 어려워요. 자료와 이동도 준비해 주세요.</span>${icon('arrow')}</button><button type="button" class="secondary-prompt" data-example="어머니가 휠체어를 이용하세요. 무엇을 확인해야 할까요?"><span>어머니가 휠체어를 이용하세요. 무엇을 확인해야 할까요?</span>${icon('arrow')}</button></div></details>
