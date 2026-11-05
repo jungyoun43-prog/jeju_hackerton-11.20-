@@ -1185,6 +1185,11 @@ function mount() {
         // 작아진 영역에서는 출처를 보이게 두고, 다시 넓어지면 원래 읽던 위치로 돌아간다.
         scroller.scrollTop+=bounds.top<frame.top+8?bounds.top-frame.top-8:Math.max(0,bounds.bottom-frame.bottom+8);
       }
+      const careRail=document.getElementById('care-rail');
+      if(drawerOpen && careRail.contains(anchor)){
+        const bounds=anchor.getBoundingClientRect(),frame=careRail.getBoundingClientRect();
+        if(bounds.top<Math.max(0,frame.top) || bounds.bottom>Math.min(innerHeight,frame.bottom))anchor.scrollIntoView({block:'nearest',inline:'nearest'});
+      }
       readingResizeFrame=requestAnimationFrame(()=>{readingWidth=innerWidth;readingHeight=innerHeight;readingResizeFrame=0;});
     });
   });
