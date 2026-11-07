@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { readdir, readFile, realpath, lstat } from 'node:fs/promises';
-import { dirname, resolve, relative } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const projectRoot=resolve(dirname(fileURLToPath(import.meta.url)),'..');
