@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, readFile, rm, symlink } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { scanProject } from '../orchestration/checks.mjs';
@@ -24,11 +24,34 @@ async function fixture(t) {
 }
 const pack=project=>spawnSync(process.execPath,['scripts/package.mjs'],{cwd:project,encoding:'utf8',env:{...process.env,OPENAI_API_KEY:''}});
 
-test('실제 패키지 명령은 일반 파일·빌드·라이선스를 포함하고 .env를 제외한다',async t=>{
-  const {project,archive}=await fixture(t),result=pack(project);
+test('실제 ZIP은 소스·빌드·대표 화면·최종 요약을 보존하고 반복 캡처·비공개 파일을 제외한다',async t=>{
+  const {project,archive}=await fixture(t);
+  const currentFiles={
+    '.impeccable/design.json':'{"fixture":"design"}',
+    '.impeccable/review/chat-rail/product-redesign/release-capture/initial-1440.png':'fixture initial desktop',
+    '.impeccable/review/chat-rail/product-redesign/release-capture/preview-1440.png':'fixture preview desktop',
+    '.impeccable/review/chat-rail/product-redesign/release-capture/preview-390.png':'fixture preview mobile',
+    '.impeccable/review/chat-rail/product-redesign/qa-final/final-summary.json':'{"fixture":"final summary"}',
+    'orchestration/runs/browser.json':'{"fixture":"browser"}',
+    'orchestration/runs/latest-eval.json':'{"fixture":"latest evaluation"}',
+  };
+  const excludedFiles={
+    '.impeccable/review/chat-rail/product-redesign/final-before/old-capture.png':'fixture old capture',
+    '.impeccable/review/board/old-capture.png':'fixture old board',
+    'orchestration/runs/caregiver-local-live-check.json':'{"fixture":"historical run"}',
+    'docs/.env.local':'fixture-private-value',
+    'docs/.git/config':'fixture-private-value',
+    'docs/node_modules/private.txt':'fixture-private-value',
+  };
+  for(const [path,content] of Object.entries({...currentFiles,...excludedFiles})){
+    await mkdir(dirname(join(project,path)),{recursive:true});
+    await writeFile(join(project,path),content);
+  }
+  const result=pack(project);
   assert.equal(result.status,0,result.stderr);
   const entries=JSON.parse(execFileSync('python3',['-c','import json,sys,zipfile; z=zipfile.ZipFile(sys.argv[1]); assert z.testzip() is None; print(json.dumps(z.namelist()))',archive],{encoding:'utf8'}));
-  for(const path of ['docs/reference.txt','.env.example','dist/index.html','dist/vendor/leaflet/LICENSE.txt'])assert.ok(entries.includes('jeju-care-compass-mvp/'+path));
+  for(const path of ['app/index.html','scripts/package.mjs','docs/reference.txt','.env.example','dist/index.html','dist/vendor/leaflet/LICENSE.txt',...Object.keys(currentFiles)])assert.ok(entries.includes('jeju-care-compass-mvp/'+path));
+  for(const path of Object.keys(excludedFiles))assert.ok(!entries.includes('jeju-care-compass-mvp/'+path),path);
   assert.ok(entries.every(path=>!path.endsWith('/.env')&&!path.includes('/node_modules/')));
 });
 
