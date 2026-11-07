@@ -616,6 +616,12 @@
         "aaf4c7d"
       ],
       "note": "최종83ba34ae 실행 지문에서5개 suite994·수동47·실제 native확대43 총1084/1084. 새 제품 작업면/짧은 초안 안내/입력 하단·같은DOM/초안·출처·복구 보존. 독립7원본의 지정2수정 resolved/limited ship·전체Impeccable미검증. 최종성능·규칙·공개·ZIP은 해당runs를 따름. 실모델/발신/개인기록0·현재모델품질미검증 유지."
+    },
+    "submission-package": {
+      "phase": "implementing",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261107-submission-package",
+      "integrationCommits": [],
+      "note": "Ponytail 제출 ZIP 정리·중복된 선택 목록 축소. scripts/package.mjs와tests/package.test.mjs만 소유. 실행 지문83 유지·유료/실발신0. 검증 전."
     }
   },
   "review": {
