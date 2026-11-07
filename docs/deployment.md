@@ -10,7 +10,7 @@
 | /api/config·/api/health | 정적 JSON. 모델·병원 가용성 확인이 아님 |
 | /api/agent* | 캐시 없는 Lambda origin. OAC가 AWS_IAM Function URL에 서명 |
 | output/agent-lambda.zip | index.mjs·deployment.json의 Node22 ESM 코드. 사이트 S3에 올리지 않고 함수에 직접 게시 |
-| output/jeju-care-compass-mvp.zip | 대회 제출용 개발 스냅샷. 함수 ZIP·정적 artifact와 구분 |
+| output/jeju-care-compass-mvp.zip | 대회 제출용 소스·문서·빌드·검증 요약·대표 화면. 전체 개발 캡처/로그와 함수 ZIP·정적 artifact는 구분 |
 
 POST는 UTF-8 본문의 SHA256을 x-amz-content-sha256으로 보낸다. viewer Host만 제외해 전달하며 임의 X-Amz-* whitelist는 만들지 않는다. API no-store·정적 S3 읽기 전용을 유지한다. Lambda512MiB·60초·reserved concurrency2·로그7일이며 CloudFront OriginReadTimeout60초, 브라우저 대기65초다. 서버는 입력 원문·답변·reasoning을 로그/DB에 저장하지 않는다.
 

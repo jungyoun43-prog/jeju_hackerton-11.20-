@@ -83,7 +83,7 @@ python3 scripts/prepare-fonts.py /path/to/pretendard-1.3.9.tgz
 
 새 Prompt·자동 이어가기의 실제 모델 품질은 API 크레딧 소진으로 미검증입니다. 과거12과업의 실모델 결과는 당시 커밋의 참고 이력으로 보존하며 새 로직의 통과로 인용하지 않습니다. 이번 범위와 현재 증거는 [현재 할 일 계약](docs/guided-visit-contract.md)과 [검증 기록](docs/implementation-results.md)을 따릅니다.
 
-현재 구현의 서버 검사442개와 브라우저/HTTP 검사1,084개가 같은 실행 지문에서 통과했습니다. 자동 규칙은91통과·실패0·현재 모델 품질 미검증1로 구분합니다. 제품 참고를 반영한 새 화면과 기획서12페이지를 [최신 검증3.22절](docs/implementation-results.md#322-제품-참고-기반-작업-화면-재설계)에서 확인할 수 있습니다. 실제 모델·시연·fixture와 독립 시각 수정 검토의 범위는 구분합니다.
+현재 구현의 서버 검사442개와 브라우저/HTTP 검사1,084개가 같은 실행 지문에서 통과했습니다. 자동 규칙은92통과·실패0·현재 모델 품질 미검증1로 구분합니다. 제품 참고를 반영한 새 화면과 기획서12페이지를 [최신 검증3.23절](docs/implementation-results.md#323-ponytail-제출-패키지-정리)에서 확인할 수 있습니다. 실제 모델·시연·fixture와 독립 시각 수정 검토의 범위는 구분합니다.
 
 ## 방문 준비 이어하기
 
@@ -202,9 +202,9 @@ npm run package
 
 `PLAYWRIGHT_MODULE`·`CHROMIUM_PATH`로 선택 QA 도구를 지정하고 `npm run proposal:pdf`로12페이지 기획서를 재생성할 수 있습니다. 같은 실행 지문의 실제 keyless preview에서 현재 작업이 보이는 PC 캡처(native 확대 proof)와 Poppler `pdfinfo`가 필요합니다. PDF는 서비스 실행 의존성이 아닙니다.
 
-Lambda 빌드와 ZIP 패키징에는 Python 3가 필요합니다. Lambda ZIP은 `index.mjs`·`deployment.json`으로 구성하며 제출용 `output/jeju-care-compass-mvp.zip`과 구분합니다. 제출 ZIP은 개발 스냅샷이며 이번 버전의 재생성·독립 설치·최종 제출 확인은 [추적표](docs/submission-checklist.md)를 따릅니다. 센터 PC의 GPU·로컬 모델은 요구하지 않지만 센터 실기기 검증은 별도입니다.
+Lambda 빌드와 ZIP 패키징에는 Python 3가 필요합니다. Lambda ZIP은 `index.mjs`·`deployment.json`으로 구성하며 제출용 `output/jeju-care-compass-mvp.zip`과 구분합니다. 제출 ZIP은 소스·문서·정적 빌드와 최신 검증 요약·대표 화면3장으로 구성합니다. 반복 검증 이미지와 전체 로그는 개발 보관본에 남깁니다. 포함/제외 범위와 압축 해제 후 실행은 [패키지 안내](docs/submission-package.md), 최종 제출 확인은 [추적표](docs/submission-checklist.md)를 따릅니다. 센터 PC의 GPU·로컬 모델은 요구하지 않지만 센터 실기기 검증은 별도입니다.
 
-- [PRD v0.22](docs/prd.md): 중앙 현재 작업·선택 단계 상세와 오른쪽 네 단계 탐색 UX, 전화 협진·휠체어 이동 준비와 내부 공공데이터 스킬, 실제·시연·후속 기능과 대회 요구사항.
+- [PRD v0.23](docs/prd.md): 중앙 현재 작업·선택 단계 상세와 오른쪽 네 단계 탐색 UX, 전화 협진·휠체어 이동 준비와 내부 공공데이터 스킬, 실제·시연·후속 기능과 대회 요구사항.
 - [다음 구현 우선순위](docs/next-steps.md): 현재 완료 범위, 실제 LLM 평가·데이터 보강·중복 방지·이어하기와 외부 연동의 완료 기준. Research-Wiki에서도 이 문서를 참조합니다.
 - [12페이지 AI Agent 기획서](docs/submission-proposal.pdf): 데이터 활용·모델/도구·자율 범위·센터 실행환경과 검증 한계.
 - [기능 파이프라인](docs/agent-pipeline.md): 요청부터 도구·처리 기록·재확인까지.

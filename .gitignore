@@ -11,3 +11,4 @@ test-results/
 .worktrees/
 orchestration/runs/
 .impeccable/review/
+.omo/evidence/

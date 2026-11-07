@@ -115,7 +115,7 @@ APP_REVISION=local-preview npm run build:agent
 npm run package
 ```
 
-Python 3가 필요하다. `output/agent-lambda.zip`은 AWS 함수용 `index.mjs`·`deployment.json`이고, `output/jeju-care-compass-mvp.zip`은 제출 준비용 개발 스냅샷이다. 생성만으로 대회 제출 요건 충족·업로드가 완료되는 것은 아니다. [제출 추적표](submission-checklist.md)를 확인한다.
+Python 3가 필요하다. `output/agent-lambda.zip`은 AWS 함수용 `index.mjs`·`deployment.json`이고, `output/jeju-care-compass-mvp.zip`은 제출 준비용 개발 스냅샷이다. 소스·문서·정적 빌드·최신 검증 요약과 대표 화면3장만 묶으며 전체 반복 캡처·로그는 개발 보관본에 둔다. [포함/제외와 독립 실행](submission-package.md)을 따른다. 생성만으로 대회 제출 요건 충족·업로드가 완료되는 것은 아니다. [제출 추적표](submission-checklist.md)를 확인한다.
 
 `npm run observe`, `npm run eval`, `npm run rollback -- <통합-커밋-SHA>`는 브랜치·worktree가 있는 개발 저장소용이다. ZIP의 일반 실행에는 필요하지 않다. 모델·프롬프트·도구·의존성과 실제/시연 범위는 [외부 명세](../THIRD_PARTY.md)와 [API 문서](../agent/README.md)를 따른다.
 
