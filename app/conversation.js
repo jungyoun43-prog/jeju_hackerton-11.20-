@@ -7,6 +7,7 @@ import { buildCallPlan, CALL_TARGETS } from './call-policy.js';
 import { getCareJourneySummary, JOURNEY_SCENARIOS, CALL_RECOVERY_SCENARIOS } from './care-journey.js';
 import { getPreparationBoard, normalizePreparationProgress } from './preparation-stages.js';
 import { preparationBoardMarkup, preparationNavigationMarkup, renderPreparationBoard, renderPreparationView, renderPreparationSources, preservePreparationReading } from './preparation-board-view.js';
+import { renderPatientRecords as renderPatientRecordsContent } from './patient-records.js';
 
 const API = '/api/agent';
 const MAX_MESSAGE = 1600;
@@ -233,32 +234,7 @@ function openCareMenu() {
 }
 
 function renderPatientRecords() {
-  const patient=caseState.patient || {};
-  const provided=value=>typeof value==='string' && value.trim()?value:'현재 사례에 정보가 제공되지 않았습니다.';
-  const fields=[
-    ['name','이름',provided(patient.name)],
-    ['age','나이',Number.isFinite(patient.age)?`${patient.age}세`:'현재 사례에 정보가 제공되지 않았습니다.'],
-    ['area','지역',provided(patient.area)],
-    ['caregiver','보호자',provided(patient.caregiver)],
-    ['existingHospital','기존 도외 병원',provided(patient.existingHospital)],
-    ['localHospital','제주 병원',provided(patient.localHospital)],
-    ['nextVisit','방문일 · 시연 일정',provided(patient.nextVisit)],
-    ['purpose','준비 목적',provided(patient.purpose)],
-  ];
-  document.getElementById('patient-basics').innerHTML=fields.map(([key,label,value])=>`<div data-patient-field="${key}" class="${['existingHospital','localHospital','purpose'].includes(key)?'wide':''}"><dt>${label}</dt><dd>${escape(value)}</dd></div>`).join('');
-  for(const definition of DOCUMENT_DEFINITIONS) {
-    const record=caseState.documents?.find(item=>item.id===definition.id);
-    const node=document.querySelector(`[data-record-document-id="${definition.id}"]`);
-    const source=typeof record?.source==='string'?record.source:'';
-    const content=typeof record?.content==='string'?record.content:'';
-    const status=record?.status==='ready' ? source.trim()?'준비됨 표시 · 합성 자료':'준비됨 표시 · 출처 미확인' : record?.status==='missing'?'사례 자료 미준비':record?.status==='not_performed'?'사례상 시행 전':'상태가 제공되지 않았습니다.';
-    node.querySelector('[data-record-label]').textContent=record?.label || definition.label;
-    node.querySelector('[data-record-status]').textContent=status;
-    node.querySelector('[data-record-status]').dataset.status=record?.status || 'unknown';
-    node.querySelector('[data-record-status]').classList.toggle('unverified',record?.status==='ready' && !source.trim());
-    node.querySelector('[data-record-source]').textContent=source.trim()?source:'출처가 제공되지 않았습니다.';
-    node.querySelector('[data-record-content]').textContent=content.trim()?content:'이 사례에 표시할 내용이 제공되지 않았습니다.';
-  }
+  renderPatientRecordsContent(caseState);
 }
 
 function openPatientRecords() {
@@ -1110,6 +1086,7 @@ function mount() {
           <section class="records-section" aria-labelledby="patient-basics-title"><h3 id="patient-basics-title">현재 준비 대상</h3><dl class="patient-basics" id="patient-basics"></dl><p class="records-note">방문일은 시연 일정이며 실제 예약이 확정된 상태가 아닙니다.</p></section>
           <section class="records-section health-highway" aria-labelledby="health-highway-title"><div class="records-section-heading"><h3 id="health-highway-title">건강정보 고속도로</h3><span class="connector-state" id="health-highway-status">미연결</span></div><dl class="connector-facts"><div><dt>최근 불러오기</dt><dd id="health-highway-last-sync">불러온 기록 없음</dd></div><div><dt>현재 표시 자료</dt><dd>가상 사례의 합성 자료</dd></div></dl><p class="records-note">현재 자료는 건강정보 고속도로·공단에서 조회한 기록이 아닙니다. 연결되지 않아 실제 건강 상태는 확인되지 않았습니다.</p><details class="highway-help" id="health-highway-help"><summary>연결 안내와 현재 범위${icon('chevron')}</summary><p>이 화면에는 건강정보 고속도로의 본인인증·동의·기록 연계 기능이 없습니다. 이 창을 여는 것만으로 인증이나 기록 조회를 요청하지 않습니다.</p><a href="https://www.myhealthway.go.kr/portal/index?page=Individual%2FPortal%2FMediMyData%2FMydataService" target="_blank" rel="noopener noreferrer">공식 서비스 소개${icon('external')}</a></details></section>
           <section class="records-section" aria-labelledby="record-documents-title"><h3 id="record-documents-title">현재 진료 자료</h3><p class="records-note">이 대화에 반영된 합성 자료의 상태·출처·내용입니다. 준비됨 표시는 실제 기관이 확인했다는 뜻이 아닙니다.</p><div class="record-documents" id="patient-record-documents">${DOCUMENT_DEFINITIONS.map(item=>`<details class="record-document" data-record-document-id="${item.id}"><summary><span data-record-label>${escape(item.label)}</span><span data-record-status></span>${icon('chevron')}</summary><dl><div><dt>출처</dt><dd data-record-source></dd></div><div><dt>내용</dt><dd data-record-content></dd></div></dl></details>`).join('')}</div></section>
+          <section class="records-section" id="fhir-demo-records" aria-labelledby="fhir-demo-title"><h3 id="fhir-demo-title">건강기록 체험 자료</h3><p class="records-note" data-fhir-source-label></p><p class="records-note" data-fhir-notice></p><div class="record-documents" id="fhir-demo-entries"></div><details class="record-document" data-fhir-original><summary><span>FHIR 합성 원본 보기</span>${icon('chevron')}</summary><pre class="fhir-source" data-fhir-json></pre></details></section>
           <p class="records-memory-note">${icon('lock')}환자 정보와 진료 자료는 현재 대화에서만 표시합니다. 이 창에서는 수정하거나 기기에 저장하지 않습니다.</p>
         </div>
       </dialog>

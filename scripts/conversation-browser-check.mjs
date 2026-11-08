@@ -24,7 +24,7 @@ const fixtureSessionId='q'.repeat(43);
 const configuredCaps={llm:true,model:'gpt-6.1-sol',phone:'simulation',healthRecords:'demo',voiceInput:'browser'};
 await mkdir(resolve(root,directory),{recursive:true});
 await mkdir(resolve(root,'orchestration/runs'),{recursive:true});
-const browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH||undefined,args:['--no-sandbox','--disable-dev-shm-usage']});
+const browser=await chromium.launch({headless:true,chromiumSandbox:true,executablePath:process.env.CHROMIUM_PATH||undefined,args:['--disable-dev-shm-usage']});
 const checks=[],errors=[];
 const record=(name,ok,detail='')=>{checks.push({name,status:ok?'pass':'fail',detail});console.log(`${ok?'PASS':'FAIL'} ${name}${detail?' · '+detail:''}`);};
 const proof={result:'fail',checkedAt:new Date().toISOString(),url:base.href,sourceHash:await runtimeFingerprint(servedRoot),invokingSourceHash:await runtimeFingerprint(root),checks,errors,apiLive:false,modelInvoked:false,phoneInvoked:false,healthRecordsQueried:false,microphone:'permission-denied, transcript-review and delayed-abort fixtures only',fixedPreview:false,normalInputDisconnected:false,keylessDisconnectedInitialCheckCount:0,actualHttpPostCounts:{agent:0,preview:0},desktop:{width:1440,height:900,noOverflow:false},mobile:{width:390,height:844,noOverflow:false},interfaceScenarios:[],loadingScenarios:[],lazyRecordScenarios:[],supportReasonScenarios:[],lastAnswerRecovery:[],textDraftScenarios:[],voiceFeedbackScenarios:[],fixtureCoverage:{lastAnswerRecovery:false,preferences:false,markdown:false,recovery:false,voiceReview:false,voiceCancellation:false,exampleDrafts:false,cancellation:false,contactPlan:false,shortViewport:false},shortViewport:[],runtimeAssets:[],sourceHashScope:process.env.QA_SERVED_SOURCE_ROOT?'explicit QA_SERVED_SOURCE_ROOT; served UI assets compared below':'invoking checkout; served UI assets compared below'};
@@ -284,7 +284,7 @@ try {
   record('API 응답 캐시 금지',capResponse.headers.get('cache-control')==='no-store');
   if(!keyless)throw new Error('실제 모델이 연결됐거나 keyless 상태를 확인하지 못해 POST 검사를 중단합니다.');
   proof.apiLive=true;
-  for(const path of ['conversation.js','conversation.css','preparation-board-view.js','preparation-stages.js','preparation-workflow.js','visit-support.js','icons.js','assets/pretendard/pretendardvariable-dynamic-subset.css']) {
+  for(const path of ['conversation.js','conversation.css','patient-records.js','health-records.js','data/fhir-demo-bundle.json','preparation-board-view.js','preparation-stages.js','preparation-workflow.js','visit-support.js','icons.js','assets/pretendard/pretendardvariable-dynamic-subset.css']) {
     const response=await fetch(new URL('/'+path,base),{redirect:'error',signal:AbortSignal.timeout(8000)});
     const expected=await readFile(resolve(servedRoot,'app',path));
     const hash=value=>createHash('sha256').update(value).digest('hex');
@@ -323,6 +323,18 @@ try {
       await input.fill('환자정보를 보기 전 작성한 요청');
       let panel=await openPatientRecords(page);
       record(`${width}px 환자정보는 합성 현재 상태의 읽기 전용 native dialog`,await panel.evaluate(node=>node instanceof HTMLDialogElement && node.open && node.matches(':modal') && node.contains(document.activeElement) && Boolean(document.getElementById(node.getAttribute('aria-labelledby'))?.textContent.trim())) && await panel.locator('[data-patient-field]').count()===8 && (await panel.locator('[data-patient-field="name"]').textContent()).includes(createDemoCase().patient.name) && await recordsMatch(panel,createDemoCase()) && await highwayDisconnected(panel) && await panel.locator('input:not([readonly]),textarea:not([readonly]),select,[contenteditable=true]').count()===0);
+      const fhir=panel.locator('#fhir-demo-records'),reportRecord=fhir.locator('[data-fhir-record-id="demo-report"]');
+      await reportRecord.locator('summary').click();
+      record(`${width}px 합성 FHIR 출처·작성일·미반영 판독문을 실제 준비와 구분`,/혼디 고정 합성 FHIR.*2026.*11.*08.*7개 리소스/.test(await fhir.locator('[data-fhir-source-label]').innerText()) && /미반영/.test(await reportRecord.locator('[data-fhir-value]').innerText()) && !(await reportRecord.locator('[data-fhir-detail]').innerText()).includes('[고정 합성 판독문 보유 예시]') && await fhir.locator('[data-fhir-record-id]').count()===5);
+      await fhir.locator('[data-fhir-original]>summary').click();
+      const original=JSON.parse(await fhir.locator('[data-fhir-json]').textContent());
+      record(`${width}px 읽기 전용 FHIR 원본은 자체 합성 환자의7개 리소스`,original.resourceType==='Bundle' && original.type==='collection' && original.entry.length===7 && original.meta.tag.some(tag=>tag.code==='synthetic') && original.entry.some(({resource})=>resource.resourceType==='Patient' && resource.name[0].text==='김정희') && networkRequests.length===initialNetwork);
+      await screenshot(page,`fhir-records-${label}`);
+      await fhir.locator('[data-fhir-original]>summary').click();
+      const temperature=fhir.locator('[data-fhir-record-id="demo-temperature"]'),medication=fhir.locator('[data-fhir-record-id="demo-medication"]');
+      await temperature.locator('summary').click();await medication.locator('summary').click();
+      record(`${width}px 합성 체온과 과거 복약은 실제 측정·현재 복용과 구분`,/36\.5 °C/.test(await temperature.locator('[data-fhir-value]').innerText()) && /실제 측정.*나타내지 않습니다/.test(await temperature.locator('[data-fhir-detail]').innerText()) && /아세트아미노펜.*가상 복약/.test(await medication.locator('[data-fhir-value]').innerText()) && /종료된 가상 이력.*현재 복용.*의미하지 않습니다/.test(await medication.locator('[data-fhir-detail]').innerText()));
+      await fhir.locator('h3').scrollIntoViewIfNeeded();await screenshot(page,`fhir-summary-${label}`);
       const mobile=await page.locator('#open-care-menu').isVisible();
       record(`${width}px 환자정보 Escape는 초안과 focus를 복원`,(!mobile || await page.locator('#care-rail').evaluate(node=>node.inert && node.getAttribute('role')!=='dialog')) && await closePatientRecords(page,{escape:true}) && await input.inputValue()==='환자정보를 보기 전 작성한 요청');
       panel=await openPatientRecords(page);
@@ -363,7 +375,11 @@ try {
       record(`${width}px 실제 공개 기관·애월콜·공식 동행 경로`,payload.caseState.selectedHospital?.source.datasetId==='859' && payload.caseState.visitSupport.taxi.provider.name==='애월콜' && payload.caseState.visitSupport.taxi.provider.source.datasetId==='327' && payload.caseState.visitSupport.companion.provider.id==='areum-escort');
       record(`${width}px 공단 미연결·진찰 미수행·동행 불통 유지`,payload.events.some(e=>e.tool==='request_records' && e.status==='not_connected') && payload.pendingActions.some(a=>a.kind==='physician-exam') && payload.caseState.visitSupport.companion.status==='unreachable_demo');
       panel=await openPatientRecords(page);
-      record(`${width}px 실제 preview 결과가 환자자료 상태·출처·본문에 반영`,await recordsMatch(panel,payload.caseState) && await highwayDisconnected(panel));await closePatientRecords(page);
+      record(`${width}px 실제 preview 결과가 환자자료 상태·출처·본문에 반영`,await recordsMatch(panel,payload.caseState) && await highwayDisconnected(panel));
+      const preparedReport=panel.locator('[data-fhir-record-id="demo-report"]');
+      if(!await preparedReport.evaluate(node=>node.open))await preparedReport.locator('summary').click();
+      record(`${width}px 실제 preview가 같은 FHIR 판독문을 준비 목록에 연결`,/반영됨/.test(await preparedReport.locator('[data-fhir-value]').innerText()) && (await preparedReport.locator('[data-fhir-detail]').innerText())===payload.caseState.documents.find(document=>document.id==='report').content && /DiagnosticReport\/demo-report/.test(await preparedReport.locator('[data-fhir-reference]').innerText()) && await highwayDisconnected(panel));
+      await preparedReport.scrollIntoViewIfNeeded();await screenshot(page,`fhir-prepared-${label}`);await closePatientRecords(page);
       await page.locator('.tool-records>summary').click();
       record(`${width}px 펼친 처리 기록 source 링크는 HTTPS`,await page.locator('.tool-source a').evaluateAll(links=>links.length>0 && links.every(a=>a.href.startsWith('https://') && a.target==='_blank' && a.rel.includes('noopener'))));
       await openVisitSummary(page);

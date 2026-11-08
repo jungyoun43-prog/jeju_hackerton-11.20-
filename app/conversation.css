@@ -304,6 +304,7 @@ details>summary:focus-visible { background:var(--soft); color:var(--secondary-ho
 .close-records { display:inline-flex; align-items:center; justify-content:center; width:44px; min-height:44px; flex-shrink:0; border-radius:7px; color:var(--secondary); }
 .close-records:hover { background:var(--soft); }
 .patient-records-body { padding:23px 26px 25px; overflow-y:auto; overscroll-behavior:contain; min-height:0; }
+.fhir-source { margin:12px 0; padding:12px; white-space:pre-wrap; overflow-wrap:anywhere; font:12px/1.7 monospace; }
 .records-section+.records-section { margin-top:28px; }
 .records-section h3 { font-size:16px; line-height:1.6; font-weight:650; }
 .records-section-heading { display:flex; align-items:center; justify-content:space-between; gap:14px; }
