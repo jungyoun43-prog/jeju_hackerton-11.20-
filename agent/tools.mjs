@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { applyAction, createDemoCase, getTasks, buildReport } from '../app/domain.js';
 import { getVisitSupportSummary, buildSupportInquiry } from '../app/visit-support.js';
 import { filterHospitals } from '../app/hospitals.js';
+import { getDemoDocument, getDemoHealthRecords } from '../app/health-records.js';
 import { getSupportCandidates, validateSupportRegistry } from '../app/support-data.js';
 import hospitalData from '../app/data/hospital-candidates.json' with {type:'json'};
 import supportData from '../app/data/visit-support-providers.json' with {type:'json'};
@@ -50,7 +51,7 @@ export const AGENT_TOOLS = Object.freeze([
   }, [], {minProperties:1})},
   {name:'search_hospital_contacts', description:'허브859 공개13개 기관의 등록 사실을 검색한다. 현재 수용·협진·환자 적합성을 판단하지 않는다.', inputSchema:objectSchema({name:shortText(100),department:shortText(100),area:shortText(100)})},
   {name:'select_hospital_contact', description:'보호자가 현재 요청에서 이름을 명시한 공개 기관을 문의 대상으로 설정한다. 임상 장소 추천은 하지 않는다.', inputSchema:objectSchema({hospitalId:{type:'string',pattern:'^hospital-[0-9]{1,2}$',maxLength:20}}, ['hospitalId'])},
-  {name:'request_records', description:'demo는 서버의 고정 합성 자료만 정리한다. nhis는 승인된 기록 연계가 미설정인 상태를 반환한다. 진찰 소견을 작성하지 않는다.', inputSchema:objectSchema({source:{type:'string',enum:['demo','nhis']}}, ['source'])},
+  {name:'request_records', description:'demo는 앱의 고정 합성 FHIR 기록에서 치료이력·판독문을 준비하고 작성일·출처·합성 검사/과거복약 예제를 반환한다. 실제 건강 상태·처방이 아니다. nhis는 미연결이며 자동 합성 대체하지 않는다. 진찰 소견·의뢰서를 작성하지 않는다.', inputSchema:objectSchema({source:{type:'string',enum:['demo','nhis']}}, ['source'])},
   {name:'mark_document_missing', description:'보호자가 이번 요청에서 치료 이력·판독문·의뢰서 파일을 없거나 미보유라고 명시한 경우에만 합성 준비 목록을 미보유로 정정한다. 이전 제출·검토를 무효화한다. 문서 삭제나 실제 의료기록 조회가 아니며 미시행 진찰 상태는 변경하지 않는다.', inputSchema:objectSchema({documentId:{type:'string',enum:['history','report','referral']}}, ['documentId'])},
   {name:'request_hospital_contact', description:'제주 또는 기존 도외 병원 역할에 협진·의뢰/회송 창구와 접수·자료 절차를 묻는 합성 전화 시연. 공통 위임·최소정보·AI·기록 처리 계획을 포함하며 실제 발신·진료 수락·예약이 아니다.', inputSchema:objectSchema({target:{type:'string',enum:['mainland','jeju']}}, ['target'])},
   {name:'find_support', description:'택시327·돌봄254·별도 공식서비스에서 현재 행정지역과 지원 유형의 문의 후보를 찾는다. 가능 시간·예약은 미확인이다.', inputSchema:objectSchema({kind:kindSchema}, ['kind'])},
@@ -80,9 +81,6 @@ export function createPhoneSimulationAdapter() {
     async support({kind}) { return {outcome:kind === 'taxi' ? 'available' : 'unreachable', isSimulation:true, wheelchairConfirmed:false,eligibilityConfirmed:false}; },
   });
 }
-const recordsTemplate = Object.freeze({
-  report:'[고정 합성 판독문 보유 예시] 최근 검사 자료의 파일이 있는 것으로 시연합니다. 실제 검사 결과·병변·치료 판단은 포함하지 않습니다. 의료진이 원본과 시행일을 확인해야 합니다.',
-});
 function event(tool, label, detail, {status = 'completed', isSimulation = false, source} = {}) {
   if (typeof source === 'string' && /^https?:/i.test(source)) assertSourceUrl(source);
   return {id:randomUUID(), tool,label,status,detail,isSimulation,...(source ? {source} : {})};
@@ -107,7 +105,7 @@ export function getPendingActions(state) {
 function caseFacts(state) {
   return {
     isSynthetic:true,patient:state.patient,selectedHospital:state.selectedHospital ?? null,
-    permissions:state.permissions,documents:state.documents.map(({id,label,status,source}) => ({id,label,status,source})),
+    permissions:state.permissions,documents:state.documents.map(({id,label,status,source}) => ({id,label,status,source})),healthRecords:getDemoHealthRecords(state),
     inquiries:Object.fromEntries(Object.entries(state.inquiries).map(([target,item]) => [target,{status:item.status,requestedDocuments:item.requestedDocuments,source:'합성 전화 역할 · 실제 발신 없음'}])),
     packet:state.packet,review:state.review,visitSupport:getVisitSupportSummary(state),requirements:state.visitSupport.requirements,
     nextActions:getPendingActions(state),callPlans:callPlanSummaries(state),careJourney:getCareJourneySummary(state),preparationWorkflow:preparationWorkflowContext(state),
@@ -424,9 +422,13 @@ export function createToolDispatcher({phoneAdapter = createPhoneSimulationAdapte
           events.push(event(name,'건강보험공단 기록 연계 미설정','승인된 인증·동의 연계가 설정되지 않아 실제 기록을 가져오지 않았습니다.',{status:'not_connected',source:NHIS_SOURCE}));
           pendingActions.push(pending('health-records','실제 진료기록 확인 필요','지금은 합성 자료를 사용합니다. 실제 기록은 본인인증·동의를 거친 연계가 필요합니다.'));
         } else {
-          next = applyAction(next,{type:'ADD_DOCUMENT',id:'report',content:recordsTemplate.report,source:'서버 고정 합성 판독문 보유 예시 · 실제 진료기록 아님'});
-          data = {isSimulation:true,documents:next.documents.map(({id,label,status,source}) => ({id,label,status,source})),physicianExamCreated:false};
-          events.push(event(name,'합성 자료 정리','서버의 고정 합성 치료 이력·판독문 보유 예시를 정리했습니다. 대면 진찰 소견과 의뢰서는 의료진 확인이 필요합니다.',{isSimulation:true,source:'서버 고정 합성 자료'}));
+          fail(getDemoHealthRecords(next).matchesCase,'DEMO_PATIENT_MISMATCH','현재 준비 대상이 고정 FHIR 합성 사례와 다릅니다. 다른 환자의 기록으로 연결하지 않습니다.');
+          for(const id of ['history','report']) {
+            const {content,source}=getDemoDocument(id);
+            next=applyAction(next,{type:'ADD_DOCUMENT',id,content,source});
+          }
+          data = {isSimulation:true,documents:next.documents.map(({id,label,status,source}) => ({id,label,status,source})),healthRecords:getDemoHealthRecords(next),physicianExamCreated:false};
+          events.push(event(name,'합성 FHIR 자료 정리','고정 FHIR 예제의 치료 이력·판독문을 준비 목록에 반영했습니다. 작성일·가상 검사·과거 복약은 합성 예제이며 실제 조회·측정·처방이 아닙니다. 대면 진찰 소견과 의뢰서는 의료진 확인이 필요합니다.',{isSimulation:true,source:'혼디 고정 합성 FHIR 예제'}));
         }
         break;
       case 'mark_document_missing': {

@@ -1,6 +1,7 @@
 import { createCallRecovery, applyCallRecoveryAction } from './call-recovery.js';
 import { createCareJourney, applyCareJourneyAction, reconcileCareJourney, getCareJourneySummary } from './care-journey.js';
 import { createVisitSupport, applyVisitSupportAction, reconcileVisitSupport, buildVisitSupportReport } from './visit-support.js';
+import { getDemoDocument } from './health-records.js';
 
 /**
  * 혼디의 결정적 시연용 워크플로.
@@ -67,6 +68,7 @@ const proceduresConfirmed = state => TARGETS.every(target => state.inquiries[tar
 
 export function createDemoCase() {
   const at = now();
+  const history = getDemoDocument('history');
   return {
     version: 1,
     patient: {
@@ -78,8 +80,8 @@ export function createDemoCase() {
     documents: DOCUMENT_DEFINITIONS.map(doc => ({
       id: doc.id, label: doc.label,
       status: doc.id === 'history' ? 'ready' : doc.id === 'exam' ? 'not_performed' : 'missing',
-      source: doc.id === 'history' ? '시연용 합성 치료 이력' : '',
-      content: doc.id === 'history' ? '합성 사례입니다. 기존 도외 병원에서 치료 후 추적 진료를 준비하고 있습니다. 실제 환자 기록이나 진료 계획이 아닙니다.' : '',
+      source: doc.id === 'history' ? history.source : '',
+      content: doc.id === 'history' ? history.content : '',
     })),
     inquiries: Object.fromEntries(TARGETS.map(id => [id, { status: 'not_contacted', response: '', requestedDocuments: [], transcript: [], at: null }])),
     packet: { status: 'draft', submittedAt: null },
