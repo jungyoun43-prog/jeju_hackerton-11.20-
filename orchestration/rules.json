@@ -820,6 +820,32 @@
         "scripts/package.mjs",
         "tests/package.test.mjs"
       ]
+    },
+    {
+      "id": "fhir-demo-records",
+      "branch": "feature/fhir-demo-records",
+      "baseCommit": "cf7c6d8acff9fefacf81125e86794a4eac8d53ba",
+      "allow": [
+        "app/data/fhir-demo-bundle.json",
+        "app/health-records.js",
+        "app/patient-records.js",
+        "app/domain.js",
+        "app/conversation.js",
+        "app/conversation.css",
+        "agent/tools.mjs",
+        "agent/README.md",
+        "tests/health-records.test.mjs",
+        "scripts/conversation-browser-check.mjs",
+        "README.md",
+        "docs/fhir-demo-contract.md",
+        "docs/patient-records-contract.md",
+        "docs/data-sources.md",
+        "docs/prd.md",
+        "docs/user-manual.md",
+        "docs/implementation-results.md",
+        "orchestration/rules.json",
+        "orchestration/state.json"
+      ]
     }
   ],
   "rules": [

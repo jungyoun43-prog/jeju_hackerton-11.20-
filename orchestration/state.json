@@ -1,6 +1,6 @@
 {
   "baseCommit": "e1e7e44",
-  "updatedAt": "2026-11-05T16:26:57.083906+00:00",
+  "updatedAt": "2026-11-08T11:51:44.928Z",
   "tasks": {
     "ui": {
       "phase": "verified",
@@ -624,6 +624,15 @@
         "46fd6c9"
       ],
       "note": "Ponytail패키지2파일통합46fd6c9/전용worktreeclean/fixture6/6/독립코드검토APPROVE. 442단위·92/93eval(현재모델미검증1)·독립설치442·웹/Lambda빌드·실제keyless서버GET3/preview1 pass. 실행지문83불변/이전UI1084는원시각보존. ZIP약404→32.2MB·대표3화면/요약16개. 전체QA원본은개발보관. 유료/실발신0;새배포/최종ZIP은runs참조."
+    },
+    "fhir-demo-records": {
+      "phase": "verified",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261108-fhir-demo-records",
+      "integrationCommits": [
+        "f41d03b1e7bee6fbd6001d64b611cd904d70b0b1",
+        "3b3784b0285f8a25c6260a0831fc42354ecb6363"
+      ],
+      "note": "고정 합성 FHIR R4 7리소스·화면/Agent 공통 투영·기존 자료 도구 연결. 단위449/449·대화250/250·웹/Lambda빌드·번들preview200/네트워크0·구문37·미보유 회귀 변이검사 pass. 실제 건강정보 고속도로/개인기록/유료 모델/발신0. 전체 과거 UI·성능/기획서·ZIP의 지문은 갱신하지 않음. 배포는 runs/fhir-demo.json 참조."
     }
   },
   "review": {

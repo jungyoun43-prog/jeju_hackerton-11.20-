@@ -166,6 +166,8 @@ node scripts/public-data-query.mjs analyze --analysis public_health_contacts --a
 
 ## 2. 환자 기록과 의학적 근거
 
+2026-11-08 사용자가 승인한 더미데이터는 `app/data/fhir-demo-bundle.json`에 직접 작성한 FHIR R4 collection Bundle이다. 가상 환자·기관·외래 방문·치료 이력·판독문·체온·과거 복약의7개 리소스이며 실제 환자·공공데이터셋·건강정보 고속도로 수신 자료가 아니다. `app/health-records.js`가 같은 환자의 출처·작성일·현재 준비 여부를 읽고, `request_records(source=demo)`가 보유 치료 이력·판독문을 기존 reducer에 연결한다. 새 진찰·의뢰서나 새 DB 원문 저장은 추가하지 않는다. 예제는 프로젝트에서 작성했으며 외부 환자 자료의 사용권을 추정하지 않는다. 기준 문서와 검증 범위는 [합성 FHIR 계약](fhir-demo-contract.md)을 따른다. 기존 허브 계보4종의 활용 수에 합산하지 않는다.
+
 현재 시연은 **암 치료 후 추적 진료를 준비하는 합성 사례**를 예시로 삼는다. 구체 암종·병기·치료 단계와 실제 협력 의료진은 아직 정하지 않았다. 과거 정형외과 수술 후 외래 초안은 현재 확정 대표 사례가 아니다. 치료 이력·판독문·현지 대면 진찰 소견·의뢰서·의료진 회신의 출처를 따로 보존하며, 새 진찰이나 검사 기록을 Agent가 작성하지 않는다. 제주 공개 카탈로그가 개인 환자의 임상 기록을 제공한다고 가정하지 않는다. `request_records`의 `nhis` 경로는 승인 어댑터 미설정 상태를 반환하고 `demo`만 고정 합성 기록을 읽는다. [건강정보 고속도로 API 안내](https://myhealthway.go.kr/portal/index?page=Individual%2FPortal%2FMediMyData%2FMydataApi)와 [개발기관 절차](https://myhealthway.go.kr/portal/index?page=Login%2FRegPart)는 본인인증·제공/활용 동의·승인 연계가 필요한 별도 경로다. 실제 공단 인증·조회·연결을 수행하지 않았다.
 
 초기 문서는 모두 합성임을 내용·화면·보고서에 표시한다. 문헌은 용어 이해와 의료진에게 확인할 질문의 준비 자료다. 암종과 치료 단계가 정해지기 전에 암종별 추적 간격·검사·도외 방문 조건을 일반 규칙으로 만들지 않는다. 임상 근거 선정과 환자별 적용은 협력 의료진 검토 대상으로 남긴다.
