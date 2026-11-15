@@ -1,0 +1,14 @@
+{
+  "checkedAt": "2026-11-15T12:16:12.746Z",
+  "result": "pass",
+  "revision": "9b2dfee83acb857af82028c775b32640f83818f7",
+  "sourceHash": "307b9906c66a6874465997accb1d9bd48e2b09746d02492707cae31632d73f70",
+  "pdfHash": "bd0895bea2785e4d9434092dff2b788b671aa2e5e78fd2662139a672be16499a",
+  "pages": 12,
+  "screenshotIncluded": true,
+  "screenshotPath": "docs/reviews/2026-11-15-evidence/final-1440.png",
+  "screenshotScope": "같은 소스의 실제 keyless 고정 합성 preview 화면. 실제 LLM·전화·기록 연동 화면 아님.",
+  "networkRequestsAllowed": false,
+  "source": "docs/submission-proposal.html",
+  "file": "docs/submission-proposal.pdf"
+}

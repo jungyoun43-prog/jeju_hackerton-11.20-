@@ -3,6 +3,18 @@
   "baseBranch": "main",
   "tasks": [
     {
+      "id": "guided-demo-engine",
+      "branch": "feature/guided-demo-engine",
+      "baseCommit": "335fdfc1f126b062cbcbdefd8cd7f82b9fe8b30d",
+      "allow": ["app/guided-demo.js", "agent/guided-preview.mjs", "agent/preview.mjs", "agent/validation.mjs", "agent/service.mjs", "tests/guided-preview.test.mjs"]
+    },
+    {
+      "id": "judge-polish",
+      "branch": "refactor/judge-polish",
+      "baseCommit": "f3ecbe0",
+      "allow": ["app/conversation.js", "app/conversation.css", "app/preparation-board-view.js", "app/message-format.js", "app/patient-records.js", "app/app.js", "tests/message-format.test.mjs", "tests/package.test.mjs", "scripts/guided-demo-browser-check.mjs", "scripts/build-proposal.mjs", "scripts/package.mjs", "package.json", "README.md", "DESIGN.md", "docs/**", "orchestration/rules.json", "orchestration/state.json", "orchestration/retrospective.md"]
+    },
+    {
       "id": "ui",
       "branch": "mvp/ui",
       "allow": [

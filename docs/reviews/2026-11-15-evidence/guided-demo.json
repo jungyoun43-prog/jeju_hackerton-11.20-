@@ -1,0 +1,484 @@
+{
+  "checkedAt": "2026-11-15T12:09:35.413Z",
+  "sourceHash": "307b9906c66a6874465997accb1d9bd48e2b09746d02492707cae31632d73f70",
+  "result": "pass",
+  "checks": [
+    {
+      "name": "1440 초기 화면·입력·44px·16px",
+      "status": "pass"
+    },
+    {
+      "name": "체험 HTTP 200",
+      "status": "pass"
+    },
+    {
+      "name": "1440 첫 질문·readonly",
+      "status": "pass"
+    },
+    {
+      "name": "1440 선택 이력 0",
+      "status": "pass"
+    },
+    {
+      "name": "1440 단계 일치 0",
+      "status": "pass"
+    },
+    {
+      "name": "1440 같은 입력 0",
+      "status": "pass"
+    },
+    {
+      "name": "1440 단계 0 화면·입력·44px·16px",
+      "status": "pass"
+    },
+    {
+      "name": "1440 키보드 초점 0",
+      "status": "pass"
+    },
+    {
+      "name": "1440 선택 이력 1",
+      "status": "pass"
+    },
+    {
+      "name": "1440 단계 일치 1",
+      "status": "pass"
+    },
+    {
+      "name": "1440 같은 입력 1",
+      "status": "pass"
+    },
+    {
+      "name": "1440 단계 1 화면·입력·44px·16px",
+      "status": "pass"
+    },
+    {
+      "name": "1440 키보드 초점 1",
+      "status": "pass"
+    },
+    {
+      "name": "1440 선택 이력 2",
+      "status": "pass"
+    },
+    {
+      "name": "1440 단계 일치 2",
+      "status": "pass"
+    },
+    {
+      "name": "1440 같은 입력 2",
+      "status": "pass"
+    },
+    {
+      "name": "1440 단계 2 화면·입력·44px·16px",
+      "status": "pass"
+    },
+    {
+      "name": "1440 키보드 초점 2",
+      "status": "pass"
+    },
+    {
+      "name": "1440 선택 이력 3",
+      "status": "pass"
+    },
+    {
+      "name": "1440 단계 일치 3",
+      "status": "pass"
+    },
+    {
+      "name": "1440 같은 입력 3",
+      "status": "pass"
+    },
+    {
+      "name": "1440 단계 3 화면·입력·44px·16px",
+      "status": "pass"
+    },
+    {
+      "name": "1440 키보드 초점 3",
+      "status": "pass"
+    },
+    {
+      "name": "1440 네 단계 종료·임상 미확정",
+      "status": "pass"
+    },
+    {
+      "name": "1440 자료 분기",
+      "status": "pass"
+    },
+    {
+      "name": "1440 병원 분기",
+      "status": "pass"
+    },
+    {
+      "name": "1440 휠체어 후보",
+      "status": "pass"
+    },
+    {
+      "name": "1440 일정 재확인",
+      "status": "pass"
+    },
+    {
+      "name": "1440 준비표 펼침",
+      "status": "pass"
+    },
+    {
+      "name": "1440 보고서 합성·미확인",
+      "status": "pass"
+    },
+    {
+      "name": "1440 출처 링크",
+      "status": "pass"
+    },
+    {
+      "name": "1440 전환 취소 보존",
+      "status": "pass"
+    },
+    {
+      "name": "1440 명시 전환 후 입력",
+      "status": "pass"
+    },
+    {
+      "name": "1440 체험 원문 미저장",
+      "status": "pass"
+    },
+    {
+      "name": "390 초기 화면·입력·44px·16px",
+      "status": "pass"
+    },
+    {
+      "name": "체험 HTTP 200",
+      "status": "pass"
+    },
+    {
+      "name": "390 첫 질문·readonly",
+      "status": "pass"
+    },
+    {
+      "name": "390 선택 이력 0",
+      "status": "pass"
+    },
+    {
+      "name": "390 단계 일치 0",
+      "status": "pass"
+    },
+    {
+      "name": "390 같은 입력 0",
+      "status": "pass"
+    },
+    {
+      "name": "390 단계 0 화면·입력·44px·16px",
+      "status": "pass"
+    },
+    {
+      "name": "390 키보드 초점 0",
+      "status": "pass"
+    },
+    {
+      "name": "390 선택 이력 1",
+      "status": "pass"
+    },
+    {
+      "name": "390 단계 일치 1",
+      "status": "pass"
+    },
+    {
+      "name": "390 같은 입력 1",
+      "status": "pass"
+    },
+    {
+      "name": "390 단계 1 화면·입력·44px·16px",
+      "status": "pass"
+    },
+    {
+      "name": "390 키보드 초점 1",
+      "status": "pass"
+    },
+    {
+      "name": "390 선택 이력 2",
+      "status": "pass"
+    },
+    {
+      "name": "390 단계 일치 2",
+      "status": "pass"
+    },
+    {
+      "name": "390 같은 입력 2",
+      "status": "pass"
+    },
+    {
+      "name": "390 단계 2 화면·입력·44px·16px",
+      "status": "pass"
+    },
+    {
+      "name": "390 키보드 초점 2",
+      "status": "pass"
+    },
+    {
+      "name": "390 선택 이력 3",
+      "status": "pass"
+    },
+    {
+      "name": "390 단계 일치 3",
+      "status": "pass"
+    },
+    {
+      "name": "390 같은 입력 3",
+      "status": "pass"
+    },
+    {
+      "name": "390 단계 3 화면·입력·44px·16px",
+      "status": "pass"
+    },
+    {
+      "name": "390 키보드 초점 3",
+      "status": "pass"
+    },
+    {
+      "name": "390 네 단계 종료·임상 미확정",
+      "status": "pass"
+    },
+    {
+      "name": "390 자료 분기",
+      "status": "pass"
+    },
+    {
+      "name": "390 병원 분기",
+      "status": "pass"
+    },
+    {
+      "name": "390 휠체어 후보",
+      "status": "pass"
+    },
+    {
+      "name": "390 일정 재확인",
+      "status": "pass"
+    },
+    {
+      "name": "390 준비표 펼침",
+      "status": "pass"
+    },
+    {
+      "name": "390 보고서 합성·미확인",
+      "status": "pass"
+    },
+    {
+      "name": "390 출처 링크",
+      "status": "pass"
+    },
+    {
+      "name": "390 전환 취소 보존",
+      "status": "pass"
+    },
+    {
+      "name": "390 명시 전환 후 입력",
+      "status": "pass"
+    },
+    {
+      "name": "390 체험 원문 미저장",
+      "status": "pass"
+    },
+    {
+      "name": "900 초기 화면·입력·44px·16px",
+      "status": "pass"
+    },
+    {
+      "name": "체험 HTTP 200",
+      "status": "pass"
+    },
+    {
+      "name": "900 첫 질문·readonly",
+      "status": "pass"
+    },
+    {
+      "name": "900 선택 이력 0",
+      "status": "pass"
+    },
+    {
+      "name": "900 단계 일치 0",
+      "status": "pass"
+    },
+    {
+      "name": "900 같은 입력 0",
+      "status": "pass"
+    },
+    {
+      "name": "900 단계 0 화면·입력·44px·16px",
+      "status": "pass"
+    },
+    {
+      "name": "900 키보드 초점 0",
+      "status": "pass"
+    },
+    {
+      "name": "900 선택 이력 1",
+      "status": "pass"
+    },
+    {
+      "name": "900 단계 일치 1",
+      "status": "pass"
+    },
+    {
+      "name": "900 같은 입력 1",
+      "status": "pass"
+    },
+    {
+      "name": "900 단계 1 화면·입력·44px·16px",
+      "status": "pass"
+    },
+    {
+      "name": "900 키보드 초점 1",
+      "status": "pass"
+    },
+    {
+      "name": "900 선택 이력 2",
+      "status": "pass"
+    },
+    {
+      "name": "900 단계 일치 2",
+      "status": "pass"
+    },
+    {
+      "name": "900 같은 입력 2",
+      "status": "pass"
+    },
+    {
+      "name": "900 단계 2 화면·입력·44px·16px",
+      "status": "pass"
+    },
+    {
+      "name": "900 키보드 초점 2",
+      "status": "pass"
+    },
+    {
+      "name": "900 선택 이력 3",
+      "status": "pass"
+    },
+    {
+      "name": "900 단계 일치 3",
+      "status": "pass"
+    },
+    {
+      "name": "900 같은 입력 3",
+      "status": "pass"
+    },
+    {
+      "name": "900 단계 3 화면·입력·44px·16px",
+      "status": "pass"
+    },
+    {
+      "name": "900 키보드 초점 3",
+      "status": "pass"
+    },
+    {
+      "name": "900 네 단계 종료·임상 미확정",
+      "status": "pass"
+    },
+    {
+      "name": "900 자료 분기",
+      "status": "pass"
+    },
+    {
+      "name": "900 병원 분기",
+      "status": "pass"
+    },
+    {
+      "name": "900 휠체어 후보",
+      "status": "pass"
+    },
+    {
+      "name": "900 일정 재확인",
+      "status": "pass"
+    },
+    {
+      "name": "900 준비표 펼침",
+      "status": "pass"
+    },
+    {
+      "name": "900 보고서 합성·미확인",
+      "status": "pass"
+    },
+    {
+      "name": "900 출처 링크",
+      "status": "pass"
+    },
+    {
+      "name": "900 전환 취소 보존",
+      "status": "pass"
+    },
+    {
+      "name": "900 명시 전환 후 입력",
+      "status": "pass"
+    },
+    {
+      "name": "900 체험 원문 미저장",
+      "status": "pass"
+    },
+    {
+      "name": "체험 HTTP 200",
+      "status": "pass"
+    },
+    {
+      "name": "오류 뒤 선택·이전 상태 보존",
+      "status": "pass"
+    },
+    {
+      "name": "체험 HTTP 200",
+      "status": "pass"
+    },
+    {
+      "name": "같은 선택 재시도",
+      "status": "pass"
+    },
+    {
+      "name": "중복 클릭 방지",
+      "status": "pass"
+    },
+    {
+      "name": "중지 뒤 이전 질문 보존",
+      "status": "pass"
+    },
+    {
+      "name": "체험 HTTP 200",
+      "status": "pass"
+    },
+    {
+      "name": "중지 후 재시도",
+      "status": "pass"
+    },
+    {
+      "name": "일반 모델 요청 없음",
+      "status": "pass"
+    },
+    {
+      "name": "검사 중 동일 소스",
+      "status": "pass"
+    }
+  ],
+  "screenshots": [
+    "output/guided-demo-qa/initial-1440.png",
+    "output/guided-demo-qa/support-1440.png",
+    "output/guided-demo-qa/final-1440.png",
+    "output/guided-demo-qa/initial-390.png",
+    "output/guided-demo-qa/support-390.png",
+    "output/guided-demo-qa/final-390.png",
+    "output/guided-demo-qa/initial-900.png",
+    "output/guided-demo-qa/support-900.png",
+    "output/guided-demo-qa/final-900.png",
+    "output/guided-demo-qa/error-390.png"
+  ],
+  "screenshotHashes": {
+    "initial-1440.png": "01f59ee88e9d9bdada1e3c6ddfb175a44295553312a5451ec88db4e6e1db5a82",
+    "support-1440.png": "eeecd64e7c16a95e453281b97f5d992744178285ef27ae47ae560252b6b6a6ef",
+    "final-1440.png": "ac139bb9332db5072a2a3ec68b429fc0a499e1d88251ac0bd35c2e294988dd7f",
+    "initial-390.png": "c2513ac0d734a02713e8824b7eea809b72edb675b5c6d4e4b18019e88fd11c4e",
+    "support-390.png": "ec61bffb2d6edac61c2f56a37e6abedf6852fa0a04d4a8c5916c1cc774075db8",
+    "final-390.png": "cc0603590427d9e9b9f05f2a9ee41513cb1e65d941c7038a5993fdf8242cbf56",
+    "initial-900.png": "743eeedbe3390ea311a101e2f5bd2ffc8d4791a92ecbf442bdac6d013612e12c",
+    "support-900.png": "e2cc46f5fe810e2c0fc02bb89ba7a5bb7242b294328a25e7f9a214f9a64cf8c1",
+    "final-900.png": "e0daa5f732aafba93cccc16fbd79db9e9816003369f7eaf895a0ee796ccf875f",
+    "error-390.png": "c73ab3de8b0ebe7268bcdc45323f54e8cf0d1b1ed41f7c929cc653c4055f0b8c"
+  },
+  "previewPosts": 20,
+  "modelPosts": 0,
+  "modelInvoked": false,
+  "realCalls": false,
+  "scope": "실제 로컬 API·공개 snapshot·합성 상태. 오류/지연은 HTTP fixture. 모바일 viewport이며 실기기·스크린리더 검증 아님."
+}

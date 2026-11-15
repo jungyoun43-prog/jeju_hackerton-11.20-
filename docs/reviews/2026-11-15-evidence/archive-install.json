@@ -1,0 +1,54 @@
+{
+  "checkedAt": "2026-11-15T12:22:15.183Z",
+  "result": "pass",
+  "sourceHash": "307b9906c66a6874465997accb1d9bd48e2b09746d02492707cae31632d73f70",
+  "unitTests": 453,
+  "installation": "npm ci --ignore-scripts",
+  "builds": [
+    "npm run build",
+    "npm run build:agent"
+  ],
+  "statuses": [
+    {
+      "path": "/",
+      "status": 200
+    },
+    {
+      "path": "/api/health",
+      "status": 200
+    },
+    {
+      "path": "/api/agent/capabilities",
+      "status": 200
+    },
+    {
+      "path": "/api/agent/preview",
+      "step": 0,
+      "status": 200
+    },
+    {
+      "path": "/api/agent/preview",
+      "step": 1,
+      "status": 200
+    },
+    {
+      "path": "/api/agent/preview",
+      "step": 2,
+      "status": 200
+    },
+    {
+      "path": "/api/agent/preview",
+      "step": 3,
+      "status": 200
+    },
+    {
+      "path": "/api/agent/preview",
+      "step": 4,
+      "status": 200
+    }
+  ],
+  "modelCalls": 0,
+  "realCalls": 0,
+  "snapshotZipSha256": "1a5132f139be49709e905c6033ed814da6add4156de31921b5e3dcd34290b60b",
+  "scope": "독립 압축해제 소스의 설치·단위·빌드·실제 keyless HTTP. 최종 문서 갱신 ZIP은 별도 CRC/SHA, 실행 지문이 같은지 대조한다."
+}

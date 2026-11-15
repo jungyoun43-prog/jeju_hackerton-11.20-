@@ -1,0 +1,77 @@
+{
+  "checkedAt": "2026-11-15T12:20:49.707Z",
+  "sourceHash": "307b9906c66a6874465997accb1d9bd48e2b09746d02492707cae31632d73f70",
+  "unitTests": 453,
+  "result": "pass",
+  "suites": [
+    {
+      "name": "browser",
+      "result": "pass",
+      "checks": 47,
+      "sourceHash": "307b9906c66a6874465997accb1d9bd48e2b09746d02492707cae31632d73f70",
+      "checkedAt": "2026-11-15T12:15:02.918Z"
+    },
+    {
+      "name": "conversation-browser",
+      "result": "pass",
+      "checks": 250,
+      "sourceHash": "307b9906c66a6874465997accb1d9bd48e2b09746d02492707cae31632d73f70",
+      "checkedAt": "2026-11-15T12:10:55.521Z"
+    },
+    {
+      "name": "preparation-board-browser",
+      "result": "pass",
+      "checks": 374,
+      "sourceHash": "307b9906c66a6874465997accb1d9bd48e2b09746d02492707cae31632d73f70",
+      "checkedAt": "2026-11-15T12:09:36.497Z",
+      "scope": {
+        "localhostKeylessOnly": true,
+        "modelInvoked": false,
+        "phoneInvoked": false,
+        "healthRecordsQueried": false,
+        "unmockedNormalPostAttempts": 0,
+        "blockedPostAttempts": 0,
+        "actualProgressReads": 2,
+        "actualPreviewRequests": 4,
+        "fixtureMainRequests": 46,
+        "fixtureProgressReads": 46,
+        "microphone": "not exercised; conversation browser fixtures cover transcript review",
+        "progress": "fixed safe DTO/browser fetch fixtures; actual keyless endpoint read only"
+      }
+    },
+    {
+      "name": "journey-browser",
+      "result": "pass",
+      "checks": 268,
+      "sourceHash": "307b9906c66a6874465997accb1d9bd48e2b09746d02492707cae31632d73f70",
+      "checkedAt": "2026-11-15T12:15:01.685Z",
+      "scope": {
+        "localhostKeylessOnly": true,
+        "fixtures": false,
+        "modelInvoked": false,
+        "phone": false,
+        "externalRecords": false,
+        "normalAgentPostAttempts": 0,
+        "previewRequests": 14,
+        "retryGate": "고정 preview 상태·표시만 확인하며 시간/횟수 초과 gate는 별도 단위 검사 범위"
+      }
+    },
+    {
+      "name": "visit-recovery-browser",
+      "result": "pass",
+      "checks": 74,
+      "sourceHash": "307b9906c66a6874465997accb1d9bd48e2b09746d02492707cae31632d73f70",
+      "checkedAt": "2026-11-15T12:18:44.726Z",
+      "scope": "Actual local static assets; normal and recovery HTTP response fixtures. Successful fixed preview is a real keyless local endpoint; the preview-failure case is a separate fixture. No real model, database durability, phone, microphone or physical-device evidence."
+    },
+    {
+      "name": "visit-recovery-integration",
+      "result": "pass",
+      "checks": 36,
+      "sourceHash": "307b9906c66a6874465997accb1d9bd48e2b09746d02492707cae31632d73f70",
+      "checkedAt": "2026-11-15T12:18:45.565Z",
+      "scope": "Actual owned localhost HTTP server, current service/store/dispatcher and static UI. Only the provider is a fixed fixture. The first completed HTTP response is truncated by the server; no local API route is fulfilled or response fixture injected. No real model, AWS durability, phone or personal records. Request bodies and identifiers remain in memory and are excluded from proof and captures."
+    }
+  ],
+  "note": "실제 API/브라우저 또는 HTTP/provider fixture를 각 원실행의 범위대로 구분. 실모델·실전화·개인기록 조회0."
+}

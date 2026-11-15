@@ -22,7 +22,7 @@
 <p class="lead">멀리 있는 가족을 대신해 자료·병원 문의·이동·동행의 준비 조건을 정리하고, 막힌 일과 변경된 일정을 끝까지 이어 줍니다.</p>
 <blockquote class="quote">“애월에 계신 어머니의 병원 방문을 준비하고 싶어요.<br>저는 못 가니 필요한 자료와 택시·동행도 알아봐 주세요.”</blockquote>
 <p>핵심 결과물은 <strong>확인한 준비, 아직 확인할 조건, 다음 담당자</strong>가 보이는 방문 계획입니다. 진료 장소와 치료 계획의 결정은 의료진·기관의 역할입니다.</p>
-<p class="small muted">실제 공공데이터·LLM과 합성 환자·기관 응답의 범위를 구분합니다. 현재 실제 전화·개인기록 조회·예약·배차는 연결하지 않았습니다.</p>
+<p class="small muted">선택형 체험은 실제 공공데이터와 도구를 쓰고 답변·환자·기관 응답은 합성입니다. 자유 입력의 LLM 연결 경로는 별도이며 현재 품질은 미검증입니다. 실제 전화·예약·배차는 미연동입니다.</p>
 <div class="footer"><span>혼디 AI Agent 기획서</span><span class="revision"></span><span>01 / 12</span></div>
 </section>
 <section class="page">
@@ -54,7 +54,7 @@
 <h3>지원할 세 가지 진료 연결 결과</h3>
 <ul><li><strong>도내 전환:</strong> 의료진·기관이 확인한 수용 조건에 따른 서류와 첫 접수 준비</li><li><strong>일부 제주 진행:</strong> 의료진이 정한 현지 진찰/검사와 기존 병원 제출 절차 준비</li><li><strong>도외 유지:</strong> 기존 진료의 자료·이동·동행 부담과 남은 일 정리</li></ul>
 <p>결과가 확인되지 않으면 의료진 확인 전으로 둡니다. 기관의 행정 접수 거절을 임상 부적합이나 도외 진료 필요성으로 바꾸지 않습니다.</p>
-<h3>편의성</h3><p>입력창 한 곳에서 요청하고, 네 준비 요약에서 상태를 읽습니다. 필요한 핵심 정보만 다시 묻고, 선호 택시·휠체어·동행 설정은 선택적으로 다음 요청에 반영합니다.</p>
+<h3>편의성</h3><p>키 없이 ‘방문 준비 시작’에서 네 질문에 답하면 준비표까지 이어집니다. 자료 부족·접수 거절·휠체어·시간 변경을 선택할 수 있습니다. 자유 입력으로 전환하면 모델이 요청을 해석하는 기존 경로를 사용합니다.</p>
 <div class="footer"><span>대상·역할·서비스</span><span class="revision"></span><span>03 / 12</span></div>
 </section>
 <section class="page">
@@ -122,11 +122,11 @@
 </section>
 <section class="page">
 <div class="top"><img src="../app/assets/hondi-logo-v1.png" alt="hondi"><span>서비스 UI</span></div>
-<h2>한 번 요청하고,<br>지금 확인할 일부터 이어갑니다.</h2>
+<h2>질문에 답하면,<br>다음 준비로 이어집니다.</h2>
 <div class="capture-placeholder" data-screenshot>최종 실행 지문의 PC 고정 합성 예시를 브라우저 검증 캡처에서 포함합니다.</div>
 <p class="small muted">동일 소스의 고정 합성 예시 화면이며 실제 LLM·전화·기록 연동 화면은 아닙니다. 왼쪽 설정/기록, 중앙 현재 작업·선택 상세/공통 입력, 오른쪽 네 단계입니다.</p>
 <div class="row"><div><h3>한 화면 작업 공간</h3><p>일정한 여백과 화면 높이에 맞춘 배치. 현재 작업·단계 상세를 중앙에서 읽고 대화·처리 이력은 펼쳐 확인합니다. 카드별 스크롤은 만들지 않습니다.</p></div><div><h3>작은 창에서도 같은 입력</h3><p>좁거나 낮은 창은 대화/준비 탭으로 전환합니다. 예시·음성·넓게 읽기·44px 조작과 초안을 유지합니다.</p></div></div>
-<p>준비 이어하기는 과거 모델 답변을 재생하지 않고 마지막 확인 상태와 남은 일을 보여 줍니다. 새로운 큰 소개 블록을 추가하지 않습니다.</p>
+<p>체험은 자료→병원→이동→일정의 두 답변씩16조합을 지원합니다. 선택 이력을 기존 도구로 재생하고 실패 뒤 같은 답변을 다시 선택할 수 있습니다. 체험 종료와 실제 준비 완료는 구분합니다.</p>
 <div class="footer"><span>읽기·입력·설정·기록</span><span class="revision"></span><span>09 / 12</span></div>
 </section>
 <section class="page">
@@ -140,16 +140,16 @@
 <tr><td>만료·저장 불가</td><td>만료와 연결 실패를 구분. 브라우저 저장 차단은 현재 탭의 대화를 막지 않음.</td></tr>
 <tr><td>새 대화·늦은 응답</td><td>소유권/버전 guard로 이전 응답이 새 초안·환자/준비 상태를 덮지 않게 함.</td></tr>
 </tbody></table>
-<p>운영 저장에는 정규화된 합성 상태와 요청 ID·본문 해시·고정 상태·시각만 추가합니다. 대화 원문·모델 답변·reasoning·원문 토큰은 보관하지 않습니다. 복구 참조는 현재 탭의 sessionStorage만 사용하며 환자별 계정 인증을 대신하지 않습니다.</p>
+<p>위 복구는 일반 모델 요청의 경로입니다. 정규화된 합성 상태·요청 지문만 저장하고 원문·답변·reasoning은 보관하지 않습니다. 선택형 체험은 별도로 DB 없이 실행하고 새로고침 시 초기화됩니다. 두 경로 모두 실제 환자 인증을 대신하지 않습니다.</p>
 <div class="footer"><span>만료·중복·late·위임 경계</span><span class="revision"></span><span>10 / 12</span></div>
 </section>
 <section class="page">
 <div class="top"><img src="../app/assets/hondi-logo-v1.png" alt="hondi"><span>개발·탑재 계획</span></div>
 <h2>센터 PC에서는 브라우저와<br>Node.js로 실행합니다.</h2>
 <table><thead><tr><th>환경</th><th>실행과 의존성</th></tr></thead><tbody>
-<tr><td>센터 최소 PC</td><td>Intel Core i7-8700 / GTX1060 / RAM32GB. Node.js22와 브라우저. 외부 모델 API 방식이라 로컬 GPU 추론을 요구하지 않음. 센터 실기기 검증은 별도.</td></tr>
+<tr><td>센터 최소 PC</td><td>i7-8700 / GTX1060 / RAM32GB / VRAM3072MB. Node.js22와 브라우저. 로컬 GPU 추론을 요구하지 않음. 센터 실기기 검증은 별도.</td></tr>
 <tr><td>로컬 기본 실행</td><td>npm ci --ignore-scripts → npm run dev. 키 없는 고정 preview와 공개 snapshot은 모델 호출 없이 실행. 일반 입력은 키 없으면503.</td></tr>
-<tr><td>모델 연결</td><td>.env의 OPENAI_API_KEY를 서버만 읽음. 실제 키를 코드·정적 파일·PDF·ZIP에 포함하지 않음. OpenAI 접근과 인터넷 필요.</td></tr>
+<tr><td>모델 연결</td><td>서버 .env의 OPENAI_API_KEY 사용. 현재 ZIP에 키 없음. 공식 공지상 실제 모델 평가용 키·비용은 참가자 제공이므로 전용 키 준비가 별도로 필요.</td></tr>
 <tr><td>AWS 공개</td><td>S3·CloudFront·Lambda·Secrets Manager·DynamoDB. OIDC CI/CD가 같은 커밋의 웹/API artifact와 공개 revision을 검증.</td></tr>
 <tr><td>선택 검증/문서 재생성</td><td>Python3은 ZIP·Lambda 포장에 사용. Playwright/Chromium은 브라우저 검사·PDF 재생성의 선택 개발 도구. 설치된 PDF는 별도 뷰어로 읽음.</td></tr>
 </tbody></table>
@@ -161,7 +161,7 @@
 <div class="top"><img src="../app/assets/hondi-logo-v1.png" alt="hondi"><span>검증·한계·산출물</span></div>
 <h2>시연한 내용과<br>확인한 증거를 함께 제출합니다.</h2>
 <table><thead><tr><th>검증</th><th>방법과 판단 범위</th></tr></thead><tbody>
-<tr><td>코드/도메인</td><td>상태·자료/조건 변경·원문 미저장·첫 요청 경쟁·저장 ack 유실·만료·읽기 전용 복구 회귀.</td></tr>
+<tr><td>코드/도메인</td><td>고정 선택16조합과 실제 HTTP·도구 실행. 자료 미확보·접수 거절·휠체어 후보·시간 변경 재확인, 잘못된 입력 거절·기존 복구 회귀.</td></tr>
 <tr><td>실제 LLM</td><td>과거12개 합성 과업의 도구·상태·답변을 원커밋에 보존. 새 workflow/Prompt의 실제 모델 품질은 크레딧 소진으로 미검증. fixture/시연과 분리.</td></tr>
 <tr><td>UI/배포</td><td>PC/좁은 창·긴 내용·표·큰 글자·초점·초안·복구와 동일 소스 지문, CI·공개 정적/API revision을 대조.</td></tr>
 <tr><td>재현</td><td>데이터 재취득/정규화·CLI, README·환경변수 예시·라이선스·Prompt·도구·독립 ZIP 설치/검사/빌드.</td></tr>

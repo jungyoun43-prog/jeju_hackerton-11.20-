@@ -1,7 +1,19 @@
 {
   "baseCommit": "e1e7e44",
-  "updatedAt": "2026-11-08T11:51:44.928Z",
+  "updatedAt": "2026-11-15T12:00:00Z",
   "tasks": {
+    "guided-demo-engine": {
+      "phase": "verified",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261115-judge-date-validation",
+      "note": "16개 조합·실제 HTTP·모델/DB/Secret 미호출과 전체 단위453 통과. 전용 커밋 a713f64를 통합.",
+      "integrationCommits": ["f3ecbe0f70021e58714de39d2c401f5f45ae508e"]
+    },
+    "judge-polish": {
+      "phase": "verified",
+      "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261115-judge-polish",
+      "note": "독립 시각/기술 baseline 평가 후 선택형 체험·접근성·공통 함수·문서 정리. 실제 keyless 완주112·대화250·준비판374·여정268·수동47 통과. 실모델/실기기는 미검증.",
+      "integrationCommits": ["9b2dfee83acb857af82028c775b32640f83818f7"]
+    },
     "ui": {
       "phase": "verified",
       "worktree": "/home/ubuntu/projects/.jeju-worktrees/20261031-ui",
