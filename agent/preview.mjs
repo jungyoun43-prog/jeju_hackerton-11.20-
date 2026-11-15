@@ -1,3 +1,5 @@
+import { GUIDED_DEMO_ID } from '../app/guided-demo.js';
+import { buildGuidedPreview } from './guided-preview.mjs';
 import { createDemoCase } from '../app/domain.js';
 import { createToolDispatcher, getPendingActions } from './tools.mjs';
 import { JOURNEY_SCENARIOS, CALL_RECOVERY_SCENARIOS, getCareJourneySummary } from '../app/care-journey.js';
@@ -24,7 +26,8 @@ export const PREVIEW_SCENARIO = Object.freeze({
     ['prepare_review',{}],
   ],
 });
-export async function buildFixedPreview({capabilities,requestId,scenarioId = PREVIEW_SCENARIO.id}) {
+export async function buildFixedPreview({capabilities,requestId,scenarioId = PREVIEW_SCENARIO.id,answers}) {
+  if (scenarioId === GUIDED_DEMO_ID) return buildGuidedPreview({answers,requestId,capabilities});
   if (scenarioId !== PREVIEW_SCENARIO.id) {
     const recoveryScenario=CALL_RECOVERY_SCENARIOS.find(item=>item.id===scenarioId);
     const scenario = recoveryScenario ?? JOURNEY_SCENARIOS.find(item => item.id === scenarioId);

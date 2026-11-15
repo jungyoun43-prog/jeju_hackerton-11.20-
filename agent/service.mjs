@@ -238,7 +238,7 @@ export function createAgentService({provider = createDisconnectedProvider(),stor
         && ![parsed.visitToken,parsed.progressToken].some(token=>typeof token === 'string' && /^[A-Za-z0-9_-]{43}$/.test(token) && parsed.requestId.includes(token))) requestId = parsed.requestId;
       if (route === '/api/agent/preview') {
         const request = validatePreviewRequest(parsed);
-        return response(200,await buildFixedPreview({capabilities:capabilities('unavailable'),requestId:request.requestId,scenarioId:request.scenarioId}),revision);
+        return response(200,await buildFixedPreview({capabilities:capabilities('unavailable'),requestId:request.requestId,scenarioId:request.scenarioId,answers:request.answers}),revision);
       }
       const request = validateMessageRequest(parsed);
       return response(200,await runTurn(request),revision);

@@ -1,3 +1,4 @@
+import { GUIDED_DEMO_ID, getGuidedDemo } from '../app/guided-demo.js';
 import { AgentError, assertKeys, fail, isObject } from './errors.mjs';
 import { JOURNEY_SCENARIOS, CALL_RECOVERY_SCENARIOS } from '../app/care-journey.js';
 import { normalizeCarePreferences } from '../app/care-preferences.js';
@@ -64,8 +65,12 @@ export function validateProgressRequest(body) {
   return {progressToken:validateProgressToken(body.progressToken)};
 }
 export function validatePreviewRequest(body) {
-  assertKeys(body, ['scenarioId', 'requestId']);
+  assertKeys(body, ['scenarioId', 'requestId', ...(body?.scenarioId === GUIDED_DEMO_ID ? ['answers'] : [])]);
   validateRequestId(body.requestId);
+  if (body.scenarioId === GUIDED_DEMO_ID) {
+    fail(getGuidedDemo(body.answers), 'INVALID_PREVIEW_ANSWERS', '현재 단계의 고정 답변을 순서대로 선택해 주세요.');
+    return body;
+  }
   fail(['aewol-parent-visit',...JOURNEY_SCENARIOS.map(item => item.id),...CALL_RECOVERY_SCENARIOS.map(item=>item.id)].includes(body.scenarioId), 'UNKNOWN_PREVIEW', '지원하는 고정 대화 예시를 선택해 주세요.');
   return body;
 }
