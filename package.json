@@ -20,6 +20,7 @@
     "rollback": "node orchestration/rollback.mjs",
     "build:agent": "node scripts/build-agent.mjs",
     "test:conversation": "node scripts/conversation-browser-check.mjs",
+    "test:guided-demo": "node scripts/guided-demo-browser-check.mjs",
     "test:journey": "node scripts/journey-browser-check.mjs",
     "data:catalog": "node scripts/public-data-catalog.mjs",
     "data:query": "node scripts/public-data-query.mjs",

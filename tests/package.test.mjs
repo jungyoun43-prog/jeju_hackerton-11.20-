@@ -28,14 +28,16 @@ test('실제 ZIP은 소스·빌드·대표 화면·최종 요약을 보존하고
   const {project,archive}=await fixture(t);
   const currentFiles={
     '.impeccable/design.json':'{"fixture":"design"}',
-    '.impeccable/review/chat-rail/product-redesign/release-capture/initial-1440.png':'fixture initial desktop',
-    '.impeccable/review/chat-rail/product-redesign/release-capture/preview-1440.png':'fixture preview desktop',
-    '.impeccable/review/chat-rail/product-redesign/release-capture/preview-390.png':'fixture preview mobile',
-    '.impeccable/review/chat-rail/product-redesign/qa-final/final-summary.json':'{"fixture":"final summary"}',
+    'docs/reviews/2026-11-15-evidence/initial-1440.png':'fixture initial desktop',
+    'docs/reviews/2026-11-15-evidence/final-1440.png':'fixture preview desktop',
+    'docs/reviews/2026-11-15-evidence/final-390.png':'fixture preview mobile',
+    'docs/reviews/2026-11-15-evidence/guided-demo.json':'{"fixture":"final summary"}',
     'orchestration/runs/browser.json':'{"fixture":"browser"}',
     'orchestration/runs/latest-eval.json':'{"fixture":"latest evaluation"}',
   };
   const excludedFiles={
+    '.impeccable/review/chat-rail/product-redesign/release-capture/preview-1440.png':'fixture old preview',
+    'output/guided-demo-qa/error-390.png':'fixture intermediate',
     '.impeccable/review/chat-rail/product-redesign/final-before/old-capture.png':'fixture old capture',
     '.impeccable/review/board/old-capture.png':'fixture old board',
     'orchestration/runs/caregiver-local-live-check.json':'{"fixture":"historical run"}',

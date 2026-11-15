@@ -11,24 +11,25 @@ const require=createRequire(import.meta.url);
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const sourceHash=await runtimeFingerprint(root);
 const revision=execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim();
-const browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH || undefined,args:['--no-sandbox','--disable-dev-shm-usage']});
+const browser=await chromium.launch({headless:true,chromiumSandbox:true,executablePath:process.env.CHROMIUM_PATH || undefined});
 try {
   const page=await browser.newPage();
   await page.route('**/*',route=>new URL(route.request().url()).protocol==='file:'?route.continue():route.abort());
   await page.goto(pathToFileURL(resolve(root,'docs/submission-proposal.html')).href,{waitUntil:'load'});
   await page.evaluate(()=>document.fonts.ready);
   await page.locator('.revision').evaluateAll((nodes,label)=>nodes.forEach(node=>node.textContent=label),`구현 ${revision.slice(0,8)} · ${sourceHash.slice(0,10)}`);
-  const proofPath=resolve(root,'orchestration/runs/native-zoom-browser.json');
+  const proofPath=resolve(root,'docs/reviews/2026-11-15-evidence/guided-demo.json');
   let screenshotIncluded=false,screenshotPath;
   try {
     const proof=JSON.parse(await readFile(proofPath,'utf8'));
-    if(proof.result==='pass' && proof.sourceHash===sourceHash && proof.fixedPreviewRequests===1 && proof.modelInvoked===false && proof.fixtureResponses===false && proof.guidedPreviewCapture?.taskVisible && proof.guidedPreviewCapture?.currentMatches && proof.guidedPreviewCapture?.selectedMatches && proof.guidedPreviewCapture?.historyClosed) {
-      const selected=proof.guidedPreviewCapture.width===1440 && proof.guidedPreviewCapture.height===900 ? {screenshot:proof.guidedPreviewScreenshot} : null;
-      if(selected?.screenshot) {
-        const bytes=await readFile(resolve(root,selected.screenshot));
+    if(proof.result==='pass' && proof.sourceHash===sourceHash && proof.modelPosts===0 && proof.modelInvoked===false && proof.checks?.length>0 && proof.checks.every(check=>check.status==='pass')) {
+      const selected='docs/reviews/2026-11-15-evidence/final-1440.png';
+      if(proof.screenshotHashes?.['final-1440.png']) {
+        const bytes=await readFile(resolve(root,selected));
         if(bytes.readUInt32BE(0)!==0x89504e47)throw new Error('검증 캡처가 PNG가 아닙니다.');
+        if(createHash('sha256').update(bytes).digest('hex')!==proof.screenshotHashes['final-1440.png'])throw new Error('검증 캡처의 SHA가 다릅니다.');
         await page.locator('[data-screenshot]').evaluate((node,url)=>{const img=document.createElement('img');img.className='screen';img.alt='동일 소스의 실제 PC 고정 합성 예시 화면';img.src=url;node.replaceWith(img);},'data:image/png;base64,'+bytes.toString('base64'));
-        await page.locator('.screen').evaluate(node=>node.decode());screenshotIncluded=true;screenshotPath=selected.screenshot;
+        await page.locator('.screen').evaluate(node=>node.decode());screenshotIncluded=true;screenshotPath=selected;
       }
     }
   } catch(error) {if(error.code!=='ENOENT')throw error;}

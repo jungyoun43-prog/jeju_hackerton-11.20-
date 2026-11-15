@@ -2,7 +2,7 @@ import { DOCUMENT_DEFINITIONS } from './domain.js';
 import { getDemoHealthRecords, getDemoFhirJson } from './health-records.js';
 import { icon } from './icons.js';
 
-const escape=value=>String(value ?? '').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+import { escapeHtml as escape } from './message-format.js';
 const dateLabel=value=>new Intl.DateTimeFormat('ko-KR',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(value));
 
 function renderFhirRecords(state) {

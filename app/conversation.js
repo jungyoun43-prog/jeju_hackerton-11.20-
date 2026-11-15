@@ -2,12 +2,13 @@ import { createDemoCase, getProgress, getTasks, buildReport, DOCUMENT_DEFINITION
 import { getVisitSupportSummary } from './visit-support.js';
 import { icon } from './icons.js';
 import { DEFAULT_CARE_PREFERENCES, normalizeCarePreferences, getTaxiPreferenceOptions } from './care-preferences.js';
-import { formatMessage } from './message-format.js';
+import { formatMessage, escapeHtml as escape } from './message-format.js';
 import { buildCallPlan, CALL_TARGETS } from './call-policy.js';
 import { getCareJourneySummary, JOURNEY_SCENARIOS, CALL_RECOVERY_SCENARIOS } from './care-journey.js';
 import { getPreparationBoard, normalizePreparationProgress } from './preparation-stages.js';
 import { preparationBoardMarkup, preparationNavigationMarkup, renderPreparationBoard, renderPreparationView, renderPreparationSources, preservePreparationReading } from './preparation-board-view.js';
 import { renderPatientRecords as renderPatientRecordsContent } from './patient-records.js';
+import { GUIDED_DEMO_ID, getGuidedDemo } from './guided-demo.js';
 
 const API = '/api/agent';
 const MAX_MESSAGE = 1600;
@@ -19,7 +20,6 @@ const VISIT_TOKEN = /^[A-Za-z0-9_-]{43}$/;
 const mobileRail = window.matchMedia('(max-width:1050px)');
 const compactWorkspace = window.matchMedia('(max-width:900px), (max-height:650px)');
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-const escape = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 const micIcon = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="13" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3m-4 0h8"/></svg>';
 const stopIcon = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="1"/></svg>';
 const makeId = () => crypto.randomUUID();
@@ -38,6 +38,7 @@ let latestActions = [];
 let latestEvents = [];
 let responseCount = 0;
 let previewMode = false;
+let guidedDemo = null;
 let activeRecognition;
 let recognitionCancelled = false;
 let recognitionFailed = false;
@@ -94,14 +95,15 @@ function renderBoard() {
   const progress=activeRequest?.kind==='message'?activeRequest.progress:null;
   const board=getPreparationBoard(caseState,{events:latestEvents,progress,pending,responseCount,requestProblem});
   preparationBoard=board;
-  if(!manualStageSelection || !selectedStageId)selectedStageId=board.workflow.currentStageId;
+  if(!manualStageSelection || !selectedStageId)selectedStageId=guidedDemo?.stepId || board.workflow.currentStageId;
   document.getElementById('care-journey-summary').hidden=responseCount===0;
   document.getElementById('return-to-request').hidden=responseCount===0;
-  renderPreparationBoard(board,{unreadAnswer,progress,selectedStageId,reviewing:manualStageSelection,disableDrafts:pending||Boolean(activeRecognition)});
+  renderPreparationBoard(board,{unreadAnswer,progress,selectedStageId,reviewing:manualStageSelection,disableDrafts:pending||Boolean(activeRecognition),currentStageId:guidedDemo?.stepId || board.workflow.currentStageId});
+  renderGuidedDemo();
   const task=board.workflow.currentTask;
   document.getElementById('care-journey-next').textContent=task?.title || '현재 방문 준비와 남은 일을 확인해 주세요.';
   const draft=document.getElementById('next-request-draft');
-  draft.hidden=!board.hasResponse || !task?.requestDraft;draft.disabled=pending || Boolean(activeRecognition);
+  draft.hidden=Boolean(guidedDemo)||!board.hasResponse || !task?.requestDraft;draft.disabled=pending || Boolean(activeRecognition);
   const replyCount=document.querySelectorAll('#message-list .message.assistant:not(.greeting)').length;
   document.getElementById('conversation-history-count').textContent=replyCount?`${replyCount}회 응답`:'';
   document.getElementById('current-task-answer').hidden=!replyCount;
@@ -111,8 +113,35 @@ function renderBoard() {
 
 function renderBoardView() {
   if(!preparationBoard)return;
-  if(!manualStageSelection || !selectedStageId)selectedStageId=preparationBoard.workflow.currentStageId;
-  renderPreparationView(preparationBoard,{unreadAnswer,selectedStageId,reviewing:manualStageSelection});
+  if(!manualStageSelection || !selectedStageId)selectedStageId=guidedDemo?.stepId || preparationBoard.workflow.currentStageId;
+  renderPreparationView(preparationBoard,{unreadAnswer,selectedStageId,reviewing:manualStageSelection,currentStageId:guidedDemo?.stepId || preparationBoard.workflow.currentStageId});
+}
+
+function renderGuidedDemo() {
+  const host=document.getElementById('guided-demo-controls');
+  host.hidden=responseCount>0 && !guidedDemo;
+  const markup=guidedDemo
+    ? guidedDemo.complete
+      ? `<button type="button" class="demo-primary" data-demo-save>${icon('download')}준비표 저장</button><button type="button" data-demo-start>다시 체험${icon('refresh')}</button>`
+      : guidedDemo.choices.map(choice=>`<button type="button" data-demo-choice="${escape(choice.id)}"><span>${escape(choice.label)}</span>${icon('arrow')}</button>`).join('')
+    : `<button type="button" class="demo-primary" data-demo-start>방문 준비 시작${icon('arrow')}</button><p class="demo-intro">답변을 고르면 자료·병원·이동 준비가 이어져요. 모델 키 없이 체험할 수 있어요.</p>`;
+  if(host.dataset.step!==JSON.stringify(guidedDemo?.answers ?? null)) {
+    host.innerHTML=markup;host.dataset.step=JSON.stringify(guidedDemo?.answers ?? null);
+  }
+  for(const button of host.querySelectorAll('button'))button.disabled=pending || Boolean(activeRecognition);
+  const exit=document.getElementById('exit-guided-demo');
+  exit.hidden=!guidedDemo;exit.disabled=pending;
+  const input=document.getElementById('request-input');
+  input.readOnly=pending || Boolean(guidedDemo);
+  input.placeholder=guidedDemo?.complete?'준비표를 저장하거나 자유 입력으로 전환하세요.':guidedDemo?'위의 답변을 선택하면 다음 준비로 이어져요.':'예: 어머니 진료 자료와 이동·동행을 준비해줘.';
+  document.getElementById('send-request').disabled=pending || Boolean(guidedDemo) || Boolean(activeRecognition) || !input.value.trim();
+  document.getElementById('voice-request').disabled=pending || Boolean(guidedDemo) || !SpeechRecognition;
+  if(!guidedDemo)return;
+  document.getElementById('current-task-title').textContent=guidedDemo.title;
+  document.getElementById('current-task-detail').textContent=guidedDemo.detail;
+  document.getElementById('current-task-stage').textContent=guidedDemo.complete?'선택 체험 종료':`선택 체험 ${guidedDemo.answers.length+1}/4`;
+  document.getElementById('current-task-owner').hidden=true;
+  for(const id of ['current-task-question','current-task-choices','current-task-draft','workflow-draft-note'])document.getElementById(id).hidden=true;
 }
 
 function showLatestAnswer() {
@@ -613,7 +642,7 @@ function resizeInput() {
   const input = document.getElementById('request-input');
   input.style.height = 'auto';
   input.style.height = `${Math.min(input.scrollHeight,128)}px`;
-  document.getElementById('send-request').disabled = pending || Boolean(activeRecognition) || !input.value.trim();
+  document.getElementById('send-request').disabled = pending || Boolean(guidedDemo) || Boolean(activeRecognition) || !input.value.trim();
   document.getElementById('character-count').textContent = `${input.value.length}/${MAX_MESSAGE}`;
   for(const button of document.querySelectorAll('[data-contact-draft],[data-journey-draft],[data-journey-scenario],[data-call-recovery-scenario],[data-workflow-draft],[data-workflow-choice],#next-request-draft'))button.disabled=pending || Boolean(activeRecognition);
   renderVisitRecovery();
@@ -621,6 +650,7 @@ function resizeInput() {
 
 function fillRequestDraft(text,{source='요청 예시',focus=true}={}) {
   if(pending || activeRecognition)return false;
+  if(guidedDemo && !resetConversation({focus:false}))return false;
   const input=document.getElementById('request-input');
   const draft=String(text || '').trim().slice(0,MAX_MESSAGE);
   if(!draft)return false;
@@ -800,11 +830,15 @@ async function callAgent(path,body,signal) {
   return raw;
 }
 
-async function showPreview(scenarioId='aewol-parent-visit') {
+async function showPreview(scenarioId='aewol-parent-visit',answers=[]) {
   if(pending || activeRecognition)return;
-  if(!['aewol-parent-visit',...JOURNEY_SCENARIOS.map(item=>item.id),...CALL_RECOVERY_SCENARIOS.map(item=>item.id)].includes(scenarioId))return;
-  if(hasConversationWork() && !window.confirm('준비 흐름 체험을 열면 현재 대화와 작성 중인 요청이 사라집니다. 체험을 열까요?'))return;
-  const body=failedPreviewRequest?.scenarioId===scenarioId?failedPreviewRequest:{scenarioId,requestId:makeId()};
+  const guided=scenarioId===GUIDED_DEMO_ID;
+  if(![GUIDED_DEMO_ID,'aewol-parent-visit',...JOURNEY_SCENARIOS.map(item=>item.id),...CALL_RECOVERY_SCENARIOS.map(item=>item.id)].includes(scenarioId))return;
+  if(guided && !getGuidedDemo(answers))return;
+  const advancing=guided && guidedDemo && answers.length===guidedDemo.answers.length+1 && guidedDemo.answers.every((value,index)=>answers[index]===value);
+  if(!advancing && hasConversationWork() && !window.confirm('준비 흐름 체험을 열면 현재 대화와 작성 중인 요청이 사라집니다. 체험을 열까요?'))return;
+  const sameRetry=failedPreviewRequest?.scenarioId===scenarioId && JSON.stringify(failedPreviewRequest.answers ?? [])===JSON.stringify(answers);
+  const body=sameRetry?failedPreviewRequest:{scenarioId,...(guided?{answers}:{}),requestId:makeId()};
   const journeyDialog=document.getElementById('care-journey-dialog');
   if(journeyDialog.open)journeyDialog.close('preview');
   const contactDialog=document.getElementById('contact-plan-dialog');
@@ -818,13 +852,17 @@ async function showPreview(scenarioId='aewol-parent-visit') {
     const data=normalizeResponse(await callAgent(API+'/preview',request.body,request.controller.signal));
     if(!requestIsCurrent(request))return;
     if(data.isPreview!==true || !Array.isArray(data.previewMessages) || !data.previewMessages.length)throw new Error('INVALID_PREVIEW');
+    const nextDemo=guided?getGuidedDemo(data.guidedDemo?.answers):null;
+    if(guided && (!nextDemo || JSON.stringify(data.guidedDemo.answers)!==JSON.stringify(answers)))throw new Error('INVALID_PREVIEW');
     const messages=data.previewMessages.slice(0,12).filter(message=>['user','assistant'].includes(message.role) && typeof message.text==='string' && message.text.trim()).map(message=>({role:message.role,text:message.text.slice(0,16000)}));
     if(!messages.length)throw new Error('INVALID_PREVIEW');
     const last=messages.at(-1);
     if(last.role!=='assistant' || last.text!==data.reply)messages.push({role:'assistant',text:data.reply});
     clearVisitRecovery();previewMode=true;sessionId=undefined;history=[];failedRequests.clear();
+    guidedDemo=nextDemo?{...nextDemo,detail:answers.length?(data.reply.endsWith(nextDemo.title)?data.reply.slice(0,-nextDemo.title.length).trim():data.reply):nextDemo.detail}:null;
     failedPreviewRequest=undefined;
     caseState=data.caseState;latestActions=data.pendingActions;latestEvents=data.events;responseCount=1;
+    if(guided)manualStageSelection=false;
     restoreReading=markAnswerReady();
     document.getElementById('request-input').value='';resizeInput();
     document.getElementById('message-list').replaceChildren();
@@ -832,14 +870,15 @@ async function showPreview(scenarioId='aewol-parent-visit') {
     messages.forEach((message,index)=>appendMessage({...message,isExample:true,events:index===messages.length-1?data.events:[]}));
     // 미리보기의 LLM 미사용은 전역 모델 연결 설정과 별개다.
     updateCapabilities();renderSnapshot({updateBoard:false});applied=true;
-    document.getElementById('conversation-status').textContent='준비 흐름 체험의 고정 합성 예시를 불러왔습니다. 실제 모델 응답과 전화는 아닙니다.';
+    document.getElementById('conversation-status').textContent=guided?`${data.reply} ${guidedDemo.title}`:'준비 흐름 체험의 고정 합성 예시를 불러왔습니다. 실제 모델 응답과 전화는 아닙니다.';
   } catch {
     if(!requestIsCurrent(request))return;
     failedPreviewRequest=request.body;previewProblem=true;
-    notice.hidden=false;notice.textContent='준비 흐름 체험을 불러오지 못했어요. 연결 상태를 확인한 뒤 ‘체험’을 다시 눌러주세요.';
+    notice.hidden=false;notice.textContent=guided?'체험을 불러오지 못했어요. 앞선 준비는 그대로입니다. 같은 답변을 다시 선택해 주세요.':'준비 흐름 체험을 불러오지 못했어요. 연결 상태를 확인한 뒤 ‘체험’을 다시 눌러주세요.';
     document.getElementById('conversation-status').textContent=notice.textContent;
   } finally {
     if(finishRequest(request)) {
+      if(applied && guidedDemo?.complete)document.querySelector('#stage-plan [data-stage-details]').open=true;
       if(applied && !unreadAnswer)showCurrentTask();
       else restoreReading?.();
     }
@@ -847,7 +886,7 @@ async function showPreview(scenarioId='aewol-parent-visit') {
 }
 
 async function sendRequest(text,retryId) {
-  if (pending || activeRecognition) return;
+  if (pending || activeRecognition || guidedDemo) return;
   const input=document.getElementById('request-input');
   if(capabilityState==='checking') {
     const version=conversationVersion,draft=input.value;
@@ -922,6 +961,7 @@ function resetVoiceButton() {
 }
 
 function startVoice() {
+  if(guidedDemo)return;
   if (pending || !SpeechRecognition) return;
   if (activeRecognition) {
     recognitionCancelled=true;activeRecognition.abort();
@@ -975,7 +1015,7 @@ function resetConversation({focus=true,force=false}={}) {
   if(activeRecognition){recognitionCancelled=true;activeRecognition.abort();activeRecognition=undefined;resetVoiceButton();}
   stopProgress(activeRequest);conversationVersion++;failedPreviewRequest=undefined;
   requestProblem='';previewProblem=false;manualStageSelection=false;selectedStageId=undefined;unreadAnswer=false;
-  caseState=createDemoCase();sessionId=undefined;history=[];latestActions=[];latestEvents=[];responseCount=0;previewMode=false;failedRequests.clear();
+  caseState=createDemoCase();sessionId=undefined;history=[];latestActions=[];latestEvents=[];responseCount=0;previewMode=false;guidedDemo=null;failedRequests.clear();
   preferencesNeedApply=true;
   document.getElementById('message-list').replaceChildren();
   document.getElementById('conversation-history').open=false;
@@ -1050,7 +1090,7 @@ function mount() {
           </div>
           <div class="conversation-layout" data-active-view="chat">
             <section class="chat-workspace" id="chat-workspace" role="tabpanel" aria-label="지금 준비할 일과 단계 상세">${chatContent}</section>
-            <aside class="preparation-rail" id="preparation-rail" role="tabpanel" aria-label="준비 길잡이와 방문 상세" tabindex="0">${preparationNavigationMarkup()}
+            <div class="preparation-rail" id="preparation-rail" role="tabpanel" aria-label="준비 길잡이와 방문 상세" tabindex="0">${preparationNavigationMarkup()}
               <details class="visit-summary" id="visit-summary"><summary><span>${icon('calendar')}이번 방문 상세</span><span>일정·준비 상태·출처</span>${icon('chevron')}</summary>
             <aside class="case-sidebar" aria-label="대화에서 준비한 내용">
               <details class="case-summary" id="case-summary" open><summary><span>${icon('calendar')}이번 방문 준비</span>${icon('chevron')}</summary><div id="case-content"></div></details>
@@ -1060,12 +1100,12 @@ function mount() {
               <details class="source-details"><summary>준비에 사용한 출처${icon('chevron')}</summary><div id="case-sources"></div></details>
               <span class="mode-label" id="mode-label">가상 사례 · 실제 발신 없음</span><p class="service-note">진찰과 진료 계획은 의료진이 결정합니다. 등록된 문의처와 실제 예약·배정은 다릅니다.</p>
             </aside></details>
-            </aside>
+            </div>
             <div class="chat-composer" id="chat-composer">
               <form id="conversation-form" class="conversation-form" aria-busy="false">
                 <label for="request-input" class="visually-hidden">진료 준비 요청</label>
                 <textarea id="request-input" name="message" rows="2" maxlength="${MAX_MESSAGE}" placeholder="예: 어머니 진료 자료와 이동·동행을 준비해줘." autocomplete="off" aria-describedby="composer-disclosure composer-boundary privacy-note voice-help" required></textarea>
-                <div class="composer-actions"><button type="button" id="voice-request" class="voice-button" aria-label="음성으로 요청하기" aria-pressed="false" aria-describedby="voice-help" ${SpeechRecognition?'':'disabled'}>${micIcon}<span>말로 요청</span></button><span class="keyboard-hint">Enter로 전송 · Shift+Enter 줄바꿈</span><span class="character-count" id="character-count">0/${MAX_MESSAGE}</span><div id="answer-ready-notice" class="answer-ready-notice" hidden><button type="button" aria-label="새 답변이 도착했어요. 대화에서 보기" title="새 답변이 도착했어요. 대화에서 보기">새 답변</button></div><div id="request-problem-notice" class="request-problem-notice" hidden><button type="button" aria-label="요청 결과를 확인해 주세요. 대화에서 보기" title="요청 결과를 확인해 주세요. 대화에서 보기">오류 보기</button></div><div class="pending-message" id="pending-message" hidden><button type="button" id="cancel-request" class="cancel-request" aria-label="응답 대기 중지" title="응답 대기 중지"><span class="working-mark" aria-hidden="true"></span>중지</button></div><button type="submit" class="send-button" id="send-request" aria-label="요청 보내기" title="요청 보내기" disabled>${icon('arrow')}<span>보내기</span></button></div>
+                <div class="composer-actions"><button type="button" id="voice-request" class="voice-button" aria-label="음성으로 요청하기" aria-pressed="false" aria-describedby="voice-help" ${SpeechRecognition?'':'disabled'}>${micIcon}<span>말로 요청</span></button><button type="button" id="exit-guided-demo" class="text-button" hidden>자유 입력으로 전환</button><span class="keyboard-hint">Enter로 전송 · Shift+Enter 줄바꿈</span><span class="character-count" id="character-count">0/${MAX_MESSAGE}</span><div id="answer-ready-notice" class="answer-ready-notice" hidden><button type="button" aria-label="새 답변이 도착했어요. 대화에서 보기" title="새 답변이 도착했어요. 대화에서 보기">새 답변</button></div><div id="request-problem-notice" class="request-problem-notice" hidden><button type="button" aria-label="요청 결과를 확인해 주세요. 대화에서 보기" title="요청 결과를 확인해 주세요. 대화에서 보기">오류 보기</button></div><div class="pending-message" id="pending-message" hidden><button type="button" id="cancel-request" class="cancel-request" aria-label="응답 대기 중지" title="응답 대기 중지"><span class="working-mark" aria-hidden="true"></span>중지</button></div><button type="submit" class="send-button" id="send-request" aria-label="요청 보내기" title="요청 보내기" disabled>${icon('arrow')}<span>보내기</span></button></div>
               </form>
               <p class="draft-feedback" id="draft-feedback" role="status" aria-atomic="true" hidden></p>
               <div class="composer-notes"><p class="composer-disclosure" id="composer-disclosure">${icon('info')}시연 · 실행 없음</p>
@@ -1115,6 +1155,14 @@ function mount() {
   document.getElementById('cancel-request').addEventListener('click',cancelRequest);
   document.getElementById('new-conversation').addEventListener('click',()=>resetConversation());
   document.getElementById('preview-button').addEventListener('click',()=>showPreview());
+  document.getElementById('guided-demo-controls').addEventListener('click',event=>{
+    const button=event.target.closest('button');
+    if(!button || pending || activeRecognition)return;
+    if(button.hasAttribute('data-demo-start'))showPreview(GUIDED_DEMO_ID);
+    else if(button.hasAttribute('data-demo-save'))saveReport();
+    else if(guidedDemo?.choices.some(choice=>choice.id===button.dataset.demoChoice))showPreview(GUIDED_DEMO_ID,[...guidedDemo.answers,button.dataset.demoChoice]);
+  });
+  document.getElementById('exit-guided-demo').addEventListener('click',()=>resetConversation());
   document.getElementById('save-report').addEventListener('click',saveReport);
   document.getElementById('resume-visit').addEventListener('click',resumeVisit);
   document.getElementById('stage-navigation').addEventListener('click',event=>{

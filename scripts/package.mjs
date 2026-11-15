@@ -14,10 +14,6 @@ const selected = [
   'README.md','AGENTS.md','PRODUCT.md','DESIGN.md','THIRD_PARTY.md','.env.example','package.json','package-lock.json',
   'app','agent','prompts','scripts','tests','docs','research','orchestration','infra','.github','dist',
   '.impeccable/design.json',
-  '.impeccable/review/chat-rail/product-redesign/release-capture/initial-1440.png',
-  '.impeccable/review/chat-rail/product-redesign/release-capture/preview-1440.png',
-  '.impeccable/review/chat-rail/product-redesign/release-capture/preview-390.png',
-  '.impeccable/review/chat-rail/product-redesign/qa-final/final-summary.json',
 ];
 const code = `import json,sys,zipfile,pathlib
 root=pathlib.Path(sys.argv[1]); dest=pathlib.Path(sys.argv[2]); selected=json.loads(sys.argv[3])

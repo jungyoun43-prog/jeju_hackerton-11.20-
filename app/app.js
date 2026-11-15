@@ -23,7 +23,7 @@ let supportLoadError = '';
 const supportNames = { taxi: '택시 이동', companion: '병원 동행' };
 const busyTargets = new Set();
 const views = { overview: ['진료 준비', 'home'], documents: ['진료 자료', 'folder'], calls: ['병원 문의', 'phone'], plan: ['일정·동행', 'calendar'], data: ['기관·데이터', 'database'] };
-const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+import { escapeHtml as escape } from './message-format.js';
 const money = value => new Intl.NumberFormat('ko-KR').format(value || 0);
 const documentLabels = { history: '치료 이력 요약', report: '최근 검사 판독문', exam: '제주 대면 진찰 소견', referral: '의료진 작성 의뢰서' };
 const docStatus = { ready: ['준비 완료', 'green'], missing: ['자료 필요', 'orange'], not_performed: ['진찰 후 준비', 'neutral'] };
