@@ -123,6 +123,7 @@ export function createRealtimeService({
   const configuredLimit = env.OPENAI_REALTIME_DAILY_SESSION_LIMIT ?? '3';
   const dailyLimit = Number(configuredLimit);
   const limitValid = /^(?:[1-9]|[1-7][0-9]|80)$/.test(String(configuredLimit)) && Number.isSafeInteger(dailyLimit);
+  const configuredKey = () => typeof env.OPENAI_API_KEY === 'string' ? env.OPENAI_API_KEY.trim() : '';
   const schedule = (fn, delay) => { const timer = setTimeoutImpl(fn, delay); timer?.unref?.(); return timer; };
   const clear = timer => { if (timer !== undefined) clearTimeoutImpl(timer); };
   const getBudget = () => budget ?? (budgetPromise ??= import('./model-budget.mjs').then(({ createFileModelBudget }) => createFileModelBudget({ directory: resolve('.runtime/realtime-usage'), now })));
@@ -221,7 +222,7 @@ export function createRealtimeService({
   async function start({ sdp, region }, signal) {
     if (!validSdp(sdp) || !['jeju', 'seoul'].includes(region)) throw new VoiceFailure('VOICE_INVALID_REQUEST');
     if (disposed) throw new VoiceFailure('VOICE_CLOSED');
-    const apiKey = typeof env.OPENAI_API_KEY === 'string' ? env.OPENAI_API_KEY.trim() : '';
+    const apiKey = configuredKey();
     if (!apiKey) throw new VoiceFailure('VOICE_NOT_CONFIGURED');
     if (signal?.aborted) throw new VoiceFailure('VOICE_CANCELLED');
     if (active) throw new VoiceFailure('VOICE_BUSY');
@@ -258,6 +259,10 @@ export function createRealtimeService({
   }
 
   return {
+    availableForHost(host) {
+      return !disposed && limitValid && Boolean(configuredKey()) && typeof host === 'string'
+        && checkOrigin({ host, origin: `https://${host}` }, env.REALTIME_ALLOWED_ORIGIN);
+    },
     async handle({ method = 'GET', path = '/', body, headers = {}, signal } = {}) {
       try {
         if (!['/api/voice/session', '/api/voice/end'].includes(path)) throw new VoiceFailure('VOICE_NOT_FOUND');

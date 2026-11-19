@@ -48,6 +48,9 @@ const server = createServer(async (req, res) => {
       const body=Buffer.concat(chunks).toString('utf8');
       const result=await handleAgentRequest({method:req.method,path,body,headers:req.headers});
       res.writeHead(result.statusCode,result.headers);
+      if(path==='/api/agent/capabilities' && req.method==='GET' && result.statusCode===200) {
+        return res.end(JSON.stringify({...JSON.parse(result.body),realtimeVoice:realtime.availableForHost(req.headers.host)}));
+      }
       return res.end(result.body);
     }
     if (!['GET','HEAD'].includes(req.method)) return json(405, {error:'지원하지 않는 요청입니다.'});

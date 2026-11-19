@@ -63,6 +63,17 @@ function privateFree(response) {
   assert.equal(response.headers['access-control-allow-origin'], undefined);
 }
 
+test('실시간 음성의 설정 조회는 허용된 호스트만 안내하며 음성 세션을 열지 않는다', t => {
+  const local=fixture(t), keyed=fixture(t,{env:{REALTIME_ALLOWED_ORIGIN:'https://hondi.example'}});
+  assert.equal(local.service.availableForHost(HEADERS.host),true);
+  assert.equal(local.service.availableForHost('hondi.example'),false);
+  assert.equal(keyed.service.availableForHost('hondi.example'),true);
+  assert.equal(keyed.service.availableForHost('other.hondi.example'),false);
+  assert.equal(fixture(t,{env:{OPENAI_API_KEY:''}}).service.availableForHost(HEADERS.host),false);
+  assert.equal(fixture(t,{env:{OPENAI_REALTIME_DAILY_SESSION_LIMIT:'0'}}).service.availableForHost(HEADERS.host),false);
+  assert.equal(local.calls.length+keyed.calls.length+local.budget.limits.length+keyed.budget.limits.length,0);
+});
+
 test('브라우저 Origin·Host·same-origin이 맞지 않으면 한도 차감과 외부 전송 전에 거절한다', async t => {
   const f = fixture(t);
   for (const headers of [

@@ -27,7 +27,8 @@ test('로컬 서버는 시연 상태만 공개하고 비밀 파일·경로 이�
  assert.deepEqual(Object.keys(await config.json()).sort(),['mode','tileUrl']);
  const capabilities=await fetch(base+'/api/agent/capabilities');
  assert.equal(capabilities.status,200);
- assert.equal((await capabilities.json()).llm,false);
+ const settings=await capabilities.json();
+ assert.equal(settings.llm,false);assert.equal(settings.realtimeVoice,false);
  assert.equal(capabilities.headers.get('cache-control'),'no-store');
  const unavailableProgress=await fetch(base+'/api/agent/progress',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({progressToken:'p'.repeat(43)})});
  assert.equal(unavailableProgress.status,200);assert.deepEqual(await unavailableProgress.json(),{available:false,progress:null});

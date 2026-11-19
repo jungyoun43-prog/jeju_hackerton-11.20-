@@ -153,7 +153,7 @@ test('Node env-file 부팅에서 키 한 줄만으로 API가 구성되고 실제
         child.once('exit',()=>{clearTimeout(timer);reject(new Error('env 서버 종료'));});
       });
       const caps=await (await fetch(base+'/api/agent/capabilities')).json();
-      assert.equal(caps.llm,true);assert.equal(Object.hasOwn(caps,'model'),false);assert.equal(Object.hasOwn(caps,'reasoningEffort'),false);
+      assert.equal(caps.llm,true);assert.equal(caps.realtimeVoice,true);assert.equal(Object.hasOwn(caps,'model'),false);assert.equal(Object.hasOwn(caps,'reasoningEffort'),false);
       const response=await fetch(base+'/api/agent',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({message,requestId})});
       assert.equal(response.status,200);
       const body=await response.json();

@@ -34,10 +34,55 @@ try {
   await page.getByRole('button',{name:'진료과 수정',exact:true}).click();check(width+' 직접 수정에 기존 조건 연결',await page.locator('#public-visit-department').innerText()==='정형외과');
   check(width+' 다른 병원과 출처 기본 접힘',await page.locator('.public-candidates').getAttribute('open')===null&&await page.locator('.jeju-data-sources').getAttribute('open')===null);
   await page.locator('[data-book-action="entry_summary"]').click();check(width+' 요약 복귀 보존',(await page.locator('.entry-review-rows').innerText()).includes('2026-12-01'));
-  await page.getByRole('button',{name:'이동·준비표로 계속',exact:true}).click();check(width+' 상세 이동정보 접힘',await page.getByText('제주 이동·동행 문의처 찾기',{exact:true}).isVisible()&&!await page.locator('#jeju-support-area').isVisible());
-  await page.getByText('제주 이동·동행 문의처 찾기',{exact:true}).click();check(width+' 지원 조회에 입력 반영',await page.locator('#jeju-support-wheelchair').getAttribute('data-state')==='checked');
+  await page.getByRole('button',{name:'다음: AI에게 맡길 내용',exact:true}).click();check(width+' 상세 이동정보 접힘',await page.getByText('제주 공개 문의처·출처',{exact:true}).isVisible()&&!await page.locator('#jeju-support-area').isVisible());
+  await page.getByText('제주 공개 문의처·출처',{exact:true}).click();check(width+' 지원 조회에 입력 반영',await page.locator('#jeju-support-wheelchair').getAttribute('data-state')==='checked');
   check(width+' 문서 전체 overflow 없음',await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1&&document.documentElement.scrollHeight<=innerHeight+1));
   check(width+' 모델명/추론 설정 숨김',!/(gpt-|reasoningEffort|\bmedium\b)/i.test(await page.locator('body').innerText()));
+  await context.close();
+ }
+ for(const supportsDictation of [true,false]){
+  const context=await browser.newContext({locale:'ko-KR',reducedMotion:'reduce'});
+  let realtimePosts=0;
+  await context.route('**/*',route=>{
+   const request=route.request(),url=new URL(request.url());
+   if(url.origin!==new URL(base).origin)return route.abort();
+   // The deployed Agent can answer text while the voice session routes are absent.
+   if(url.pathname==='/api/agent/capabilities')return route.fulfill({json:{llm:true,voiceInput:'browser'}});
+   if(request.method()==='POST'){if(url.pathname.startsWith('/api/voice/'))realtimePosts++;else proof.modelCalls++;return route.abort();}
+   return route.continue();
+  });
+  await context.addInitScript(supported=>{
+   window.__microphoneCalls=0;
+   Object.defineProperty(navigator,'mediaDevices',{value:{getUserMedia(){window.__microphoneCalls++;throw new Error('fixture only');}},configurable:true});
+   window.webkitSpeechRecognition=undefined;
+   window.SpeechRecognition=supported?class {
+    constructor(){window.__dictation=this;}
+    start(){this.onstart();}
+    stop(){this.onend();}
+    abort(){this.onend();}
+   }:undefined;
+  },supportsDictation);
+  const p=await context.newPage();p.on('pageerror',error=>proof.errors.push(error.message));
+  await p.goto(base);await p.locator('#choose-region-jeju').click();await p.locator('#entry-mode-voice').click();
+  const type=p.getByRole('button',{name:'글로 입력하기'}),draft=p.locator('#request-input');
+  await type.waitFor();
+  check('공개 앱에서 실시간 버튼을 숨김 '+supportsDictation,await p.locator('#realtime-start').count()===0);
+  if(supportsDictation){
+   const start=p.getByRole('button',{name:'받아쓰기 시작'});await start.click();
+   const stop=p.getByRole('button',{name:'받아쓰기 마치기'});
+   await p.evaluate(()=>window.__dictation.onresult({resultIndex:0,results:[Object.assign([{transcript:'제주우리병원 정형외과'}],{isFinal:true})]}));
+   check('받아쓴 조건을 표시하고 마치기 버튼 초점을 유지',await stop.evaluate(n=>document.activeElement===n)&&await p.locator('.entry-live li[data-found=true]').count()>0);
+   await type.click();
+   await p.evaluate(()=>window.__dictation.onresult({resultIndex:0,results:[Object.assign([{transcript:'늦은 음성'}],{isFinal:true})]}));
+   check('글로 전환한 뒤 늦은 받아쓰기 이벤트에서 초안 보존',await draft.inputValue()==='제주우리병원 정형외과');
+  }else{
+   await p.getByText('이 환경에서는 음성 입력을 사용할 수 없어요.',{exact:false}).waitFor();
+   check('인식 미지원 브라우저에서 받아쓰기 버튼 없음',await p.getByRole('button',{name:'받아쓰기 시작'}).count()===0);
+   await type.click();await draft.fill('제주우리병원 정형외과');
+  }
+  check('직접 입력에 초점 이동 '+supportsDictation,await draft.evaluate(n=>document.activeElement===n&&!n.readOnly));
+  await p.locator('#send-request').click();await p.locator('.entry-review-rows').waitFor();
+  check('공개 앱에서 WebRTC 마이크·세션 요청 0 '+supportsDictation,await p.evaluate(()=>window.__microphoneCalls===0)&&realtimePosts===0);
   await context.close();
  }
  const context=await browser.newContext({viewport:{width:1280,height:720},locale:'ko-KR'});
@@ -47,7 +92,7 @@ try {
   Object.defineProperty(navigator,'mediaDevices',{value:{getUserMedia:async()=>{window.__voiceTest.mediaCalls++;return{getTracks:()=>[track],getAudioTracks:()=>[track]};}},configurable:true});
   window.RTCPeerConnection=class {constructor(){window.__voiceTest.peer=this;this.connectionState='new';}addTrack(){}createDataChannel(){const c={readyState:'connecting',send:text=>window.__voiceTest.sent.push(JSON.parse(text)),close(){this.readyState='closed';}};window.__voiceTest.channel=c;return c;}async createOffer(){return{sdp:'v=0\r\nm=audio 9 UDP/TLS/RTP/SAVPF 111\r\n'};}async setLocalDescription(){}async setRemoteDescription(){this.connectionState='connected';window.__voiceTest.channel.readyState='open';window.__voiceTest.channel.onopen();}close(){this.connectionState='closed';}};
  });
- await context.route('**/*',route=>{const url=new URL(route.request().url());if(url.origin!==new URL(base).origin)return route.abort();if(url.pathname==='/api/voice/session'){proof.voiceStarts++;return route.fulfill({json:{sdp:'v=0\r\nm=audio 9 UDP/TLS/RTP/SAVPF 111\r\n',token:'x'.repeat(43),expiresIn:180}});}if(url.pathname==='/api/voice/end'){proof.voiceEnds++;return route.fulfill({json:{ended:true}});}if(url.pathname==='/api/agent'&&route.request().method()==='POST'){proof.modelCalls++;return route.abort();}return route.continue();});
+ await context.route('**/*',route=>{const url=new URL(route.request().url());if(url.origin!==new URL(base).origin)return route.abort();if(url.pathname==='/api/agent/capabilities')return route.fulfill({json:{llm:false,realtimeVoice:true}});if(url.pathname==='/api/voice/session'){proof.voiceStarts++;return route.fulfill({json:{sdp:'v=0\r\nm=audio 9 UDP/TLS/RTP/SAVPF 111\r\n',token:'x'.repeat(43),expiresIn:180}});}if(url.pathname==='/api/voice/end'){proof.voiceEnds++;return route.fulfill({json:{ended:true}});}if(url.pathname==='/api/agent'&&route.request().method()==='POST'){proof.modelCalls++;return route.abort();}return route.continue();});
  const p=await context.newPage();p.on('pageerror',e=>proof.errors.push(e.message));await p.goto(base);await p.locator('#choose-region-jeju').click();await p.locator('#entry-mode-voice').click();
  check('음성 방식 선택만으로 마이크를 열지 않음',await p.evaluate(()=>window.__voiceTest.mediaCalls===0));await p.locator('#realtime-start').click();await p.getByText('듣고 있어요',{exact:true}).waitFor();
  check('명시 시작 후 WebRTC 연결',proof.voiceStarts===1&&await p.evaluate(()=>window.__voiceTest.mediaCalls===1));

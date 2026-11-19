@@ -55,6 +55,7 @@ let regionHomeOpen = false;
 let regionRenderer;
 let careEntry={screen:'region',region:null,mode:null};
 let voiceSession;
+let entryVoiceMode='checking';
 let careMotion;
 let coordinationRun;
 let voiceUi={status:'idle',active:false,assistant:''};
@@ -181,7 +182,7 @@ function setupAppointmentWorkspace() {
 
 function renderRegionHome() {
   const preview=careEntry.screen==='request'?careRequestPreview(careEntry.conditionText||document.getElementById('request-input').value,careEntry.region):[];
-  regionRenderer?.(appointmentDrafts,handleCareEntryAction,{...careEntry,preview,voice:voiceUi,caseState});
+  regionRenderer?.(appointmentDrafts,handleCareEntryAction,{...careEntry,preview,voice:{...voiceUi,mode:entryVoiceMode,dictating:Boolean(activeRecognition)},caseState});
 }
 
 function playCareTransition(options={},update=()=>{}) { if(careMotion)careMotion.transition({...options,update});else update(); }
@@ -231,13 +232,35 @@ function showCareEntry(screen) {
     setWorkspaceView('chat');renderSnapshot();renderRegionHome();
     document.getElementById('conversation-scroll').scrollTop=0;
     document.getElementById('care-region-title')?.focus({preventScroll:true});
-    if(screen==='request')document.getElementById('request-input').focus({preventScroll:true});
+    if(screen==='request'){
+      const voiceControl=careEntry.mode==='voice'&&document.querySelector('[data-entry-voice-primary]');
+      (voiceControl||document.getElementById('request-input')).focus({preventScroll:true});
+    }
   });
 }
 
 function handleCareEntryAction(type,value) {
+  const voiceEntry=regionHomeOpen&&careEntry.screen==='request'&&careEntry.mode==='voice';
+  if(type==='dictate'){
+    if(voiceEntry&&entryVoiceMode==='dictation'){
+      if(activeRecognition)activeRecognition.stop();else startVoice();
+    }
+    return;
+  }
+  if(voiceEntry&&activeRecognition&&(type==='voice_type'||type==='methods')){
+    const previous=activeRecognition;activeRecognition=undefined;recognitionCancelled=true;
+    previous.abort();resetVoiceButton();
+  }
+  if(type==='voice_type'){
+    if(!voiceEntry)return;
+    careEntry={...careEntry,mode:'text',conditionText:null};
+    resizeInput();document.getElementById('request-input').focus({preventScroll:true});return;
+  }
   if(type==='voice_stop'){void voiceSession?.stop();return;}
-  if(type==='voice_start'){void voiceSession?.start({region:careEntry.region,draft:document.getElementById('request-input').value});return;}
+  if(type==='voice_start'){
+    if(voiceEntry&&entryVoiceMode==='realtime'&&!activeRecognition)void voiceSession?.start({region:careEntry.region,draft:document.getElementById('request-input').value});
+    return;
+  }
   if(type==='voice_play'){voiceSession?.resumeAudio();return;}
   if(pending||activeRecognition)return;
   if(type==='existing'){closeAppointmentDemo();return;}
@@ -273,7 +296,6 @@ function handleCareEntryAction(type,value) {
     careEntry={...careEntry,mode:value};
     if(value==='manual'){openAppointmentDemo(careEntry.region);return;}
     showCareEntry('request');
-    document.getElementById('request-input').focus({preventScroll:true});
     return;
   }
   if(type==='resume'){openAppointmentDemo(careEntry.region);return;}
@@ -1410,7 +1432,10 @@ function startVoice() {
     return;
   }
   recognitionCancelled=false;recognitionFailed=false;finalTranscript='';voiceBase=document.getElementById('request-input').value.trim();
-  const recognition=new SpeechRecognition();activeRecognition=recognition;
+  let recognition;
+  try {recognition=new SpeechRecognition();}
+  catch {voiceMessage('이 브라우저에서 받아쓰기를 시작할 수 없어요. 아래에 직접 입력해 주세요.',true);return;}
+  activeRecognition=recognition;
   recognition.lang='ko-KR';recognition.interimResults=true;recognition.continuous=false;recognition.maxAlternatives=1;
   recognition.onstart=()=>{
     if(activeRecognition!==recognition || recognitionCancelled)return;
@@ -1426,6 +1451,7 @@ function startVoice() {
       if(event.results[index].isFinal)finalTranscript+=transcript;else interim+=transcript;
     }
     const value=[voiceBase,finalTranscript,interim].filter(Boolean).join(' ').slice(0,MAX_MESSAGE);
+    if(regionHomeOpen&&careEntry.screen==='request')careEntry.conditionText=null;
     document.getElementById('request-input').value=value;resizeInput();
   };
   recognition.onspeechend=()=>{if(activeRecognition===recognition && !recognitionCancelled)recognition.stop();};
@@ -1768,7 +1794,19 @@ export function mount({renderAppointment:renderer,renderRegionStart}={}) {
   });
   setWorkspaceView('chat');resizeInput();
   const capabilityController=new AbortController(),capabilityTimer=setTimeout(()=>capabilityController.abort(),8000);
-  capabilitiesReady=fetch(API+'/capabilities',{cache:'no-store',signal:capabilityController.signal}).then(response=>{if(!response.ok)throw new Error('unavailable');return response.json();}).then(data=>updateCapabilities(data.capabilities || data)).catch(()=>updateCapabilities({llm:false})).finally(()=>clearTimeout(capabilityTimer));
+  capabilitiesReady=fetch(API+'/capabilities',{cache:'no-store',signal:capabilityController.signal})
+    .then(response=>{if(!response.ok)throw new Error('unavailable');return response.json();})
+    .catch(()=>({llm:false}))
+    .then(data=>{
+      const settings=data?.capabilities||data||{};
+      entryVoiceMode=settings.realtimeVoice===true&&window.RTCPeerConnection&&navigator.mediaDevices?.getUserMedia?'realtime':SpeechRecognition?'dictation':'text';
+      updateCapabilities(settings);
+      if(regionHomeOpen&&['request','method'].includes(careEntry.screen)){
+        const focused=document.activeElement;
+        renderRegionHome();
+        if(focused&&!focused.isConnected)document.querySelector('[data-entry-voice-primary]')?.focus({preventScroll:true});
+      }
+    }).finally(()=>clearTimeout(capabilityTimer));
   if(visitToken)resumeVisit();
 }
 
