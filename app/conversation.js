@@ -1528,36 +1528,35 @@ export function mount({renderAppointment:renderer,renderRegionStart}={}) {
     <div class="app-shell">
       <header class="mobile-app-header" id="mobile-app-header">
         <a class="brand" href="/" aria-label="혼디 홈">${brand}</a>
-        <button type="button" id="open-care-menu" class="menu-button" aria-controls="care-rail" aria-expanded="false">${menuIcon}<span>설정</span></button>
+        <button type="button" id="open-care-menu" class="menu-button" aria-controls="care-rail" aria-expanded="false">${menuIcon}<span>메뉴</span></button>
       </header>
-      <button type="button" id="drawer-backdrop" class="drawer-backdrop" aria-label="설정 닫기" tabindex="-1" hidden></button>
+      <button type="button" id="drawer-backdrop" class="drawer-backdrop" aria-label="메뉴 닫기" tabindex="-1" hidden></button>
       <aside class="care-rail" id="care-rail" aria-label="가상 가족 사례와 기본 설정" tabindex="-1">
-        <div class="rail-brand-row"><a class="brand" href="/" aria-label="혼디 홈">${brand}</a><button type="button" id="close-care-menu" class="close-menu" aria-label="설정 닫기">${icon('close')}</button></div>
+        <div class="rail-brand-row"><a class="brand" href="/" aria-label="혼디 홈">${brand}</a><button type="button" id="close-care-menu" class="close-menu" aria-label="메뉴 닫기">${icon('close')}</button></div>
         <section class="rail-case" aria-labelledby="rail-patient">
           <h2 id="rail-patient"></h2>
           <p id="rail-area"></p><p id="rail-caregiver"></p>
-          <span class="case-demo">가상 사례 체험 중</span>
         </section>
         <nav class="rail-nav" aria-label="준비 화면 이동">
-          <a href="#main" id="nav-preparation" class="active" aria-current="location">${icon('compass')}<span>진료 준비</span></a>
+          <a href="#main" id="nav-preparation" class="active" aria-current="location">${icon('compass')}<span>${regionRenderer?'진료 준비 홈':'진료 준비'}</span></a>
           <a href="#care-journey-dialog" id="nav-care-journey" aria-haspopup="dialog" aria-controls="care-journey-dialog">${icon('file')}<span>진료 연결 여정</span></a>
           <a href="#patient-records-dialog" id="nav-patient-records" aria-haspopup="dialog" aria-controls="patient-records-dialog">${icon('folder')}<span>환자 정보·건강 기록</span></a>
           <a href="#contact-plan-dialog" id="nav-contact-plan" aria-haspopup="dialog" aria-controls="contact-plan-dialog">${icon('phone')}<span>전화·협진 준비</span></a>
-          <a href="#care-preferences" id="nav-preferences">${icon('car')}<span>이동·동행 설정</span></a>
         </nav>
-        <section class="preference-panel" id="care-preferences" aria-labelledby="preferences-heading" tabindex="-1">
-          <h2 id="preferences-heading">이동·동행 기본 설정</h2>
-          <p class="preference-intro">자주 쓰는 이동 조건을 정해 두세요.</p>
-          <form id="preferences-form">
-            <label class="select-label" for="pref-taxi">선호 택시 문의처</label>
-            <select id="pref-taxi" name="taxiProviderId" aria-describedby="taxi-preference-note"></select>
-            <p class="field-note" id="taxi-preference-note">공개 문의처 · 실제 배차·예약 미확정</p>
-            <label class="preference-toggle" for="pref-wheelchair"><span>휠체어 차량 필요</span><input type="checkbox" id="pref-wheelchair" name="wheelchair"/></label>
-            <label class="preference-toggle" for="pref-companion"><span>병원 동행 필요</span><input type="checkbox" id="pref-companion" name="companionNeeded"/></label>
-          </form>
-          <p class="preference-feedback" id="preferences-status" role="status" aria-live="polite"></p>
-          <p class="field-note">선택 설정 · 요청에서 말한 조건이 우선해요.</p>
-        </section>
+        <details class="preference-panel" id="care-preferences">
+          <summary class="text-button" id="nav-preferences">${icon('car')}<span id="preferences-heading">이동·동행 설정</span>${icon('chevron')}</summary>
+          <div class="rail-preference-body">
+            <form id="preferences-form">
+              <label class="select-label" for="pref-taxi">선호 택시 문의처</label>
+              <select id="pref-taxi" name="taxiProviderId" aria-describedby="taxi-preference-note"></select>
+              <p class="field-note" id="taxi-preference-note">공개 문의처 · 실제 배차·예약 미확정</p>
+              <label class="preference-toggle" for="pref-wheelchair"><span>휠체어 차량 필요</span><input type="checkbox" id="pref-wheelchair" name="wheelchair"/></label>
+              <label class="preference-toggle" for="pref-companion"><span>병원 동행 필요</span><input type="checkbox" id="pref-companion" name="companionNeeded"/></label>
+            </form>
+            <p class="preference-feedback" id="preferences-status" role="status" aria-live="polite"></p>
+            <p class="field-note">요청할 때 다른 조건을 말씀하셔도 돼요.</p>
+          </div>
+        </details>
         <p class="rail-note">${icon('lock')}기본 설정과 이 탭의 이어하기 참조만 저장해요. 대화와 의료기록은 저장하지 않습니다.</p>
       </aside>
       <div class="workspace-shell" id="workspace-shell">
@@ -1778,13 +1777,12 @@ export function mount({renderAppointment:renderer,renderRegionStart}={}) {
   document.getElementById('open-care-menu').addEventListener('click',openCareMenu);
   document.getElementById('close-care-menu').addEventListener('click',()=>closeCareMenu());
   document.getElementById('drawer-backdrop').addEventListener('click',()=>closeCareMenu());
-  document.getElementById('nav-preparation').addEventListener('click',event=>{event.preventDefault();closeCareMenu({restoreFocus:false});document.getElementById('nav-preparation').setAttribute('aria-current','location');document.getElementById('nav-preferences').removeAttribute('aria-current');if(regionHomeOpen || appointmentOpen)showRegionHome();else focusRequest();});
-  document.getElementById('nav-preferences').addEventListener('click',event=>{event.preventDefault();document.getElementById('nav-preparation').removeAttribute('aria-current');document.getElementById('nav-preferences').setAttribute('aria-current','location');document.getElementById('pref-taxi').focus({preventScroll:true});document.getElementById('care-preferences').scrollIntoView({block:'nearest'});});
+  document.getElementById('nav-preparation').addEventListener('click',event=>{event.preventDefault();closeCareMenu({restoreFocus:false});if(regionRenderer && !pending && !activeRecognition)showRegionHome();else focusRequest();});
   document.addEventListener('keydown',event=>{
     if(!drawerOpen)return;
     if(event.key==='Escape'){event.preventDefault();closeCareMenu();return;}
     if(event.key==='Tab'){
-      const items=[...document.getElementById('care-rail').querySelectorAll('a[href],button:not(:disabled),input:not(:disabled),select:not(:disabled)')].filter(node=>node.getBoundingClientRect().width>0);
+      const items=[...document.getElementById('care-rail').querySelectorAll('a[href],button:not(:disabled),summary,input:not(:disabled),select:not(:disabled)')].filter(node=>node.checkVisibility({visibilityProperty:true}));
       const first=items[0],last=items.at(-1);
       if(event.shiftKey && document.activeElement===first){event.preventDefault();last.focus();}
       else if(!event.shiftKey && document.activeElement===last){event.preventDefault();first.focus();}

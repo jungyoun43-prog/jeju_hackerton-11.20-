@@ -145,6 +145,7 @@ async function confirmAction(page,selector,accept=true) {
 async function editPreferences(page,values) {
   const mobile=await page.locator('#open-care-menu').isVisible();
   if(mobile)await page.locator('#open-care-menu').click();
+  await reveal(page.locator('#pref-taxi'));
   await page.locator('#pref-taxi').selectOption(values.taxiProviderId);
   await page.locator('#pref-wheelchair').setChecked(values.wheelchair);
   await page.locator('#pref-companion').setChecked(values.companionNeeded);
@@ -519,6 +520,11 @@ try {
       record(`${width}px 추가 반응형 앱 넘침·공통 입력·실제 처리 한계`,await overflow(page) && (await reachable(page.locator('#send-request'))).reachable && await disclosure(page));
       await page.locator('#open-care-menu').focus();await page.keyboard.press('Enter');
       record(`${width}px 설정 서랍은 이름·focus·배경 비활성 제공`,await page.locator('#care-rail').getAttribute('role')==='dialog' && await page.locator('#care-rail').getAttribute('aria-modal')==='true' && await page.evaluate(()=>document.activeElement.id==='close-care-menu' && document.querySelector('#workspace-shell').inert));
+      const summary=page.locator('#nav-preferences');
+      await summary.focus();await page.keyboard.press('Tab');await page.keyboard.press('Shift+Tab');
+      record(`${width}px 접힌 설정의 폼을 건너뛰고 메뉴 안에서 순환`,await summary.evaluate(node=>!node.parentElement.open&&document.activeElement===node));
+      await page.keyboard.press('Space');
+      record(`${width}px 키보드로 설정을 펼치면 초점 유지`,await summary.evaluate(node=>node.parentElement.open&&document.activeElement===node));
       const targets=page.locator('#open-care-menu,#close-care-menu,#pref-taxi,.preference-toggle,#nav-preparation,#nav-preferences');
       record(`${width}px 서랍과 선택 조작의 터치 영역 44px 이상`,await targets.evaluateAll(nodes=>nodes.every(node=>{const r=node.getBoundingClientRect();return r.width>=44 && r.height>=44;})));
       await page.locator('#pref-companion').focus();await page.keyboard.press('Tab');

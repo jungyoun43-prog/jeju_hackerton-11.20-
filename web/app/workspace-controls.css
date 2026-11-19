@@ -1,0 +1,102 @@
+/* 내비게이션은 글자 폭, 선택 화면은 실제 작업 면적에 맞춘다. */
+@media (min-width:1051px) {
+  .app-shell { --navigation-width:clamp(196px,16vw,228px); }
+}
+
+.care-rail {
+  padding:16px 12px;
+  gap:0;
+}
+.rail-brand-row { padding-inline:10px; }
+.rail-brand-row .brand img { width:108px; }
+.rail-case { margin:6px 0 8px; padding:10px 10px 14px; }
+.rail-case h2 { font-size:var(--text-body); font-weight:650; }
+.rail-case p { font-size:14px; line-height:1.45; }
+.rail-nav { padding:0; gap:2px; }
+.rail-nav a,
+.care-rail .preference-panel > summary {
+  display:flex;
+  align-items:center;
+  gap:10px;
+  min-height:44px;
+  padding:9px 10px;
+  border-radius:var(--radius-control);
+  color:var(--ink);
+  font-size:15px;
+  font-weight:500;
+  line-height:1.4;
+}
+.rail-nav a[aria-current] { color:var(--secondary); background:color-mix(in srgb,var(--soft) 86%,var(--secondary)); font-weight:650; }
+.rail-nav a > .icon:first-child,
+.preference-panel > summary > .icon:first-child { width:18px; height:18px; color:var(--secondary); }
+.care-rail .preference-panel { margin-top:6px; padding:6px 0 0; }
+.preference-panel > summary { list-style:none; text-decoration:none; cursor:pointer; }
+.preference-panel > summary::-webkit-details-marker { display:none; }
+.preference-panel > summary > .icon:last-child { width:16px; height:16px; margin-left:auto; }
+.preference-panel[open] > summary > .icon:last-child { transform:rotate(90deg); }
+.rail-preference-body { padding:2px 10px 8px; }
+.rail-preference-body .select-label { margin-top:8px; font-size:14px; }
+.rail-preference-body select { font-size:16px; }
+.rail-preference-body .preference-toggle { min-height:44px; font-size:14px; }
+.rail-note { margin:12px 10px 0; padding:12px 0 0; border-top:1px solid var(--line); }
+.care-rail > * { flex-shrink:0; }
+
+.workspace-header :is(.header-button,.expand-answer,.preview-button),
+.mobile-app-header .menu-button { font-size:14px; line-height:1.35; }
+:is(.is-region-home,.is-booking-workspace) #open-my-reservations {
+  width:fit-content;
+  gap:7px;
+  padding:8px 12px;
+}
+:is(.is-region-home,.is-booking-workspace) #open-my-reservations span { display:inline; font-size:14px; }
+
+.hondi-react .booking-footer-buttons [data-slot=button],
+.hondi-react.coordination-result-dialog .result-window-footer [data-slot=button] {
+  min-height:44px;
+  min-width:44px;
+  padding:9px 14px;
+  gap:8px;
+  font-size:15px;
+  line-height:1.4;
+}
+.booking-footer-buttons [data-book-primary] { min-width:0; }
+.hondi-react .booking-footer-buttons svg,
+.hondi-react.coordination-result-dialog .result-window-footer svg { width:17px; height:17px; flex-shrink:0; }
+.booking-footer-buttons > button:not(.appointment-primary,[data-role=within-step]) { padding-inline:10px; }
+
+/* 타일 전체를 누를 수 있으므로 내부 행동 표시는 문구 길이만큼 둔다. */
+.region-start .region-choice-action {
+  width:fit-content;
+  max-width:100%;
+  min-height:44px;
+  padding:9px 14px;
+  gap:9px;
+  font-size:15px;
+  line-height:1.4;
+}
+.hondi-react.region-start .region-choice-action svg { width:17px; height:17px; }
+@media (min-width:701px) {
+  .entry-method-screen .entry-method .entry-method-action,
+  :is(.region-start,.entry-method-screen) .entry-header-navigation > button,
+  :is(.region-start,.entry-method-screen) .entry-screen-footer > [data-slot=button] {
+    min-height:44px;
+    font-size:15px;
+    line-height:1.4;
+  }
+  .entry-method-screen .entry-method .entry-method-action { width:fit-content; gap:9px; }
+  .entry-method-screen .entry-method-action > svg { width:17px; height:17px; }
+}
+@media (min-width:1600px) and (min-height:901px) {
+  .hondi-react.region-start .care-region-choice { min-height:calc(21 * var(--entry-unit)); }
+  .hondi-react.entry-method-screen .entry-method { min-height:calc(17 * var(--entry-unit)); }
+  .region-start .region-choice-action,
+  .entry-method-screen .entry-method .entry-method-action { font-size:16px; }
+}
+@media (max-width:700px) {
+  .region-start .region-choice-action { font-size:14px; padding-inline:10px; gap:6px; }
+  .hondi-react .booking-footer-buttons [data-slot=button],
+  .hondi-react.coordination-result-dialog .result-window-footer [data-slot=button] {
+    padding-inline:10px;
+    font-size:14px;
+  }
+}

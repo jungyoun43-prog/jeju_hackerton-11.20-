@@ -113,7 +113,7 @@ try{
   });
   for(const status of ['running','interrupted'])await scenario(`${status} 복구와 초안`,async()=>{
     const held=deferred(),{page,context,messages}=await open(1440,900,{seed:token,onResume:()=>held.promise});
-    try{await page.locator('#request-input').fill('작성 중인 새 초안');await page.locator('#pref-wheelchair').check();held.release({body:recovery(status)});await page.waitForFunction(()=>!document.getElementById('resume-visit').getAttribute('aria-busy') || document.getElementById('resume-visit').getAttribute('aria-busy')==='false');
+    try{await page.locator('#request-input').fill('작성 중인 새 초안');await page.locator('#nav-preferences').click();await page.locator('#pref-wheelchair').check();held.release({body:recovery(status)});await page.waitForFunction(()=>!document.getElementById('resume-visit').getAttribute('aria-busy') || document.getElementById('resume-visit').getAttribute('aria-busy')==='false');
       record(`${status}는 미확인/중단을 안내하고 자동 재전송하지 않음`,messages.length===0 && (status==='running'?/처리 중/:/자동으로 다시 실행하지/).test(await page.locator('#visit-recovery-notice').textContent()));
       record(`${status} 도중 작성한 초안·변경 설정 유지`,await page.locator('#request-input').inputValue()==='작성 중인 새 초안' && await page.locator('#pref-wheelchair').isChecked());
       await submit(page,'사용자가 확인해 보낸 후속 요청');const sent=JSON.parse(messages[0].postData());record(`${status} 복구 중 바꾼 설정은 다음 요청에 반영`,sent.applyPreferences===true && sent.preferences.wheelchair===true);
