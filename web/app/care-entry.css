@@ -408,16 +408,20 @@
 .is-region-home:has(.region-start,.entry-method-screen) .chat-workspace { background:transparent; }
 .is-region-home:has(.region-start,.entry-method-screen) .workspace-header::after { content:none; }
 .region-start,.entry-method-screen { flex-shrink:0; }
-:is(.region-start,.entry-method-screen) .entry-page-header>div,
 :is(.region-start,.entry-method-screen) .entry-screen-footer>:is(button,p,details) {
   background:var(--coast-paper);
   border-radius:7px;
+  padding-inline:12px;
 }
-:is(.region-start,.entry-method-screen) .entry-page-header>div:first-child {
-  padding:8px 14px;
+:is(.region-start,.entry-method-screen) #care-region-title {
+  color:var(--ink);
+  word-break:keep-all;
+  text-wrap:balance;
 }
-:is(.region-start,.entry-method-screen) .entry-steps,
-:is(.region-start,.entry-method-screen) .entry-screen-footer>:is(button,p,details) { padding-inline:12px; }
+:is(.region-start,.entry-method-screen) .entry-page-header :is(.entry-lead,.entry-steps) {
+  color:var(--foreground);
+}
+:is(.region-start,.entry-method-screen) .entry-lead { text-wrap:pretty; }
 .entry-method-screen .entry-screen-footer>p { padding-block:8px; }
 .page-main .workspace-header {
   margin-bottom:var(--coast-view);

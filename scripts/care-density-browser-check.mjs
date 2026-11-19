@@ -112,6 +112,8 @@ async function checkCoast(page) {
     const height = choices ? box.height : parseFloat(layer.height);
     let left = box.left, right = box.right, top = y, bottom = y + height;
     const surfaces = [];
+    let bareHeading = null;
+    let alignedHeading = null;
     if (choices) {
       const [a, b] = [...choices.children].map(card => card.getBoundingClientRect());
       if (b.left >= a.right) {
@@ -119,7 +121,15 @@ async function checkCoast(page) {
       } else {
         left = a.left; right = a.right; top = a.bottom; bottom = b.top;
       }
-      surfaces.push(...choices.children, ...choices.parentElement.querySelectorAll('.entry-page-header>div,.entry-screen-footer>*'));
+      surfaces.push(...choices.children, ...choices.parentElement.querySelectorAll('.entry-screen-footer>*'));
+      const header = choices.parentElement.querySelector('.entry-page-header');
+      const title = header.querySelector('#care-region-title');
+      const headerParts = [header, ...header.querySelectorAll(':scope > div, h2, .entry-lead, .entry-steps')];
+      bareHeading = headerParts.filter(el => el.checkVisibility()).every(el => {
+        const css = getComputedStyle(el);
+        return css.backgroundColor === 'rgba(0, 0, 0, 0)' && css.backgroundImage === 'none' && css.boxShadow === 'none';
+      });
+      alignedHeading = Math.abs(title.getBoundingClientRect().left - a.left) < 1;
     } else {
       surfaces.push(getComputedStyle(chat).display === 'contents' ? main.querySelector('.conversation-layout') : chat);
     }
@@ -133,10 +143,10 @@ async function checkCoast(page) {
       const s = getComputedStyle(el);
       return s.opacity === '1' && s.backgroundColor.startsWith('rgb(') && s.backgroundImage === 'none';
     });
-    return {url, coastPainted, opaque, clip, x:box.left, y, width:box.width, height,
+    return {url, coastPainted, opaque, bareHeading, alignedHeading, clip, x:box.left, y, width:box.width, height,
       fx:parseFloat(layer.backgroundPositionX)/100, fy:parseFloat(layer.backgroundPositionY)/100};
   });
-  const metrics = {coastPainted:frame.coastPainted, opaque:frame.opaque, sampleWidth:frame.clip.width, sampleHeight:frame.clip.height, meanColorDifference:null};
+  const metrics = {coastPainted:frame.coastPainted, opaque:frame.opaque, bareHeading:frame.bareHeading, alignedHeading:frame.alignedHeading, sampleWidth:frame.clip.width, sampleHeight:frame.clip.height, meanColorDifference:null};
   if (!frame.coastPainted || !frame.opaque || frame.clip.width <= 0 || frame.clip.height <= 0) return metrics;
   const screenshot = await page.screenshot({clip:frame.clip, scale:'css'});
   const difference = await page.evaluate(async ({frame:f, png}) => {
@@ -194,6 +204,9 @@ try{
     if (width >= 1280) check(`${width} ${screen} 기본 화면 무스크롤`,geometry.overflow <= 3);
     check(`${width} ${screen} 다음 행동과 가로 폭`,geometry.primaryVisible && geometry.bodyOverflow <= 1);
     check(`${width} ${screen} 50% 반투명 해안과 불투명 작업면`,coast.meanColorDifference !== null && coast.meanColorDifference < 8);
+    if (screen === 'region' || screen === 'method') {
+      check(`${width} ${screen} 사진 위에 별도 바탕 없이 제목을 선택지와 정렬`,coast.bareHeading && coast.alignedHeading);
+    }
     if ([1280,1920,390].includes(width)) await p.screenshot({path:resolve(out,`${screen}-${width}.png`)});
   };
   await p.goto(base);await p.locator('#choose-region-jeju').waitFor();await inspect('region');
