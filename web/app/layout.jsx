@@ -5,6 +5,7 @@ import './appointment-react.css';
 import './care-entry.css';
 import './coordination.css';
 import './reservations.css';
+import './hospital-directory.css';
 import './care-motion.css';
 export const metadata = {
   title: '혼디 · 대화로 준비하는 가족 진료',

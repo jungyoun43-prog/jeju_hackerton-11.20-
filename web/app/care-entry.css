@@ -68,8 +68,7 @@
 .hondi-react .appointment-boundary { margin:8px 0 14px; font-size:13px; }
 .hondi-react .appointment-topline { margin-bottom:8px; }
 .appointment-storage-note { margin-top:12px; }
-.public-result-heading { margin-top:16px; }
-.public-hospital-row,.public-support-row { padding:14px 0; gap:14px; }
+.public-support-row { padding:14px 0; gap:14px; }
 .public-chosen-hospital { margin-top:14px; padding:12px 0; }
 .realtime-controls { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin:12px 0; }
 .realtime-status { color:#285c43; font-size:14px; }
@@ -222,18 +221,6 @@
 .appointment-topline .appointment-back-actions { display:flex; gap:8px; }
 .appointment-utility { margin-top:8px; }
 .appointment-utility summary { min-height:44px; cursor:pointer; color:#285c43; font-size:13px; padding:10px 0; }
-.hospital-finder-layout { display:grid; grid-template-columns:minmax(230px,.7fr) minmax(0,1.3fr); gap:24px; }
-.hospital-find-controls .hospital-search { margin:0 0 12px; }
-.hospital-find-controls .public-data-intro { font-size:14px; line-height:1.6; margin:0 0 12px; }
-.hospital-find-results .public-result-heading { margin:0 0 8px; }
-.hospital-find-results .public-hospital-row { padding:10px 0; gap:12px; }
-.hospital-find-results .public-hospital-row h4 { font-size:16px; margin:0; }
-.hospital-find-results .public-hospital-row p { font-size:13px; margin:3px 0; line-height:1.5; }
-.hospital-find-results .public-hospital-row details { margin:0; }
-.hospital-find-results .public-hospital-row summary { min-height:32px; padding:4px 0; font-size:12px; }
-.hospital-pagination { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:8px; font-size:13px; color:#52675a; }
-.hospital-find-controls .jeju-data-sources { margin-top:12px; padding-top:0; }
-.hospital-find-controls .public-chosen-hospital { margin-top:10px; padding:10px 0; }
 @media(min-width:1101px) { .public-wish-layout { grid-template-columns:minmax(308px,1fr) minmax(220px,.8fr); } }
 @media(min-width:901px) and (max-height:850px) {
   .is-region-home #conversation-scroll { padding:18px 22px; }
@@ -260,7 +247,6 @@
   .entry-steps { display:none; }
   .entry-header-navigation { flex-shrink:1; }
   .entry-request-columns { grid-template-columns:minmax(250px,.9fr) minmax(0,1.1fr); gap:18px; }
-  .hospital-finder-layout { grid-template-columns:minmax(220px,.8fr) minmax(0,1.2fr); gap:16px; }
 }
 @media(max-width:700px) {
   .is-region-home #conversation-scroll { padding:14px; }
@@ -293,7 +279,6 @@
   .entry-review-footer>button { width:100%; }
   .entry-review-rows>div { grid-template-columns:72px minmax(0,1fr) auto; gap:8px; }
   .entry-review-rows dd { font-size:14px; }
-  .hospital-finder-layout { grid-template-columns:minmax(0,1fr); }
   .appointment-workspace .appointment-topline { flex-direction:column; align-items:stretch; }
   .appointment-back-actions { justify-content:space-between; }
 }
@@ -301,9 +286,6 @@
 .is-appointment-mode.conversation-scroll { padding:14px 22px; }
 .hondi-react .appointment-boundary { margin:4px 0 10px; }
 .appointment-workspace .appointment-topline { margin-bottom:4px; }
-.public-candidates { margin:0; }
-.public-candidates[open] { padding-bottom:0; }
-.public-candidates>summary { padding-top:0; padding-bottom:6px; min-height:34px; }
 .public-review-heading { margin:10px 0 6px; }
 .public-review-heading h3 { font-size:20px; }
 .public-review-facts { margin:0; }

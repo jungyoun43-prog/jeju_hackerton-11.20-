@@ -2,21 +2,16 @@
 .public-data-mode { display:flex; flex-wrap:wrap; gap:6px; margin:18px 0 24px; border-bottom:1px solid var(--line); padding-bottom:8px; }
 .hondi-react .public-data-mode button { padding:9px 12px; font-size:14px; font-weight:500; }
 .hondi-react .public-data-mode button[aria-pressed=true] { background:#eaf3ec; color:#255238; }
-.public-data-intro { margin:0 0 24px; font-size:16px; line-height:1.85; max-width:64ch; }
-.public-result-heading { margin:28px 0 8px; }
-.public-result-heading h3 { font-size:18px; font-weight:600; }
-.public-result-heading h3 span { color:var(--secondary); margin-left:8px; white-space:nowrap; }
-.public-result-heading p,.public-support-context { font-size:13px; color:var(--muted); line-height:1.8; margin:6px 0; }
-.public-hospital-row,.public-support-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:20px; align-items:start; padding:22px 0; border-bottom:1px solid var(--line); }
-.public-hospital-row h4,.public-support-row h4 { font-size:18px; line-height:1.6; font-weight:600; margin:0 0 6px; overflow-wrap:anywhere; }
-.public-hospital-row p,.public-support-row p { font-size:14px; line-height:1.85; color:var(--muted); margin:6px 0; }
-.public-hospital-row>button,.public-support-row>button { margin-top:4px; font-size:14px; padding:10px 12px; }
+.public-support-context { font-size:13px; color:var(--muted); line-height:1.8; margin:6px 0; }
+.public-support-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:20px; align-items:start; padding:22px 0; border-bottom:1px solid var(--line); }
+.public-support-row h4 { font-size:18px; line-height:1.6; font-weight:600; margin:0 0 6px; overflow-wrap:anywhere; }
+.public-support-row p { font-size:14px; line-height:1.85; color:var(--muted); margin:6px 0; }
+.public-support-row>button { margin-top:4px; font-size:14px; padding:10px 12px; }
 .public-address { display:flex; align-items:flex-start; gap:6px; }
 .public-address svg { margin-top:4px; }
-.public-hospital-row details { margin-top:6px; }
-.public-hospital-row summary,.jeju-data-sources summary { min-height:44px; padding:10px 0; cursor:pointer; color:var(--secondary); font-size:14px; line-height:1.7; }
-.public-hospital-row details a,.jeju-data-sources a,.public-contact-links a { display:inline-flex; align-items:center; gap:6px; min-height:44px; color:var(--secondary); text-decoration:underline; text-underline-offset:4px; font-size:14px; line-height:1.6; }
-.public-hospital-row details a svg,.jeju-data-sources a svg,.public-contact-links a svg { width:14px; height:14px; }
+.jeju-data-sources summary { min-height:44px; padding:10px 0; cursor:pointer; color:var(--secondary); font-size:14px; line-height:1.7; }
+.jeju-data-sources a,.public-contact-links a { display:inline-flex; align-items:center; gap:6px; min-height:44px; color:var(--secondary); text-decoration:underline; text-underline-offset:4px; font-size:14px; line-height:1.6; }
+.jeju-data-sources a svg,.public-contact-links a svg { width:14px; height:14px; }
 .hondi-react .public-more { width:100%; margin:12px 0; color:var(--secondary); }
 .jeju-data-sources { border-top:1px solid var(--line); margin-top:24px; padding-top:8px; }
 .jeju-data-sources>p { font-size:14px; line-height:1.8; margin:12px 0; }
@@ -46,9 +41,9 @@
 .public-support-row .public-support-source { font-size:12px; }
 @media(max-width:1100px) { .public-wish-layout { grid-template-columns:minmax(0,1fr); gap:16px; } }
 @media(max-width:600px) {
-  .public-hospital-row,.public-support-row { grid-template-columns:minmax(0,1fr); gap:8px; padding:20px 0; }
-  .public-hospital-row>button,.public-support-row>button { justify-self:start; }
-  .public-hospital-row h4,.public-support-row h4 { font-size:17px; }
+  .public-support-row { grid-template-columns:minmax(0,1fr); gap:8px; padding:20px 0; }
+  .public-support-row>button { justify-self:start; }
+  .public-support-row h4 { font-size:17px; }
   .jeju-support-filters { grid-template-columns:minmax(0,1fr); gap:12px; }
   .public-data-mode { gap:2px; }
   .hondi-react .public-data-mode button { font-size:13px; padding:9px 8px; }
@@ -384,7 +379,6 @@
 .public-chosen-hospital>p:first-child { display:flex; gap:8px; align-items:center; font-size:15px; color:#315c43; margin:0 0 14px; }
 .public-chosen-hospital svg { width:18px; }
 .public-chosen-hospital .search-picker { max-width:380px; }
-.public-hospital-row[data-selected=true] h4 { color:#315c43; }
 .public-wish-summary fieldset+fieldset { margin-top:24px; }
 .wish-input { margin-top:12px; }
 .wish-input input { width:100%; min-height:46px; padding:10px 12px; font:inherit; font-size:16px; color:var(--ink); border:1px solid #c5d2c9; border-radius:6px; background:white; }
