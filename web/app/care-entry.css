@@ -409,7 +409,7 @@
   --coast-view:clamp(32px,6dvh,66px);
 }
 .page-main.is-region-home:has(.region-start,.entry-method-screen) {
-  --coast-view:clamp(0px,min(14dvh,100dvh - 610px),160px);
+  --coast-view:clamp(0px,min(14dvh,100dvh - 610px),260px);
   background:#8aa8ad var(--coast-photo) 45% 60% / cover no-repeat;
 }
 .is-region-home:has(.region-start,.entry-method-screen) .chat-workspace { background:transparent; }
