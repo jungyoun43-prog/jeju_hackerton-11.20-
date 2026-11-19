@@ -185,7 +185,10 @@ function renderRegionHome() {
   regionRenderer?.(appointmentDrafts,handleCareEntryAction,{...careEntry,preview,voice:{...voiceUi,mode:entryVoiceMode,dictating:Boolean(activeRecognition)},caseState});
 }
 
-function playCareTransition(options={},update=()=>{}) { if(careMotion)careMotion.transition({...options,update});else update(); }
+function playCareTransition(update) {
+  if (careMotion) careMotion.transition(update);
+  else update();
+}
 
 function discardReservationEdit() {
   if(!reservationEdit)return;
@@ -200,7 +203,7 @@ function beginReservationEdit(region,section='schedule') {
   reservationEdit={region,section,original};
   appointmentDemo=reservationEditTarget(structuredClone(original),section);
   appointmentOpen=true;regionHomeOpen=false;
-  playCareTransition({},()=>{setWorkspaceView('chat');renderAppointment();});
+  playCareTransition(()=>{setWorkspaceView('chat');renderAppointment();});
 }
 
 function parkAppointment() {
@@ -215,7 +218,7 @@ function showReservations() {
   if(!regionRenderer||pending||activeRecognition)return;
   stopCoordination();parkAppointment();void voiceSession?.stop();
   appointmentOpen=false;regionHomeOpen=true;careEntry={...careEntry,screen:'reservations'};
-  playCareTransition({},()=>{
+  playCareTransition(()=>{
     setWorkspaceView('chat');renderSnapshot();renderRegionHome();
     document.getElementById('conversation-scroll').scrollTop=0;
     document.getElementById('care-region-title')?.focus({preventScroll:true});
@@ -225,10 +228,9 @@ function showReservations() {
 function showCareEntry(screen) {
   discardReservationEdit();
   stopCoordination();
-  const previousScreen=careEntry.screen;
   if(screen!=='request'&&voiceSession?.active)void voiceSession.stop();
   appointmentOpen=false;regionHomeOpen=true;careEntry={...careEntry,screen};
-  playCareTransition({kind:previousScreen==='region'||(previousScreen==='method'&&screen==='request')?'choice':'step',back:previousScreen!=='region'&&screen==='method'},()=>{
+  playCareTransition(()=>{
     setWorkspaceView('chat');renderSnapshot();renderRegionHome();
     document.getElementById('conversation-scroll').scrollTop=0;
     document.getElementById('care-region-title')?.focus({preventScroll:true});
@@ -330,7 +332,7 @@ function showRegionHome() {
   if(!regionRenderer || pending || activeRecognition)return;
   parkAppointment();
   appointmentOpen=false;regionHomeOpen=true;careEntry={...careEntry,screen:'region'};void voiceSession?.stop();
-  playCareTransition({back:true},()=>{
+  playCareTransition(()=>{
     setWorkspaceView('chat');renderSnapshot();renderRegionHome();
     document.getElementById('conversation-scroll').scrollTop=0;
     document.getElementById('care-region-title').focus({preventScroll:true});
@@ -413,7 +415,7 @@ function openAppointmentDemo(region='seoul',{motion=true}={}) {
   appointmentDrafts[region] ||= createAppointmentDemo(region,{usePublicData:region==='jeju',area:caseState.patient.area});
   appointmentDemo=appointmentDrafts[region];appointmentOpen=true;regionHomeOpen=false;
   const update=()=>{setWorkspaceView('chat');renderAppointment();};
-  if(motion)playCareTransition({kind:'choice'},update);else{careMotion?.cancel();update();}
+  if(motion)playCareTransition(update);else{careMotion?.cancel();update();}
   document.getElementById('conversation-status').textContent=appointmentDemo.usePublicData?'제주 공개자료로 병원과 문의처를 찾아요. 실제 빈자리 조회·예약·발신은 하지 않습니다.':`${region==='jeju'?'제주':'내륙'} 병원 예약 체험을 열었어요. 기존 자료와 초안은 유지합니다. 병원·의료진·시간표는 가상입니다.`;
 }
 
@@ -421,11 +423,13 @@ function closeAppointmentDemo() {
   discardReservationEdit();
   stopCoordination();
   if(appointmentReturnContext)({manualStageSelection,selectedStageId,unreadAnswer}=appointmentReturnContext);
-  appointmentOpen=false;regionHomeOpen=false;renderSnapshot();
-  document.getElementById('exit-guided-demo').textContent='자유 입력으로 전환';
-  setWorkspaceView('chat');document.getElementById('conversation-scroll').scrollTop=appointmentReturnScroll;
-  if(appointmentReturnFocus?.isConnected && appointmentReturnFocus.checkVisibility())appointmentReturnFocus.focus({preventScroll:true});
-  else document.getElementById('current-task-title').focus({preventScroll:true});
+  playCareTransition(()=>{
+    appointmentOpen=false;regionHomeOpen=false;renderSnapshot();
+    document.getElementById('exit-guided-demo').textContent='자유 입력으로 전환';
+    setWorkspaceView('chat');document.getElementById('conversation-scroll').scrollTop=appointmentReturnScroll;
+    if(appointmentReturnFocus?.isConnected && appointmentReturnFocus.checkVisibility())appointmentReturnFocus.focus({preventScroll:true});
+    else document.getElementById('current-task-title').focus({preventScroll:true});
+  });
 }
 
 function stopCoordination() {
@@ -442,7 +446,8 @@ function startCoordination(type='coordination_start',value) {
   const id=makeId(),next=reduceCoordination(appointmentDemo,{type,value,runId:id},caseState);
   if(next===appointmentDemo)return;
   const run={id,region:next.region,controller:new AbortController()};coordinationRun=run;
-  appointmentDemo=next;appointmentDrafts[next.region]=next;renderAppointment({focus:false});
+  appointmentDemo=next;appointmentDrafts[next.region]=next;
+  playCareTransition(()=>renderAppointment({focus:false}));
   void runCoordinationDemo(next,caseState,{signal:run.controller.signal,onEvent:event=>{
     if(coordinationRun!==run||appointmentDrafts[run.region]?.coordination?.runId!==id)return;
     const draft=appointmentDrafts[run.region],updated=reduceCoordination(draft,{type:'coordination_event',value:event},caseState);
@@ -473,7 +478,7 @@ function handleAppointmentAction(type,value,control) {
       field.scrollIntoView({block:'nearest',behavior:'instant'});
       field.focus({preventScroll:true});
     };
-    if(reservationEdit&&reservationEdit.section!=='support')playCareTransition({},reveal);
+    if(reservationEdit&&reservationEdit.section!=='support')playCareTransition(reveal);
     else reveal();
     return;
   }
@@ -482,12 +487,12 @@ function handleAppointmentAction(type,value,control) {
   if(type==='reservation_edit_section'){
     if(!reservationEdit||!RESERVATION_EDIT_SECTIONS.some(([id])=>id===value))return;
     reservationEdit.section=value;appointmentDemo=reservationEditTarget(appointmentDemo,value);
-    playCareTransition({},()=>renderAppointment());return;
+    playCareTransition(()=>renderAppointment());return;
   }
   if(type==='reservation_edit_review'){
     if(!reservationEdit)return;const summary=reservationEditSummary(reservationEdit.original,appointmentDemo,caseState);
     if(!summary.changed||!summary.ready)return;
-    appointmentDemo={...appointmentDemo,screen:'reservation_review'};playCareTransition({},()=>renderAppointment());return;
+    appointmentDemo={...appointmentDemo,screen:'reservation_review'};playCareTransition(()=>renderAppointment());return;
   }
   if(type==='reservation_edit_apply'){
     if(!reservationEdit||appointmentDemo.screen!=='reservation_review')return;
@@ -541,7 +546,7 @@ function handleAppointmentAction(type,value,control) {
     setWorkspaceView('chat');
     renderAppointment({focus:!retain,control:retain&&control?{id:control.id,action:type,value:typeof value==='string'?value:''}:undefined});
   };
-  if(retain)update();else playCareTransition({back:['back','hospital'].includes(type)},update);
+  if(retain)update();else playCareTransition(update);
   if(type==='public_show_preferences') {
     const target=document.getElementById('public-preferences-title');target?.scrollIntoView({block:'start',behavior:'instant'});target?.focus({preventScroll:true});
   }
@@ -1557,7 +1562,7 @@ export function mount({renderAppointment:renderer,renderRegionStart}={}) {
       </aside>
       <div class="workspace-shell" id="workspace-shell">
         <main id="main" class="page-main" tabindex="-1">
-          <header class="workspace-header"><img id="care-transition" class="care-transition" src="/assets/hondi-mark-v1.png" alt="" aria-hidden="true"/>
+          <header class="workspace-header">
             <div class="case-header"><h1 id="case-heading"></h1><p id="case-caption"></p></div><button type="button" id="choose-care-region" class="text-button" hidden>병원 지역 선택</button>
             <div class="header-actions"><span class="connection-state checking" id="connection-state">연결 확인 중</span><div class="workspace-tools"><button type="button" class="expand-answer" id="expand-answer" aria-label="넓게 읽기" title="넓게 읽기" aria-haspopup="dialog" aria-controls="answer-dialog" disabled>${icon('expand')}<span>넓게 읽기</span></button><button type="button" id="preview-button" class="preview-button" aria-label="준비 결과 예시 보기" title="선택 없이 준비 결과 예시 보기">결과 예시</button></div><button type="button" class="header-button" id="new-conversation" aria-label="새 대화" title="새 대화">${icon('plus')}<span>새 대화</span></button></div>
           </header>

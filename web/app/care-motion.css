@@ -1,0 +1,110 @@
+/* Press feedback stays on the control. Navigation paints the same outline at its
+   old bounds, since React may replace that control before the next frame. */
+#main[data-care-pointer="true"] button:enabled:not([aria-disabled="true"]):active,
+.coordination-result-dialog button:enabled:not([aria-disabled="true"]):active {
+  background-color: #ffdfb3;
+  color: #562b13;
+  border-color: #cf5d12;
+  box-shadow: inset 0 0 0 2px #e47519;
+  transition-duration: 0ms;
+}
+#main .care-region-choice:active .region-choice-action,
+#main .entry-method:active .entry-method-action {
+  background-color: #a6430c;
+  color: #fff;
+}
+
+.care-motion-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 160;
+  pointer-events: none;
+  overflow: clip;
+  contain: strict;
+}
+.care-button-flash {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px solid #ed791f;
+  background-color: rgba(255, 135, 40, .22);
+  box-shadow: inset 0 0 0 1px #fff0c7;
+  animation: care-button-flash 240ms ease-out both;
+}
+@keyframes care-button-flash {
+  0%, 35% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* The zero-size origin is the actual pointer position in viewport coordinates. */
+.care-citrus-burst {
+  position: absolute;
+  width: 0;
+  height: 0;
+  font-size: clamp(16px, 1.35vw, 23px);
+  animation: citrus-finish 620ms linear both;
+}
+.care-citrus-burst > * { position: absolute; left: 0; top: 0; }
+.citrus-fruit {
+  z-index: 1;
+  width: 2.4em;
+  height: 2.4em;
+  max-width: none;
+  object-fit: contain;
+  filter: drop-shadow(0 1px 1px #fff4dc);
+  animation: citrus-pop 265ms var(--feedback-ease, ease-out) both;
+}
+.citrus-halo {
+  width: 2.6em;
+  height: 2.6em;
+  border: 2px solid #f99532;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px #fff2d1;
+  animation: citrus-halo 370ms ease-out 50ms both;
+}
+.citrus-piece {
+  animation: citrus-scatter 510ms var(--feedback-ease, ease-out) 85ms both;
+}
+.citrus-slice {
+  width: 1.18em;
+  height: .72em;
+  border: 1px solid #fff0b1;
+  border-bottom: .15em solid #d96b19;
+  border-radius: 8% 8% 64% 64% / 14% 14% 100% 100%;
+  background: repeating-conic-gradient(from 90deg at 50% 0%, #ffb441 0deg 30deg, #ffe5a1 30deg 35deg);
+}
+.citrus-leaf {
+  width: .61em;
+  height: 1.1em;
+  border-radius: 85% 12% 85% 12%;
+  background: #386c46;
+  box-shadow: inset 1px 0 #8eb074;
+}
+.citrus-drop {
+  width: .32em;
+  height: .55em;
+  border-radius: 70% 70% 46% 46%;
+  background: #fb9230;
+}
+@keyframes citrus-pop {
+  0% { transform: translate(-50%, -50%) scale(.68) rotate(-12deg); opacity: .9; }
+  36% { transform: translate(-50%, -50%) scale(1.15) rotate(5deg); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(.84) rotate(13deg); opacity: 0; }
+}
+@keyframes citrus-halo {
+  from { transform: translate(-50%, -50%) scale(.55); opacity: .8; }
+  to { transform: translate(-50%, -50%) scale(2.1); opacity: 0; }
+}
+@keyframes citrus-scatter {
+  0% { transform: translate(-50%, -50%) scale(.55); opacity: 0; }
+  12% { opacity: 1; }
+  65% { opacity: 1; }
+  100% { transform: translate(-50%, -50%) translate(var(--dx), var(--dy)) rotate(var(--spin)) scale(.72); opacity: 0; }
+}
+@keyframes citrus-finish {
+  0%, 84% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .care-citrus-burst { display: none; }
+  .care-button-flash { animation-duration: 150ms; }
+}

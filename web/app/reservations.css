@@ -41,9 +41,6 @@
 .hondi-react .reservations-empty button{background:#285c43;color:#fff;padding:0 20px}
 
 /* The live workspace stays clickable throughout the scene's arrival. */
-.care-scene-guide{position:fixed;width:320px;height:120px;pointer-events:none}
-.care-scene-guide svg{position:absolute;inset:0;width:100%;height:100%;fill:none;stroke:#c57332;stroke-width:2;stroke-dasharray:3 9;stroke-linecap:round}
-.care-scene-guide img{position:absolute;left:120px;top:20px;width:80px;height:80px;object-fit:contain}
 @media(max-width:600px){
   #open-my-reservations{width:44px;justify-content:center;padding:0}
   #open-my-reservations span,.result-window-tools button span,.result-long-label{display:none}
@@ -57,7 +54,6 @@
   .reservation-status-list li>span{grid-column:2;grid-row:2;line-height:16px}
   .reservations-empty{min-height:280px}
 }
-@media(prefers-reduced-motion:reduce){.care-scene-guide{display:none}}
 .is-region-home .header-actions{display:flex}
 .is-region-home .header-actions>:not(#open-my-reservations){display:none}
 @media(max-width:600px){

@@ -5,6 +5,7 @@ import './appointment-react.css';
 import './care-entry.css';
 import './coordination.css';
 import './reservations.css';
+import './care-motion.css';
 export const metadata = {
   title: '혼디 · 대화로 준비하는 가족 진료',
   description: '제주 현지 진료와 도외 진료의 자료·예약 상담·왕복 이동 준비를 이어갑니다.',

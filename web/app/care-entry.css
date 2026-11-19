@@ -4,7 +4,6 @@
 .care-rail { background:#e5eee8; }
 .workspace-shell { background:#f5f3eb; background-image:none; }
 .workspace-header { position:relative; background:#f5f3eb; }
-.care-transition { position:absolute; z-index:10; pointer-events:none; width:28px; height:28px; object-fit:contain; left:50%; top:18px; opacity:0; }
 .preparation-rail { background:#eaf0e9; }
 .chat-workspace { background:#fcfbf7; }
 .chat-composer { background:#f8f6ef; }
@@ -88,7 +87,6 @@
 .hondi-react.care-entry.voice-entry #care-region-title { font-size:25px; line-height:1.3; margin:4px 0; }
 .realtime-error { font-size:14px; line-height:1.6; color:#9c3429; }
 .realtime-answer { margin:8px 0; font-size:14px; line-height:1.6; color:#244e38; max-height:90px; overflow:auto; }
-.hondi-react button:active:not(:disabled),.send-button:active:not(:disabled) { transform:translateY(1px); }
 @keyframes citrus-arrive { from { transform:translateX(-16px) rotate(-50deg); opacity:.3; } to { transform:translateX(0) rotate(0); opacity:1; } }
 @keyframes condition-arrive { from { opacity:.5; transform:translateY(3px); } to { opacity:1; transform:translateY(0); } }
 @media(min-width:1051px) {
@@ -135,7 +133,7 @@
   .entry-review-rows dd { font-size:14px; }
   .entry-request-heading>span { display:none; }
 }
-@media(prefers-reduced-motion:reduce) { .care-transition { display:none; } .condition-arrived,.entry-live-mark img { animation:none; } .hondi-react button:active:not(:disabled),.send-button:active:not(:disabled) { transform:none; } }
+@media(prefers-reduced-motion:reduce) { .condition-arrived,.entry-live-mark img { animation:none; } }
 
 /* 화면에 맞는 불투명 작업면. 기본 단계는 viewport 안에서 끝나고, 펼친 상세만 더 읽는다. */
 .is-region-home .chat-workspace { background:#f5f3eb; background-image:none; }
@@ -404,22 +402,11 @@
   :is(.region-start,.entry-method-screen) .entry-screen-footer>p,:is(.region-start,.entry-method-screen) .entry-notes,:is(.region-start,.entry-method-screen) .entry-screen-footer>[data-slot=button] { font-size:calc(var(--entry-unit)*.8125); }
 }
 
-/* Deliberate selection feedback, with no input-blocking overlay or animation wait. */
-.care-motion-layer { position:fixed; inset:0; z-index:80; pointer-events:none; overflow:clip; contain:strict; }
-.care-motion-layer .care-transition { position:absolute; left:0; top:0; opacity:0; width:48px; height:48px; object-fit:contain; }
-.care-action-wave { position:absolute; width:76px; height:76px; border:2px solid #6a9477; border-radius:50%; opacity:0; }
-.care-action-wave.tone-orange { border-color:#db8a38; }
-.care-citrus-seed { position:absolute; width:8px;height:13px;border-radius:50%;background:#e38a33;opacity:0; }
-.care-citrus-seed.seed-1 { background:#2d7654; width:7px; height:14px; }
-.care-citrus-seed.seed-2 { background:#efbd69; width:9px; height:9px; }
 .hondi-react [data-slot=button],.send-button { transition-property:transform,background-color,border-color,color,box-shadow;transition-duration:160ms;transition-timing-function:var(--feedback-ease); }
-[data-care-pointer=true] .hondi-react button:active:not(:disabled),[data-care-pointer=true] .send-button:active:not(:disabled) { transform:scale(.98); }
-[data-care-pointer=false] .hondi-react button:active:not(:disabled),[data-care-pointer=false] .send-button:active:not(:disabled) { transform:none; }
 @media(hover:hover) and (pointer:fine) {
   .region-choice-action>svg,.entry-method-action>svg { transition:transform 160ms var(--feedback-ease); }
   .care-region-choice:hover .region-choice-action>svg,.entry-method:hover .entry-method-action>svg { transform:translateX(4px); }
 }
 @media(prefers-reduced-motion:reduce) {
-  .care-motion-layer { display:none; }
-  [data-care-pointer=true] .hondi-react button:active:not(:disabled),[data-care-pointer=true] .send-button:active:not(:disabled),.care-region-choice:hover .region-choice-action>svg,.entry-method:hover .entry-method-action>svg { transform:none; }
+  .care-region-choice:hover .region-choice-action>svg,.entry-method:hover .entry-method-action>svg { transform:none; }
 }
