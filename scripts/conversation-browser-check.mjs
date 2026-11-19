@@ -168,8 +168,12 @@ async function disclosure(page) {
 async function backgroundLoaded(page) {
   return page.evaluate(async()=>{
     const path='/assets/jeju-workspace-background-v1.webp';
-    const nodes=[document.documentElement,document.body,...document.querySelectorAll('.app-shell,.workspace-shell')];
-    if(!nodes.some(node=>[null,'::before','::after'].some(pseudo=>getComputedStyle(node,pseudo).backgroundImage.includes(path))))return false;
+    const nodes=[document.documentElement,document.body,...document.querySelectorAll('.app-shell,.workspace-shell,.page-main,.workspace-header')];
+    const painted=nodes.some(node=>node.checkVisibility({visibilityProperty:true})&&[null,'::before','::after'].some(pseudo=>{
+      const style=getComputedStyle(node,pseudo);
+      return style.backgroundImage.includes(path)&&(!pseudo||(!['none','normal'].includes(style.content)&&style.display!=='none'&&parseFloat(style.height)>0));
+    }));
+    if(!painted)return false;
     const image=new Image();image.src=path;
     try {await image.decode();return image.naturalWidth>0;} catch {return false;}
   });
