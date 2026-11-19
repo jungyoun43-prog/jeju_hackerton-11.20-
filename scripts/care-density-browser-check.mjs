@@ -21,9 +21,11 @@ async function checkHospitalDirectory(page,width) {
 
   const geometry=await rows.evaluateAll(items=>{
     let fullyVisible=0,singleLine=0;
+    let smallestTouchHeight=Infinity;
     for (const row of items) {
       const rect=row.getBoundingClientRect(),x=rect.left+rect.width/2;
       if (rect.top>=0 && rect.bottom<=innerHeight && [rect.top+2,rect.bottom-2].every(y=>row.contains(document.elementFromPoint(x,y)))) fullyVisible++;
+      for (const button of row.querySelectorAll(':scope > button')) smallestTouchHeight=Math.min(smallestTouchHeight,button.getBoundingClientRect().height);
       const name=row.querySelector('.hospital-directory-name'),address=row.querySelector('.hospital-directory-address');
       if (!name || !address) continue;
       const boxes=[name,address].map(element=>element.getBoundingClientRect());
@@ -31,11 +33,12 @@ async function checkHospitalDirectory(page,width) {
       if (oneLine && boxes[0].height>0 && boxes[1].height>0 && boxes[1].left>=boxes[0].right-1 && boxes[0].top<boxes[1].bottom && boxes[1].top<boxes[0].bottom) singleLine++;
     }
     const overflow=document.documentElement.scrollWidth-innerWidth;
-    return {fullyVisible,singleLine,overflow};
+    return {fullyVisible,singleLine,overflow,smallestTouchHeight};
   });
   report.directory ??= [];
   report.directory.push({width,rows:ids.length,...geometry});
   check(width+' 병원 목록 가로 넘침 없음',geometry.overflow<=1);
+  if (width===390) check('390px에서 병원·상세 터치 영역은 모두 44px 이상',Number.isFinite(geometry.smallestTouchHeight) && geometry.smallestTouchHeight>=44);
   if (width===1280) {
     check('1280×720에서 첫 스크롤 전 병원 다섯 곳 이상 온전히 표시',geometry.fullyVisible>=5);
     check('1280×720에서 접힌 13행의 이름·주소를 같은 줄에 표시',geometry.singleLine===13);
@@ -58,6 +61,7 @@ async function checkHospitalDirectory(page,width) {
   const contents=(await detail.innerText()).replace(/\s+/g,' ');
   check(width+' 상세에 원문 주소·모든 등록 진료과·공식 출처 보존',contents.includes(record.address.replace(/\s+/g,' ')) && record.departments.every(name=>contents.includes(name)) && await detail.getByRole('link').getAttribute('href')===record.source.url);
   check(width+' 상세를 펼쳐도 병원은 미선택',await toggle.getAttribute('aria-expanded')==='true' && await page.locator('#public-visit-department').count()===0 && await page.locator('[data-book-primary]').isDisabled());
+  if (width===390) await page.screenshot({path:resolve(out,'directory-detail-390.png')});
   if (width===390) await toggle.tap(); else await page.keyboard.press('Space');
   await detail.waitFor({state:'hidden'});
   check(width+' 상세를 닫아도 선택 상태 보존',await toggle.getAttribute('aria-expanded')==='false' && await page.locator('#public-visit-department').count()===0);
@@ -82,6 +86,7 @@ async function checkHospitalDirectory(page,width) {
     check('진료과 미수록 병원은 키보드 초점을 공식 창구로 이동',await official.evaluate(link=>link===document.activeElement) && decodeURIComponent(await official.getAttribute('href')).includes(missing.companyName));
     const hint=await page.locator('#booking-next-hint').innerText();
     check('진료과 미수록이면 공식 문의·재선택 안내를 하고 미확인 진행을 막음',/공식 창구/.test(hint) && /다른 병원/.test(hint) && await page.locator('[data-book-primary]').isDisabled() && await page.locator('#public-visit-department[role="combobox"]').count()===0);
+    await page.screenshot({path:resolve(out,'directory-missing-department-1280.png')});
     await page.keyboard.press('Tab');
     const reopen=directory.locator(':scope > summary');
     check('공식 창구에서 Tab으로 다른 병원 선택에 도달',await reopen.evaluate(el=>el===document.activeElement));
@@ -155,6 +160,7 @@ async function checkCoast(page) {
   return metrics;
 }
 try{
+ assert.equal((await(await fetch(base+'/deployment.json')).json()).sourceHash,report.sourceHash,'기록할 화면과 검사 소스가 같은 빌드여야 합니다.');
  for(const [width,height] of [[1280,720],[1440,900],[1920,1080],[390,844]]){
   const context=await browser.newContext({viewport:{width,height},locale:'ko-KR',hasTouch:width===390});await context.route('**/*',r=>{const url=new URL(r.request().url());if(url.origin!==new URL(base).origin)return r.abort();if(url.pathname==='/api/agent'&&r.request().method()==='POST'){report.modelCalls++;return r.abort();}return r.continue();});
   const p=await context.newPage();p.on('pageerror',e=>report.errors.push(e.message));p.setDefaultTimeout(7000);
