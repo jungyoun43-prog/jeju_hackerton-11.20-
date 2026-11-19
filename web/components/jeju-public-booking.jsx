@@ -67,11 +67,18 @@ export function PublicHospitalFinder() {
   });
 
   useEffect(() => {
-    const desktop = window.matchMedia('(min-width:901px)');
-    const adaptFilters = () => { filters.current.open = desktop.matches; };
+    const directory = filters.current.closest('.public-hospital-finder');
+    let previousLayout;
+    const adaptFilters = () => {
+      const sideBySide = directory.clientWidth > 635;
+      if (sideBySide === previousLayout) return;
+      filters.current.open = sideBySide;
+      previousLayout = sideBySide;
+    };
     adaptFilters();
-    desktop.addEventListener('change', adaptFilters);
-    return () => desktop.removeEventListener('change', adaptFilters);
+    const observer = new ResizeObserver(adaptFilters);
+    observer.observe(directory);
+    return () => observer.disconnect();
   }, []);
 
   function updateQuery(value) {
