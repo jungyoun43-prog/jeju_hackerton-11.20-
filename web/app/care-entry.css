@@ -442,6 +442,8 @@
   .page-main { --coast-view:32px; }
   .page-main.is-request-entry #conversation-scroll,
   .page-main.is-booking-workspace #conversation-scroll { padding-block:8px; }
+  .page-main.is-booking-workspace:has(.coordination) { --coast-view:16px; }
+  .page-main.is-booking-workspace #conversation-scroll:has(.coordination) { padding-block:4px; }
   .hondi-react.region-start .care-region-choice {
     padding:clamp(18px,3dvh,24px);
     gap:clamp(12px,2dvh,18px);
