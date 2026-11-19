@@ -33,17 +33,6 @@ function makeBurst(x, y) {
   return burst;
 }
 
-function makeFlash({ bounds, radius, x, y }) {
-  const flash = decoration('care-button-flash');
-  Object.assign(flash.style, {
-    left: bounds.left + 'px', top: bounds.top + 'px',
-    width: bounds.width + 'px', height: bounds.height + 'px', borderRadius: radius,
-  });
-  flash.style.setProperty('--press-x', (x - bounds.left) + 'px');
-  flash.style.setProperty('--press-y', (y - bounds.top) + 'px');
-  return flash;
-}
-
 export function createCareMotion(root) {
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
   const layer = document.createElement('div');
@@ -70,8 +59,7 @@ export function createCareMotion(root) {
     const button = event.target.closest?.('button');
     if (!button || !owns(button) || button.disabled || button.getAttribute('aria-disabled') === 'true'
         || event.detail === 0 || event.button !== 0 || document.hidden) return;
-    origin = { x: event.clientX, y: event.clientY, bounds: button.getBoundingClientRect(),
-      radius: getComputedStyle(button).borderRadius };
+    origin = { x: event.clientX, y: event.clientY };
     // Only a navigation performed by this activation may use the position.
     originTimer = window.setTimeout(() => { origin = null; }, 0);
   }
@@ -80,20 +68,12 @@ export function createCareMotion(root) {
     const point = origin;
     origin = null;
     update();
-    if (!point || document.hidden || !layer.isConnected) return;
-    layer.append(makeFlash(point));
-    if (!reduced.matches) layer.append(makeBurst(point.x, point.y));
+    if (!point || reduced.matches || document.hidden || !layer.isConnected) return;
+    layer.append(makeBurst(point.x, point.y));
     // Also releases feedback if a browser extension turns all CSS animations off.
     cleanupTimer = window.setTimeout(clear, 800);
   }
 
-  function pointer(event) {
-    if (owns(event.target)) root.dataset.carePointer = 'true';
-  }
-  function keyboard() {
-    root.dataset.carePointer = 'false';
-    clear();
-  }
   function visibility() {
     if (document.hidden) clear();
   }
@@ -103,8 +83,7 @@ export function createCareMotion(root) {
   const controller = new AbortController();
   const capture = { capture: true, signal: controller.signal };
   document.addEventListener('click', rememberClick, capture);
-  document.addEventListener('pointerdown', pointer, capture);
-  document.addEventListener('keydown', keyboard, capture);
+  document.addEventListener('keydown', clear, capture);
   document.addEventListener('visibilitychange', visibility, { signal: controller.signal });
   reduced.addEventListener('change', clear, { signal: controller.signal });
   window.addEventListener('resize', clear, { signal: controller.signal });

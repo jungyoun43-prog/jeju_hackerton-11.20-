@@ -1,17 +1,7 @@
-/* Press feedback stays on the control. Navigation paints the same outline at its
-   old bounds, since React may replace that control before the next frame. */
-#main[data-care-pointer="true"] button:enabled:not([aria-disabled="true"]):active,
-.coordination-result-dialog button:enabled:not([aria-disabled="true"]):active {
-  background-color: #ffdfb3;
-  color: #562b13;
-  border-color: #cf5d12;
-  box-shadow: inset 0 0 0 2px #e47519;
-  transition-duration: 0ms;
-}
-#main .care-region-choice:active .region-choice-action,
-#main .entry-method:active .entry-method-action {
-  background-color: #a6430c;
-  color: #fff;
+/* An inset outline also works on borderless buttons without shifting their content. */
+button:enabled:active:not([aria-disabled="true"]):not(:focus-visible) {
+  outline: 2px solid var(--ink);
+  outline-offset: -2px;
 }
 
 .care-motion-layer {
@@ -22,21 +12,6 @@
   overflow: clip;
   contain: strict;
 }
-.care-button-flash {
-  position: absolute;
-  box-sizing: border-box;
-  border: 2px solid #ed791f;
-  background-color: rgba(255, 135, 40, .22);
-  box-shadow: inset 0 0 0 1px #fff0c7;
-  /* Once the page changes, the glow stays near the tap on large choice cards. */
-  mask-image: radial-gradient(circle at var(--press-x) var(--press-y), #000 46px, transparent 130px);
-  animation: care-button-flash 240ms ease-out both;
-}
-@keyframes care-button-flash {
-  0%, 35% { opacity: 1; }
-  100% { opacity: 0; }
-}
-
 /* The zero-size origin is the actual pointer position in viewport coordinates. */
 .care-citrus-burst {
   position: absolute;
@@ -108,5 +83,4 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .care-citrus-burst { display: none; }
-  .care-button-flash { animation-duration: 150ms; }
 }

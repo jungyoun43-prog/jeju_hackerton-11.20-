@@ -14,13 +14,12 @@ async function setup(viewport,motion='reduce'){
  await c.route('**/*',r=>{if(new URL(r.request().url()).origin!==new URL(base).origin)return r.abort();if(r.request().method()==='POST'){report.posts++;return r.abort();}return r.continue();});
  const p=await c.newPage();p.on('pageerror',e=>report.errors.push(e.message));p.setDefaultTimeout(10000);await p.goto(base);await p.locator('#choose-region-jeju').waitFor();
  await p.evaluate(()=>{
-  window.__resultFeedback={bursts:0,flashes:0};
+  window.__resultFeedback={bursts:0,total:0};
   new MutationObserver(records=>{for(const row of records)for(const node of row.addedNodes){
    if(node.nodeType!==1)continue;
-   for(const [key,selector] of [['bursts','.care-citrus-burst'],['flashes','.care-button-flash']]){
-    window.__resultFeedback[key]+=Number(node.matches(selector))+node.querySelectorAll(selector).length;
-   }
-  }}).observe(document.body,{subtree:true,childList:true});
+   window.__resultFeedback.total++;
+   if(node.matches('.care-citrus-burst'))window.__resultFeedback.bursts++;
+  }}).observe(document.querySelector('.care-motion-layer'),{childList:true});
  });
  return{c,p};
 }
@@ -30,8 +29,9 @@ async function request(p){
  await p.locator('#send-request').click();await p.locator('.entry-review-footer .appointment-primary').click();
  const start=await p.evaluate(()=>({...window.__resultFeedback,reduced:matchMedia('(prefers-reduced-motion: reduce)').matches}));
  await p.locator('[data-book-primary]').click();await p.locator('[role=dialog]').waitFor();
- const end=await p.evaluate(()=>({...window.__resultFeedback,clean:!document.querySelector('.care-citrus-burst,.care-button-flash')}));
- check('사용자 시작만 강조하고 자동 회신·결과에 추가 클릭 효과 없음',end.flashes-start.flashes===1&&end.bursts-start.bursts===(start.reduced?0:1)&&end.clean);
+ const end=await p.evaluate(()=>({...window.__resultFeedback,clean:!document.querySelector('.care-motion-layer > *')}));
+ const expected=start.reduced?0:1;
+ check('사용자 시작에만 귤 표시, 자동 회신·결과에 추가 클릭 효과 없음',end.total-start.total===expected&&end.bursts-start.bursts===expected&&end.clean);
 }
 async function inspect(p,name){
  const v=await p.evaluate(()=>{const d=document.querySelector('.coordination-result-dialog'),r=d.getBoundingClientRect(),f=d.querySelector('footer').getBoundingClientRect(),body=d.querySelector('.result-window-body');return{viewport:[innerWidth,innerHeight],bounds:r.toJSON(),footer:f.toJSON(),overflow:body.scrollHeight-body.clientHeight,heading:d.querySelector('h2').textContent,checked:d.querySelectorAll('[data-result=confirmed]').length,focus:document.activeElement.id,animation:getComputedStyle(d).animationDuration,horizontal:document.documentElement.scrollWidth-innerWidth};});report.views.push({name,...v});
@@ -52,7 +52,7 @@ try{
  }
  const {c,p}=await setup({width:1440,height:900},'no-preference');
  await p.locator('#choose-region-jeju').click({position:{x:31,y:43}});
- check('클릭 위치에서 감귤 표시 후 다음 작업면 그대로 열림',await p.locator('#entry-mode-text').isVisible()&&await p.evaluate(()=>window.__resultFeedback.bursts===1&&window.__resultFeedback.flashes===1&&!document.querySelector('.care-scene-guide')));
+ check('클릭 위치에서 감귤 표시 후 다음 작업면 그대로 열림',await p.locator('#entry-mode-text').isVisible()&&await p.evaluate(()=>window.__resultFeedback.bursts===1&&window.__resultFeedback.total===1&&!document.querySelector('.care-scene-guide')));
  await p.screenshot({path:resolve(out,'button-feedback.png')});
  await request(p);check('전환 중에도 다음 선택 즉시 처리',await p.locator('[role=dialog]').isVisible());
  const duration=await p.locator('[role=dialog]').evaluate(n=>getComputedStyle(n).animationDuration);check('결과창 850ms·감귤 1200ms',duration==='0.85s'&&await p.locator('.result-brand-seal').evaluate(n=>getComputedStyle(n).animationDuration)==='1.2s');

@@ -172,10 +172,9 @@ details>summary:focus-visible { background:var(--soft); color:var(--secondary-ho
 .voice-button:disabled { opacity:.7; }
 .keyboard-hint { font-size:12px; color:var(--muted); }
 .character-count { margin-left:auto; font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums; }
-.send-button { display:flex; align-items:center; justify-content:center; gap:7px; min-width:44px; min-height:var(--target-size); padding:10px 12px; border-radius:var(--radius-control); background:var(--primary); color:#fff; font-size:var(--text-small); font-weight:600; transition:background-color 150ms var(--feedback-ease),transform 100ms var(--feedback-ease); }
-.send-button:hover:not(:disabled),.send-button:not(:disabled):active { background:var(--primary-hover); }
+.send-button { display:flex; align-items:center; justify-content:center; gap:7px; min-width:44px; min-height:var(--target-size); padding:10px 12px; border-radius:var(--radius-control); background:var(--primary); color:#fff; font-size:var(--text-small); font-weight:600; transition:background-color 150ms var(--feedback-ease); }
+.send-button:hover:not(:disabled) { background:var(--primary-hover); }
 .send-button:disabled { background:#6b776e; color:#fff; opacity:1; }
-.send-button:not(:disabled):active { transform:translateY(1px); }
 .send-button>.icon { width:16px; height:16px; transition:transform 150ms var(--feedback-ease); }
 .draft-feedback { margin:8px 0 0; font-size:var(--text-meta); line-height:1.6; color:var(--secondary); max-width:72ch; }
 .voice-help { margin:0; padding:0; border:0; font-size:var(--text-small); line-height:1.6; color:var(--secondary); }
@@ -835,5 +834,5 @@ details>summary:focus-visible { background:var(--soft); color:var(--secondary-ho
 }
 @media(prefers-reduced-motion:reduce) {
   *,*::before,*::after { transition:none!important; animation:none!important; scroll-behavior:auto!important; }
-  .send-button:not(:disabled):active,.send-button:hover:not(:disabled)>.icon,.starter-prompts>button:hover>.icon { transform:none; }
+  .send-button:hover:not(:disabled)>.icon,.starter-prompts>button:hover>.icon { transform:none; }
 }
