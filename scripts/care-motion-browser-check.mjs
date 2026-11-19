@@ -16,6 +16,64 @@ async function context(options={}){
  await p.goto(base);await p.locator('#choose-region-jeju').waitFor();await p.evaluate(()=>document.fonts.ready);
  return {c,p};
 }
+// Read the real click before React replaces its button. Measure the decoration at paint.
+async function watchClicks(page){
+ await page.evaluate(()=>{
+  const measurements=window.__careClicks=[];
+  const rect=node=>{const {x,y,width,height}=node.getBoundingClientRect();return {x,y,width,height};};
+  window.addEventListener('click',event=>{
+   const button=event.target.closest?.('button');
+   if(!button)return;
+   const activation={x:event.clientX,y:event.clientY,box:rect(button),detail:event.detail};
+   measurements.push(activation);
+   requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    const flash=document.querySelector('.care-button-flash'),burst=document.querySelector('.care-citrus-burst');
+    const layer=(flash||burst)?.closest('.care-motion-layer');
+    const decoration=flash&&getComputedStyle(flash);
+    activation.frame={
+     flashes:document.querySelectorAll('.care-button-flash').length,bursts:document.querySelectorAll('.care-citrus-burst').length,
+     box:flash&&rect(flash),origin:burst&&rect(burst),
+     colors:decoration?[decoration.backgroundColor,decoration.borderTopColor]:[],
+     visible:flash?.checkVisibility({visibilityProperty:true})&&Number(decoration.opacity)>0,
+     fixed:layer&&getComputedStyle(layer).position==='fixed',
+     transparentToPointer:[layer,flash,burst].filter(Boolean).every(n=>getComputedStyle(n).pointerEvents==='none'),
+     slices:burst?.querySelectorAll('.citrus-slice').length||0,leaf:Boolean(burst?.querySelector('.citrus-leaf')),
+     fruit:Boolean(burst?.querySelector('img.citrus-fruit')),central:document.querySelectorAll('.care-scene-guide').length,
+     movingSurface:document.querySelector('.conversation-layout').getAnimations().some(a=>a.effect.getKeyframes().some(f=>f.transform&&f.transform!=='none')),
+    };
+   }));
+  },true);
+  window.__careAdditions=0;
+  new MutationObserver(records=>{for(const record of records)for(const node of record.addedNodes){
+   if(node.nodeType===1)window.__careAdditions+=Number(node.matches('.care-citrus-burst,.care-button-flash'))+node.querySelectorAll('.care-citrus-burst,.care-button-flash').length;
+  }}).observe(document.body,{subtree:true,childList:true});
+ });
+}
+async function clickAwayFromCenter(page,button,touch=false){
+ await button.scrollIntoViewIfNeeded();
+ const box=await button.boundingBox();assert.ok(box,'클릭 위치를 측정할 수 있는 버튼이 필요합니다.');
+ const index=await page.evaluate(()=>window.__careClicks.length);
+ const x=Math.floor(box.x+box.width*.23),y=Math.floor(box.y+box.height*.64);
+ if(touch)await page.touchscreen.tap(x,y);else await page.mouse.click(x,y);
+ await page.waitForFunction(i=>Boolean(window.__careClicks[i]?.frame),index);
+ return page.evaluate(i=>window.__careClicks[i],index);
+}
+function orange(css){
+ const [r,g,b,a=1]=(css.match(/[\d.]+/g)||[]).map(Number);
+ return r>=190&&g>=65&&g<r-32&&b<g-25&&a>0;
+}
+function checkFlash(label,{box,frame}){
+ check(label+' 당시 버튼과 강조 영역 일치',frame.flashes===1&&frame.box&&['x','y','width','height'].every(k=>Math.abs(frame.box[k]-box[k])<=2));
+ check(label+' 버튼 위에 주황 강조 표시',frame.visible&&frame.colors.some(orange));
+ check(label+' 고정 레이어가 입력을 통과시킴',frame.fixed&&frame.transparentToPointer);
+}
+function checkBurst(label,event){
+ const {box,frame,x,y}=event;
+ check(label+' 버튼 중앙이 아닌 실제 입력 좌표',Math.abs(x-(box.x+box.width/2))>7&&event.detail>0);
+ check(label+' 귤 입자 원점이 입력 좌표와 일치',frame.bursts===1&&frame.origin&&Math.abs(frame.origin.x-x)<=2&&Math.abs(frame.origin.y-y)<=2);
+ check(label+' 감귤 조각과 열매·잎',frame.slices>1&&frame.fruit&&frame.leaf);
+ check(label+' 중앙 궤적과 작업면 이동 없음',!frame.central&&!frame.movingSurface);
+}
 try {
  for(const [width,height] of [[1280,720],[1440,900],[1920,1080],[2831,1448],[3840,2160],[1920,720],[390,844],[320,600]]){
   const {c,p}=await context({viewport:{width,height},reducedMotion:'reduce'});
@@ -31,32 +89,51 @@ try {
  check('노트북부터 4K까지 높이 점유율 차이 18%p 이내',Math.max(...desktop.map(v=>v.heightRatio))-Math.min(...desktop.map(v=>v.heightRatio))<=.18);
  {
   const {c,p}=await context({viewport:{width:1280,height:720}});
-  await p.evaluate(()=>{const original=Element.prototype.animate;window.__motionFrames=[];window.__motionSlow=true;Element.prototype.animate=function(frames,options){window.__motionFrames.push({id:this.id,role:this.className,frames,options});const a=original.call(this,frames,options);if(window.__motionSlow)a.playbackRate=.1;return a;};});
-  await p.locator('#choose-region-jeju').click();
-  check('선택 즉시 다음 화면 도달',await p.locator('#entry-mode-text').isVisible());
-  check('작업면과 감귤 궤적 효과 실행',await p.evaluate(()=>document.querySelector('.conversation-layout').getAnimations().length===1&&document.querySelector('.care-scene-guide img')?.getAnimations().length===1));
-  await p.waitForFunction(()=>document.querySelector('.conversation-layout')?.getAnimations()[0]?.currentTime>=140);
-  await p.screenshot({path:resolve(out,'motion-10percent.png')});
-  await p.evaluate(()=>{window.__motionSlow=false;for(const a of document.getAnimations())if(!a.animationName){a.pause();a.currentTime=280;}});
-  const trajectory=await p.evaluate(()=>window.__motionFrames.find(x=>String(x.role).includes('conversation-layout')));
-  check('작업면이 900ms 동안 펼쳐짐',trajectory.frames[0].transform!==trajectory.frames.at(-1).transform&&trajectory.options.duration===900);
-  check('효과 레이어가 다음 조작을 가리지 않음',await p.locator('#entry-mode-text').evaluate(n=>{const r=n.getBoundingClientRect();return n.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2));}));
-  await p.locator('#entry-mode-text').click();await p.locator('.request-example').first().click();
-  check('애니메이션 중 입력/예시 작동',(await p.locator('#request-input').inputValue()).includes('제주우리병원'));
+  await watchClicks(p);
+  const region=await clickAwayFromCenter(p,p.locator('#choose-region-jeju'));
+  checkFlash('PC 지역 선택',region);checkBurst('PC 지역 선택',region);
+  check('선택 즉시 다음 화면 및 제목 초점',await p.locator('#entry-mode-text').isVisible()&&await p.locator('#care-region-title').evaluate(n=>n===document.activeElement));
+  check('다음 단계 버튼 위에서 올바른 요소를 누를 수 있음',await p.locator('#entry-mode-text').evaluate(n=>{const r=n.getBoundingClientRect();return n.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2));}));
+  await p.screenshot({path:resolve(out,'click-citrus.png')});
+  await p.locator('#entry-mode-text').click();
+  const example=await clickAwayFromCenter(p,p.locator('.request-example').first());
+  checkFlash('연속 입력',example);checkBurst('연속 입력',example);
+  check('연속 클릭 중 예시가 초안에 한 번 반영',((await p.locator('#request-input').inputValue()).match(/제주우리병원/g)||[]).length===1);
   await p.getByRole('button',{name:'입력 방식 바꾸기',exact:true}).click();await p.locator('#entry-mode-manual').click();
   check('빠른 전환 후 마지막 선택 유지',await p.locator('#public-hospital-search').isVisible());
-  check('연속 클릭에서 감귤 궤적 중복 없음',await p.locator('.care-scene-guide').count()<=1);
   await p.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'));delete document.hidden;});
-  check('탭 숨김 신호가 효과 정리',await p.evaluate(()=>document.querySelectorAll('.care-scene-guide,.care-action-wave').length===0));
+  check('탭을 떠나면 입자와 강조 정리',await p.locator('.care-citrus-burst,.care-button-flash').count()===0);
+  await c.close();
+ }
+ {
+  const {c,p}=await context({viewport:{width:390,height:720},hasTouch:true,isMobile:true});
+  await watchClicks(p);
+  const touch=await clickAwayFromCenter(p,p.locator('#choose-region-jeju'),true);
+  checkFlash('모바일 터치',touch);checkBurst('모바일 터치',touch);
+  await p.locator('#entry-mode-text').tap();
+  const send=p.locator('#send-request');assert.equal(await send.isDisabled(),true);
+  await p.waitForFunction(()=>!document.querySelector('.care-citrus-burst,.care-button-flash'),null,{timeout:2000});
+  const before=await p.evaluate(()=>window.__careAdditions),box=await send.boundingBox();
+  await p.touchscreen.tap(Math.floor(box.x+box.width/2),Math.floor(box.y+box.height/2));
+  // A wheel gesture is observed even if this viewport has no overflow.
+  await p.evaluate(()=>window.addEventListener('wheel',()=>{window.__careWheel=true;},{once:true,passive:true}));
+  await p.mouse.move(180,310);await p.mouse.wheel(0,170);await p.waitForFunction(()=>window.__careWheel);
+  check('비활성 버튼과 스크롤에서 장식 생성 없음',await p.evaluate(()=>window.__careAdditions)===before);
   await c.close();
  }
  {
   const {c,p}=await context({viewport:{width:1280,height:720},reducedMotion:'reduce'});
-  await p.locator('#choose-region-jeju').click();
-  check('움직임 줄이기에서는 궤적과 파동 생략',await p.evaluate(()=>document.querySelectorAll('.care-scene-guide,.care-action-wave').length===0));
+  await watchClicks(p);
+  const reduced=await clickAwayFromCenter(p,p.locator('#choose-region-jeju'));
+  checkFlash('움직임 줄이기',reduced);
+  check('움직임 줄이기에서 귤 입자·작업면 이동 생략',reduced.frame.bursts===0&&!reduced.frame.central&&!reduced.frame.movingSurface);
+  await p.waitForFunction(()=>!document.querySelector('.care-button-flash'),null,{timeout:2000});
   await p.getByRole('button',{name:'진료 지역 다시 선택',exact:true}).click();
-  await p.emulateMedia({reducedMotion:'no-preference'});await p.locator('#choose-region-seoul').focus();await p.keyboard.press('Enter');
-  check('키보드 진입에 공간 이동 효과 없음',await p.evaluate(()=>document.querySelector('#care-transition').getAnimations().length===0&&[...document.querySelectorAll('.entry-method')].every(n=>n.getAnimations().length===0)));
+  await p.emulateMedia({reducedMotion:'no-preference'});await p.locator('#choose-region-seoul').focus();
+  const index=await p.evaluate(()=>window.__careClicks.length);
+  await p.keyboard.press('Enter');await p.waitForFunction(i=>Boolean(window.__careClicks[i]?.frame),index);
+  const keyboard=await p.evaluate(i=>window.__careClicks[i],index);
+  check('키보드 진입에 위치 강조·입자·작업면 이동 없음',keyboard.detail===0&&!keyboard.frame.bursts&&!keyboard.frame.flashes&&!keyboard.frame.central&&!keyboard.frame.movingSurface);
   check('키보드 초점은 새 단계 제목에 유지',await p.locator('#care-region-title').evaluate(n=>n===document.activeElement));
   await c.close();
  }
