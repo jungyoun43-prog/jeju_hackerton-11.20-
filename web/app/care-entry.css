@@ -1,8 +1,8 @@
 @font-face { font-family:'Jeju Gothic'; src:url('/assets/JejuGothic.ttf') format('truetype'); font-style:normal; font-weight:400; font-display:swap; }
 :root { --ground:#dce7e2; --nav:#e5eee8; --line:#d6dfd6; --heading-font:'Jeju Gothic',Pretendard,sans-serif; }
-.app-shell { background:#dce7e2 url('/assets/jeju-workspace-background-v1.webp') center/cover; }
+.app-shell { background:#dce7e2; }
 .care-rail { background:#e5eee8; }
-.workspace-shell { background:#f5f3eb; background-image:none; }
+.workspace-shell { background:#f5f3eb; }
 .workspace-header { position:relative; background:#f5f3eb; }
 .preparation-rail { background:#eaf0e9; }
 .chat-workspace { background:#fcfbf7; }
@@ -10,7 +10,6 @@
 .hondi-react #appointment-title,.hondi-react #care-region-title,.region-choice-main>strong { font-family:var(--heading-font); font-weight:400; letter-spacing:-.025em; }
 .hondi-react #care-region-title { font-size:30px; line-height:1.4; margin:16px 0 8px; }
 .hondi-react #appointment-title { font-size:25px; }
-.is-region-home .chat-workspace { background:linear-gradient(110deg,rgba(246,244,234,.96) 15%,rgba(230,241,233,.86) 65%,rgba(222,239,231,.66)),url('/assets/jeju-workspace-background-v1.webp') center/cover; }
 .is-region-home #conversation-scroll { padding:24px 36px; }
 .is-request-entry .conversation-layout { grid-template-rows:minmax(0,1fr) auto; grid-template-areas:'chat' 'composer'; }
 .is-request-entry .chat-composer { grid-area:composer; }
@@ -136,7 +135,7 @@
 @media(prefers-reduced-motion:reduce) { .condition-arrived,.entry-live-mark img { animation:none; } }
 
 /* 화면에 맞는 불투명 작업면. 기본 단계는 viewport 안에서 끝나고, 펼친 상세만 더 읽는다. */
-.is-region-home .chat-workspace { background:#f5f3eb; background-image:none; }
+.is-region-home .chat-workspace { background:#f5f3eb; }
 .is-region-home #conversation-scroll { padding:24px; scrollbar-gutter:auto; }
 #care-region-workspace { height:100%; min-height:0; }
 #care-region-workspace:has(>.region-start,>.entry-method-screen) { display:flex; flex-direction:column; justify-content:safe center; }
@@ -400,6 +399,61 @@
   .hondi-react.entry-method-screen .entry-method>svg { width:calc(var(--entry-unit)*1.75);height:calc(var(--entry-unit)*1.75); }
   .entry-method-screen .entry-method .entry-method-action { min-height:calc(var(--entry-unit)*2.75);font-size:calc(var(--entry-unit)*.9375);gap:var(--entry-unit); }
   :is(.region-start,.entry-method-screen) .entry-screen-footer>p,:is(.region-start,.entry-method-screen) .entry-notes,:is(.region-start,.entry-method-screen) .entry-screen-footer>[data-slot=button] { font-size:calc(var(--entry-unit)*.8125); }
+}
+
+/* One continuous coast under the two entry screens. In a focused task
+   only the shoreline below the toolbar remains, leaving room for the controls. */
+.page-main {
+  --coast-photo:url('/assets/jeju-workspace-background-v1.webp');
+  --coast-paper:#fcfbf7;
+  --coast-view:clamp(32px,6dvh,66px);
+}
+.page-main.is-region-home:has(.region-start,.entry-method-screen) {
+  --coast-view:clamp(0px,min(14dvh,100dvh - 610px),160px);
+  background:#8aa8ad var(--coast-photo) 45% 60% / cover no-repeat;
+}
+.is-region-home:has(.region-start,.entry-method-screen) .chat-workspace { background:transparent; }
+.is-region-home:has(.region-start,.entry-method-screen) .workspace-header::after { content:none; }
+.region-start,.entry-method-screen { flex-shrink:0; }
+:is(.region-start,.entry-method-screen) .entry-page-header>div,
+:is(.region-start,.entry-method-screen) .entry-screen-footer>:is(button,p,details) {
+  background:var(--coast-paper);
+  border-radius:7px;
+}
+:is(.region-start,.entry-method-screen) .entry-page-header>div:first-child {
+  padding:8px 14px;
+}
+:is(.region-start,.entry-method-screen) .entry-steps,
+:is(.region-start,.entry-method-screen) .entry-screen-footer>:is(button,p,details) { padding-inline:12px; }
+.entry-method-screen .entry-screen-footer>p { padding-block:8px; }
+.page-main .workspace-header {
+  margin-bottom:var(--coast-view);
+  border-bottom:0;
+}
+.workspace-header::after {
+  content:"";
+  position:absolute;
+  inset:100% 0 auto;
+  height:var(--coast-view);
+  pointer-events:none;
+  background:#8aa8ad var(--coast-photo) 50% 64% / cover no-repeat;
+}
+@media(min-width:901px) and (max-height:780px) {
+  .page-main { --coast-view:32px; }
+  .page-main.is-request-entry #conversation-scroll,
+  .page-main.is-booking-workspace #conversation-scroll { padding-block:8px; }
+  .hondi-react.region-start .care-region-choice {
+    padding:clamp(18px,3dvh,24px);
+    gap:clamp(12px,2dvh,18px);
+  }
+}
+@media(max-width:700px) {
+  .page-main { --coast-view:clamp(30px,5dvh,48px); }
+  .page-main.is-region-home:has(.region-start,.entry-method-screen) { --coast-view:clamp(28px,8dvh,76px); }
+}
+@media(max-height:650px) {
+  .page-main { --coast-view:16px; }
+  .page-main.is-region-home:has(.region-start,.entry-method-screen) { --coast-view:clamp(12px,3dvh,20px); }
 }
 
 .hondi-react [data-slot=button],.send-button { transition-property:transform,background-color,border-color,color,box-shadow;transition-duration:160ms;transition-timing-function:var(--feedback-ease); }
