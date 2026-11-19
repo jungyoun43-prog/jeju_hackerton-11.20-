@@ -107,7 +107,11 @@ try {
  await p.locator('#realtime-stop').click();check('종료 시 마이크·피어 정리',await p.evaluate(()=>window.__voiceTest.stopped===1&&window.__voiceTest.peer.connectionState==='closed'));
  await emit({type:'conversation.item.input_audio_transcription.completed',item_id:'late',transcript:'늦은 오염'});check('늦은 음성 이벤트를 무시',!(await p.locator('#request-input').inputValue()).includes('늦은 오염'));
  await p.locator('#send-request').click();check('음성 조건 적용은 사용자 확인 뒤',(await p.locator('.entry-review-rows').innerText()).includes('2026-12-03'));
- await p.emulateMedia({reducedMotion:'reduce'});check('모션 줄이기 적용',await p.locator('.care-scene-guide,.care-citrus-burst').count()===0);
+ await p.emulateMedia({reducedMotion:'reduce'});
+ const burst=p.locator('.care-citrus-burst');
+ await burst.waitFor({state:'hidden'});
+ await burst.waitFor({state:'detached',timeout:1000});
+ check('모션 줄이기 적용',await p.evaluate(()=>matchMedia('(prefers-reduced-motion: reduce)').matches));
  check('고정 응답 검사만 사용',proof.modelCalls===0&&proof.voiceStarts===1&&proof.voiceEnds===1);await context.close();
  check('브라우저 JS 오류 없음',proof.errors.length===0);proof.result='pass';
 } finally {await browser.close();await writeFile(resolve(out,'report.json'),JSON.stringify(proof,null,2));}

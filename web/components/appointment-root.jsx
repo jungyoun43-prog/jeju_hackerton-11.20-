@@ -79,7 +79,26 @@ function Workspace() {
   const View={intake:Intake,public_find:PublicHospitalFinder,public_dates:PublicHospitalDates,public_review:PublicHospitalReview,doctors:Doctors,schedule:AppointmentCalendar,availability:AppointmentAvailability,review:Review,result:Result,records:Records,support:Coordination,reservation_review:ReservationEditReview}[state.screen];
   if(needsScheduleConsultation(state))titles.review='일정 상담 메모';
   if(edit)return <div className="hondi-react reservation-edit-workspace" data-appointment-screen={state.screen}><div className="appointment-topline"><h2 id="appointment-title" tabIndex={-1}>{state.screen==='reservation_review'?'변경 내용 확인':'예약 수정'}</h2><Action action="reservation_edit_cancel" variant="ghost">수정 취소</Action></div><ReservationEditHeader/><View/></div>;
-  return <div className="hondi-react" data-appointment-screen={state.screen}><div className="appointment-topline"><h2 id="appointment-title" tabIndex={-1}>{titles[state.screen]}</h2><div className="appointment-back-actions"><Action action="home" variant="ghost"><ArrowLeft/>병원 지역 선택</Action>{state.quickEntry?<Action action="entry_summary" variant="ghost">요청 요약·빠진 내용</Action>:<Action action="methods" variant="ghost">준비 방식 바꾸기</Action>}</div></div><p className="appointment-boundary">{state.screen==='support'?'예약 시연 · 실제 전화·예약·배차는 하지 않아요.':state.usePublicData?'제주 공개자료로 병원과 희망 일정을 골라요. 실제 예약은 아직 없어요.':APPOINTMENT_BOUNDARY}</p>{state.recheck&&state.screen!=='support'&&<p className="appointment-recheck" role="status">일정 변경 · {local?'접수·이동·동행':'접수·항공·이동·동행'}을 다시 확인해 주세요.</p>}{state.screen==='schedule'&&<Selection/>}<View/></div>;
+  const findingHospital=state.screen==='public_find';
+  let boundary=APPOINTMENT_BOUNDARY;
+  if(state.screen==='support') boundary='예약 시연 · 실제 전화·예약·배차는 하지 않아요.';
+  else if(findingHospital) boundary='제주 공개자료로 진료를 준비하는 시연입니다.';
+  else if(state.usePublicData) boundary='제주 공개자료로 병원과 희망 일정을 골라요. 실제 예약은 아직 없어요.';
+  return <div className="hondi-react" data-appointment-screen={state.screen}>
+    <div className="appointment-topline">
+      <h2 id="appointment-title" tabIndex={-1}>{titles[state.screen]}</h2>
+      <div className="appointment-back-actions">
+        {!findingHospital&&<Action action="home" variant="ghost"><ArrowLeft/>병원 지역 선택</Action>}
+        {state.quickEntry
+          ? <Action action="entry_summary" variant="ghost">요청 요약·빠진 내용</Action>
+          : <Action action="methods" variant="ghost" aria-label="준비 방식 바꾸기">{findingHospital?'방식 변경':'준비 방식 바꾸기'}</Action>}
+      </div>
+    </div>
+    <p className="appointment-boundary">{boundary}</p>
+    {state.recheck&&state.screen!=='support'&&<p className="appointment-recheck" role="status">일정 변경 · {local?'접수·이동·동행':'접수·항공·이동·동행'}을 다시 확인해 주세요.</p>}
+    {state.screen==='schedule'&&<Selection/>}
+    <View/>
+  </div>;
 }
 function Navigation() {
   const {state,edit,coordination:coord}=useAppointment();
@@ -104,7 +123,7 @@ function Footer() {
   const next=bookingNext(state,caseState,coordination),step=bookingStep(state),summary=bookingSelectionLabel(state),steps=bookingSteps(state);
   const withinStep=['public_show_preferences','show_times'].includes(next.action);
   const back=state.screen==='records'?'resume':state.screen==='support'?(canReviewAppointment(state)?'summary':'resume'):step===1?'home':state.screen==='public_review'?'public_edit_dates':state.screen==='result'?'find_dates':'back';
-  return <div className="hondi-react booking-footer"><div className="booking-footer-context"><span className="booking-footer-step">{step} / 4 · {steps[step-1]}</span><p className="booking-footer-selection">{summary || '아직 선택한 병원이 없어요'}</p><p id="booking-next-hint" className="booking-footer-hint" role="status">{next.hint}</p></div><div className="booking-footer-buttons"><Action action={back} variant="ghost" aria-label={step===1?'병원 지역 선택으로':'이전 단계'}><ArrowLeft/><span>이전</span></Action><Action action={next.action} value={next.value} primary={!withinStep} variant="outline" data-role={withinStep?'within-step':'next-step'} disabled={next.disabled} aria-describedby="booking-next-hint" data-book-primary="true">{withinStep?(next.action==='show_times'?'의료진·시간 목록 보기':'시간 조건 선택하기'):next.label}{withinStep?<ArrowDown/>:['save','coordination_save'].includes(next.action)?<Download/>:<ArrowRight/>}</Action></div></div>;
+  return <div className="hondi-react booking-footer"><div className="booking-footer-context"><span className="booking-footer-step">{step} / 4 · {steps[step-1]}</span><p className="booking-footer-selection">{summary || '아직 선택한 병원이 없어요'}</p><p id="booking-next-hint" className="booking-footer-hint" role="status">{next.hint}</p></div><div className="booking-footer-buttons"><Action action={back} variant="ghost" aria-label={step===1?'병원 지역 선택으로':'이전 단계'}><ArrowLeft/><span>{state.screen==='public_find'?'지역 선택':'이전'}</span></Action><Action action={next.action} value={next.value} primary={!withinStep} variant="outline" data-role={withinStep?'within-step':'next-step'} disabled={next.disabled} aria-describedby="booking-next-hint" data-book-primary="true">{withinStep?(next.action==='show_times'?'의료진·시간 목록 보기':'시간 조건 선택하기'):next.label}{withinStep?<ArrowDown/>:['save','coordination_save'].includes(next.action)?<Download/>:<ArrowRight/>}</Action></div></div>;
 }
 const roots=new WeakMap();
 export function renderAppointment(state,caseState,onAction,edit=null) {
