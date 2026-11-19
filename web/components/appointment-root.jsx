@@ -123,7 +123,26 @@ function Footer() {
   const next=bookingNext(state,caseState,coordination),step=bookingStep(state),summary=bookingSelectionLabel(state),steps=bookingSteps(state);
   const withinStep=['public_show_preferences','show_times'].includes(next.action);
   const back=state.screen==='records'?'resume':state.screen==='support'?(canReviewAppointment(state)?'summary':'resume'):step===1?'home':state.screen==='public_review'?'public_edit_dates':state.screen==='result'?'find_dates':'back';
-  return <div className="hondi-react booking-footer"><div className="booking-footer-context"><span className="booking-footer-step">{step} / 4 · {steps[step-1]}</span><p className="booking-footer-selection">{summary || '아직 선택한 병원이 없어요'}</p><p id="booking-next-hint" className="booking-footer-hint" role="status">{next.hint}</p></div><div className="booking-footer-buttons"><Action action={back} variant="ghost" aria-label={step===1?'병원 지역 선택으로':'이전 단계'}><ArrowLeft/><span>{state.screen==='public_find'?'지역 선택':'이전'}</span></Action><Action action={next.action} value={next.value} primary={!withinStep} variant="outline" data-role={withinStep?'within-step':'next-step'} disabled={next.disabled} aria-describedby="booking-next-hint" data-book-primary="true">{withinStep?(next.action==='show_times'?'의료진·시간 목록 보기':'시간 조건 선택하기'):next.label}{withinStep?<ArrowDown/>:['save','coordination_save'].includes(next.action)?<Download/>:<ArrowRight/>}</Action></div></div>;
+  const directory=state.screen==='public_find';
+  const selection=summary || (directory ? '' : '아직 선택한 병원이 없어요');
+  return <div className="hondi-react booking-footer" data-booking-screen={state.screen}>
+    <div className="booking-footer-context">
+      <span className="booking-footer-step">{step} / 4 · {steps[step-1]}</span>
+      {selection&&<p className="booking-footer-selection">{selection}</p>}
+      <p id="booking-next-hint" className="booking-footer-hint" role="status">{next.hint}</p>
+    </div>
+    <div className="booking-footer-buttons">
+      <Action action={back} variant="ghost" aria-label={step===1?'병원 지역 선택으로':'이전 단계'}>
+        <ArrowLeft/><span>{directory?'지역 선택':'이전'}</span>
+      </Action>
+      <Action action={next.action} value={next.value} primary={!withinStep} variant="outline"
+        data-role={withinStep?'within-step':'next-step'} disabled={next.disabled}
+        aria-describedby="booking-next-hint" data-book-primary="true">
+        {withinStep?(next.action==='show_times'?'의료진·시간 목록 보기':'시간 조건 선택하기'):next.label}
+        {withinStep?<ArrowDown/>:['save','coordination_save'].includes(next.action)?<Download/>:<ArrowRight/>}
+      </Action>
+    </div>
+  </div>;
 }
 const roots=new WeakMap();
 export function renderAppointment(state,caseState,onAction,edit=null) {

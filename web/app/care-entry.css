@@ -283,6 +283,7 @@
   .appointment-back-actions { justify-content:space-between; }
   .appointment-workspace [data-appointment-screen=public_find] .appointment-topline { flex-direction:row; align-items:center; gap:8px; }
   [data-appointment-screen=public_find] .appointment-back-actions { flex-shrink:0; }
+  [data-booking-screen=public_find] .booking-footer-buttons { grid-template-columns:auto auto; justify-content:space-between; }
 }
 
 .is-appointment-mode.conversation-scroll { padding:14px 22px; }
