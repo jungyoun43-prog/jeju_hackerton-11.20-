@@ -17,8 +17,8 @@ export function PublicSelect({id,label,action,value,options,all}) {
   const {onAction}=useAppointment();
   return <SearchPicker id={id} label={label} value={value} options={[...(all?[{value:'',label:all}]:[]),...options.map(value=>({value,label:value}))]} onChange={value=>onAction(action,value,document.getElementById(id))}/>;
 }
-export function JejuSourceDetails() {
-  return <details className="jeju-data-sources"><summary>어떤 제주 데이터를 쓰나요?</summary><p>지역과 등록 진료과로 병원을 좁히고, 소재지·관할과 이동 조건으로 문의처를 찾습니다. 선택한 근거는 준비표에도 남아요.</p><dl>{JEJU_DATA_SOURCES.map(s=><div key={s.id}><dt><a href={s.hubUrl} target="_blank" rel="noreferrer">{s.name}<ExternalLink aria-hidden="true"/></a></dt><dd>{s.count}곳 · {s.scope}<br/>{s.dateLabel} {s.asOf}{s.url!==s.hubUrl&&<> · <a href={s.url} target="_blank" rel="noreferrer">연결 원출처</a></>}</dd></div>)}</dl><Note>표시 수는 보유 표본의 범위입니다. 제주 전체 기관·현재 운영 여부를 뜻하지 않아요. 센터 이동시간 자료는 명세만 확인해 예상 소요시간을 계산하지 않습니다.</Note></details>;
+export function JejuSourceDetails({summary = '어떤 제주 데이터를 쓰나요?', children}) {
+  return <details className="jeju-data-sources"><summary>{summary}</summary>{children}<p>지역과 등록 진료과로 병원을 좁히고, 소재지·관할과 이동 조건으로 문의처를 찾습니다. 선택한 근거는 준비표에도 남아요.</p><dl>{JEJU_DATA_SOURCES.map(s=><div key={s.id}><dt><a href={s.hubUrl} target="_blank" rel="noreferrer">{s.name}<ExternalLink aria-hidden="true"/></a></dt><dd>{s.count}곳 · {s.scope}<br/>{s.dateLabel} {s.asOf}{s.url!==s.hubUrl&&<> · <a href={s.url} target="_blank" rel="noreferrer">연결 원출처</a></>}</dd></div>)}</dl><Note>표시 수는 보유 표본의 범위입니다. 제주 전체 기관·현재 운영 여부를 뜻하지 않아요. 센터 이동시간 자료는 명세만 확인해 예상 소요시간을 계산하지 않습니다.</Note></details>;
 }
 function HospitalDirectoryRow({hospital, selected}) {
   const [expanded, setExpanded] = useState(false);
@@ -111,18 +111,24 @@ export function PublicHospitalFinder() {
             <label htmlFor="public-hospital-search">병원명·주소 검색</label>
             <div><Search aria-hidden="true"/>
               <input ref={search} id="public-hospital-search" type="search" value={query}
-                onChange={event => updateQuery(event.target.value)} placeholder="제주우리병원, 한림, 서광로" autoComplete="off"/>
+                onChange={event => updateQuery(event.target.value)} placeholder="병원명이나 주소로 검색" autoComplete="off"/>
               {query && <Button type="button" variant="ghost" aria-label="병원 검색어 지우기" onClick={clearQuery}><X aria-hidden="true"/></Button>}
             </div>
           </div>
-          <details ref={filters} className="compact-disclosure hospital-directory-filters">
-            <summary>지역·등록 진료과로 좁히기</summary>
-            <div className="appointment-filters">
-              <PublicSelect id="public-hospital-area" label="병원 지역" action="public_area" value={plan.area} options={JEJU_DATA_AREAS} all="제주 전체"/>
-              <PublicSelect id="public-hospital-department" label="등록 진료과" action="public_department" value={plan.department} options={JEJU_REGISTERED_DEPARTMENTS} all="등록 진료과 전체"/>
+          <div className="hospital-directory-tools">
+            <details ref={filters} className="compact-disclosure hospital-directory-filters">
+              <summary>지역·진료과 필터</summary>
+              <div className="appointment-filters">
+                <PublicSelect id="public-hospital-area" label="병원 지역" action="public_area" value={plan.area} options={JEJU_DATA_AREAS} all="제주 전체"/>
+                <PublicSelect id="public-hospital-department" label="등록 진료과" action="public_department" value={plan.department} options={JEJU_REGISTERED_DEPARTMENTS} all="등록 진료과 전체"/>
+              </div>
+            </details>
+            <div className="hospital-directory-source">
+              <JejuSourceDetails summary="자료 범위·출처">
+                <Note>공개 표본 {source.count}곳 · 수집 {source.asOf}<br/>현재 운영 여부와 빈자리는 병원에 확인해 주세요.</Note>
+              </JejuSourceDetails>
             </div>
-          </details>
-          <div className="hospital-directory-source"><Note>공개 표본 {source.count}곳 · 수집 {source.asOf}<br/>현재 운영 여부와 빈자리는 병원에 확인해 주세요.</Note><JejuSourceDetails/></div>
+          </div>
         </div>
         <div className="hospital-find-results">
           {chosen ? <>

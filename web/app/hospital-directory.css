@@ -324,16 +324,45 @@
     grid-template-columns: minmax(0, 1fr);
   }
   .public-hospital-finder .hospital-find-controls {
-    padding: 12px;
+    padding: 8px 10px 0;
     border-inline-end: 0;
     border-bottom: 1px solid var(--line);
   }
+  .public-hospital-finder .hospital-search {
+    gap: 0;
+    margin: 0;
+  }
+  .public-hospital-finder .hospital-search label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .hospital-directory-tools {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 0 14px;
+  }
+  .public-hospital-finder .hospital-directory-filters,
+  .public-hospital-finder .hospital-directory-source {
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+  .hospital-directory-tools > details[open],
+  .hospital-directory-tools > .hospital-directory-source:has(details[open]) {
+    flex-basis: 100%;
+  }
   .public-hospital-finder .hospital-directory-filters .appointment-filters {
     grid-template-columns: repeat(auto-fit, minmax(min(160px, 100%), 1fr));
+    padding-bottom: 8px;
   }
-  .public-hospital-finder .hospital-directory-source {
-    margin-top: 0;
-    padding-top: 4px;
+  .public-hospital-finder .hospital-directory-heading {
+    padding-block: 7px 5px;
   }
   .public-hospital-finder .hospital-find-results {
     padding-inline: 8px;
@@ -344,7 +373,7 @@
     grid-template-columns: 14px minmax(0, 1fr);
     grid-template-rows: auto auto;
     gap: 0 7px;
-    padding-block: 7px;
+    padding-block: 4px;
   }
   .hospital-directory-pick .hospital-choice-mark {
     grid-row: span 2;
@@ -353,6 +382,7 @@
   .hospital-directory-address {
     white-space: normal;
     overflow-wrap: anywhere;
+    line-height: 1.4;
   }
   .hospital-directory-address {
     grid-column: 2;
