@@ -5,6 +5,7 @@ import './appointment-react.css';
 import './care-entry.css';
 import './coordination.css';
 import './reservations.css';
+import './workspace-controls.css';
 import './hospital-directory.css';
 import './care-motion.css';
 export const metadata = {
