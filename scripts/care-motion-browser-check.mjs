@@ -59,8 +59,16 @@ async function clickAwayFromCenter(page,button,touch=false){
  return page.evaluate(i=>window.__careClicks[i],index);
 }
 function orange(css){
- const [r,g,b,a=1]=(css.match(/[\d.]+/g)||[]).map(Number);
- return r>=190&&g>=65&&g<r-32&&b<g-25&&a>0;
+ return (css.match(/rgba?\([^)]+\)/g)||[]).some(color=>{
+  const [r,g,b,a=1]=color.match(/[\d.]+/g).map(Number);
+  return r>=190&&g>=65&&g<r-32&&b<g-25&&a>0;
+ });
+}
+function buttonPaint(button){
+ return [null,'::before','::after'].flatMap(pseudo=>{
+  const style=getComputedStyle(button,pseudo);
+  return [style.backgroundColor,style.borderTopColor,style.boxShadow,style.outlineColor,style.color];
+ });
 }
 function checkFlash(label,{box,frame}){
  check(label+' 당시 버튼과 강조 영역 일치',frame.flashes===1&&frame.box&&['x','y','width','height'].every(k=>Math.abs(frame.box[k]-box[k])<=2));
@@ -95,10 +103,23 @@ try {
   check('선택 즉시 다음 화면 및 제목 초점',await p.locator('#entry-mode-text').isVisible()&&await p.locator('#care-region-title').evaluate(n=>n===document.activeElement));
   check('다음 단계 버튼 위에서 올바른 요소를 누를 수 있음',await p.locator('#entry-mode-text').evaluate(n=>{const r=n.getBoundingClientRect();return n.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2));}));
   await p.screenshot({path:resolve(out,'click-citrus.png')});
-  await p.locator('#entry-mode-text').click();
-  const example=await clickAwayFromCenter(p,p.locator('.request-example').first());
-  checkFlash('연속 입력',example);checkBurst('연속 입력',example);
-  check('연속 클릭 중 예시가 초안에 한 번 반영',((await p.locator('#request-input').inputValue()).match(/제주우리병원/g)||[]).length===1);
+  const method=await clickAwayFromCenter(p,p.locator('#entry-mode-text'));
+  checkFlash('두 번째 화면 전환',method);checkBurst('두 번째 화면 전환',method);
+  check('연속 전환의 원점이 새 버튼으로 이동',Math.hypot(region.x-method.x,region.y-method.y)>10);
+  const example=p.locator('.request-example').first();await example.scrollIntoViewIfNeeded();
+  const exampleBox=await example.boundingBox(),additions=await p.evaluate(()=>window.__careAdditions);
+  await p.mouse.move(exampleBox.x+exampleBox.width/2,exampleBox.y+exampleBox.height/2);
+  const unpressed=await example.evaluate(buttonPaint);
+  await p.mouse.down();
+  await example.evaluate(async node=>{
+   await new Promise(resolve=>requestAnimationFrame(resolve));
+   const transitions=node.getAnimations().filter(a=>a instanceof CSSTransition&&a.effect.getComputedTiming().endTime<600);
+   await Promise.allSettled(transitions.map(a=>a.finished));
+  });
+  const pressed=await example.evaluate(buttonPaint);await p.mouse.up();
+  check('예시는 누르는 동안 버튼만 주황 강조',pressed.some((css,i)=>css!==unpressed[i]&&orange(css)));
+  check('같은 화면의 예시는 입자·외부 강조를 추가하지 않음',await p.evaluate(()=>window.__careAdditions)===additions);
+  check('예시가 즉시 한 번 반영되고 초점은 초안 입력칸에 유지',((await p.locator('#request-input').inputValue()).match(/제주우리병원/g)||[]).length===1&&await p.locator('#request-input').evaluate(n=>n===document.activeElement));
   await p.getByRole('button',{name:'입력 방식 바꾸기',exact:true}).click();await p.locator('#entry-mode-manual').click();
   check('빠른 전환 후 마지막 선택 유지',await p.locator('#public-hospital-search').isVisible());
   await p.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'));delete document.hidden;});
