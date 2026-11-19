@@ -87,10 +87,22 @@
   .entry-method-screen .entry-method-action > svg { width:17px; height:17px; }
 }
 @media (min-width:1600px) and (min-height:901px) {
-  .hondi-react.region-start .care-region-choice { min-height:calc(21 * var(--entry-unit)); }
-  .hondi-react.entry-method-screen .entry-method { min-height:calc(17 * var(--entry-unit)); }
+  .hondi-react.region-start .care-region-choice { min-height:calc(20 * var(--entry-unit)); }
+  .hondi-react.entry-method-screen .entry-method { min-height:calc(16 * var(--entry-unit)); }
+  .hondi-react.region-start .care-region-choice,
+  .hondi-react.entry-method-screen .entry-method { justify-content:space-between; }
   .region-start .region-choice-action,
-  .entry-method-screen .entry-method .entry-method-action { font-size:16px; }
+  .entry-method-screen .entry-method .entry-method-action {
+    min-height:clamp(48px,1.9vw,56px);
+    margin-top:0;
+    gap:.55em;
+    font-size:clamp(18px,.75vw,22px);
+  }
+  .region-start .region-choice-action { padding-inline:clamp(14px,.65vw,22px); }
+  .hondi-react.region-start .region-choice-action svg,
+  .entry-method-screen .entry-method-action > svg { width:1em; height:1em; }
+  :is(.region-start,.entry-method-screen) .entry-screen-footer > :is([data-slot=button],.entry-notes),
+  :is(.region-start,.entry-method-screen) .entry-header-navigation > button { font-size:clamp(16px,.62vw,20px); }
 }
 @media (max-width:700px) {
   .region-start .region-choice-action { font-size:14px; padding-inline:10px; gap:6px; }
