@@ -20,7 +20,15 @@ export function bookingNext(state,caseState={},coordination) {
   const p=state.jejuHospital;
   switch(state.screen) {
     case 'intake':return {action:'find_dates',label:'다음: 의료진·시간',hint:'병원과 진료과를 확인한 뒤 날짜를 골라 주세요.'};
-    case 'public_find':return {action:'public_dates_next',label:'다음: 의료진·시간',disabled:!publicHospitalReady(p),hint:!publicHospital(state)?'아래 목록에서 병원을 선택해 주세요.':!p.visitDepartment?'선택한 병원에서 진료받을 과를 골라 주세요.':'선택한 병원에 문의할 날짜와 의료진을 정해요.'};
+    case 'public_find': {
+      const hospital=publicHospital(state);
+      const ready=publicHospitalReady(p);
+      let hint='목록에서 진료받을 병원을 선택해 주세요.';
+      if (ready) hint='선택한 병원에 문의할 날짜와 의료진을 정해요.';
+      else if (hospital?.departments.length) hint='선택한 병원에서 진료받을 과를 골라 주세요.';
+      else if (hospital) hint='공개자료에 진료과가 실려 있지 않아요. 병원 공식 창구를 확인하거나 다른 병원을 골라 주세요.';
+      return {action:'public_dates_next',label:'다음: 의료진·시간',disabled:!ready,hint};
+    }
     case 'public_dates':
       if(p.from&&p.to&&!p.preferencesOpen)return {action:'public_show_preferences',label:'의료진·시간 선택',hint:'희망 날짜를 골랐어요. 의료진과 시간 조건을 이어서 선택해요.'};
       return {action:'public_prepare',label:'다음: 요청 확인',disabled:!publicWishReady(p),hint:!p.from?'달력에서 희망 날짜를 선택해 주세요.':!p.to?'기간의 종료일을 선택해 주세요.':p.doctorMode==='named'&&!p.doctorName.trim()?'희망 의료진 이름을 입력해 주세요.':p.timeOfDay==='unknown'?'시간대를 선택하거나 시간대 무관을 골라 주세요.':p.timeOfDay==='specific'&&!p.time?'희망 시각을 입력해 주세요.':'희망 조건을 정리해요. 실제 가능 여부는 병원 확인이 필요해요.'};

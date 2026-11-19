@@ -42,6 +42,15 @@ test('공개 병원 선택은 자동 이동하지 않고 선택 기관의 등록
   s=act(s,'public_visit_department','정형외과');assert.equal(publicHospitalReady(s.jejuHospital),true);
   s=act(s,'public_dates_next');assert.equal(s.screen,'public_dates');assert.equal(bookingStep(s),2);
 });
+test('등록 진료과 미수록 병원은 공식 창구와 병원 재선택을 안내한다',()=>{
+  const start=createAppointmentDemo('jeju',{usePublicData:true,today:'2026-11-16'});
+  const missing=act(start,'public_hospital','hospital-5');
+  assert.equal(bookingNext(missing).disabled,true);
+  assert.match(bookingNext(missing).hint,/공식 창구.*다른 병원/);
+  const another=act(missing,'public_hospital','hospital-4');
+  assert.match(bookingNext(another).hint,/진료받을 과/);
+  assert.equal(bookingNext(act(another,'public_visit_department','정형외과')).disabled,false);
+});
 test('공개 병원 이름·정확한 시각은 검증된 예약이 아닌 사용자 희망으로만 저장한다',()=>{
   let s=createAppointmentDemo('jeju',{usePublicData:true,today:'2026-11-16'});
   for(const [type,value] of [['public_department','정형외과'],['public_hospital','hospital-4'],['public_dates_next'],['public_date','2026-11-25'],['public_doctor_mode','named'],['public_time','specific']])s=act(s,type,value);
