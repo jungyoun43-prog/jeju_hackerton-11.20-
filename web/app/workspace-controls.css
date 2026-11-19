@@ -87,7 +87,7 @@
   .entry-method-screen .entry-method-action > svg { width:17px; height:17px; }
 }
 @media (min-width:1600px) and (min-height:901px) {
-  .hondi-react.region-start .care-region-choice { min-height:calc(20 * var(--entry-unit)); }
+  .hondi-react.region-start .care-region-choice { min-height:calc(20.4 * var(--entry-unit)); }
   .hondi-react.entry-method-screen .entry-method { min-height:calc(16 * var(--entry-unit)); }
   .hondi-react.region-start .care-region-choice,
   .hondi-react.entry-method-screen .entry-method { justify-content:space-between; }
