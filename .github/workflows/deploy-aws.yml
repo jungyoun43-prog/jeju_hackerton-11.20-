@@ -53,6 +53,7 @@ jobs:
       AWS_AGENT_FUNCTION_NAME: ${{ vars.AWS_AGENT_FUNCTION_NAME }}
       AGENT_EXPECT_MODEL: ${{ vars.AGENT_EXPECT_MODEL || 'false' }}
       OPENAI_MODEL: ${{ vars.OPENAI_MODEL || 'gpt-6.1-sol' }}
+      OPENAI_REASONING_EFFORT: medium
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -122,6 +123,7 @@ jobs:
           import assert from 'node:assert/strict';
           import { appendFile, readFile } from 'node:fs/promises';
           const expectedTitle = (await readFile('dist/index.html', 'utf8')).match(/<title>[^<]+<\/title>/)?.[0];
+          const expectedBuild = JSON.parse(await readFile('dist/deployment.json', 'utf8'));
           assert.ok(expectedTitle, '검증한 산출물에 문서 제목이 없습니다.');
           const base = new URL(process.env.AWS_SITE_URL);
           let last;
@@ -136,6 +138,9 @@ jobs:
               };
               const deployment = await (await get('/deployment.json')).json();
               assert.equal(deployment.revision, process.env.GITHUB_SHA, '공개 버전이 검사한 커밋과 다릅니다.');
+              assert.equal(deployment.frontend, 'next-react');
+              assert.match(expectedBuild.sourceHash, /^[a-f0-9]{64}$/);
+              assert.equal(deployment.sourceHash, expectedBuild.sourceHash, '공개 소스 지문이 검사한 빌드와 다릅니다.');
               assert.equal(deployment.mode, 'simulation');
               const health = await (await get('/api/health')).json();
               assert.equal(health.runtime, 'static');

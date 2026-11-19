@@ -38,3 +38,18 @@ test('미커밋 실행 소스 변경도 브라우저 증거의 지문을 바꾼�
  await writeFile(join(root,'public/unrelated.txt'),'sk-proj-'+'x'.repeat(40));
  assert.deepEqual(await scanProject(root),['public/unrelated.txt']);
 });
+
+test('Windows 제출물과 Linux 배포의 지문은 텍스트 줄바꿈만 정규화한다', async t => {
+ const root = await mkdtemp(join(tmpdir(), 'hondi-release-fingerprint-'));
+ t.after(() => rm(root, { recursive: true, force: true }));
+ const app = join(root, 'app');
+ await mkdir(app);
+ const script = join(app, 'app.js'), image = join(app, 'logo.png');
+ await writeFile(script, 'const title = "혼디";\r\n');
+ await writeFile(image, Buffer.from([0, 13, 10, 250]));
+ const windowsHash = await runtimeFingerprint(root);
+ await writeFile(script, 'const title = "혼디";\n');
+ assert.equal(await runtimeFingerprint(root), windowsHash);
+ await writeFile(image, Buffer.from([0, 10, 250]));
+ assert.notEqual(await runtimeFingerprint(root), windowsHash);
+});

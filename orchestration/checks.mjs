@@ -1,5 +1,5 @@
 import { readdir, readFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { extname, resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 export const excluded = new Set(['.git','node_modules','dist','output','.worktrees','.impeccable','runs']);
 export async function sourceFiles(root, prefix='') {
@@ -27,6 +27,12 @@ export async function scanProject(root) {
 export async function runtimeFingerprint(root) {
   const hash=createHash('sha256');
   const files=(await sourceFiles(root)).filter(p=>p.startsWith('app/') || p.startsWith('web/') || p.startsWith('agent/') || p.startsWith('prompts/') || ['scripts/server.mjs','scripts/dev.mjs','scripts/build-web.mjs','scripts/prepare-web.mjs','package.json','package-lock.json'].includes(p)).sort();
-  for(const path of files) {hash.update(path+'\0');hash.update(await readFile(resolve(root,path)));}
+  // Git may check the same UTF-8 sources out with CRLF on Windows and LF in CI.
+  const textExtensions = new Set(['.css', '.html', '.js', '.json', '.jsx', '.md', '.mjs', '.svg', '.txt']);
+  for (const path of files) {
+    const bytes = await readFile(resolve(root, path));
+    hash.update(path + '\0');
+    hash.update(textExtensions.has(extname(path)) ? bytes.toString('utf8').replaceAll('\r\n', '\n') : bytes);
+  }
   return hash.digest('hex');
 }
