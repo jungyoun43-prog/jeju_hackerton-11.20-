@@ -391,11 +391,19 @@
 .page-main {
   --coast-photo:url('/assets/jeju-workspace-background-v1.webp');
   --coast-paper:#fcfbf7;
+  --coast-wash:rgb(252 251 247 / 50%);
   --coast-view:clamp(32px,6dvh,66px);
+}
+.page-main.is-region-home:has(.region-start,.entry-method-screen),
+.page-main .workspace-header::after {
+  background-color:var(--coast-paper);
+  background-image:linear-gradient(var(--coast-wash),var(--coast-wash)),var(--coast-photo);
+  background-repeat:no-repeat;
+  background-size:cover;
 }
 .page-main.is-region-home:has(.region-start,.entry-method-screen) {
   --coast-view:clamp(0px,min(14dvh,100dvh - 610px),260px);
-  background:#8aa8ad var(--coast-photo) 45% 60% / cover no-repeat;
+  background-position:45% 60%;
 }
 .is-region-home:has(.region-start,.entry-method-screen) .chat-workspace { background:transparent; }
 .is-region-home:has(.region-start,.entry-method-screen) .workspace-header::after { content:none; }
@@ -421,7 +429,7 @@
   inset:100% 0 auto;
   height:var(--coast-view);
   pointer-events:none;
-  background:#8aa8ad var(--coast-photo) 50% 64% / cover no-repeat;
+  background-position:50% 64%;
 }
 @media(min-width:901px) and (max-height:780px) {
   .page-main { --coast-view:32px; }

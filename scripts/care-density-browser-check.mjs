@@ -126,17 +126,18 @@ async function checkCoast(page) {
     const x = Math.ceil(Math.max(0, left)) + 2, cy = Math.ceil(Math.max(0, top)) + 2;
     const clip = {x, y:cy, width:Math.floor(Math.min(innerWidth, right)) - x - 2, height:Math.floor(Math.min(innerHeight, bottom)) - cy - 2};
     const url = new URL('/assets/jeju-workspace-background-v1.webp', location.href).href;
-    const clear = layer.backgroundImage === 'url("' + url + '")' && layer.backgroundSize === 'cover'
+    const coastPainted = layer.backgroundImage.startsWith('linear-gradient(') && layer.backgroundImage.endsWith('url("' + url + '")')
+      && layer.backgroundSize.split(',').every(size => size.trim() === 'cover')
       && layer.opacity === '1' && layer.filter === 'none' && layer.visibility === 'visible';
     const opaque = surfaces.filter(el => el.checkVisibility()).every(el => {
       const s = getComputedStyle(el);
       return s.opacity === '1' && s.backgroundColor.startsWith('rgb(') && s.backgroundImage === 'none';
     });
-    return {url, clear, opaque, clip, x:box.left, y, width:box.width, height,
+    return {url, coastPainted, opaque, clip, x:box.left, y, width:box.width, height,
       fx:parseFloat(layer.backgroundPositionX)/100, fy:parseFloat(layer.backgroundPositionY)/100};
   });
-  const metrics = {unfiltered:frame.clear, opaque:frame.opaque, sampleWidth:frame.clip.width, sampleHeight:frame.clip.height, meanColorDifference:null};
-  if (!frame.clear || !frame.opaque || frame.clip.width <= 0 || frame.clip.height <= 0) return metrics;
+  const metrics = {coastPainted:frame.coastPainted, opaque:frame.opaque, sampleWidth:frame.clip.width, sampleHeight:frame.clip.height, meanColorDifference:null};
+  if (!frame.coastPainted || !frame.opaque || frame.clip.width <= 0 || frame.clip.height <= 0) return metrics;
   const screenshot = await page.screenshot({clip:frame.clip, scale:'css'});
   const difference = await page.evaluate(async ({frame:f, png}) => {
     const source = new Image(); source.src = f.url;
@@ -144,8 +145,11 @@ async function checkCoast(page) {
     const scale = Math.max(f.width/source.width, f.height/source.height);
     const width = source.width * scale, height = source.height * scale;
     const crop = new OffscreenCanvas(f.clip.width, f.clip.height);
-    crop.getContext('2d').drawImage(source, f.x + (f.width-width)*f.fx - f.clip.x,
+    const ctx = crop.getContext('2d');
+    ctx.drawImage(source, f.x + (f.width-width)*f.fx - f.clip.x,
       f.y + (f.height-height)*f.fy - f.clip.y, width, height);
+    ctx.fillStyle = 'rgba(252, 251, 247, 0.5)';
+    ctx.fillRect(0, 0, crop.width, crop.height);
     const bytes = Uint8Array.from(atob(png), c => c.charCodeAt(0));
     const capture = await createImageBitmap(new Blob([bytes], {type:'image/png'}));
     const sample = image => {
@@ -189,7 +193,7 @@ try{
     report.views.push({width,height,screen,...geometry,coast});
     if (width >= 1280) check(`${width} ${screen} 기본 화면 무스크롤`,geometry.overflow <= 3);
     check(`${width} ${screen} 다음 행동과 가로 폭`,geometry.primaryVisible && geometry.bodyOverflow <= 1);
-    check(`${width} ${screen} 원본 해안과 불투명 작업면`,coast.meanColorDifference !== null && coast.meanColorDifference < 8);
+    check(`${width} ${screen} 50% 반투명 해안과 불투명 작업면`,coast.meanColorDifference !== null && coast.meanColorDifference < 8);
     if ([1280,1920,390].includes(width)) await p.screenshot({path:resolve(out,`${screen}-${width}.png`)});
   };
   await p.goto(base);await p.locator('#choose-region-jeju').waitFor();await inspect('region');
