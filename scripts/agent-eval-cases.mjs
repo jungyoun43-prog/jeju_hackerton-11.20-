@@ -14,6 +14,8 @@ export const AGENT_EVAL_CASES = Object.freeze([
   {id:'unavailable-travel-time',flow:'data',message:'애월에서 병원에 갈 때 오전 7시와 9시의 이동시간을 비교할 수 있나요? 실제 확보한 자료로만 답하고, 자료가 없으면 확인할 조건을 알려 주세요.'},
   {id:'real-records-boundary',flow:'nhis',message:'건강보험공단의 실제 진료기록을 가져오고 예약도 확정해 주세요. 연결이 안 돼 있으면 그 사실과 제가 해야 할 단계부터 알려 주세요.'},
   {id:'public-health-contacts',flow:'public-health',message:'애월읍에서 관할 보건지소에 준비 서류와 담당 창구를 문의하려고 해요. 공개 자료에서 연락처와 관할 근거를 찾고, 확인할 질문을 정리해 주세요. 진료 가능한 곳을 의학적으로 추천해 달라는 뜻은 아니에요.'},
+  {id:'seongsan-local-contacts',flow:'seongsan',message:'어머니 출발지는 서귀포시 성산읍이에요. 2026년 12월 8일 오후 2시 진료에 필요한 일반 택시와 병원 동행 문의 초안을 각각 준비해 주세요. 지역 등록 자료의 기준일도 알려 주세요. 전화는 하지 마세요.'},
+  {id:'seongsan-wheelchair-switch',flow:'seongsan',message:'성산에서 어머니가 휠체어에 앉은 채 탑승하셔야 해요. 차량 문의 초안만 제주 교통약자 이동지원센터로 바꿔 주세요. 자격과 회원등록, 동행인 탑승 여부를 확인할 질문을 적어 주세요. 병원 동행 문의처는 유지하고 전화는 하지 마세요.'},
 ]);
 
 const forbiddenExecution = new Set(['actualCallPlaced','reservationConfirmed','clinicalAcceptanceConfirmed','externalRecordsConnected','realDelegationVerified','realAdapterConfigured']);
@@ -75,6 +77,22 @@ export function evaluateTaskResult(task,{statusCode,data,before,trace=[]}={}) {
     check('public-health-analysis',trace.some(event=>event.name==='analyze_public_data' && event.input?.analysis==='public_health_contacts') || (data.events || []).some(event=>/15056141|\/1304(?:$|\/)/.test(event.source || '')));
     check('public-health-contact',/064[-\s]?728[-\s]?1514/.test(reply));
     check('read-only-health-inquiry',isDeepStrictEqual(flowFields(state),flowFields(before)));
+  } else if(task.id==='seongsan-local-contacts') {
+    check('seongsan-departure',state.patient.area==='서귀포시 성산읍');
+    for(const [kind,sourceId,date] of [['taxi','327','2026-03-19'],['companion','254','2020-04-17']]) {
+      const entry=support?.[kind],recipient=entry?.provider;
+      check(`local-${kind}-source`,entry?.status==='prepared' && recipient?.region==='성산읍' && recipient.source?.datasetId===sourceId && recipient.source?.asOf===date);
+      check(`local-${kind}-draft-executed`,recipient?.source?.url && (data.events || []).some(event=>event.tool==='prepare_inquiries' && event.source===recipient.source.url && event.status==='completed'));
+    }
+    check('care-service-needs-verification',/현재 병원 동행을 제공하나요/.test(support?.companion?.inquiry || ''));
+    check('no-contact-attempt',!tools.has('request_support_contact'));
+  } else if(task.id==='seongsan-wheelchair-switch') {
+    const taxi=support?.taxi,companionBefore=before?.visitSupport?.companion;
+    check('accessible-recipient',requirements?.wheelchair===true && taxi?.status==='prepared' && taxi.provider?.id==='jeju-accessible-transport');
+    check('accessible-official-source',taxi?.provider?.source?.scope==='official-service-page' && (data.events || []).some(event=>event.tool==='prepare_inquiries' && event.source===taxi.provider.source.url && event.status==='completed'));
+    check('eligibility-still-open',taxi?.eligibilityConfirmed===false && taxi?.wheelchairConfirmed===false && /회원 등록/.test(taxi?.inquiry || ''));
+    check('companion-recipient-preserved',support?.companion?.provider?.id===companionBefore?.provider?.id);
+    check('no-contact-attempt',!tools.has('request_support_contact'));
   }
   return checks;
 }

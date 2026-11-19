@@ -9,6 +9,14 @@ import { getPreparationBoard, normalizePreparationProgress } from './preparation
 import { preparationBoardMarkup, preparationNavigationMarkup, renderPreparationBoard, renderPreparationView, renderPreparationSources, preservePreparationReading } from './preparation-board-view.js';
 import { renderPatientRecords as renderPatientRecordsContent } from './patient-records.js';
 import { GUIDED_DEMO_ID, getGuidedDemo } from './guided-demo.js';
+import { createAppointmentDemo, reduceAppointmentDemo, canReviewAppointment, needsScheduleConsultation, referralDisposition, buildAppointmentReport } from './appointment-demo.js';
+import { appointmentMarkup, appointmentNavigationMarkup } from './appointment-view.js';
+import { buildAppointmentAgentDraft, mergeAppointmentDraft } from './appointment-agent-handoff.js';
+import { applyCareRequest, careRequestPreview, careRequestReview } from './care-request-entry.js';
+import { createRealtimeVoice } from './voice-reply.js';
+import { createCareMotion } from './care-motion.js';
+import {coordinationView,reduceCoordination,runCoordinationDemo,coordinationReport} from './care-coordination.js';
+import {reservationEditTarget,reservationEditSummary,applyReservationEdit,RESERVATION_EDIT_SECTIONS} from './reservation-edit.js';
 
 const API = '/api/agent';
 const MAX_MESSAGE = 1600;
@@ -33,12 +41,27 @@ let activeRequest;
 let failedPreviewRequest;
 let conversationVersion = 0;
 let capabilityState = 'checking';
-let capabilities = {llm:null,model:'',phone:'not_connected',healthRecords:'not_connected',voiceInput:'browser',progress:'unavailable'};
+let capabilities = {llm:null,phone:'not_connected',healthRecords:'not_connected',voiceInput:'browser',progress:'unavailable'};
 let latestActions = [];
 let latestEvents = [];
 let responseCount = 0;
 let previewMode = false;
 let guidedDemo = null;
+let appointmentDemo = null;
+let appointmentOpen = false;
+let appointmentDrafts = {jeju:null,seoul:null};
+let reservationEdit = null;
+let regionHomeOpen = false;
+let regionRenderer;
+let careEntry={screen:'region',region:null,mode:null};
+let voiceSession;
+let careMotion;
+let coordinationRun;
+let voiceUi={status:'idle',active:false,assistant:''};
+let appointmentReturnFocus;
+let appointmentReturnScroll = 0;
+let appointmentReturnContext;
+let appointmentRenderer;
 let activeRecognition;
 let recognitionCancelled = false;
 let recognitionFailed = false;
@@ -75,13 +98,14 @@ const failedRequests = new Map();
 function setWorkspaceView(view,{focus=false}={}) {
   const layout=document.querySelector('.conversation-layout');
   if(!layout)return;
+  if(reservationEdit)view='chat';
   const panels={chat:document.getElementById('chat-workspace'),preparation:document.getElementById('preparation-rail')};
   const scrollers={chat:document.getElementById('conversation-scroll'),preparation:panels.preparation};
   for(const key of Object.keys(panels))if(!panels[key].hidden)workspaceScroll[key]=scrollers[key].scrollTop;
   workspaceView=view;
   layout.dataset.activeView=view;
   for(const key of Object.keys(panels)) {
-    const hidden=compactWorkspace.matches && key!==view;
+    const hidden=((regionHomeOpen || reservationEdit) && key==='preparation') || (compactWorkspace.matches && key!==view);
     panels[key].hidden=hidden;panels[key].inert=hidden;
     const tab=document.getElementById('workspace-tab-'+key);
     tab.setAttribute('aria-selected',String(key===view));tab.tabIndex=key===view?0:-1;
@@ -109,37 +133,436 @@ function renderBoard() {
   document.getElementById('current-task-answer').hidden=!replyCount;
   document.getElementById('request-problem-notice').hidden=pending || !(requestProblem || previewProblem);
   document.getElementById('request-examples').hidden=document.getElementById('starter-prompts').hidden;
+  syncAppointmentMode();
 }
 
 function renderBoardView() {
   if(!preparationBoard)return;
   if(!manualStageSelection || !selectedStageId)selectedStageId=guidedDemo?.stepId || preparationBoard.workflow.currentStageId;
   renderPreparationView(preparationBoard,{unreadAnswer,selectedStageId,reviewing:manualStageSelection,currentStageId:guidedDemo?.stepId || preparationBoard.workflow.currentStageId});
+  syncAppointmentMode();
+}
+
+function setupAppointmentWorkspace() {
+  // 기존 출처·단계·대화 DOM은 옮겨서 보존한다. 서울 예약 체험은 별도 임시 상태다.
+  for(const [parentId,previousId,nextId] of [
+    ['conversation-scroll','existing-visit-workspace','appointment-workspace'],
+    ['preparation-rail','existing-preparation-navigation','appointment-navigation'],
+  ]) {
+    const parent=document.getElementById(parentId),previous=document.createElement('div'),next=document.createElement('section');
+    previous.id=previousId;previous.append(...parent.childNodes);
+    next.id=nextId;next.hidden=true;next.inert=true;
+    if(nextId==='appointment-workspace'){next.className='appointment-workspace';next.setAttribute('aria-labelledby','appointment-title');}
+    parent.append(previous,next);
+    if(!appointmentRenderer)next.addEventListener('click',event=>{
+      const control=event.target.closest('[data-book-action]');
+      if(control && !control.disabled)handleAppointmentAction(control.dataset.bookAction,control.dataset.bookValue,control);
+    });
+  }
+  if(!appointmentRenderer)document.getElementById('appointment-workspace').addEventListener('change',event=>{
+    if(event.target.id==='appointment-hospital')handleAppointmentAction('hospital',event.target.value,event.target);
+    if(event.target.id==='appointment-department')handleAppointmentAction('department',event.target.value,event.target);
+  });
+  const entry=document.createElement('div');entry.className='appointment-entry';
+  entry.innerHTML=`<button type="button" id="open-appointment-demo">${icon('hospital')}<span>내륙 병원 예약 준비</span>${icon('arrow')}</button>`;
+  document.getElementById('guided-demo-controls').after(entry);
+  entry.firstElementChild.addEventListener('click',()=>openAppointmentDemo('seoul'));
+  const start=document.createElement('section');start.id='care-region-workspace';start.hidden=true;start.inert=true;start.setAttribute('aria-labelledby','care-region-title');
+  document.getElementById('conversation-scroll').append(start);
+  const reservations=document.createElement('button');reservations.type='button';reservations.id='open-my-reservations';reservations.className='header-button';reservations.setAttribute('aria-label','내 예약 현황 보기');reservations.innerHTML=`${icon('calendar')}<span>내 예약 현황</span>`;
+  reservations.addEventListener('click',showReservations);
+  document.querySelector('.header-actions').prepend(reservations);
+  if(appointmentRenderer) {
+    const actions=document.createElement('section');actions.id='appointment-actions';actions.hidden=true;actions.inert=true;actions.setAttribute('aria-label','선택 요약과 다음 단계');
+    document.getElementById('chat-composer').prepend(actions);
+  }
+  if(regionRenderer)renderRegionHome();
+}
+
+function renderRegionHome() {
+  const preview=careEntry.screen==='request'?careRequestPreview(careEntry.conditionText||document.getElementById('request-input').value,careEntry.region):[];
+  regionRenderer?.(appointmentDrafts,handleCareEntryAction,{...careEntry,preview,voice:voiceUi,caseState});
+}
+
+function playCareTransition(options={},update=()=>{}) { if(careMotion)careMotion.transition({...options,update});else update(); }
+
+function discardReservationEdit() {
+  if(!reservationEdit)return;
+  const original=reservationEdit.original;
+  appointmentDemo={...original,coordination:{...original.coordination,resultOpen:false}};
+  appointmentDrafts[reservationEdit.region]=appointmentDemo;reservationEdit=null;
+}
+function beginReservationEdit(region,section='schedule') {
+  if(pending||activeRecognition||!appointmentDrafts[region]||!RESERVATION_EDIT_SECTIONS.some(([id])=>id===section))return;
+  stopCoordination();parkAppointment();void voiceSession?.stop();
+  const original=structuredClone(appointmentDrafts[region]);
+  reservationEdit={region,section,original};
+  appointmentDemo=reservationEditTarget(structuredClone(original),section);
+  appointmentOpen=true;regionHomeOpen=false;
+  playCareTransition({},()=>{setWorkspaceView('chat');renderAppointment();});
+}
+
+function parkAppointment() {
+  discardReservationEdit();
+  if(!appointmentOpen||!appointmentDemo)return;
+  appointmentDemo=reduceCoordination(appointmentDemo,{type:'coordination_result_close'},caseState);
+  appointmentDrafts[appointmentDemo.region]=appointmentDemo;
+  appointmentRenderer?.(appointmentDemo,caseState,handleAppointmentAction);
+}
+
+function showReservations() {
+  if(!regionRenderer||pending||activeRecognition)return;
+  stopCoordination();parkAppointment();void voiceSession?.stop();
+  appointmentOpen=false;regionHomeOpen=true;careEntry={...careEntry,screen:'reservations'};
+  playCareTransition({},()=>{
+    setWorkspaceView('chat');renderSnapshot();renderRegionHome();
+    document.getElementById('conversation-scroll').scrollTop=0;
+    document.getElementById('care-region-title')?.focus({preventScroll:true});
+  });
+}
+
+function showCareEntry(screen) {
+  discardReservationEdit();
+  stopCoordination();
+  const previousScreen=careEntry.screen;
+  if(screen!=='request'&&voiceSession?.active)void voiceSession.stop();
+  appointmentOpen=false;regionHomeOpen=true;careEntry={...careEntry,screen};
+  playCareTransition({kind:previousScreen==='region'||(previousScreen==='method'&&screen==='request')?'choice':'step',back:previousScreen!=='region'&&screen==='method'},()=>{
+    setWorkspaceView('chat');renderSnapshot();renderRegionHome();
+    document.getElementById('conversation-scroll').scrollTop=0;
+    document.getElementById('care-region-title')?.focus({preventScroll:true});
+    if(screen==='request')document.getElementById('request-input').focus({preventScroll:true});
+  });
+}
+
+function handleCareEntryAction(type,value) {
+  if(type==='voice_stop'){void voiceSession?.stop();return;}
+  if(type==='voice_start'){void voiceSession?.start({region:careEntry.region,draft:document.getElementById('request-input').value});return;}
+  if(type==='voice_play'){voiceSession?.resumeAudio();return;}
+  if(pending||activeRecognition)return;
+  if(type==='existing'){closeAppointmentDemo();return;}
+  if(type==='home'){showRegionHome();return;}
+  if(type==='reservations'){showReservations();return;}
+  if(type==='resume_region'){
+    const draft=appointmentDrafts[value];
+    if(!draft)return;
+    if(coordinationView(draft,caseState).stopped){
+      appointmentDrafts[value]=reduceAppointmentDemo(draft,{type:'view',value:'support'});
+    }
+    openAppointmentDemo(value);return;
+  }
+  if(type==='consultation_memo'||type==='consultation_dates'){
+    const draft=appointmentDrafts[value];
+    if(!draft||!needsScheduleConsultation(draft))return;
+    appointmentDrafts[value]=type==='consultation_memo'?{...draft,screen:'review'}:reduceAppointmentDemo(draft,{type:'find_dates'});
+    openAppointmentDemo(value);
+    return;
+  }
+  if(type==='reservation_edit'){beginReservationEdit(value);return;}
+  if(type==='reservation_detail'){
+    const draft=appointmentDrafts[value];if(!draft||!coordinationView(draft,caseState).done)return;
+    appointmentDrafts[value]={...reduceCoordination(draft,{type:'coordination_result_open'},caseState),screen:'support'};
+    openAppointmentDemo(value,{motion:false});return;
+  }
+  if(type==='reservation_save'){
+    const draft=appointmentDrafts[value];if(draft&&coordinationView(draft,caseState).done)downloadReport(coordinationReport(draft,caseState),'혼디-예약-결과-시연.md');return;
+  }
+  if(type==='region'){careEntry={...careEntry,region:value};showCareEntry('method');return;}
+  if(type==='methods'){showCareEntry('method');return;}
+  if(type==='mode') {
+    careEntry={...careEntry,mode:value};
+    if(value==='manual'){openAppointmentDemo(careEntry.region);return;}
+    showCareEntry('request');
+    document.getElementById('request-input').focus({preventScroll:true});
+    return;
+  }
+  if(type==='resume'){openAppointmentDemo(careEntry.region);return;}
+  if(type==='edit_request') {
+    showCareEntry('request');document.getElementById('request-input').value=appointmentDrafts[careEntry.region]?.quickEntry?.text||document.getElementById('request-input').value;resizeInput();document.getElementById('request-input').focus({preventScroll:true});return;
+  }
+  if(type==='example') {
+    if(voiceSession?.active||voiceUi.ending)return;
+    const input=document.getElementById('request-input');
+    if(typeof value!=='string'||!value.trim()||input.value.includes(value))return;
+    const combined=[input.value.trim(),value].filter(Boolean).join('\n');
+    if(combined.length>MAX_MESSAGE){document.getElementById('conversation-status').textContent='입력 길이를 줄인 뒤 예시를 더해 주세요.';return;}
+    input.value=combined;careEntry.conditionText=null;resizeInput();input.focus({preventScroll:true});return;
+  }
+  if(type==='complete') {
+    openAppointmentDemo(careEntry.region);
+    handleAppointmentAction(value==='support'?'view':value,value==='support'?'support':undefined);
+  }
+}
+
+function prepareCareRequest(text,conditions=careEntry.conditionText) {
+  if(!text.trim()||text.length>MAX_MESSAGE)return;
+  const region=careEntry.region;
+  const previous=appointmentDrafts[region]||createAppointmentDemo(region,{usePublicData:region==='jeju',area:caseState.patient.area});
+  appointmentDrafts[region]=applyCareRequest(previous,conditions||text);
+  appointmentDrafts[region].quickEntry.text=text;
+  appointmentDemo=appointmentDrafts[region];showCareEntry('summary');
+}
+
+function showRegionHome() {
+  stopCoordination();
+  if(!regionRenderer || pending || activeRecognition)return;
+  parkAppointment();
+  appointmentOpen=false;regionHomeOpen=true;careEntry={...careEntry,screen:'region'};void voiceSession?.stop();
+  playCareTransition({back:true},()=>{
+    setWorkspaceView('chat');renderSnapshot();renderRegionHome();
+    document.getElementById('conversation-scroll').scrollTop=0;
+    document.getElementById('care-region-title').focus({preventScroll:true});
+  });
+}
+
+function syncAppointmentMode() {
+  const entering=regionHomeOpen&&careEntry.screen==='request';
+  const reservations=document.getElementById('open-my-reservations');
+  if(reservations){reservations.disabled=pending||Boolean(activeRecognition);reservations.setAttribute('aria-current',regionHomeOpen&&careEntry.screen==='reservations'?'page':'false');}
+  document.getElementById('main').classList.toggle('is-region-home',regionHomeOpen);
+  document.getElementById('main').classList.toggle('is-booking-workspace',appointmentOpen);
+  document.getElementById('main').classList.toggle('is-reservation-edit',Boolean(reservationEdit));
+  document.getElementById('main').classList.toggle('is-request-entry',entering);
+  const start=document.getElementById('care-region-workspace');
+  if(start){start.hidden=!regionHomeOpen;start.inert=!regionHomeOpen;}
+  const chooser=document.getElementById('choose-care-region');
+  if(chooser){chooser.hidden=regionHomeOpen || appointmentOpen || !regionRenderer;chooser.disabled=pending || Boolean(activeRecognition);}
+  document.getElementById('chat-composer').hidden=regionHomeOpen&&!entering;
+  document.getElementById('chat-composer').classList.toggle('is-booking',appointmentOpen&&Boolean(appointmentRenderer));
+  document.getElementById('conversation-form').hidden=appointmentOpen&&Boolean(appointmentRenderer);
+  document.getElementById('conversation-form').inert=appointmentOpen&&Boolean(appointmentRenderer);
+  document.getElementById('conversation-scroll').classList.toggle('is-appointment-mode',appointmentOpen);
+  for(const id of ['existing-visit-workspace','existing-preparation-navigation']) {
+    const node=document.getElementById(id);if(node){node.hidden=appointmentOpen || regionHomeOpen;node.inert=appointmentOpen || regionHomeOpen;}
+  }
+  for(const id of ['appointment-workspace','appointment-navigation','appointment-actions']) {
+    const node=document.getElementById(id);if(node){node.hidden=!appointmentOpen;node.inert=!appointmentOpen;}
+  }
+  const entry=document.getElementById('open-appointment-demo');
+  if(entry){entry.disabled=pending || Boolean(activeRecognition);entry.querySelector('span').textContent=appointmentDrafts.seoul?'내륙 예약 준비 이어보기':'내륙 병원 예약 준비';}
+  document.getElementById('preview-button').disabled=pending || appointmentOpen || regionHomeOpen;
+  if(regionHomeOpen)document.getElementById('case-caption').textContent=careEntry.screen==='reservations'?'내 예약 현황 · 실제 예약 없음':careEntry.screen==='region'?'제주 또는 내륙 · 진료 지역 선택':`${careEntry.region==='jeju'?'제주':'내륙'} 진료 준비 · 실제 예약 없음`;
+  const submit=document.getElementById('send-request');
+  submit.querySelector('span').textContent=entering?'내용 정리':'보내기';submit.setAttribute('aria-label',entering?'입력한 조건 정리하기':'요청 보내기');
+  document.querySelector('.keyboard-hint').textContent=entering?'Enter로 정리 · Shift+Enter 줄바꿈':'Enter로 전송 · Shift+Enter 줄바꿈';
+  if(entering) {
+    const input=document.getElementById('request-input');input.readOnly=Boolean(activeRecognition)||voiceUi.active;input.placeholder='병원·진료과, 희망 날짜, 서류와 이동 조건을 알려 주세요.';
+    document.getElementById('chat-composer').classList.remove('is-guided');
+    for(const id of ['voice-request','send-request','character-count'])document.getElementById(id).hidden=false;
+    document.getElementById('request-examples').hidden=true;document.getElementById('exit-guided-demo').hidden=true;
+    submit.disabled=Boolean(activeRecognition)||!input.value.trim();
+    document.getElementById('voice-request').disabled=!SpeechRecognition||voiceUi.active;
+    if(careEntry.mode==='voice')document.getElementById('voice-request').hidden=true;
+  }
+  if(!appointmentOpen)return;
+  document.getElementById('chat-composer').classList.add('is-guided');
+  const input=document.getElementById('request-input');input.readOnly=true;input.placeholder='예약 준비 중';
+  for(const id of ['voice-request','send-request','character-count','request-examples'])document.getElementById(id).hidden=true;
+  for(const id of ['voice-request','send-request'])document.getElementById(id).disabled=true;
+  const exit=document.getElementById('exit-guided-demo');exit.hidden=false;exit.textContent='기존 준비로 돌아가기';exit.disabled=false;
+  const coordination=coordinationView(appointmentDemo,caseState);
+  if(reservationEdit){document.getElementById('case-caption').textContent='예약 수정 중';return;}
+  document.getElementById('case-caption').textContent=`${caseState.patient.area} → ${appointmentDemo.region==='jeju'?'제주 병원':'내륙 병원'} · ${coordination.done?'예약 조율 시연 완료':coordination.running?'예약 조율 시연 중':appointmentDemo.usePublicData?'공개자료·문의 준비':'예약 체험'} · 실제 예약 없음`;
+}
+
+function renderAppointment({focus=true,control}={}) {
+  if(appointmentRenderer)appointmentRenderer(appointmentDemo,caseState,handleAppointmentAction,reservationEdit);
+  else {
+    document.getElementById('appointment-workspace').innerHTML=appointmentMarkup(appointmentDemo,caseState);
+    document.getElementById('appointment-navigation').innerHTML=appointmentNavigationMarkup(appointmentDemo);
+  }
+  syncAppointmentMode();
+  if(control) {
+    const target=control.id?document.getElementById(control.id):document.querySelector(`#appointment-workspace [data-book-action="${CSS.escape(control.action)}"][data-book-value="${CSS.escape(control.value)}"]`);
+    if(target && !target.disabled){target.focus({preventScroll:true});return;}
+  }
+  if(focus){document.getElementById('conversation-scroll').scrollTop=0;document.getElementById('appointment-title').focus({preventScroll:true});}
+}
+
+function openAppointmentDemo(region='seoul',{motion=true}={}) {
+  if(pending || activeRecognition)return;
+  if(!['jeju','seoul'].includes(region))return;
+  discardReservationEdit();
+  stopCoordination();
+  if(!regionHomeOpen && !appointmentOpen) {
+    appointmentReturnFocus=document.activeElement;appointmentReturnScroll=document.getElementById('conversation-scroll').scrollTop;
+    appointmentReturnContext={manualStageSelection,selectedStageId,unreadAnswer};
+  }
+  appointmentDrafts[region] ||= createAppointmentDemo(region,{usePublicData:region==='jeju',area:caseState.patient.area});
+  appointmentDemo=appointmentDrafts[region];appointmentOpen=true;regionHomeOpen=false;
+  const update=()=>{setWorkspaceView('chat');renderAppointment();};
+  if(motion)playCareTransition({kind:'choice'},update);else{careMotion?.cancel();update();}
+  document.getElementById('conversation-status').textContent=appointmentDemo.usePublicData?'제주 공개자료로 병원과 문의처를 찾아요. 실제 빈자리 조회·예약·발신은 하지 않습니다.':`${region==='jeju'?'제주':'내륙'} 병원 예약 체험을 열었어요. 기존 자료와 초안은 유지합니다. 병원·의료진·시간표는 가상입니다.`;
+}
+
+function closeAppointmentDemo() {
+  discardReservationEdit();
+  stopCoordination();
+  if(appointmentReturnContext)({manualStageSelection,selectedStageId,unreadAnswer}=appointmentReturnContext);
+  appointmentOpen=false;regionHomeOpen=false;renderSnapshot();
+  document.getElementById('exit-guided-demo').textContent='자유 입력으로 전환';
+  setWorkspaceView('chat');document.getElementById('conversation-scroll').scrollTop=appointmentReturnScroll;
+  if(appointmentReturnFocus?.isConnected && appointmentReturnFocus.checkVisibility())appointmentReturnFocus.focus({preventScroll:true});
+  else document.getElementById('current-task-title').focus({preventScroll:true});
+}
+
+function stopCoordination() {
+  if(!coordinationRun)return;
+  const run=coordinationRun;coordinationRun=null;run.controller.abort();
+  const draft=appointmentDrafts[run.region];
+  if(draft?.coordination?.runId!==run.id)return;
+  const stopped=reduceCoordination(draft,{type:'coordination_stop'},caseState);
+  appointmentDrafts[run.region]=stopped;
+  if(appointmentDemo?.region===run.region)appointmentDemo=stopped;
+}
+function startCoordination(type='coordination_start',value) {
+  if(reservationEdit)return;
+  const id=makeId(),next=reduceCoordination(appointmentDemo,{type,value,runId:id},caseState);
+  if(next===appointmentDemo)return;
+  const run={id,region:next.region,controller:new AbortController()};coordinationRun=run;
+  appointmentDemo=next;appointmentDrafts[next.region]=next;renderAppointment({focus:false});
+  void runCoordinationDemo(next,caseState,{signal:run.controller.signal,onEvent:event=>{
+    if(coordinationRun!==run||appointmentDrafts[run.region]?.coordination?.runId!==id)return;
+    const draft=appointmentDrafts[run.region],updated=reduceCoordination(draft,{type:'coordination_event',value:event},caseState);
+    if(updated===draft)return;
+    appointmentDrafts[run.region]=updated;
+    if(appointmentOpen&&appointmentDemo.region===run.region){appointmentDemo=updated;renderAppointment({focus:false});}
+  }}).catch(error=>{
+    if(error.name==='AbortError'||coordinationRun!==run)return;
+    stopCoordination();if(appointmentOpen)renderAppointment({focus:false});
+    document.getElementById('conversation-status').textContent='시연을 멈췄어요. 확인한 결과는 남아 있으니 이어서 다시 시작해 주세요.';
+  }).finally(()=>{if(coordinationRun===run)coordinationRun=null;});
+}
+function handleAppointmentAction(type,value,control) {
+  if(!appointmentOpen || pending || activeRecognition)return;
+  if(type==='coordination_fix_issue'){
+    const id=coordinationView(appointmentDemo,caseState).issueControl;
+    if(!id)return;
+    const reveal=()=>{
+      setWorkspaceView('chat');
+      if(reservationEdit&&reservationEdit.section!=='support'){
+        reservationEdit.section='support';
+        appointmentDemo=reservationEditTarget(appointmentDemo,'support');
+        renderAppointment({focus:false});
+      }
+      const field=document.getElementById(id);
+      if(!field)return;
+      for(let parent=field.closest('details');parent;parent=parent.parentElement?.closest('details'))parent.open=true;
+      field.scrollIntoView({block:'nearest',behavior:'instant'});
+      field.focus({preventScroll:true});
+    };
+    if(reservationEdit&&reservationEdit.section!=='support')playCareTransition({},reveal);
+    else reveal();
+    return;
+  }
+  if(type==='reservation_edit'){beginReservationEdit(appointmentDemo.region,value||'schedule');return;}
+  if(type==='reservation_edit_cancel'){discardReservationEdit();showReservations();return;}
+  if(type==='reservation_edit_section'){
+    if(!reservationEdit||!RESERVATION_EDIT_SECTIONS.some(([id])=>id===value))return;
+    reservationEdit.section=value;appointmentDemo=reservationEditTarget(appointmentDemo,value);
+    playCareTransition({},()=>renderAppointment());return;
+  }
+  if(type==='reservation_edit_review'){
+    if(!reservationEdit)return;const summary=reservationEditSummary(reservationEdit.original,appointmentDemo,caseState);
+    if(!summary.changed||!summary.ready)return;
+    appointmentDemo={...appointmentDemo,screen:'reservation_review'};playCareTransition({},()=>renderAppointment());return;
+  }
+  if(type==='reservation_edit_apply'){
+    if(!reservationEdit||appointmentDemo.screen!=='reservation_review')return;
+    const next=applyReservationEdit(reservationEdit.original,appointmentDemo,caseState);if(!next)return;
+    reservationEdit=null;appointmentDemo=next;appointmentDrafts[next.region]=next;
+    if(coordinationView(next,caseState).done){showReservations();return;}
+    renderAppointment();startCoordination();return;
+  }
+  if(reservationEdit&&['coordination_start','coordination_save','coordination_result_open','coordination_scenario','data_mode','save','agent_draft'].includes(type))return;
+  if(type==='coordination_start'||type==='coordination_vehicle_retry'){startCoordination(type,value);return;}
+  if(type==='coordination_stop'){stopCoordination();renderAppointment({focus:false});return;}
+  if(type==='coordination_save'){downloadReport(coordinationReport(appointmentDemo,caseState),'혼디-예약-결과-시연.md');return;}
+  if(coordinationRun&&!type.startsWith('coordination_')&&!['jeju_support_area','jeju_support_pick','jeju_support_wheelchair'].includes(type))stopCoordination();
+  if(type==='close'){closeAppointmentDemo();return;}
+  if(type==='home'){showRegionHome();return;}
+  if(type==='reservations'){showReservations();return;}
+  if(type==='entry_summary'){careEntry.region=appointmentDemo.region;showCareEntry('summary');return;}
+  if(type==='methods'){careEntry.region=appointmentDemo.region;showCareEntry('method');return;}
+  if(type==='region'){openAppointmentDemo(value);return;}
+  if(type==='agent_draft') {
+    const text=buildAppointmentAgentDraft(appointmentDemo,caseState);
+    appointmentDrafts[appointmentDemo.region]=appointmentDemo;
+    fillRequestDraft(text,{source:'선택한 병원·일정·제주 문의처',preserveExisting:true});return;
+  }
+  if(type==='save'){downloadReport(buildAppointmentReport(appointmentDemo,caseState),appointmentDemo.usePublicData?'제주-병원-문의-준비표.md':`${appointmentDemo.region==='jeju'?'제주':'내륙'}-진료-예약-준비표-시연.md`);return;}
+  if(type==='show_times') {
+    setWorkspaceView('chat');
+    const target=document.getElementById('availability-result-title');
+    target?.scrollIntoView({block:'start',behavior:'instant'});target?.focus({preventScroll:true});return;
+  }
+  if(['coordination_option','coordination_scenario','coordination_edit','coordination_result_open','coordination_result_close'].includes(type)) {
+    const next=reduceCoordination(appointmentDemo,{type,value},caseState);if(next===appointmentDemo)return;appointmentDemo=next;
+  } else if(type==='summary') {
+    if(!canReviewAppointment(appointmentDemo))return;
+    appointmentDemo=appointmentDemo.usePublicData?{...appointmentDemo,screen:'public_review'}:{...appointmentDemo,screen:appointmentDemo.status==='draft'?'review':'result',requestMode:appointmentDemo.requestMode || 'slot'};
+  } else {
+    const next=reduceAppointmentDemo(appointmentDemo,{type,value,area:caseState.patient.area,wheelchair:Boolean(caseState.visitSupport?.requirements?.wheelchair)});if(next===appointmentDemo)return;appointmentDemo=next;
+  }
+  const retain=['coordination_result_open','coordination_result_close','coordination_option','coordination_scenario','hospital','department','visit_type','referral','date','time','month','preferred_mode','preferred_date','preferred_month','slot','travel_field','travel_check','flight_field','flight_dates','public_area','public_department','public_hospital','public_visit_department','public_date_mode','public_month','public_date','public_time','public_exact_time','public_doctor_mode','public_doctor_name','public_show_preferences','jeju_support_area','jeju_support_pick','jeju_support_wheelchair'].includes(type);
+  if(appointmentDemo.quickEntry) {
+    const field={hospital:'hospital',department:'department',public_hospital:'hospital',public_visit_department:'department'}[type];
+    if(field)appointmentDemo={...appointmentDemo,quickEntry:{...appointmentDemo.quickEntry,fields:{...appointmentDemo.quickEntry.fields,[field]:true}}};
+  }
+  if(reservationEdit){
+    if(['public_find','intake'].includes(appointmentDemo.screen))reservationEdit.section='hospital';
+    else if(['public_dates','availability','schedule','doctors'].includes(appointmentDemo.screen))reservationEdit.section='schedule';
+    else if(appointmentDemo.screen==='support')reservationEdit.section='support';
+  }
+  if(!reservationEdit)appointmentDrafts[appointmentDemo.region]=appointmentDemo;
+  const update=()=>{
+    setWorkspaceView('chat');
+    renderAppointment({focus:!retain,control:retain&&control?{id:control.id,action:type,value:typeof value==='string'?value:''}:undefined});
+  };
+  if(retain)update();else playCareTransition({back:['back','hospital'].includes(type)},update);
+  if(type==='public_show_preferences') {
+    const target=document.getElementById('public-preferences-title');target?.scrollIntoView({block:'start',behavior:'instant'});target?.focus({preventScroll:true});
+  }
+  if(type==='public_hospital'&&!appointmentDemo.jejuHospital.visitDepartment) {
+    const target=document.getElementById('public-visit-department');target?.scrollIntoView({block:'center',behavior:'instant'});target?.focus({preventScroll:true});
+  }
+  document.getElementById('conversation-status').textContent=type==='time'?`${value} 시연 시간을 선택했어요. 선택한 일정 확인으로 이어가세요.`:document.getElementById('appointment-title')?.textContent||'선택한 준비 내용을 확인해 주세요.';
 }
 
 function renderGuidedDemo() {
   const host=document.getElementById('guided-demo-controls');
   host.hidden=responseCount>0 && !guidedDemo;
+  document.getElementById('chat-composer').classList.toggle('is-guided',Boolean(guidedDemo));
+  document.getElementById('current-preparation-task').classList.toggle('is-intro',!responseCount && !guidedDemo);
   const markup=guidedDemo
     ? guidedDemo.complete
       ? `<button type="button" class="demo-primary" data-demo-save>${icon('download')}준비표 저장</button><button type="button" data-demo-start>다시 체험${icon('refresh')}</button>`
       : guidedDemo.choices.map(choice=>`<button type="button" data-demo-choice="${escape(choice.id)}"><span>${escape(choice.label)}</span>${icon('arrow')}</button>`).join('')
-    : `<button type="button" class="demo-primary" data-demo-start>방문 준비 시작${icon('arrow')}</button><p class="demo-intro">답변을 고르면 자료·병원·이동 준비가 이어져요. 모델 키 없이 체험할 수 있어요.</p>`;
-  if(host.dataset.step!==JSON.stringify(guidedDemo?.answers ?? null)) {
-    host.innerHTML=markup;host.dataset.step=JSON.stringify(guidedDemo?.answers ?? null);
+    : `<button type="button" class="demo-primary" data-demo-start>방문 준비 시작${icon('arrow')}</button><button type="button" class="demo-write" data-demo-write>직접 요청하기${icon('message')}</button><p class="demo-intro">가상 사례로 체험해요. 실제 연락·예약은 하지 않아요.</p>`;
+  const viewKey=guidedDemo?JSON.stringify(guidedDemo.answers):responseCount?'response':'initial';
+  if(host.dataset.step!==viewKey) {
+    host.innerHTML=markup;host.dataset.step=viewKey;
+    document.getElementById('preparation-reading').open=Boolean(guidedDemo?.complete || (!guidedDemo && responseCount));
   }
   for(const button of host.querySelectorAll('button'))button.disabled=pending || Boolean(activeRecognition);
   const exit=document.getElementById('exit-guided-demo');
-  exit.hidden=!guidedDemo;exit.disabled=pending;
+  exit.hidden=!guidedDemo;exit.disabled=pending;exit.textContent='자유 입력으로 전환';
   const input=document.getElementById('request-input');
   input.readOnly=pending || Boolean(guidedDemo);
-  input.placeholder=guidedDemo?.complete?'준비표를 저장하거나 자유 입력으로 전환하세요.':guidedDemo?'위의 답변을 선택하면 다음 준비로 이어져요.':'예: 어머니 진료 자료와 이동·동행을 준비해줘.';
+  input.placeholder=guidedDemo?.complete?'체험을 마쳤어요.':guidedDemo?'위에서 답변 선택':'예: 어머니 진료 자료와 이동·동행을 준비해줘.';
+  for(const id of ['voice-request','send-request','character-count'])document.getElementById(id).hidden=Boolean(guidedDemo);
   document.getElementById('send-request').disabled=pending || Boolean(guidedDemo) || Boolean(activeRecognition) || !input.value.trim();
   document.getElementById('voice-request').disabled=pending || Boolean(guidedDemo) || !SpeechRecognition;
+  const result=document.getElementById('guided-demo-result');
+  result.hidden=!guidedDemo?.previousAnswer;
+  if(guidedDemo?.previousAnswer) {
+    document.getElementById('guided-demo-selection').textContent=guidedDemo.previousAnswer;
+    document.getElementById('guided-demo-result-text').textContent=guidedDemo.result;
+  }
   if(!guidedDemo)return;
   document.getElementById('current-task-title').textContent=guidedDemo.title;
   document.getElementById('current-task-detail').textContent=guidedDemo.detail;
-  document.getElementById('current-task-stage').textContent=guidedDemo.complete?'선택 체험 종료':`선택 체험 ${guidedDemo.answers.length+1}/4`;
+  document.getElementById('current-task-stage').textContent=guidedDemo.complete?'답변 선택 체험 종료':`답변 선택 ${guidedDemo.answers.length+1} / 4`;
   document.getElementById('current-task-owner').hidden=true;
   for(const id of ['current-task-question','current-task-choices','current-task-draft','workflow-draft-note'])document.getElementById(id).hidden=true;
 }
@@ -151,6 +574,8 @@ function showLatestAnswer() {
 }
 
 function showCurrentTask({focus=true}={}) {
+  if(regionHomeOpen){if(focus)document.getElementById('care-region-title').focus({preventScroll:true});return;}
+  if(appointmentOpen){setWorkspaceView('chat');if(focus)document.getElementById('appointment-title').focus({preventScroll:true});return;}
   setWorkspaceView('chat');
   manualStageSelection=false;unreadAnswer=false;renderBoardView();
   const scroller=document.getElementById('conversation-scroll');scroller.scrollTop=0;
@@ -161,12 +586,14 @@ function selectPreparationStage(id) {
   if(!preparationBoard?.stages.some(stage=>stage.id===id))return;
   selectedStageId=id;manualStageSelection=true;
   setWorkspaceView('chat');renderBoardView();
+  document.getElementById('preparation-reading').open=true;
   const pane=document.querySelector(`[data-stage-id="${id}"]`);
   pane.querySelector('[data-stage-details]').open=true;
   scrollToMessage(pane,document.querySelector('.stage-reading-tools'));
 }
 
 function focusRequest() {
+  if(regionHomeOpen || appointmentOpen)closeAppointmentDemo();
   setWorkspaceView('chat');
   manualStageSelection=false;unreadAnswer=false;renderBoardView();
   const input=document.getElementById('request-input');
@@ -406,7 +833,7 @@ function trapDialogFocus(event,dialog) {
 }
 
 function hasConversationWork() {
-  return Boolean(document.getElementById('request-input')?.value.trim() || document.querySelector('.message.user') || responseCount);
+  return Boolean(appointmentDemo || document.getElementById('request-input')?.value.trim() || document.querySelector('.message.user') || responseCount);
 }
 
 function loadVisitToken() {
@@ -543,7 +970,6 @@ function updateCapabilities(next) {
   if (next && typeof next === 'object') {
     capabilities = {
       llm: typeof next.llm === 'boolean' ? next.llm : capabilities.llm,
-      model: typeof next.model === 'string' ? next.model.slice(0,160) : capabilities.model,
       phone: ['simulation','not_connected','connected'].includes(next.phone) ? next.phone : capabilities.phone,
       healthRecords: ['demo','not_connected','connected'].includes(next.healthRecords) ? next.healthRecords : capabilities.healthRecords,
       progress: next.progress==='poll'?'poll':'unavailable',
@@ -561,7 +987,7 @@ function updateCapabilities(next) {
   const notice = document.getElementById('mode-notice');
   notice.hidden = !previewMode && capabilities.llm === true;
   notice.classList.toggle('is-preview',previewMode);
-  notice.textContent = previewMode ? '작성된 예시 · 합성 사례, 실제 연락·예약 없음' : capabilityState === 'checking' ? '연결 범위를 확인하고 있어요.' : 'AI 모델 미연결 · ‘체험’으로 준비 흐름을 볼 수 있어요.';
+  notice.textContent = previewMode ? '작성된 예시 · 합성 사례, 실제 연락·예약 없음' : capabilityState === 'checking' ? '연결 범위를 확인하고 있어요.' : '자유 입력은 AI 연결 후 사용할 수 있어요. 방문 준비 체험은 바로 시작할 수 있어요.';
   renderVisitRecovery();
 }
 
@@ -642,19 +1068,26 @@ function resizeInput() {
   const input = document.getElementById('request-input');
   input.style.height = 'auto';
   input.style.height = `${Math.min(input.scrollHeight,128)}px`;
-  document.getElementById('send-request').disabled = pending || Boolean(guidedDemo) || Boolean(activeRecognition) || !input.value.trim();
+  document.getElementById('send-request').disabled = pending || Boolean(guidedDemo) || appointmentOpen || Boolean(activeRecognition) || !input.value.trim();
   document.getElementById('character-count').textContent = `${input.value.length}/${MAX_MESSAGE}`;
   for(const button of document.querySelectorAll('[data-contact-draft],[data-journey-draft],[data-journey-scenario],[data-call-recovery-scenario],[data-workflow-draft],[data-workflow-choice],#next-request-draft'))button.disabled=pending || Boolean(activeRecognition);
   renderVisitRecovery();
+  if(regionHomeOpen&&careEntry.screen==='request'){renderRegionHome();syncAppointmentMode();}
 }
 
-function fillRequestDraft(text,{source='요청 예시',focus=true}={}) {
+function fillRequestDraft(text,{source='요청 예시',focus=true,preserveExisting=false}={}) {
+  if(appointmentOpen || regionHomeOpen)closeAppointmentDemo();
   if(pending || activeRecognition)return false;
   if(guidedDemo && !resetConversation({focus:false}))return false;
   const input=document.getElementById('request-input');
-  const draft=String(text || '').trim().slice(0,MAX_MESSAGE);
+  const draft=preserveExisting?mergeAppointmentDraft(input.value,text,MAX_MESSAGE):String(text || '').trim().slice(0,MAX_MESSAGE);
+  if(draft===null) {
+    const feedback=document.getElementById('draft-feedback');feedback.hidden=false;
+    feedback.textContent='작성 중인 요청과 선택 내용을 함께 담기에는 길어요. 기존 입력을 유지했으니 내용을 줄인 뒤 예약 준비에서 다시 눌러 주세요.';
+    resizeInput();if(focus)input.focus({preventScroll:true});return false;
+  }
   if(!draft)return false;
-  if(input.value.trim() && input.value.trim()!==draft && !window.confirm('입력창에 작성 중인 요청이 있어요. 선택한 문구로 바꿀까요? 취소하면 기존 초안을 유지합니다.'))return false;
+  if(!preserveExisting && input.value.trim() && input.value.trim()!==draft && !window.confirm('입력창에 작성 중인 요청이 있어요. 선택한 문구로 바꿀까요? 취소하면 기존 초안을 유지합니다.'))return false;
   input.value=draft;resizeInput();
   const feedback=document.getElementById('draft-feedback');
   feedback.hidden=false;feedback.textContent=`${source} · 입력창에 넣었어요. 확인 후 보내 주세요.`;
@@ -698,7 +1131,7 @@ function finishRequest(request) {
   stopProgress(request);
   if(!requestIsCurrent(request))return false;
   activeRequest=undefined;setPending(false);
-  if(request.kind==='preview'){const button=document.getElementById('preview-button');button.textContent='체험';button.setAttribute('aria-label','준비 흐름 체험');button.title='준비 흐름 체험';}
+  if(request.kind==='preview'){const button=document.getElementById('preview-button');button.textContent='결과 예시';button.setAttribute('aria-label','준비 결과 예시 보기');button.title='선택 없이 준비 결과 예시 보기';}
   return true;
 }
 
@@ -736,6 +1169,8 @@ function cancelRequest({timedOut=false}={}) {
 }
 
 function errorCopy(code) {
+  if(code==='MODEL_QUOTA_EXHAUSTED')return 'AI 이용 잔액이 소진되어 운영자의 확인이 필요해요. 입력은 보존했으며, 병원 선택과 준비표 저장은 계속 이용할 수 있습니다.';
+  if(code==='MODEL_BUDGET_UNAVAILABLE')return '이용 한도를 확인하지 못해 AI 요청을 보내지 않았어요. 입력은 그대로 남겨두었습니다.';
   if(code==='REQUEST_CONFLICT')return '같은 요청 번호에 다른 내용이 있어 실행하지 않았어요. 저장된 준비를 확인한 뒤 새 요청으로 말씀해 주세요.';
   if(code==='REQUEST_IN_PROGRESS')return '같은 요청이 아직 처리 중으로 표시돼요. 자동으로 다시 실행하지 않습니다. 방문 상세에서 저장된 준비를 확인해 주세요.';
   if(code==='REQUEST_INTERRUPTED')return '이 요청의 완료 여부를 확인하지 못해 다시 실행하지 않았어요. 방문 상세에서 확인된 준비와 남은 일을 먼저 살펴주세요.';
@@ -831,7 +1266,7 @@ async function callAgent(path,body,signal) {
 }
 
 async function showPreview(scenarioId='aewol-parent-visit',answers=[]) {
-  if(pending || activeRecognition)return;
+  if(pending || activeRecognition || appointmentOpen || regionHomeOpen)return;
   const guided=scenarioId===GUIDED_DEMO_ID;
   if(![GUIDED_DEMO_ID,'aewol-parent-visit',...JOURNEY_SCENARIOS.map(item=>item.id),...CALL_RECOVERY_SCENARIOS.map(item=>item.id)].includes(scenarioId))return;
   if(guided && !getGuidedDemo(answers))return;
@@ -847,7 +1282,7 @@ async function showPreview(scenarioId='aewol-parent-visit',answers=[]) {
   let restoreReading,applied=false;
   const button=document.getElementById('preview-button');
   const notice=document.getElementById('mode-notice');
-  button.textContent='체험';button.setAttribute('aria-label','준비 흐름 체험 불러오는 중');button.title='준비 흐름 체험 불러오는 중';
+  button.textContent='불러오는 중';button.setAttribute('aria-label','준비 결과 예시 불러오는 중');button.title='준비 흐름 체험 불러오는 중';
   try {
     const data=normalizeResponse(await callAgent(API+'/preview',request.body,request.controller.signal));
     if(!requestIsCurrent(request))return;
@@ -859,7 +1294,10 @@ async function showPreview(scenarioId='aewol-parent-visit',answers=[]) {
     const last=messages.at(-1);
     if(last.role!=='assistant' || last.text!==data.reply)messages.push({role:'assistant',text:data.reply});
     clearVisitRecovery();previewMode=true;sessionId=undefined;history=[];failedRequests.clear();
-    guidedDemo=nextDemo?{...nextDemo,detail:answers.length?(data.reply.endsWith(nextDemo.title)?data.reply.slice(0,-nextDemo.title.length).trim():data.reply):nextDemo.detail}:null;
+    const previousStep=answers.length?getGuidedDemo(answers.slice(0,-1)):null;
+    guidedDemo=nextDemo?{...nextDemo,previousAnswer:previousStep?.choices.find(choice=>choice.id===answers.at(-1))?.label,
+      result:data.reply.endsWith(nextDemo.title)?data.reply.slice(0,-nextDemo.title.length).trim():data.reply}:null;
+    document.getElementById('guided-demo-result').open=false;
     failedPreviewRequest=undefined;
     caseState=data.caseState;latestActions=data.pendingActions;latestEvents=data.events;responseCount=1;
     if(guided)manualStageSelection=false;
@@ -886,7 +1324,8 @@ async function showPreview(scenarioId='aewol-parent-visit',answers=[]) {
 }
 
 async function sendRequest(text,retryId) {
-  if (pending || activeRecognition || guidedDemo) return;
+  if(regionHomeOpen&&careEntry.screen==='request'&&!pending&&!activeRecognition&&!retryId){const entered=String(text??document.getElementById('request-input').value),conditions=careEntry.conditionText;if(voiceSession?.active)void voiceSession.stop();prepareCareRequest(entered,conditions);return;}
+  if (pending || activeRecognition || guidedDemo || appointmentOpen || regionHomeOpen) return;
   const input=document.getElementById('request-input');
   if(capabilityState==='checking') {
     const version=conversationVersion,draft=input.value;
@@ -935,7 +1374,7 @@ async function sendRequest(text,retryId) {
     const copy=errorCopy(code)+(request.stopReason==='timeout'?' 이 화면의 대기만 끝났으며 서버 처리는 계속될 수 있습니다.':'' );
     showRequestProblem(request,copy,{uncertain:request.stopReason==='timeout'});
     document.getElementById('conversation-status').textContent='요청 전송을 확인하지 못했습니다.';
-    updateCapabilities(/MODEL_NOT_CONFIGURED|MODEL_DISABLED|LLM_NOT_CONFIGURED|MODEL_NOT_CONNECTED/.test(code)?{llm:false}:undefined);
+    updateCapabilities(/MODEL_NOT_CONFIGURED|MODEL_DISABLED|LLM_NOT_CONFIGURED|MODEL_NOT_CONNECTED|MODEL_QUOTA_EXHAUSTED/.test(code)?{llm:false}:undefined);
   } finally {
     if(finishRequest(request)) {
       if(!replyNode && !manualStageSelection)scrollToMessage(messageNode);
@@ -961,7 +1400,8 @@ function resetVoiceButton() {
 }
 
 function startVoice() {
-  if(guidedDemo)return;
+  if((guidedDemo&&!(regionHomeOpen&&careEntry.screen==='request')) || appointmentOpen)return;
+  if(voiceSession?.active)return;
   if (pending || !SpeechRecognition) return;
   if (activeRecognition) {
     recognitionCancelled=true;activeRecognition.abort();
@@ -1011,14 +1451,19 @@ function startVoice() {
 function resetConversation({focus=true,force=false}={}) {
   if(pending)return false;
   if(!force && hasConversationWork() && !window.confirm('현재 대화와 작성 중인 요청이 사라집니다. 새 가상 사례를 시작할까요?'))return false;
+  stopCoordination();
   clearVisitRecovery();
   if(activeRecognition){recognitionCancelled=true;activeRecognition.abort();activeRecognition=undefined;resetVoiceButton();}
   stopProgress(activeRequest);conversationVersion++;failedPreviewRequest=undefined;
   requestProblem='';previewProblem=false;manualStageSelection=false;selectedStageId=undefined;unreadAnswer=false;
   caseState=createDemoCase();sessionId=undefined;history=[];latestActions=[];latestEvents=[];responseCount=0;previewMode=false;guidedDemo=null;failedRequests.clear();
+  appointmentDemo=null;appointmentOpen=false;appointmentReturnFocus=undefined;appointmentReturnContext=undefined;
+  appointmentDrafts={jeju:null,seoul:null};reservationEdit=null;careEntry={screen:'region',region:null,mode:null};void voiceSession?.stop();
+  if(regionRenderer)renderRegionHome();
   preferencesNeedApply=true;
   document.getElementById('message-list').replaceChildren();
   document.getElementById('conversation-history').open=false;
+  document.getElementById('preparation-reading').open=false;
   welcomeMessage();document.getElementById('starter-prompts').hidden=false;
   document.getElementById('request-input').value='';resizeInput();renderSnapshot();updateCapabilities();
   document.getElementById('conversation-status').textContent='새 가상 사례로 대화를 시작합니다.';
@@ -1030,15 +1475,21 @@ function resetConversation({focus=true,force=false}={}) {
 function saveReport() {
   if(!responseCount)return;
   const body=(previewMode?'# 고정 시나리오 미리보기\n\n작성된 합성 대화 예시입니다. 실제 모델 응답·발신·예약 결과가 아닙니다.\n\n':'')+buildReport(caseState)+'\n\n## API가 반환한 도구 처리 기록\n\n'+latestEvents.map(event=>`- ${event.label}: ${event.detail} (${event.isSimulation?'시연':event.status})${event.source?' · '+event.source:''}`).join('\n');
+  downloadReport(body,'제주-진료-준비-보고서.md');
+}
+
+function downloadReport(body,filename) {
   const url=URL.createObjectURL(new Blob([body],{type:'text/markdown;charset=utf-8'}));
-  const anchor=document.createElement('a');anchor.href=url;anchor.download='제주-진료-준비-보고서.md';anchor.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  const anchor=document.createElement('a');anchor.href=url;anchor.download=filename;anchor.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 
 function welcomeMessage() {
   appendMessage({role:'assistant',greeting:true,text:'요청하시면 확인한 내용과 남은 일을 이곳에 정리해 드려요.'});
 }
 
-function mount() {
+export function mount({renderAppointment:renderer,renderRegionStart}={}) {
+  appointmentRenderer=renderer;
+  regionRenderer=renderRegionStart;regionHomeOpen=Boolean(regionRenderer);
   const brand=`<img src="/assets/hondi-logo-v1.png" alt="" width="480" height="168"/>`;
   const chatContent=`<div class="conversation-scroll" id="conversation-scroll" tabindex="0" aria-label="지금 준비할 일과 단계 상세"><p class="mode-notice" id="visit-recovery-notice" role="status" hidden></p>${preparationBoardMarkup()}<details class="conversation-history" id="conversation-history"><summary><span>대화·처리 기록</span><span id="conversation-history-count"></span>${icon('chevron')}</summary><div class="message-list" id="message-list" role="log" aria-label="진료 준비 대화" aria-live="polite" aria-relevant="additions"></div><section class="care-journey-summary" id="care-journey-summary" aria-label="현재 진료 연결과 다음 행동"><div class="journey-summary-state"><h3>현재</h3><strong id="care-journey-current">미확인</strong></div><button type="button" id="open-care-journey" aria-haspopup="dialog" aria-controls="care-journey-dialog">여정·할 일 보기${icon('chevron')}</button><p class="journey-summary-next"><span>이어서 할 일</span><strong id="care-journey-next"></strong></p><button type="button" class="next-request-draft" id="next-request-draft" hidden>다음 문의 초안 넣기${icon('arrow')}</button><p class="next-request-note">초안을 확인·수정한 뒤 직접 보내세요.</p></section><button type="button" class="return-to-request" id="return-to-request" hidden>요청 입력으로${icon('arrow')}</button></details></div>`;
   const menuIcon='<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>';
@@ -1080,9 +1531,9 @@ function mount() {
       </aside>
       <div class="workspace-shell" id="workspace-shell">
         <main id="main" class="page-main" tabindex="-1">
-          <header class="workspace-header">
-            <div class="case-header"><h1 id="case-heading"></h1><p id="case-caption"></p></div>
-            <div class="header-actions"><span class="connection-state checking" id="connection-state">연결 확인 중</span><div class="workspace-tools"><button type="button" class="expand-answer" id="expand-answer" aria-label="넓게 읽기" title="넓게 읽기" aria-haspopup="dialog" aria-controls="answer-dialog" disabled>${icon('expand')}<span>넓게 읽기</span></button><button type="button" id="preview-button" class="preview-button" aria-label="준비 흐름 체험" title="준비 흐름 체험">체험${icon('chevron')}</button></div><button type="button" class="header-button" id="new-conversation" aria-label="새 대화" title="새 대화">${icon('plus')}<span>새 대화</span></button></div>
+          <header class="workspace-header"><img id="care-transition" class="care-transition" src="/assets/hondi-mark-v1.png" alt="" aria-hidden="true"/>
+            <div class="case-header"><h1 id="case-heading"></h1><p id="case-caption"></p></div><button type="button" id="choose-care-region" class="text-button" hidden>병원 지역 선택</button>
+            <div class="header-actions"><span class="connection-state checking" id="connection-state">연결 확인 중</span><div class="workspace-tools"><button type="button" class="expand-answer" id="expand-answer" aria-label="넓게 읽기" title="넓게 읽기" aria-haspopup="dialog" aria-controls="answer-dialog" disabled>${icon('expand')}<span>넓게 읽기</span></button><button type="button" id="preview-button" class="preview-button" aria-label="준비 결과 예시 보기" title="선택 없이 준비 결과 예시 보기">결과 예시</button></div><button type="button" class="header-button" id="new-conversation" aria-label="새 대화" title="새 대화">${icon('plus')}<span>새 대화</span></button></div>
           </header>
           <div class="mobile-case-summary" id="mobile-case-summary" aria-label="이번 방문 요약" hidden></div>
           <div class="workspace-controls">
@@ -1145,13 +1596,19 @@ function mount() {
         <div class="patient-records-body" id="care-journey-content"></div>
       </dialog>
     </div>`;
-  welcomeMessage();renderSnapshot();updateCapabilities();
+  setupAppointmentWorkspace();welcomeMessage();renderSnapshot();updateCapabilities();
+  careMotion?.dispose();careMotion=createCareMotion(document.getElementById('main'));
+  document.getElementById('choose-care-region').addEventListener('click',showRegionHome);
   const form=document.getElementById('conversation-form'),input=document.getElementById('request-input');
   form.addEventListener('submit',event=>{event.preventDefault();if(!composing)sendRequest();});
   input.addEventListener('input',()=>{if(!activeRecognition)clearInputFeedback();resizeInput();});
   input.addEventListener('compositionstart',()=>{composing=true;});input.addEventListener('compositionend',()=>{composing=false;resizeInput();});
   input.addEventListener('keydown',event=>{if(event.key==='Enter' && !event.shiftKey && !event.isComposing && !composing && event.keyCode!==229){event.preventDefault();if(!pending)sendRequest();}});
   document.getElementById('voice-request').addEventListener('click',startVoice);
+  voiceSession=createRealtimeVoice({onState:state=>{voiceUi=state;if(regionHomeOpen&&careEntry.screen==='request'){renderRegionHome();syncAppointmentMode();}},onTranscript:text=>{if(!regionHomeOpen||careEntry.screen!=='request')return;document.getElementById('request-input').value=text;careEntry.conditionText=null;resizeInput();},onConditions:text=>{if(!regionHomeOpen||careEntry.screen!=='request')return;careEntry.conditionText=text;renderRegionHome();}});
+  document.getElementById('request-input').addEventListener('input',()=>{careEntry.conditionText=null;if(regionHomeOpen&&careEntry.screen==='request')renderRegionHome();});
+  window.addEventListener('pagehide',()=>{void voiceSession.stop();});
+  document.addEventListener('visibilitychange',()=>{if(document.hidden&&voiceSession.active)void voiceSession.stop();});
   document.getElementById('cancel-request').addEventListener('click',cancelRequest);
   document.getElementById('new-conversation').addEventListener('click',()=>resetConversation());
   document.getElementById('preview-button').addEventListener('click',()=>showPreview());
@@ -1159,10 +1616,11 @@ function mount() {
     const button=event.target.closest('button');
     if(!button || pending || activeRecognition)return;
     if(button.hasAttribute('data-demo-start'))showPreview(GUIDED_DEMO_ID);
+    else if(button.hasAttribute('data-demo-write'))focusRequest();
     else if(button.hasAttribute('data-demo-save'))saveReport();
     else if(guidedDemo?.choices.some(choice=>choice.id===button.dataset.demoChoice))showPreview(GUIDED_DEMO_ID,[...guidedDemo.answers,button.dataset.demoChoice]);
   });
-  document.getElementById('exit-guided-demo').addEventListener('click',()=>resetConversation());
+  document.getElementById('exit-guided-demo').addEventListener('click',()=>appointmentOpen?closeAppointmentDemo():resetConversation());
   document.getElementById('save-report').addEventListener('click',saveReport);
   document.getElementById('resume-visit').addEventListener('click',resumeVisit);
   document.getElementById('stage-navigation').addEventListener('click',event=>{
@@ -1289,7 +1747,7 @@ function mount() {
   document.getElementById('open-care-menu').addEventListener('click',openCareMenu);
   document.getElementById('close-care-menu').addEventListener('click',()=>closeCareMenu());
   document.getElementById('drawer-backdrop').addEventListener('click',()=>closeCareMenu());
-  document.getElementById('nav-preparation').addEventListener('click',event=>{event.preventDefault();closeCareMenu({restoreFocus:false});document.getElementById('nav-preparation').setAttribute('aria-current','location');document.getElementById('nav-preferences').removeAttribute('aria-current');focusRequest();});
+  document.getElementById('nav-preparation').addEventListener('click',event=>{event.preventDefault();closeCareMenu({restoreFocus:false});document.getElementById('nav-preparation').setAttribute('aria-current','location');document.getElementById('nav-preferences').removeAttribute('aria-current');if(regionHomeOpen || appointmentOpen)showRegionHome();else focusRequest();});
   document.getElementById('nav-preferences').addEventListener('click',event=>{event.preventDefault();document.getElementById('nav-preparation').removeAttribute('aria-current');document.getElementById('nav-preferences').setAttribute('aria-current','location');document.getElementById('pref-taxi').focus({preventScroll:true});document.getElementById('care-preferences').scrollIntoView({block:'nearest'});});
   document.addEventListener('keydown',event=>{
     if(!drawerOpen)return;
@@ -1314,4 +1772,4 @@ function mount() {
   if(visitToken)resumeVisit();
 }
 
-mount();
+if(document.querySelector('script[src="/conversation.js"]'))mount();

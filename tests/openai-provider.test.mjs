@@ -38,7 +38,7 @@ test('기본 Sol Responses 설정은 선택 모델·키를 사용하고 자동 �
   assert.equal(options.redirect,'error'); assert.equal(options.credentials,'omit'); assert.equal(options.cache,'no-store');
   assert.equal(body.model,'gpt-6.1-sol'); assert.equal(body.store,false); assert.equal(body.parallel_tool_calls,true);
   assert.equal(body.tool_choice,'auto');
-  assert.equal(body.max_output_tokens,4096); assert.deepEqual(body.reasoning,{effort:'low'});
+  assert.equal(body.max_output_tokens,4096); assert.deepEqual(body.reasoning,{effort:'medium'});
   assert.deepEqual(body.include,['reasoning.encrypted_content']); assert.equal(Object.hasOwn(body,'temperature'),false);
   assert.equal(Object.hasOwn(body,'previous_response_id'),false); assert.equal(Object.hasOwn(body,'conversation'),false);
   assert.deepEqual(body.tools[0],{type:'function',name:TOOL.name,description:TOOL.description,parameters:TOOL.inputSchema,strict:false});

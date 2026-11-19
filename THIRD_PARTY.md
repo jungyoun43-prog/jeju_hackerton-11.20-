@@ -68,3 +68,21 @@
 피클의 공개 도움말·약관·공식 GitHub에서 확인한 역할과 미확인 범위는 [조사 기록](research/pickle-reference-2026-11-01.md)에 남겼다. 공개 대행 요청·조건 확인·작업 상태·결과/사람 인계의 원칙만 참고했다. 피클의 API·전화 엔진·enclave 라이브러리·tau2-bench 코드를 복사하거나 의존성으로 추가하지 않았다. 별도 신규 통신/기록 업체 연동은 없다.
 
 복구는 기존 메모리/DynamoDB 저장소와 자체 코드다. 토큰 해시·요청 지문·고정 receipt 메타데이터를 추가하며 대화/답변/reasoning 원문을 새로 보관하지 않는다. 탭 확대의 선택 QA는 격리 Chrome 확장과 Xvfb를 쓰며 사용자 브라우저를 변경하지 않는다. PDF 재생성에는 기존 Playwright/Chromium과 Poppler의 pdfinfo가 필요하지만 서비스·Lambda 의존성에는 포함하지 않는다. 기획서의 Pretendard·기존 혼디 로고는 원래 고지를 따른다.
+
+## React · Next.js · shadcn (2026-11-16)
+
+예약·진료과 검색·달력·왕복 교통을 실제 React 컴포넌트로 구현했다. Next.js 16.4.6, React/React DOM 19.3.1, Tailwind/@tailwindcss/postcss 4.3.5, Radix UI 1.8.1, React DayPicker 10.0.2, date-fns 4.4.0, cmdk 1.1.1, cn 0.5.2는 설치 패키지 메타데이터에서 MIT를 확인했다. Lucide React 1.73.0은 ISC다. class-variance-authority·clsx·tailwind-merge를 포함한 정확한 설치 버전과 전이 의존성은 package-lock.json에 고정한다.
+
+shadcn CLI 4.23.0으로 공식 new-york registry의 컴포넌트 소스 11개를 `web/components/ui`에 생성했다. 혼디의 크기·색·44px 조작·16px 입력에 맞게 상위 화면에서 조합한다. [Next 설치 안내](https://ui.shadcn.com/docs/installation/next)를 참고했으며 외부 의료기관의 화면·로고·의료진 사진을 복사하지 않았다. 원래 로고·이미지·Pretendard 원본과 라이선스를 보존한다.
+
+의료·교통과 진료과 명칭의 공식 참고 URL 및 조회 제약은 [근거 기록](research/seoul-referral-and-travel-2026-11-16.md)에 남겼다. 가상 병원 2곳·진료과 27개·의료진 55명과 시간표는 자체 합성 자료다. 실제 예약·항공·교통 API 의존성은 추가하지 않았다.
+
+## 제주 서체·색면·실시간 음성 (2026-11-17)
+
+[제주특별자치도 제주고딕](https://www.jeju.go.kr/jeju/symbol/font/infor.htm)의 공식 수동 설치 ZIP에서 원본 TTF를 사용했다. 제목과 지역 선택에만 자체 호스팅하며 출처 고지는 화면·`app/assets/JejuGothic-LICENSE.txt`·자산 명세에 남긴다. 웹·모바일 사용 안내와 글꼴 자체 판매 금지 조건을 보존하며 자유 재배포 권리 전체를 추정하지 않는다.
+
+Headspace와 Linear의 공식 공개 홈페이지에서 색면·주 행동 대비·정렬을 참고했다. 기존 혼디 로고와 제주 배경 이미지를 재사용하고 외부 회사 자산은 가져오지 않았다. 새 실시간 음성은 브라우저 표준 WebRTC와 서버 `fetch`로 OpenAI Realtime API를 사용하며 ElevenLabs·새 음성 SDK 의존성은 추가하지 않았다. 사용 모델·호출 제한·원음 처리·공식 문서와 조회 범위는 [현재 계약](docs/compact-entry-voice-contract.md)에 기록한다.
+
+## 운영자용 AI 전화 코드 (2026-11-18)
+
+`ws` 8.23.0 (MIT)을 Node WebSocket 연결에 추가했다. Twilio Calls REST·Media Streams와 OpenAI Realtime 공식 프로토콜을 사용한다. Twilio SDK·ElevenLabs·피클 API는 연결하지 않았다. 피클은 공개 도움말의 대행 전화·결과 알림 흐름만 참고했다. 실제 외부 발신 없이 fake transport와 로컬 테스트로 검사했으며 공급자 계정·통신 비용·발신번호·한국 통화 지원·공개 프록시 조건은 실제 운영 전 별도 확인한다. 공식 자료와 사용 범위는 [전화 어댑터 계약](docs/outbound-phone-adapter.md)에 기록한다.

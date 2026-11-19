@@ -1,0 +1,27 @@
+/* Preflight를 제외해 기존 대화 DOM의 크기·초점·스크롤 계약을 보존한다. */
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+@source "../components";
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--ui-primary);
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #edf4ee;
+  --color-secondary-foreground: #234c39;
+  --color-muted: #f4f7f5;
+  --color-muted-foreground: #58675e;
+  --color-accent: #e9f2ec;
+  --color-accent-foreground: #234c39;
+  --color-border: #d7e1d9;
+  --color-input: #c4d1c8;
+  --color-ring: #31734c;
+  --color-destructive: #a93422;
+  --color-popover: #ffffff;
+  --color-popover-foreground: #21372a;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+}
+:root { --background:#fff; --foreground:#21372a; --ui-primary:#d5622b; --radius:8px; }

@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { awsRunner } from './aws-bootstrap.mjs';
+import { pythonCli } from './python-cli.mjs';
 
 const projectRoot=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const parse=value=>typeof value==='string'?JSON.parse(value||'{}'):value;
@@ -18,7 +19,7 @@ export async function createAgentPublishPlan({env=process.env,root=projectRoot}=
   if(!stat.isFile()||stat.isSymbolicLink()||await realpath(zip)!==zip||await realpath(output)!==output) fail('output/agent-lambda.zip은 symlink가 아닌 프로젝트의 실제 파일이어야 합니다.');
   if(stat.size<=0||stat.size>50*1024*1024) fail('직접 업로드할 Lambda ZIP 크기는 50MiB 이내여야 합니다.');
   // ZIP을 풀거나 실행하지 않고 경로·중복·압축해제 크기·빌드 provenance만 확인한다.
-  const inspect=spawnSync(env.PYTHON_CLI||'python3',['-c',`
+  const inspect=spawnSync(pythonCli(env),['-c',`
 import json, sys, zipfile
 with zipfile.ZipFile(sys.argv[1]) as archive:
     infos = archive.infolist()
@@ -67,10 +68,13 @@ export async function runAgentPublish({env=process.env,args=process.argv.slice(2
       if(capabilities.phone==='connected'||capabilities.healthRecords==='connected') fail('실제 전화·개인 기록 연동을 활성화한 것으로 표시하면 안 됩니다.');
       if(env.AGENT_EXPECT_MODEL==='true') {
         if(capabilities.llm!==true) fail('모델 활성화 배포의 capabilities.llm은 true여야 합니다.');
-        if(!['gpt-6.1-sol','gpt-6.1-terra'].includes(capabilities.model)) fail('공개 Agent의 OpenAI 모델 명칭을 확인하세요.');
-        if(env.OPENAI_MODEL&&capabilities.model!==env.OPENAI_MODEL) fail('공개 Agent 모델이 검증하려는 OPENAI_MODEL과 다릅니다.');
+        if(Object.hasOwn(capabilities,'model')||Object.hasOwn(capabilities,'reasoningEffort')||Object.hasOwn(capabilities,'reasoning')) fail('공개 응답에 모델 설정을 노출하면 안 됩니다.');
+        const model=config.Environment?.Variables?.OPENAI_MODEL || 'gpt-6.1-sol';
+        if(!['gpt-6.1-sol','gpt-6.1-terra'].includes(model)) fail('서버 OpenAI 모델 명칭을 확인하세요.');
+        if(env.OPENAI_MODEL&&model!==env.OPENAI_MODEL) fail('서버 모델이 검증하려는 OPENAI_MODEL과 다릅니다.');
+        if(env.OPENAI_REASONING_EFFORT&&(config.Environment?.Variables?.OPENAI_REASONING_EFFORT||'medium')!==env.OPENAI_REASONING_EFFORT) fail('서버 추론 설정이 검증하려는 설정과 다릅니다.');
       } else if(capabilities.llm!==false) fail('모델 미설정 배포의 capabilities.llm은 false여야 합니다.');
-      modelStatus={modelConnected:capabilities.llm===true,model:capabilities.llm===true?capabilities.model:''};
+      modelStatus={modelConnected:capabilities.llm===true};
     }
     return {verified:true,revision:plan.revision,functionName:plan.functionName,codeSha256:plan.codeSha256,...modelStatus,note:'코드·공개 설정 확인이며 실제 모델 계정 접근·품질·마이크·발신 검증이 아닙니다.'};
   }

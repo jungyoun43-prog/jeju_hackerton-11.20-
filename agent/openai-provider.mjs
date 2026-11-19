@@ -146,10 +146,10 @@ function normalizeOutput(response, toolNames, knownCallIds) {
  * connected는 키/모델 설정 여부다. 인증·계정 접근의 성공 증거가 아니다.
  * context는 같은 turn에서만 넘기는 opaque handle이며 DB/HTTP/로그로 보내지 않는다.
  */
-export function createOpenAIProvider({apiKey,model = 'gpt-6.1-sol',reasoningEffort = 'low',maxOutputTokens = 4096,timeoutMs = 40000,fetchImpl = globalThis.fetch} = {}) {
+export function createOpenAIProvider({apiKey,model = 'gpt-6.1-sol',reasoningEffort = 'medium',maxOutputTokens = 4096,timeoutMs = 40000,fetchImpl = globalThis.fetch,beforeRequest = async () => {}} = {}) {
   if (!MODELS.has(model) || (!EFFORTS.has(reasoningEffort) && !(model === 'gpt-6.1-terra' && reasoningEffort === 'none'))
     || !Number.isSafeInteger(maxOutputTokens) || maxOutputTokens < 1 || maxOutputTokens > 16384
-    || !Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 45000 || typeof fetchImpl !== 'function') throw configurationError();
+    || !Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 45000 || typeof fetchImpl !== 'function' || typeof beforeRequest !== 'function') throw configurationError();
   const key = typeof apiKey === 'string' ? apiKey.trim() : '';
   if (key.length > 4096 || (key && !/^[\x21-\x7e]+$/.test(key))) throw configurationError();
   let available = key.length > 0;
@@ -177,10 +177,20 @@ export function createOpenAIProvider({apiKey,model = 'gpt-6.1-sol',reasoningEffo
         timer = setTimeout(() => deadline.abort(),timeoutMs);
         const combined = AbortSignal.any([deadline.signal,...(signal ? [signal] : [])]);
         if (combined.aborted) throw timeoutError();
+        // 외부 전송 직전에 선차감한다. 한도 오류·중단이면 fetch를 실행하지 않는다.
+        await withAbort(Promise.resolve().then(() => beforeRequest({signal:combined})),combined);
+        if (combined.aborted) throw timeoutError();
         const response = await withAbort(Promise.resolve().then(() => fetchImpl(ENDPOINT,{method:'POST',headers:{'content-type':'application/json',authorization:`Bearer ${key}`},body,signal:combined,redirect:'error',credentials:'omit',cache:'no-store'})),combined);
         if (!response || !Number.isInteger(response.status) || response.redirected) { cancelBody(response); throw invalid(); }
         if ([401,403,404].includes(response.status)) { available = false; cancelBody(response); throw disconnected(); }
-        if (response.status === 429) { cancelBody(response); throw new AgentError('MODEL_RATE_LIMITED','모델 API 이용 한도에 도달했습니다. 잠시 후 다시 시도해 주세요.',429); }
+        if (response.status === 429 || response.status === 402) {
+          const failure = await readBoundedJson(response,combined).catch(() => null);
+          if (['insufficient_quota','credit_balance_exhausted','billing_hard_limit_reached'].includes(failure?.error?.code) || failure?.error?.type === 'insufficient_quota') {
+            available = false;
+            throw new AgentError('MODEL_QUOTA_EXHAUSTED','AI 이용 잔액 또는 계정 한도를 확인해야 합니다. 운영자가 확인한 뒤 다시 이용해 주세요.',503);
+          }
+          throw new AgentError('MODEL_RATE_LIMITED','요청이 잠시 몰렸습니다. 잠시 후 다시 시도해 주세요.',429);
+        }
         if (response.status < 200 || response.status >= 300) { cancelBody(response); throw new AgentError('MODEL_UNAVAILABLE','모델 API 응답을 받지 못했습니다. 잠시 후 다시 시도해 주세요.',503); }
         const raw = await readBoundedJson(response,combined);
         const normalized = normalizeOutput(raw,validatedTools.names,previous?.callIds ?? new Map());

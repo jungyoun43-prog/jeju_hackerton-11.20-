@@ -34,6 +34,12 @@ export function parseEvaluationArgs(args) {
   return result;
 }
 
+export function publicEvaluationContext(capability,publicRevision,expectedRevision) {
+  if(capability?.llm!==true || capability.phone!=='simulation' || capability.healthRecords!=='demo') throw new Error('공개 API의 모델 연결과 전화·기록 시연 범위를 확인하지 못했습니다.');
+  if(!publicRevision || publicRevision!==expectedRevision) throw new Error('공개 API가 평가한 현재 커밋과 다릅니다. 배포를 확인해 주세요.');
+  return {publicRevision,recoveryAvailable:capability.visitRecovery==='token',modelIdentity:'not-verified-by-public-api'};
+}
+
 export async function runAgentEvaluation(options) {
   if(!options.live || options.list)return {mode:'list',cases:AGENT_EVAL_CASES.map(({id,flow,message})=>({id,flow,message})),help};
   const selected=AGENT_EVAL_CASES.filter(task=>!options.caseIds.length || options.caseIds.includes(task.id));
@@ -46,9 +52,8 @@ export async function runAgentEvaluation(options) {
     const base='https://d1mfksxrj025bx.cloudfront.net';
     const caps=await fetch(base+'/api/agent/capabilities',{signal:AbortSignal.timeout(15000)});
     const capability=await caps.json();
-    if(!caps.ok || !capability.llm || capability.model!=='gpt-6.1-sol')throw new Error('공개 데모의 Sol 설정을 확인하지 못했습니다.');
-    report.model=capability.model;report.publicRevision=caps.headers.get('x-app-revision');report.recoveryAvailable=capability.visitRecovery==='token';
-    if(report.publicRevision!==report.revision)throw new Error('공개 API가 평가한 현재 커밋과 다릅니다. 배포를 확인해 주세요.');
+    if(!caps.ok)throw new Error('공개 데모의 연결 상태를 확인하지 못했습니다.');
+    Object.assign(report,publicEvaluationContext(capability,caps.headers.get('x-app-revision'),report.revision));
     send=async(body,path='/api/agent')=>{
       const encoded=JSON.stringify(body);
       const response=await fetch(base+path,{method:'POST',headers:{'Content-Type':'application/json','x-amz-content-sha256':createHash('sha256').update(encoded).digest('hex')},body:encoded,signal:AbortSignal.timeout(70000)});

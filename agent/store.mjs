@@ -3,6 +3,7 @@ import { createDemoCase } from '../app/domain.js';
 import { AgentError, fail } from './errors.mjs';
 import { isProgressKey, isProgressWriterId, normalizeProgressSnapshot, PROGRESS_TTL_SECONDS } from './progress.mjs';
 import { normalizeRequestReceipts } from './visit-recovery.mjs';
+import { createMemoryModelBudget } from './model-budget.mjs';
 
 /**
  * 저장 허용 대상: 합성 준비 상태, requestId/고정 receipt, 횟수, TTL.
@@ -18,6 +19,7 @@ export function createMemorySessionStore({ now = () => Date.now(), ttlSeconds = 
     for (const day of budgets.keys()) if (day !== today) budgets.delete(day);
   };
   return {
+    ...createMemoryModelBudget({now}),
     kind: 'memory',
     visitRecovery: true,
     async loadOrCreate(sessionId,{initialSessionId} = {}) {

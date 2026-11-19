@@ -1,50 +1,91 @@
-import { createRequire } from 'node:module';
-import { readFile,writeFile,mkdir,rename } from 'node:fs/promises';
-import { resolve,dirname } from 'node:path';
-import { fileURLToPath,pathToFileURL } from 'node:url';
-import { execFileSync } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { runtimeFingerprint } from '../orchestration/checks.mjs';
+import { access, mkdtemp, readFile, rename, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { dirname, isAbsolute, join, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { promisify } from 'node:util';
 
-const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
-const require=createRequire(import.meta.url);
-const {chromium}=require(process.env.PLAYWRIGHT_MODULE || 'playwright');
-const sourceHash=await runtimeFingerprint(root);
-const revision=execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim();
-const browser=await chromium.launch({headless:true,chromiumSandbox:true,executablePath:process.env.CHROMIUM_PATH || undefined});
-try {
-  const page=await browser.newPage();
-  await page.route('**/*',route=>new URL(route.request().url()).protocol==='file:'?route.continue():route.abort());
-  await page.goto(pathToFileURL(resolve(root,'docs/submission-proposal.html')).href,{waitUntil:'load'});
-  await page.evaluate(()=>document.fonts.ready);
-  await page.locator('.revision').evaluateAll((nodes,label)=>nodes.forEach(node=>node.textContent=label),`구현 ${revision.slice(0,8)} · ${sourceHash.slice(0,10)}`);
-  const proofPath=resolve(root,'docs/reviews/2026-11-15-evidence/guided-demo.json');
-  let screenshotIncluded=false,screenshotPath;
-  try {
-    const proof=JSON.parse(await readFile(proofPath,'utf8'));
-    if(proof.result==='pass' && proof.sourceHash===sourceHash && proof.modelPosts===0 && proof.modelInvoked===false && proof.checks?.length>0 && proof.checks.every(check=>check.status==='pass')) {
-      const selected='docs/reviews/2026-11-15-evidence/final-1440.png';
-      if(proof.screenshotHashes?.['final-1440.png']) {
-        const bytes=await readFile(resolve(root,selected));
-        if(bytes.readUInt32BE(0)!==0x89504e47)throw new Error('검증 캡처가 PNG가 아닙니다.');
-        if(createHash('sha256').update(bytes).digest('hex')!==proof.screenshotHashes['final-1440.png'])throw new Error('검증 캡처의 SHA가 다릅니다.');
-        await page.locator('[data-screenshot]').evaluate((node,url)=>{const img=document.createElement('img');img.className='screen';img.alt='동일 소스의 실제 PC 고정 합성 예시 화면';img.src=url;node.replaceWith(img);},'data:image/png;base64,'+bytes.toString('base64'));
-        await page.locator('.screen').evaluate(node=>node.decode());screenshotIncluded=true;screenshotPath=selected;
-      }
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const docs = join(root, 'docs');
+const htmlPath = join(docs, 'submission-proposal.html');
+const pdfPath = join(docs, 'submission-proposal.pdf');
+const evidence = join(docs, 'reviews', '2026-11-19-submission');
+const run = promisify(execFile);
+const hash = (bytes) => createHash('sha256').update(bytes).digest('hex');
+
+async function browserPath() {
+  const configured = process.env.CHROMIUM_PATH;
+  if (configured) {
+    await access(configured);
+    return resolve(configured);
+  }
+  const candidates = [];
+  if (process.platform === 'win32') {
+    for (const base of [process.env.PROGRAMFILES, process.env['PROGRAMFILES(X86)'], process.env.LOCALAPPDATA].filter(Boolean)) {
+      candidates.push(join(base, 'Google', 'Chrome', 'Application', 'chrome.exe'));
+      candidates.push(join(base, 'Microsoft', 'Edge', 'Application', 'msedge.exe'));
+      candidates.push(join(base, 'Chromium', 'Application', 'chrome.exe'));
     }
-  } catch(error) {if(error.code!=='ENOENT')throw error;}
-  const directory=resolve(root,'output');await mkdir(directory,{recursive:true});
-  const temporary=resolve(directory,'hondi-proposal-render.pdf');
-  await page.pdf({path:temporary,format:'A4',printBackground:true,preferCSSPageSize:true});
-  const info=execFileSync('pdfinfo',[temporary],{encoding:'utf8'}),pages=Number(info.match(/^Pages:\s+(\d+)/m)?.[1]);
-  if(pages!==12)throw new Error(`기획서 페이지 수를 확인해 주세요: ${pages}; 목표12, 대회상한15`);
-  if(await runtimeFingerprint(root)!==sourceHash)throw new Error('기획서 생성 중 구현 소스가 변경됐습니다.');
-  if(!screenshotIncluded)throw new Error('같은 실행 지문의 최종 PC 캡처가 필요합니다. 기존 PDF는 보존했습니다.');
-  await rename(temporary,resolve(root,'docs/submission-proposal.pdf'));
-  const pdfHash=createHash('sha256').update(await readFile(resolve(root,'docs/submission-proposal.pdf'))).digest('hex');
-  const proof={checkedAt:new Date().toISOString(),result:'pass',revision,sourceHash,pdfHash,pages,screenshotIncluded,screenshotPath,screenshotScope:'같은 소스의 실제 keyless 고정 합성 preview 화면. 실제 LLM·전화·기록 연동 화면 아님.',networkRequestsAllowed:false,source:'docs/submission-proposal.html',file:'docs/submission-proposal.pdf'};
-  await writeFile(resolve(directory,'proposal-check.json'),JSON.stringify(proof,null,2)+'\n');
-  await mkdir(resolve(root,'orchestration/runs'),{recursive:true});
-  await writeFile(resolve(root,'orchestration/runs/proposal-pdf.json'),JSON.stringify(proof,null,2)+'\n');
-  console.log(JSON.stringify(proof));
-} finally {await browser.close();}
+  } else if (process.platform === 'darwin') {
+    candidates.push('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+      '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
+      '/Applications/Chromium.app/Contents/MacOS/Chromium');
+  } else {
+    candidates.push('/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome',
+      '/usr/bin/google-chrome-stable', '/usr/bin/microsoft-edge', '/snap/bin/chromium');
+  }
+  for (const path of candidates) {
+    try {
+      await access(path);
+      return path;
+    } catch (error) {
+      if (error.code !== 'ENOENT' && error.code !== 'ENOTDIR') throw error;
+    }
+  }
+  throw new Error('Chrome, Edge 또는 Chromium의 실행 파일을 CHROMIUM_PATH로 지정해 주세요.');
+}
+
+const html = await readFile(htmlPath, 'utf8');
+const sheets = Array.from(html.matchAll(/<section\b[^>]*\bclass="sheet(?:\s[^"]*)?"/g)).length;
+if (!sheets || sheets > 15) throw new Error('기획서 분량은 1~15쪽이어야 합니다.');
+for (const [, file] of html.matchAll(/\b(?:src="([^"]+)")/g)) {
+  if (isAbsolute(file) || /^\w+:/.test(file)) throw new Error('이미지에는 제출물 안의 상대 경로만 사용할 수 있습니다.');
+  await access(resolve(docs, file));
+}
+const manifest = JSON.parse(await readFile(join(evidence, 'screenshots.json'), 'utf8'));
+for (const shot of manifest.images) {
+  const bytes = await readFile(join(evidence, shot.file));
+  if (hash(bytes) !== shot.sha256) throw new Error(`검증 화면 해시가 일치하지 않습니다: ${shot.file}`);
+}
+const fontDir = join(root, 'app', 'assets', 'pretendard');
+await access(join(root, 'app', 'assets', 'JejuGothic.ttf'));
+const fontCSS = await readFile(join(fontDir, 'pretendardvariable-dynamic-subset.css'), 'utf8');
+const fontFiles = Array.from(fontCSS.matchAll(/url\(["']?([^)'"]+)/g), match => match[1]);
+await Promise.all(fontFiles.map(file => access(resolve(fontDir, file))));
+
+const browser = await browserPath();
+const profile = await mkdtemp(join(tmpdir(), 'hondi-pdf-profile-'));
+// The temporary PDF and final PDF share a volume, so a failed render preserves the existing document.
+const staging = await mkdtemp(join(docs, '.hondi-proposal-'));
+const temporaryPDF = join(staging, 'proposal.pdf');
+try {
+  await run(browser, [
+    '--headless', '--disable-gpu', '--disable-extensions', '--disable-background-networking',
+    '--no-first-run', '--no-default-browser-check', '--disable-component-update',
+    '--host-resolver-rules=MAP * ~NOTFOUND', '--allow-file-access-from-files',
+    '--run-all-compositor-stages-before-draw', '--virtual-time-budget=3500',
+    '--no-pdf-header-footer', `--user-data-dir=${profile}`, `--print-to-pdf=${temporaryPDF}`,
+    pathToFileURL(htmlPath).href,
+  ], { timeout: 90_000, windowsHide: true });
+  const bytes = await readFile(temporaryPDF);
+  const data = bytes.toString('latin1');
+  const printedPages = Array.from(data.matchAll(/\/Type\s*\/Page\b/g)).length;
+  if (!data.startsWith('%PDF-') || printedPages !== sheets) {
+    throw new Error(`HTML ${sheets}쪽, PDF ${printedPages}쪽으로 출력 결과를 확인해야 합니다.`);
+  }
+  await rename(temporaryPDF, pdfPath);
+  console.log(`docs/submission-proposal.pdf · ${printedPages}쪽 · SHA-256 ${hash(bytes)}`);
+} finally {
+  await Promise.all([staging, profile].map(path => rm(path, { recursive: true, force: true, maxRetries: 4, retryDelay: 250 })));
+}

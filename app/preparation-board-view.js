@@ -21,9 +21,9 @@ export function preparationBoardMarkup() {
       <p class="stage-live" data-stage-live hidden></p>
       <dl class="stage-preview" data-stage-preview></dl><details class="stage-details" data-stage-details><summary aria-label="${escape(stage.shortTitle)} 자세히 보기"><span>확인한 내용과 근거</span><span class="stage-brief" data-stage-brief></span>${icon('chevron')}</summary><div class="stage-pane-body"><p class="stage-summary" data-stage-summary></p><dl class="stage-facts" data-stage-facts></dl><section class="stage-gaps${stage.id==='plan'?' workflow-remaining':''}" ${stage.id==='plan'?'id="workflow-remaining"':''} data-stage-gaps></section><div class="stage-sources" data-stage-sources></div><details class="stage-log" data-stage-log><summary><span data-stage-log-label>처리 기록</span>${icon('chevron')}</summary><div data-stage-events></div></details></div></details>
     </section>`;
-  return `<section class="current-preparation-task" id="current-preparation-task" aria-labelledby="current-task-heading"><h2 id="current-task-heading" class="sr-only">지금 준비할 일</h2><h3 id="current-task-title" tabindex="-1"></h3><div class="current-task-heading"><div class="current-task-meta"><span id="current-task-stage"></span><p class="current-task-owner" id="current-task-owner"></p><p class="mode-notice" id="mode-notice">연결 범위를 확인하고 있어요.</p></div><button type="button" class="current-task-answer" id="current-task-answer" hidden>최근 답변 보기${icon('chevron')}</button></div><p class="current-task-detail" id="current-task-detail"></p><p class="current-task-question" id="current-task-question" hidden></p><div class="current-task-choices" id="current-task-choices" hidden></div><button type="button" class="next-request-draft" id="current-task-draft" data-workflow-draft hidden>이 내용으로 요청 초안 넣기${icon('arrow')}</button><p class="workflow-draft-note" id="workflow-draft-note" hidden>초안을 확인·수정한 뒤 아래 입력창에서 보내 주세요.</p><div id="guided-demo-controls" class="guided-demo-controls" aria-label="체험 답변 선택"></div><p class="current-task-waiting" id="current-task-waiting" role="status" hidden></p></section>
-    <div class="stage-reading-tools"><span id="stage-reading-label">현재 단계 상세</span><button type="button" id="return-to-current-task" hidden>지금 할 일로${icon('arrow')}</button></div>
-    <div id="preparation-board" class="preparation-board" aria-label="진료 준비 내역">${PREPARATION_STAGES.map(section).join('')}</div>`;
+  return `<section class="current-preparation-task" id="current-preparation-task" aria-labelledby="current-task-heading"><h2 id="current-task-heading" class="sr-only">지금 준비할 일</h2><h3 id="current-task-title" tabindex="-1"></h3><div class="current-task-heading"><div class="current-task-meta"><span id="current-task-stage"></span><p class="current-task-owner" id="current-task-owner"></p><p class="mode-notice" id="mode-notice">연결 범위를 확인하고 있어요.</p></div><button type="button" class="current-task-answer" id="current-task-answer" hidden>최근 답변 보기${icon('chevron')}</button></div><p class="current-task-detail" id="current-task-detail"></p><p class="current-task-question" id="current-task-question" hidden></p><div class="current-task-choices" id="current-task-choices" hidden></div><button type="button" class="next-request-draft" id="current-task-draft" data-workflow-draft hidden>이 내용으로 요청 초안 넣기${icon('arrow')}</button><p class="workflow-draft-note" id="workflow-draft-note" hidden>초안을 확인·수정한 뒤 아래 입력창에서 보내 주세요.</p><div id="guided-demo-controls" class="guided-demo-controls" aria-label="체험 답변 선택"></div><details class="guided-demo-result" id="guided-demo-result" hidden><summary><span>앞선 선택</span><strong id="guided-demo-selection"></strong>${icon('chevron')}</summary><p id="guided-demo-result-text"></p></details><p class="current-task-waiting" id="current-task-waiting" role="status" hidden></p></section>
+    <details class="preparation-reading" id="preparation-reading" open><summary><span>준비 현황과 근거</span>${icon('chevron')}</summary><div class="stage-reading-tools"><span id="stage-reading-label">현재 단계 상세</span><button type="button" id="return-to-current-task" hidden>지금 할 일로${icon('arrow')}</button></div>
+    <div id="preparation-board" class="preparation-board" aria-label="진료 준비 내역">${PREPARATION_STAGES.map(section).join('')}</div></details>`;
 }
 
 const renderedMarkup=new WeakMap();
@@ -73,7 +73,7 @@ export function renderPreparationView(board,{unreadAnswer=false,selectedStageId,
   for(const stage of PREPARATION_STAGES) {
     const pane=document.querySelector(`[data-stage-id="${stage.id}"]`);
     pane.hidden=stage.id!==selected;pane.inert=pane.hidden;
-    document.querySelector(`#stage-navigation [data-open-stage="${stage.id}"]`).setAttribute('aria-pressed',String(stage.id===selected));
+    document.querySelector(`#stage-navigation [data-open-stage="${stage.id}"]`).setAttribute('aria-pressed',String(stage.id===selected && (board.hasResponse || reviewing)));
   }
 }
 
@@ -88,15 +88,15 @@ export function renderPreparationBoard(board,{unreadAnswer=false,progress=null,s
   const activity=document.getElementById('board-activity');
   activity.hidden=!board.pending;activity.textContent=board.overallLabel;
   document.getElementById('expand-answer').disabled=!board.hasResponse;
-  document.getElementById('workflow-summary').textContent=workflow.summary.label;
+  document.getElementById('workflow-summary').textContent=board.hasResponse?workflow.summary.label:'자료부터 준비표까지, 네 단계로 살펴봐요.';
   const initial=!board.hasResponse;
   const task=workflow.currentTask;
   const taskNode=document.getElementById('current-preparation-task');
   taskNode.dataset.taskId=task?.id||'';taskNode.dataset.currentStage=workflow.currentStageId;
   taskNode.dataset.taskStatus=task?.status||'not_started';taskNode.dataset.taskActor=task?.actor||'agent';
   document.getElementById('current-task-stage').textContent=initial?'':workflow.stages.find(stage=>stage.id===workflow.currentStageId)?.title||'';
-  document.getElementById('current-task-title').textContent=initial?'부모님 진료 준비를 함께 시작해요.':task?.title||'현재 방문 준비와 남은 일을 확인해 주세요.';
-  document.getElementById('current-task-detail').textContent=initial?'제주에 계신 어머니의 자료부터 병원 문의, 이동·동행까지. 가상 사례로 준비 과정을 따라가 보세요.':task?.detail||'방문 준비표에서 확인된 내용과 기관·의료진에게 남은 일을 함께 읽을 수 있어요.';
+  document.getElementById('current-task-title').textContent=initial?'이번 방문을 준비해 볼까요?':task?.title||'현재 방문 준비와 남은 일을 확인해 주세요.';
+  document.getElementById('current-task-detail').textContent=initial?'제주에 계신 어머니의 자료, 병원 문의, 이동과 동행을 함께 챙겨요. 제주 방문 준비부터 서울 대학병원의 진료 일정까지 이어서 준비할 수 있어요.':task?.detail||'방문 준비표에서 확인된 내용과 기관·의료진에게 남은 일을 함께 읽을 수 있어요.';
   const owner=document.getElementById('current-task-owner');owner.hidden=initial||!task?.owner;owner.textContent=task?.owner?`담당 · ${task.owner} · ${taskStatusLabel[task.status]}`:'';
   const question=document.getElementById('current-task-question');question.hidden=initial||task?.actor!=='caregiver'||!task?.question;question.textContent=task?.question||'';
   const choices=document.getElementById('current-task-choices');
@@ -119,10 +119,10 @@ export function renderPreparationBoard(board,{unreadAnswer=false,progress=null,s
     replaceMarkup(status,`${signalMarkup(signal)}<span>${escape(workStage.label)}</span>`);
     const nav=document.querySelector(`#stage-navigation [data-open-stage="${stage.id}"]`);
     nav.dataset.workflowStatus=workStage.status;nav.dataset.signal=signal;
-    nav.dataset.current=String(stage.id===currentStageId);nav.dataset.live=String(realProgress&&stage.live);
-    if(stage.id===currentStageId)nav.setAttribute('aria-current','step');else nav.removeAttribute('aria-current');
-    nav.querySelector('[data-nav-label]').textContent=workStage.label+(workStage.remainingCount?` · 남은 ${workStage.remainingCount}건`:'');
-    replaceMarkup(nav.querySelector('[data-nav-signal]'),signalMarkup(signal));
+    nav.dataset.current=String(!initial && stage.id===currentStageId);nav.dataset.live=String(realProgress&&stage.live);
+    if(!initial && stage.id===currentStageId)nav.setAttribute('aria-current','step');else nav.removeAttribute('aria-current');
+    nav.querySelector('[data-nav-label]').textContent=initial?({records:'필요한 자료와 보유 여부',hospitals:'접수·발급·제출 방법',support:'차량과 동행 지원 조건',plan:'준비 내역과 남은 일'})[stage.id]:workStage.label+(workStage.remainingCount?` · 남은 ${workStage.remainingCount}건`:'');
+    replaceMarkup(nav.querySelector('[data-nav-signal]'),initial?'':signalMarkup(signal));
     const navLive=nav.querySelector('[data-nav-live]');navLive.hidden=!(realProgress&&stage.live);navLive.textContent=stage.liveActivity||'확인 중';
     pane.querySelector('[data-stage-summary]').textContent=stage.summary;
     const live=pane.querySelector('[data-stage-live]');

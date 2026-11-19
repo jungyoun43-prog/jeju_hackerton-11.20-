@@ -123,6 +123,17 @@
       "sourceSha256": "9664959a2ad7e24cbf33d9b8a1fb6ac19cbdd2c21ca0ae893e6430a1ab5efe21",
       "sha256": "cadbc2e5ffce3c52e20bb3087d39890c8dda8f2da2be60272606b10274a3b4d2",
       "notes": "원본은 바이트 그대로 보존. 브라우저 canvas에서 alpha>16의 범위로 빈 여백을 정리하고 기존 심볼을 분리·축소 내보냄. 새 형태·색상·배경을 생성하거나 기존 그림을 다시 그리지 않음. 상표 중복·등록 가능성은 미검증."
+    },
+    {
+      "file": "JejuGothic.ttf",
+      "type": "official_font",
+      "createdAt": "2026-11-17",
+      "source": "https://www.jeju.go.kr/jeju/symbol/font/infor.htm",
+      "download": "https://www.jeju.go.kr/download.htm?act=download&seq=60060&no=10",
+      "sha256": "49f919f989ea5945eab4635a65949792a89deef3103edf66ba3a2a0904b082b2",
+      "usage": "제주특별자치도 제주고딕. 제목과 지역 선택에만 원본 TTF를 자체 호스팅. 본문 Pretendard 유지.",
+      "license": "공식 웹·모바일 사용 허용 및 출처 표시. 글꼴 자체 판매 금지. JejuGothic-LICENSE.txt 참고.",
+      "notes": "설치·변환·서브셋·바이너리 수정 없이 공식 수동 설치 ZIP의 제주고딕 원본만 사용."
     }
   ]
 }

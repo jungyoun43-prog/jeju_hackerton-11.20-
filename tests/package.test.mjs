@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, writeFile, readFile, rm, symlink } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
+import { createFixtureLink } from './helpers/fixture-link.mjs';
+import { pythonCli } from '../scripts/python-cli.mjs';
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { spawnSync, execFileSync } from 'node:child_process';
@@ -10,7 +12,7 @@ async function fixture(t) {
   const directory=await mkdtemp(join(tmpdir(),'hondi-package-')),project=join(directory,'project');
   t.after(()=>rm(directory,{recursive:true,force:true}));
   for(const folder of ['scripts','orchestration','app','docs','output','node_modules/leaflet/dist'])await mkdir(join(project,folder),{recursive:true});
-  for(const path of ['scripts/package.mjs','scripts/build.mjs','orchestration/checks.mjs'])await writeFile(join(project,path),await readFile(new URL('../'+path,import.meta.url)));
+  for(const path of ['scripts/package.mjs','scripts/build.mjs','scripts/python-cli.mjs','orchestration/checks.mjs'])await writeFile(join(project,path),await readFile(new URL('../'+path,import.meta.url)));
   for(const [path,content] of Object.entries({
     'package.json':'{"type":"module"}',
     'app/index.html':'<!doctype html><title>합성 시연</title>',
@@ -23,6 +25,33 @@ async function fixture(t) {
   return {directory,project,archive:join(project,'output/jeju-care-compass-mvp.zip')};
 }
 const pack=project=>spawnSync(process.execPath,['scripts/package.mjs'],{cwd:project,encoding:'utf8',env:{...process.env,OPENAI_API_KEY:''}});
+
+test('심사용 ZIP에는 현재 소스로 통과한 브라우저 검사만 넣는다',()=>{
+  const receipt={sourceHash:'current',checks:[{pass:true}],passed:1,failed:[],errors:[]};
+  const calendar={sourceHash:'current',measurements:[{width:1024}],errors:[],posts:[]};
+  const scenarios=[
+    ['calendar.json',calendar,true],
+    ['calendar.json',{...calendar,errors:['footer not visible']},false],
+    ['calendar.json',{...calendar,measurements:[]},false],
+    ['coordination.json',{...receipt,apiPosts:0},true],
+    ['coordination.json',{...receipt,apiPosts:0,checks:[{pass:false}]},false],
+    ['reservation-edit.json',{...receipt,posts:0},true],
+    ['reservation-edit.json',{...receipt,posts:1},false],
+    ['reservation-edit.json',{...receipt,posts:0,sourceHash:'older'},false],
+  ];
+  const verify=`import json, runpy, sys
+check = runpy.run_path("scripts/prepare-submission.py")["verify_browser_report"]
+for name, report, expected in json.load(sys.stdin):
+    try:
+        check(name, json.dumps(report), "current")
+        accepted = True
+    except ValueError:
+        accepted = False
+    assert accepted == expected, (name, report)
+`;
+  const result=spawnSync(pythonCli(),['-c',verify],{cwd:new URL('../',import.meta.url),input:JSON.stringify(scenarios),encoding:'utf8',windowsHide:true});
+  assert.equal(result.status,0,result.stderr);
+});
 
 test('실제 ZIP은 소스·빌드·대표 화면·최종 요약을 보존하고 반복 캡처·비공개 파일을 제외한다',async t=>{
   const {project,archive}=await fixture(t);
@@ -51,7 +80,7 @@ test('실제 ZIP은 소스·빌드·대표 화면·최종 요약을 보존하고
   }
   const result=pack(project);
   assert.equal(result.status,0,result.stderr);
-  const entries=JSON.parse(execFileSync('python3',['-c','import json,sys,zipfile; z=zipfile.ZipFile(sys.argv[1]); assert z.testzip() is None; print(json.dumps(z.namelist()))',archive],{encoding:'utf8'}));
+  const entries=JSON.parse(execFileSync(pythonCli(),['-c','import json,sys,zipfile; z=zipfile.ZipFile(sys.argv[1]); assert z.testzip() is None; print(json.dumps(z.namelist()))',archive],{encoding:'utf8',windowsHide:true}));
   for(const path of ['app/index.html','scripts/package.mjs','docs/reference.txt','.env.example','dist/index.html','dist/vendor/leaflet/LICENSE.txt',...Object.keys(currentFiles)])assert.ok(entries.includes('jeju-care-compass-mvp/'+path));
   for(const path of Object.keys(excludedFiles))assert.ok(!entries.includes('jeju-care-compass-mvp/'+path),path);
   assert.ok(entries.every(path=>!path.endsWith('/.env')&&!path.includes('/node_modules/')));
@@ -67,7 +96,8 @@ test('선택 경로와 중첩 링크는 외부 파일을 읽기 전에 거절하
       await mkdir(join(external,'review/board'),{recursive:true});
       await writeFile(join(external,'review/board/private.txt'),privateText);
     }
-    await symlink(kind==='file'?join(external,'private.txt'):external,link);
+    const target=kind==='file'?join(external,'private.txt'):external;
+    if (!await createFixtureLink(child,target,link,kind==='file'?'file':'dir')) return;
     await writeFile(archive,'previous-archive');
     assert.deepEqual(await scanProject(project),[]);
     const result=pack(project);

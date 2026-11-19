@@ -20,7 +20,7 @@ async function open(width,height) {
   const page=await context.newPage();page.setDefaultTimeout(8000);
   await context.route('**/*',route=>new URL(route.request().url()).origin===base.origin?route.continue():route.abort());
   page.on('request',request=>{if(request.method()==='POST'){if(new URL(request.url()).pathname==='/api/agent/preview')proof.previewPosts++;else proof.modelPosts++;}});
-  await page.goto(base.href);await page.locator('[data-demo-start]').waitFor();
+  await page.goto(base.href);await page.locator('#open-existing-preparation').click();await page.locator('[data-demo-start]').waitFor();
   return {page,context};
 }
 async function shot(page,name) {
@@ -48,13 +48,19 @@ async function layout(page,name) {
   return result;
 }
 try {
-  for(const [width,height,adverse] of [[1440,900,false],[390,844,true],[900,600,true]]) {
+  for(const [width,height,adverse] of [[1440,900,false],[390,844,true],[900,600,true],[320,500,true]]) {
     const {page,context}=await open(width,height);
     try {
       await layout(page,width+' 초기');await shot(page,'initial-'+width);
+      check(width+' 시작 전 진행·잔여 건수 없음',await page.locator('#stage-navigation [aria-current="step"]').count()===0 && !/남은.*건/.test(await page.locator('#workflow-summary').innerText()));
+      check(width+' 첫 상세 접힘',!await page.locator('#preparation-reading').evaluate(n=>n.open));
+      await page.locator('[data-demo-write]').click();
+      check(width+' 직접 요청은 입력 초점만 이동',await page.locator('#request-input').evaluate(n=>document.activeElement===n && !n.readOnly));
       await page.evaluate(()=>{window.qaInput=document.getElementById('request-input');});
       let data=await choose(page,'[data-demo-start]');
       check(width+' 첫 질문·readonly',data.guidedDemo.stepId==='records' && await page.locator('#request-input').evaluate(n=>n.readOnly));
+      check(width+' 체험에서 비활성 전송·음성 숨김',await page.locator('#send-request').isHidden() && await page.locator('#voice-request').isHidden());
+      check(width+' 체험 하단 높이 절약',await page.locator('#chat-composer').evaluate(n=>n.getBoundingClientRect().height<120));
       const answers=adverse?['records_missing','hospitals_declined','support_wheelchair','plan_changed']:['records_ready','hospitals_accept','support_taxi','plan_keep'];
       for(const [index,id] of answers.entries()) {
         await page.locator(`[data-demo-choice="${id}"]`).focus();
@@ -65,6 +71,8 @@ try {
         check(width+' 선택 이력 '+index,JSON.stringify(data.guidedDemo.answers)===JSON.stringify(answers.slice(0,index+1)));
         check(width+' 단계 일치 '+index,await page.locator('#preparation-board').getAttribute('data-selected-stage')===data.guidedDemo.stepId && await page.locator('#stage-navigation [aria-current="step"]').getAttribute('data-open-stage')===data.guidedDemo.stepId);
         check(width+' 같은 입력 '+index,await page.evaluate(()=>window.qaInput===document.getElementById('request-input')));
+        const questionResult={detail:await page.locator('#current-task-detail').textContent(),expected:data.guidedDemo.detail,result:await page.locator('#guided-demo-result-text').textContent(),open:await page.locator('#guided-demo-result').evaluate(n=>n.open)};
+        check(width+' 질문 설명과 이전 결과 분리 '+index,questionResult.detail===questionResult.expected && Boolean(questionResult.result) && !questionResult.open);
         check(width+' 키보드 초점 '+index,(await layout(page,width+' 단계 '+index)).focus);
         if(index===2)await shot(page,'support-'+width);
       }
@@ -87,7 +95,7 @@ try {
       check(width+' 전환 취소 보존',await page.locator('[data-demo-save]').count()===1);
       page.once('dialog',dialog=>dialog.accept());await page.locator('#exit-guided-demo').click();
       check(width+' 명시 전환 후 입력',!await page.locator('#request-input').evaluate(n=>n.readOnly) && await page.locator('[data-demo-start]').isVisible());
-      await page.reload();check(width+' 체험 원문 미저장',await page.locator('[data-demo-start]').isVisible() && await page.evaluate(()=>sessionStorage.length===0));
+      await page.reload();await page.locator('#open-existing-preparation').click();check(width+' 체험 원문 미저장',await page.locator('[data-demo-start]').isVisible() && await page.evaluate(()=>sessionStorage.length===0));
     } finally {await context.close();}
   }
   const {page,context}=await open(390,844);

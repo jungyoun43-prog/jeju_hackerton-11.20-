@@ -164,7 +164,7 @@ jobs:
           for (let attempt = 0; attempt < 12; attempt++) {
             try {
               const verified = await runAgentPublish({args:['--verify']});
-              const modelState = verified.modelConnected ? `${verified.model} 설정 활성(실제 계정 접근·품질 검증 별도)` : '모델 미연결';
+              const modelState = verified.modelConnected ? '모델 연결 설정 활성(실제 계정 접근·품질 검증 별도)' : '모델 미연결';
               await appendFile(process.env.GITHUB_STEP_SUMMARY, `\n동일 커밋 Lambda ZIP의 hash와 공개 capabilities를 확인했습니다. ${modelState}. 실제 전화·개인 진료기록 조회는 미연동입니다.\n`);
               last = undefined;
               break;

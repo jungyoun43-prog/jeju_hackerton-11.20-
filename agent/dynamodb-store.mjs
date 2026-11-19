@@ -11,6 +11,7 @@ import supportData from '../app/data/visit-support-providers.json' with { type: 
 import { AgentError } from './errors.mjs';
 import { isProgressKey, isProgressWriterId, normalizeProgressSnapshot, PROGRESS_TTL_SECONDS } from './progress.mjs';
 import { normalizeRequestReceipts, containsCredential } from './visit-recovery.mjs';
+import { validateModelCallLimit } from './model-budget.mjs';
 
 const MAX_ITEM_BYTES = 192 * 1024;
 const OPERATION_TIMEOUT_MS = 4000;
@@ -296,6 +297,24 @@ export function createDynamoSessionStore({ client, tableName, region = 'ap-north
             ExpressionAttributeValues: { ':expires': expiresAt, ':one': 1, ':zero': 0, ':limit': limit } }), options);
         } catch (error) {
           if (conditional(error)) throw storeError('DAILY_LIMIT', '오늘의 대화 시연 한도에 도달했습니다.', 429);
+          throw error;
+        }
+      });
+    },
+    async consumeModelCall(limit, options) {
+      return safe(async () => {
+        validateModelCallLimit(limit);
+        const time = seconds(), day = new Date(time * 1000).toISOString().slice(0, 10);
+        const expiresAt = Math.floor(Date.parse(`${day}T00:00:00Z`) / 1000) + 86400;
+        try {
+          await send(new UpdateCommand({TableName:tableName,Key:{pk:`model-budget#${day}`},
+            UpdateExpression:'SET #expires = if_not_exists(#expires, :expires) ADD #used :one',
+            ConditionExpression:'attribute_not_exists(#used) OR (#used >= :zero AND #used < :limit)',
+            ExpressionAttributeNames:{'#expires':'expiresAt','#used':'used'},
+            ExpressionAttributeValues:{':expires':expiresAt,':one':1,':zero':0,':limit':limit},
+          }),options);
+        } catch (error) {
+          if (conditional(error)) throw storeError('MODEL_DAILY_LIMIT','오늘의 AI 이용 한도에 도달했습니다. 저장된 준비 내용과 직접 선택 기능은 계속 이용할 수 있습니다.',429);
           throw error;
         }
       });

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile, mkdtemp, mkdir, writeFile, symlink, rm } from 'node:fs/promises';
+import { readFile, mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
+import { createFixtureLink } from './helpers/fixture-link.mjs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { bootstrapSettings, runBootstrap, selectOidcProvider, validateOidcSubject, selectGitHubOidcSubject } from '../scripts/aws-bootstrap.mjs';
@@ -153,9 +154,14 @@ test('기존 다른 앱 stack이나 읽기 권한 오류는 생성·갱신으로
 test('게시 경로는 실제 dist로 제한하고 symlink·숨김 파일을 거부한다',async t=>{
   const root=await artifact(t);
   await assert.rejects(createPublishPlan({root,env:publishEnv,directory:'..'}),/dist/);
-  await symlink(join(root,'dist/index.html'),join(root,'dist/linked.html'));
-  await assert.rejects(createPublishPlan({root,env:publishEnv}),/symlink/);
-  await rm(join(root,'dist/linked.html'));
+  for (const [type,target] of [['file','index.html'],['dir','api']]) {
+    await t.test(type,async child=>{
+      const linked=join(root,'dist/linked-entry');
+      if (!await createFixtureLink(child,join(root,'dist',target),linked,type)) return;
+      await assert.rejects(createPublishPlan({root,env:publishEnv}),/symlink/);
+      await rm(linked);
+    });
+  }
   await writeFile(join(root,'dist/.env'),'do-not-publish');
   await assert.rejects(createPublishPlan({root,env:publishEnv}),/허용되지 않는 경로/);
 });

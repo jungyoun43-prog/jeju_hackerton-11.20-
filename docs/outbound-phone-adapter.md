@@ -18,11 +18,11 @@
 | `agent/phone-operator-server.mjs` | callback/WS 수신 전용 listener. 자체 listen·발신 route 없음 |
 | `tests/phone-adapter.test.mjs` | fake fetch/socket/clock 및 임시 ledger 단위 검증 |
 
-Node.js 22 이상을 전제로 한다. 운영용 WebSocket 연결과 listener에는 `ws`가 필요하다. 통합 담당자가 루트에 `ws` 8.23.0을 추가한다. 이 작업의 worktree는 package 파일을 수정하지 않는다. Twilio SDK 없이 공식 HMAC-SHA1 규칙을 구현하고 공식 예제 서명으로 검증했다. 지원하는 콜백 본문은 `application/x-www-form-urlencoded`이며 JSON 서명 변형을 지원한다고 주장하지 않는다.
+Node.js 22 이상을 전제로 한다. 운영용 WebSocket 연결과 listener를 위해 루트에 `ws` 8.23.0을 추가했다. Twilio SDK 없이 공식 HMAC-SHA1 규칙을 구현하고 공식 예제 서명으로 검증했다. 지원하는 콜백 본문은 `application/x-www-form-urlencoded`이며 JSON 서명 변형을 지원한다고 주장하지 않는다.
 
 ## 운영자 CLI와 listener
 
-통합 담당자가 제공하는 `scripts/phone-operator.mjs`의 동작:
+`scripts/phone-operator.mjs`의 동작:
 
 | 인자 | 동작 |
 | --- | --- |
@@ -31,6 +31,8 @@ Node.js 22 이상을 전제로 한다. 운영용 WebSocket 연결과 listener에
 | `--live --request <로컬 manifest 경로>` | 운영자가 검증한 manifest와 모든 live guard가 맞을 때 1회 시도한다. 이번 작업에서는 실행하지 않았다. |
 
 listener는 기본 loopback `127.0.0.1:4190`에 연결하는 별도 프로세스이며 공개 HTTPS/WSS 주소·TLS·역방향 프록시는 운영자가 따로 구성한다. 일반 `scripts/server.mjs`나 제품 화면의 시연 버튼은 이 listener를 호출하지 않는다. CLI에서 프로세스 종료 신호를 `dispose()`에 연결한다. 라이브 요청 파일은 환자 원문을 보관할 용도로 쓰지 않으며 별도 접근 통제를 적용해야 한다.
+
+`npm run phone:preview`를 실행해 `actualCallPlaced:false`인 준비 결과를 확인했다. CLI는 `.env`를 자동으로 읽지 않는다. live를 실행할 때는 운영자가 별도 프로세스 환경을 제공해야 하며 이번 작업에서는 실행하지 않았다. 로그에는 상태·고정 결과 enum만 출력하고 상세 결과는 factory의 `onReceipt` 또는 runner의 반환 `receipt`에서 읽는다. 종료 여부가 불명확하면 callback listener가 남아 있을 수 있으므로 운영자가 공급자에서 상태를 확인해야 하며 자동 재발신하지 않는다.
 
 허용하는 수신 경로는 `POST /phone/status/<무작위 token>`과 WebSocket `/phone/media`뿐이다. 요청 Host·Forwarded 헤더로 공개 URL을 추측하지 않는다. `PHONE_PUBLIC_ORIGIN`의 정확한 HTTPS origin과 고정 경로를 서명 검증에 사용한다. Media Stream의 연결 URL은 같은 origin의 `wss:` 형태다. **실제 Twilio WS handshake와 프록시의 HTTPS/WSS canonical URL 대응은 아직 실연동 검증하지 않았다.** 공개 주소의 경로·포트·리다이렉트 변경을 자동 보정하지 않는다.
 

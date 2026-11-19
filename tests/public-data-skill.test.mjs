@@ -6,7 +6,7 @@ import {join} from 'node:path';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import {PUBLIC_DATA_SOURCE_URLS, searchPublicDataCatalog, analyzePublicData, getPreparationDataEvidence} from '../app/public-data-skill.js';
-import {getSupportCandidates} from '../app/support-data.js';
+import {getSupportCandidates,getSupportInquiryCandidates} from '../app/support-data.js';
 
 const exec = promisify(execFile);
 const root = new URL('../', import.meta.url);
@@ -240,7 +240,7 @@ test('지역·휠체어별 문의 후보는 기존 registry와 같은 ID·순서
     for (const supportKind of ['taxi', 'companion']) {
       for (const wheelchair of [false, true]) {
         const result = analyzePublicData({analysis: 'support_candidates', area, supportKind, wheelchair});
-        const expected = getSupportCandidates(registry, {kind: supportKind, area, wheelchair}).slice(0, 5);
+        const expected = getSupportInquiryCandidates(registry, {kind: supportKind, area, wheelchair}).slice(0, 5);
         assert.deepEqual(result.candidates.map(row => [row.id, row.phone]), expected.map(row => [row.id, row.phone]));
         assert.ok(result.candidates.every(row => row.availabilityVerified === false && row.questions.length >= 2));
         realFlagsFalse(result);
@@ -349,6 +349,6 @@ test('조회 CLI는 키·네트워크 없이 공개 API와 같은 계산을 재�
   try {
     const destination = join(directory, 'catalog.json');
     await exec(process.execPath, ['scripts/public-data-catalog.mjs', '--output', destination], {cwd: root});
-    assert.equal(await readFile(destination, 'utf8'), await readFile(new URL('../app/data/public-data-catalog.json', import.meta.url), 'utf8'));
+    assert.equal(await readFile(destination, 'utf8'), (await readFile(new URL('../app/data/public-data-catalog.json', import.meta.url), 'utf8')).replaceAll('\r\n', '\n'));
   } finally { await rm(directory, {recursive: true, force: true}); }
 });

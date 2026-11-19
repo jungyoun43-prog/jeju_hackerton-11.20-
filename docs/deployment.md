@@ -42,7 +42,9 @@ AWS_PROFILE=jeju-deploy AWS_REGION=ap-northeast-2 node --env-file-if-exists=.env
 AWS_PROFILE=jeju-deploy AWS_REGION=ap-northeast-2 node --env-file-if-exists=.env scripts/aws-agent-key.mjs --apply
 ```
 
-키는 .env에서 Node로 읽고 Python3 OS pipe→AWS CLI stdin으로만 전송한다. Node socket을 /dev/stdin으로 다시 여는 방식은 이 환경에서 실패해 실제 OS pipe를 사용한다. CLI argv·임시 비밀파일·자식 환경·GitHub·Lambda 환경변수에 평문 키를 넣지 않는다. 실패 출력도 정해진 문구만 사용한다. 키 교체 후에는 코드 재게시 등으로 warm cache도 새로 시작한다.
+Node가 `.env`에서 OpenAI 키를 읽는다. Linux·macOS는 Python 3의 OS 파이프와 AWS CLI의 `/dev/stdin`으로 전송한다. Windows는 선택한 AWS CLI와 프로필에서 `configure export-credentials --format process`로 자격증명을 받아 메모리에 둔다. 그 자격증명으로 STS를 다시 조회해 처음 확인한 계정·ARN·사용자 ID가 모두 일치할 때만 같은 자격증명의 SDK가 서울 리전 Secrets Manager에 키를 쓴다. Windows에서는 자격증명 내보내기를 지원하는 AWS CLI가 필요하다.
+
+OpenAI 키는 CLI 인자, 임시 파일, 자식 프로세스 환경, GitHub, Lambda 환경변수에 넣지 않는다. 쓰기가 끝나면 전용 Secret ARN과 클라이언트 요청 토큰에 해당하는 버전을 확인한다. Windows 전달 경로는 가상 CLI·SDK를 사용해 검증했다. 키 교체 후에는 코드 재게시 등으로 기존 런타임을 다시 시작한다.
 
 ## 3. 코드 게시와 공개 확인
 

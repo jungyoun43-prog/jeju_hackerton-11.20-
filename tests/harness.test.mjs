@@ -28,4 +28,13 @@ test('미커밋 실행 소스 변경도 브라우저 증거의 지문을 바꾼�
  const after=await runtimeFingerprint(root);
  await writeFile(join(root,'README.md'),'검증 기록 수정');
  assert.equal(await runtimeFingerprint(root),after);
+ await mkdir(join(root,'web/components'),{recursive:true});
+ await writeFile(join(root,'web/components/view.jsx'),'export default function View(){return null}');
+ const reactHash=await runtimeFingerprint(root);assert.notEqual(reactHash,after);
+ await mkdir(join(root,'web/public'),{recursive:true});
+ await writeFile(join(root,'web/public/generated.js'),'generated');
+ assert.equal(await runtimeFingerprint(root),reactHash);
+ await mkdir(join(root,'public'),{recursive:true});
+ await writeFile(join(root,'public/unrelated.txt'),'sk-proj-'+'x'.repeat(40));
+ assert.deepEqual(await scanProject(root),['public/unrelated.txt']);
 });

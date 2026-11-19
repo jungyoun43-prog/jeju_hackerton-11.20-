@@ -78,12 +78,13 @@ async function readConversation(page) {
   const history=page.locator('#conversation-history');
   if(!await history.evaluate(node=>node.open))await history.locator(':scope>summary').click();
 }
-async function guidedEvidence(page,state) {
-  return page.evaluate(async state=>{
+async function guidedEvidence(page,state,{initial=false}={}) {
+  return page.evaluate(async ({state,initial})=>{
     const {getPreparationWorkflow}=await import('/preparation-workflow.js'),workflow=getPreparationWorkflow(state),board=document.getElementById('preparation-board'),current=document.getElementById('current-preparation-task');
     const rows=[...document.querySelectorAll('#stage-navigation>button[data-open-stage]')],panes=[...board.querySelectorAll(':scope>[data-stage-id]')];
-    return {currentStage:board.dataset.currentStage===workflow.currentStageId,task:current.dataset.currentStage===workflow.currentStageId && current.dataset.taskId===(workflow.currentTask?.id||'') && current.dataset.taskActor===(workflow.currentTask?.actor||'') && current.dataset.taskStatus===(workflow.currentTask?.status||''),stages:rows.length===4&&workflow.stages.every(stage=>rows.some(row=>row.dataset.openStage===stage.id && row.dataset.workflowStatus===stage.status && row.dataset.current===String(stage.id===workflow.currentStageId))),oneSelected:panes.length===4&&panes.filter(node=>!node.hidden&&!node.inert).length===1&&panes.every(node=>node.hidden===node.inert)&&rows.filter(node=>node.getAttribute('aria-pressed')==='true').length===1&&rows.find(node=>node.getAttribute('aria-pressed')==='true')?.dataset.openStage===board.dataset.selectedStage,visitNotReady:workflow.visitReady===false,workflow};
-  },state);
+    const selected=rows.filter(node=>node.getAttribute('aria-pressed')==='true');
+    return {currentStage:board.dataset.currentStage===workflow.currentStageId,task:current.dataset.currentStage===workflow.currentStageId && current.dataset.taskId===(workflow.currentTask?.id||'') && current.dataset.taskActor===(workflow.currentTask?.actor||'') && current.dataset.taskStatus===(workflow.currentTask?.status||''),stages:rows.length===4&&workflow.stages.every(stage=>rows.some(row=>row.dataset.openStage===stage.id && row.dataset.workflowStatus===stage.status && row.dataset.current===String(!initial && stage.id===workflow.currentStageId))),oneSelected:panes.length===4&&panes.filter(node=>!node.hidden&&!node.inert).length===1&&panes.every(node=>node.hidden===node.inert)&&(initial?selected.length===0 && !rows.some(node=>node.hasAttribute('aria-current')):selected.length===1&&selected[0].dataset.openStage===board.dataset.selectedStage),visitNotReady:workflow.visitReady===false,workflow};
+  },{state,initial});
 }
 async function stageText(page,id) {
   await readStage(page,id);
@@ -358,7 +359,7 @@ try {
   for(const [width,height] of viewports)await scenario(width+'x'+height+' 첫 화면·구조',async()=>{
     const {page,context,actualPosts}=await open(width,height);
     try {
-      const initialWorkspace=await workspaceEvidence(page),compact=initialWorkspace.compact,inputNode=await page.locator('#request-input').elementHandle(),initialGuided=await guidedEvidence(page,createDemoCase());
+      const initialWorkspace=await workspaceEvidence(page),compact=initialWorkspace.compact,inputNode=await page.locator('#request-input').elementHandle(),initialGuided=await guidedEvidence(page,createDemoCase(),{initial:true});
       await showView(page,'preparation');
       const panes=page.locator('#preparation-board>[data-stage-id]'),navigation=page.locator('#stage-navigation>button[data-open-stage]');
       const structure=await navigation.evaluateAll(nodes=>nodes.map(node=>({id:node.dataset.openStage,visible:node.checkVisibility(),x:node.getBoundingClientRect().x,y:node.getBoundingClientRect().y,width:node.getBoundingClientRect().width,height:node.getBoundingClientRect().height})));
@@ -905,7 +906,7 @@ try {
         return {tools:style('.workspace-tools'),nav:style('#care-rail'),selected:style('.rail-nav [aria-current]'),icon:style('.stage-topic-icon'),canvas:style('#chat-workspace'),names:[...document.querySelectorAll('.patient-name')].map(node=>getComputedStyle(node).color),cards:[...document.querySelectorAll('.stage-pane')].map(node=>({background:getComputedStyle(node).backgroundColor,paintedBackground:paintedBackground(node),shadow:getComputedStyle(node).boxShadow})),identityRemoved:!document.querySelector('.chat-identity,.chat-role,#conversation-title'),chatNamed:Boolean(document.getElementById('chat-workspace').getAttribute('aria-label')),utilities:[...document.querySelectorAll('.workspace-tools button')].map(node=>{const r=node.getBoundingClientRect();return {id:node.id,native:node instanceof HTMLButtonElement,width:r.width,height:r.height};})};
       });
       if(width<=1050) {await page.locator('#close-care-menu').click();await nativeFinished(page.locator('#care-rail'));}
-      const utilityNames=await page.getByRole('button',{name:'넓게 읽기',exact:true}).count()===1 && await page.getByRole('button',{name:'준비 흐름 체험',exact:true}).count()===1;
+      const utilityNames=await page.getByRole('button',{name:'넓게 읽기',exact:true}).count()===1 && await page.getByRole('button',{name:'준비 결과 예시 보기',exact:true}).count()===1;
       evidence.greenSurfaces=surfaces.identityRemoved && surfaces.chatNamed && utilityNames && surfaces.utilities.length===2 && surfaces.utilities.every(item=>item.native && item.width>=44 && item.height>=44) && surfaces.nav.background==='rgb(245, 246, 245)' && surfaces.selected.background===soft && surfaces.selected.color===secondary && surfaces.icon.color===secondary && surfaces.canvas.background==='rgb(255, 255, 255)' && surfaces.cards.length===4 && surfaces.cards.every(card=>card.paintedBackground==='rgb(255, 255, 255)'&&card.shadow==='none');
       record(label+' 이름 있는 작업면·44px 공통 도구·중성 설정 영역과 초록 탐색·연속된 흰 단계 유지',evidence.greenSurfaces,JSON.stringify(surfaces));
       const previewButton=page.locator('#preview-button');
@@ -933,7 +934,9 @@ try {
         nativeDetails &&=await details.evaluate((node,expanded)=>node instanceof HTMLDetailsElement && node.open===expanded,expanded) && icon.rotation===(expanded?90:0) && surface.width>=44 && surface.height>=44 && (!expanded || surface.background===soft);
       }
       const opened=await feedback(summary),drawerSafe=width>1050 || await page.locator('#care-rail').evaluate(node=>{const style=getComputedStyle(node);return style.visibility==='hidden' && new DOMMatrix(style.transform).e<=-node.getBoundingClientRect().width;});
-      evidence.interactionFeedback=disabled && draftOnly && inputFocus && nativeDetails && opened.background!==closedSummary.background && drawerSafe && exampleHover.color==='rgb(27, 70, 49)' && exampleHover.background===soft && exampleHover.width>=44 && exampleHover.height>=44 && exampleIcon.x===(reduce?0:2) && sendIcon.x===(reduce?0:2) && pressed.width===sendIdle.width && pressed.height===sendIdle.height && pressed.width>=44 && pressed.height>=44 && await input.inputValue()===draft && (await calls(page)).length===0;
+      // translateY 보간 중 DOMRect 44px이 43.999939px로 반올림되는 Chromium 오차만 허용한다.
+      const pressedSizeStable=Math.abs(pressed.width-sendIdle.width)<.001 && Math.abs(pressed.height-sendIdle.height)<.001 && pressed.width>=43.999 && pressed.height>=43.999;
+      evidence.interactionFeedback=disabled && draftOnly && inputFocus && nativeDetails && opened.background!==closedSummary.background && drawerSafe && exampleHover.color==='rgb(27, 70, 49)' && exampleHover.background===soft && exampleHover.width>=44 && exampleHover.height>=44 && exampleIcon.x===(reduce?0:2) && sendIcon.x===(reduce?0:2) && pressedSizeStable && await input.inputValue()===draft && (await calls(page)).length===0;
       record(label+' 실제 hover·누름·44px·반복 native 펼침·입력 초안은 POST 없이 유지',evidence.interactionFeedback,JSON.stringify({closedSummary,closedIcon,opened,exampleHover,exampleIcon,sendIdle,sendHover,sendIcon,pressed,nativeDetails,inputFocus,inputFocusContrast,drawerSafe}));
       const primaryPreserved=surfaces.names.length===2 && surfaces.names.every(color=>color===orange) && sendIdle.background===orange && sendIdle.color==='rgb(255, 255, 255)' && sendHover.background==='rgb(135, 58, 16)';
       const greetingQuiet=await page.locator('#message-list>.greeting>.message-meta').evaluate(node=>getComputedStyle(node).animationName==='none' && node.getAnimations().length===0);

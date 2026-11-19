@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, writeFile, readFile, access, rm, symlink, cp } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, readFile, access, rm, cp } from 'node:fs/promises';
+import { createFixtureLink } from './helpers/fixture-link.mjs';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -55,11 +56,19 @@ test('잘못된 출력·비공개 URL·버전 입력은 기존 파일을 지우�
 });
 
 test('앱 밖 파일로 향하는 심볼릭 링크를 게시용 빌드에 복사하지 않는다', async t => {
-  const project = await fixture(t);
-  await writeFile(join(project, 'private.txt'), 'fixture only');
-  await symlink(join(project, 'private.txt'), join(project, 'app/linked.txt'));
-  await assert.rejects(buildSite({ projectRoot: project }), /심볼릭 링크/);
-  await assert.rejects(access(join(project, 'dist/linked.txt')));
+  for (const type of ['file','dir']) {
+    await t.test(type,async child=>{
+      const project=await fixture(child);
+      const privateDirectory=join(project,'private');
+      const privateFile=join(privateDirectory,'private.txt');
+      await mkdir(privateDirectory);
+      await writeFile(privateFile,'fixture only');
+      const target=type==='dir'?privateDirectory:privateFile;
+      if (!await createFixtureLink(child,target,join(project,'app/linked-entry'),type)) return;
+      await assert.rejects(buildSite({projectRoot:project}),/심볼릭 링크/);
+      await assert.rejects(access(join(project,'dist/linked-entry')));
+    });
+  }
 });
 
 test('공식 분할 폰트 CSS·92개 WOFF2·명세·OFL을 정적 빌드에 보존한다', async t => {

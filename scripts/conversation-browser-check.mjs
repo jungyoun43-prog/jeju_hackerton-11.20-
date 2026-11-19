@@ -108,6 +108,7 @@ async function open(width,height,{configured=false,voice,storageSeed,onPost}={})
     await route.fulfill({status:answer.status??200,json:answer.body});
   });
   await page.goto(base.href,{waitUntil:'networkidle'});
+  await page.locator('#open-existing-preparation').click();
   await page.locator('#request-input').waitFor();
   await page.waitForFunction(expected=>document.querySelector('#connection-state')?.textContent===expected,configured?'대화 연결 설정됨':'AI 모델 미연결');
   await page.evaluate(()=>document.fonts.ready);
@@ -311,7 +312,7 @@ try {
       record(`${width}px 초기 폰트는 자체 호스팅 분할본·닫힌 창 제목 폰트 지연·입력16px`,loading.subsetFonts&&loading.oldWholeFontAbsent&&loading.maruDeferred&&loading.wholeFontPreloadsAbsent&&loading.inputFamily&&loading.inputFontPx>=16,JSON.stringify(loading));proof.loadingScenarios.push({width,...loading});
       await readConversation(page);
       record(`${width}px 로고·자가 호스팅 Pretendard·제주 배경, 인물사진 비노출`,await page.locator('.brand img').first().evaluate(e=>e.complete && e.naturalWidth>0) && await backgroundLoaded(page) && await page.locator('.welcome-photo').count()===0 && await page.evaluate(()=>getComputedStyle(document.body).fontFamily.includes('Pretendard') && [...document.fonts].some(font=>font.family.replaceAll('"','')==='Pretendard' && font.status==='loaded')));
-      const newChatNamed=await page.getByRole('button',{name:'새 대화',exact:true}).count()===1 && await page.locator('#new-conversation').getAttribute('title')==='새 대화',flow=page.locator('#preview-button'),examples=page.locator('#request-examples>summary'),distinctExamples=await page.getByRole('button',{name:'준비 흐름 체험',exact:true}).count()===1&&await flow.getAttribute('title')==='준비 흐름 체험'&&normalizedText(await flow.innerText())==='체험'&&await examples.getAttribute('aria-label')==='요청 예시'&&await examples.getAttribute('title')==='요청 예시'&&normalizedText(await examples.innerText())==='요청 예시';
+      const newChatNamed=await page.getByRole('button',{name:'새 대화',exact:true}).count()===1 && await page.locator('#new-conversation').getAttribute('title')==='새 대화',flow=page.locator('#preview-button'),examples=page.locator('#request-examples>summary'),distinctExamples=await page.getByRole('button',{name:'준비 결과 예시 보기',exact:true}).count()===1&&await flow.getAttribute('title')==='선택 없이 준비 결과 예시 보기'&&normalizedText(await flow.innerText())==='결과 예시'&&await examples.getAttribute('aria-label')==='요청 예시'&&await examples.getAttribute('title')==='요청 예시'&&normalizedText(await examples.innerText())==='요청 예시';
       record(`${width}px 새 대화의 이름·title과 체험/요청 예시의 두 동작 명칭 구분`,newChatNamed&&distinctExamples);
       await examples.focus();await page.keyboard.press('Enter');const draftExamplesReadOnly=await page.locator('#request-examples').evaluate(node=>node.open)&&requests.length===0&&await page.locator('#request-input').inputValue()==='';await page.keyboard.press('Enter');
       record(`${width}px 요청 예시 펼치기는 고정 흐름이나 모델 요청을 실행하지 않음`,draftExamplesReadOnly&&requests.length===0);
@@ -368,7 +369,7 @@ try {
       const previewOk=preview.status()===200 && payload.isPreview===true && payload.capabilities.llm===false && payload.events.length===15;
       const previewFrame=await workspaceEvidence(page);interfaceSample.previewComposerBottomAnchored=previewFrame.composerBottomAnchored;
       record(`${width}px 체험 뒤에도 같은 입력이 화면·작업 영역 바닥에 고정`,previewFrame.composerBottomAnchored&&previewFrame.viewportFit&&previewFrame.sharedComposer,JSON.stringify(previewFrame));
-      proof.fixedPreview ||= previewOk;interfaceSample.actualFixedFlow=previewOk&&await flow.getAttribute('aria-label')==='준비 흐름 체험'&&normalizedText(await flow.innerText())==='체험';
+      proof.fixedPreview ||= previewOk;interfaceSample.actualFixedFlow=previewOk&&await flow.getAttribute('aria-label')==='준비 결과 예시 보기'&&normalizedText(await flow.innerText())==='결과 예시';
       record(`${width}px 체험은 실제 고정 API를 실행하고 완료 뒤 같은 명칭으로 복귀`,interfaceSample.actualFixedFlow);
       record(`${width}px 작성된 합성 예시·실제 연락/예약 없음과 고정 미리보기 도구 15건`,previewOk && await page.locator('.example-label').count()===2 && previewNotice(await page.locator('#mode-notice').textContent()));
       record(`${width}px 처리 기록은 기본 접힘·설정은 preview에 미적용`,await page.locator('.tool-records').evaluateAll(nodes=>nodes.length>0 && nodes.every(node=>!node.open)) && /적용하지/.test(await page.locator('#preferences-status').textContent()) && !Object.hasOwn(json(requests.at(-1)),'preferences'));

@@ -1,0 +1,19 @@
+{
+  "checkedAt": "2026-11-19T12:00:00+09:00",
+  "url": "https://d1mfksxrj025bx.cloudfront.net/",
+  "appRevision": "3adc5f4415bb57685dc0342a0a1287422e31c2d6",
+  "scope": "기존 공개 대화 앱의 참가자 서버 인증과 데이터 기반 응답",
+  "tool": "Ego Lite",
+  "syntheticRequestsSubmitted": 1,
+  "method": "POST",
+  "endpoint": "/api/agent",
+  "httpStatus": 200,
+  "browserDurationMs": 14139,
+  "task": "공개자료에서 애월읍 택시 문의처 한 곳과 자료 기준일 확인",
+  "observedProvider": "애월콜",
+  "observedSourceDate": "2026-03-19",
+  "observedAcquisitionDate": "2026-10-31",
+  "source": "https://www.data.go.kr/data/15056321/fileData.do",
+  "actualCallPlaced": false,
+  "actualReservationMade": false
+}

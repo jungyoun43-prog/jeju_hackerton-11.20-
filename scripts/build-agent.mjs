@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { build } from 'esbuild';
+import { pythonCli } from './python-cli.mjs';
 
 const exec = promisify(execFile);
 const defaultRoot = resolve(dirname(fileURLToPath(import.meta.url)),'..');
@@ -20,7 +21,7 @@ export async function buildAgent({root = defaultRoot,revision = process.env.APP_
   });
   await writeFile(resolve(directory,'deployment.json'),JSON.stringify({revision,runtime:'lambda',mode:'synthetic'},null,2)+'\n');
   // Python 표준 라이브러리로 생성하여 추가 zip 의존성을 요구하지 않는다.
-  await exec('python3',['-c',"import pathlib,sys,zipfile; root=pathlib.Path(sys.argv[1]); output=pathlib.Path(sys.argv[2]); z=zipfile.ZipFile(output,'w',zipfile.ZIP_DEFLATED); [z.write(p,p.relative_to(root).as_posix()) for p in sorted(root.rglob('*')) if p.is_file()]; z.close()",directory,zipPath]);
+  await exec(pythonCli(),['-c',"import pathlib,sys,zipfile; root=pathlib.Path(sys.argv[1]); output=pathlib.Path(sys.argv[2]); z=zipfile.ZipFile(output,'w',zipfile.ZIP_DEFLATED); [z.write(p,p.relative_to(root).as_posix()) for p in sorted(root.rglob('*')) if p.is_file()]; z.close()",directory,zipPath],{windowsHide:true});
   return {directory,zipPath,revision,handler:'index.handler'};
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

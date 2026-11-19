@@ -204,7 +204,7 @@ test('기본 API는 모델·store 호출 없이 사실대로 미연결503을 반
   const store = new Proxy({}, {get() { throw new Error('store must not be touched'); }});
   const service = createAgentService({store,config:{revision:'test-sha'}});
   const caps = await service.handleAgentRequest({method:'GET',path:'/api/agent/capabilities'});
-  assert.deepEqual(json(caps),{llm:false,model:'',phone:'simulation',healthRecords:'demo',voiceInput:'browser',progress:'unavailable',visitRecovery:'unavailable',revision:'test-sha'});
+  assert.deepEqual(json(caps),{llm:false,phone:'simulation',healthRecords:'demo',voiceInput:'browser',progress:'unavailable',visitRecovery:'unavailable',revision:'test-sha'});
   const result = await post(service);
   assert.equal(result.statusCode,503);
   assert.equal(json(result).error.code,'MODEL_NOT_CONNECTED');

@@ -80,7 +80,7 @@ try {
   };
   const output = JSON.stringify(catalog, null, 2) + '\n';
   if (options.check) {
-    if (await readFile(options.output, 'utf8') !== output) throw new Error('카탈로그가 기존 감사 CSV와 다릅니다. 오프라인 재색인 명령으로 다시 생성하세요.');
+    if ((await readFile(options.output, 'utf8')).replaceAll('\r\n', '\n') !== output) throw new Error('카탈로그가 기존 감사 CSV와 다릅니다. 오프라인 재색인 명령으로 다시 생성하세요.');
     console.log(`오프라인 색인 일치: 허브 ${hub.length} + 센터 ${center.length} = ${catalog.indexedMetadataCount}개, 별도 공식 안내 2건. API·원자료 갱신 없음.`);
   } else {
     await mkdir(dirname(options.output), {recursive: true});

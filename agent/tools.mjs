@@ -5,7 +5,7 @@ import { applyAction, createDemoCase, getTasks, buildReport } from '../app/domai
 import { getVisitSupportSummary, buildSupportInquiry } from '../app/visit-support.js';
 import { filterHospitals } from '../app/hospitals.js';
 import { getDemoDocument, getDemoHealthRecords } from '../app/health-records.js';
-import { getSupportCandidates, validateSupportRegistry } from '../app/support-data.js';
+import { getSupportInquiryCandidates, supportInquiryIssue, validateSupportRegistry } from '../app/support-data.js';
 import hospitalData from '../app/data/hospital-candidates.json' with {type:'json'};
 import supportData from '../app/data/visit-support-providers.json' with {type:'json'};
 import { AgentError, fail } from './errors.mjs';
@@ -54,7 +54,7 @@ export const AGENT_TOOLS = Object.freeze([
   {name:'request_records', description:'demo는 앱의 고정 합성 FHIR 기록에서 치료이력·판독문을 준비하고 작성일·출처·합성 검사/과거복약 예제를 반환한다. 실제 건강 상태·처방이 아니다. nhis는 미연결이며 자동 합성 대체하지 않는다. 진찰 소견·의뢰서를 작성하지 않는다.', inputSchema:objectSchema({source:{type:'string',enum:['demo','nhis']}}, ['source'])},
   {name:'mark_document_missing', description:'보호자가 이번 요청에서 치료 이력·판독문·의뢰서 파일을 없거나 미보유라고 명시한 경우에만 합성 준비 목록을 미보유로 정정한다. 이전 제출·검토를 무효화한다. 문서 삭제나 실제 의료기록 조회가 아니며 미시행 진찰 상태는 변경하지 않는다.', inputSchema:objectSchema({documentId:{type:'string',enum:['history','report','referral']}}, ['documentId'])},
   {name:'request_hospital_contact', description:'제주 또는 기존 도외 병원 역할에 협진·의뢰/회송 창구와 접수·자료 절차를 묻는 합성 전화 시연. 공통 위임·최소정보·AI·기록 처리 계획을 포함하며 실제 발신·진료 수락·예약이 아니다.', inputSchema:objectSchema({target:{type:'string',enum:['mainland','jeju']}}, ['target'])},
-  {name:'find_support', description:'택시327·돌봄254·별도 공식서비스에서 현재 행정지역과 지원 유형의 문의 후보를 찾는다. 가능 시간·예약은 미확인이다.', inputSchema:objectSchema({kind:kindSchema}, ['kind'])},
+  {name:'find_support', description:'택시327·돌봄254·별도 공식서비스에서 출발 지역과 지원 유형에 맞는 문의 후보를 찾는다. 휠체어 탑승은 공식 교통약자 창구, 돌봄 등록은 동행 제공·관할 문의용이다. 가능 시간·예약은 미확인이다.', inputSchema:objectSchema({kind:kindSchema}, ['kind'])},
   {name:'prepare_inquiries', description:'공개 문의처 선택과 문의 초안을 함께 준비한다. providerId 생략 시 지역·휠체어 조건과 검증한 선호 택시를 반영한다. find_support 선행은 필수가 아니며 의료기록은 포함하지 않는다.', inputSchema:objectSchema({kind:kindSchema,providerId:{type:'string',maxLength:100,pattern:'^[a-z0-9_-]+$'}}, ['kind'])},
   {name:'request_support_contact', description:'현재 초안과 공통 전화 계획으로 합성 응답을 실행한다. 휠체어 이용자격·등록·탑승·승하차·동행인 탑승·희망 시각의 차량 여부도 문의 항목이다. 실제 예약·배차·동행인 배정은 하지 않는다.', inputSchema:objectSchema({kind:kindSchema}, ['kind'])},
   {name:'prepare_review', description:'현재 보유 자료와 접수 조건으로 의료진 검토 준비 상태를 정리한다. 미시행 대면진찰과 공유 동의는 대신 만들지 않는다.', inputSchema:objectSchema()},
@@ -116,7 +116,7 @@ export function preparationWorkflowContext(state) {
   return {currentStageId,currentTask:currentTask?{id:currentTask.id,status:currentTask.status,actor:currentTask.actor,title:currentTask.title,question:currentTask.question}:null,
     stages:stages.map(({id,status,actor,remainingCount})=>({id,status,actor,remainingCount})),nextAutomaticActions,visitReady};
 }
-function supportCandidates(state,kind) { return getSupportCandidates(registry,{kind,area:state.patient.area,wheelchair:state.visitSupport.requirements.wheelchair}); }
+function supportCandidates(state,kind) { return getSupportInquiryCandidates(registry,{kind,area:state.patient.area,wheelchair:state.visitSupport.requirements.wheelchair}); }
 function publicProvider(item) { return {...item,source:{...item.source,url:assertSourceUrl(item.source.url)}}; }
 
 function explicitJourneyDemo(message, scenarioId) {
@@ -491,25 +491,33 @@ export function createToolDispatcher({phoneAdapter = createPhoneSimulationAdapte
         const preferredId = input.kind === 'taxi' ? carePreferences?.taxiProviderId ?? 'auto' : 'auto';
         const preferred = candidates.find(record => record.id === preferredId);
         const current = candidates.find(record => record.id === next.visitSupport[input.kind].provider?.id);
-        const accessible = input.kind === 'taxi' && next.visitSupport.requirements.wheelchair ? candidates.find(record => record.serviceType === 'accessible_transport') : undefined;
-        let provider = input.providerId ? candidates.find(record => record.id === input.providerId) : preferred ?? current ?? candidates[0];
-        let preferenceNotice;
-        if (!input.providerId && preferredId !== 'auto' && !preferred) preferenceNotice = {code:'PREFERENCE_AREA_MISMATCH',message:'선호 택시는 현재 출발 지역의 문의 후보가 아니어서 지역에 맞는 문의처를 사용했습니다.'};
-        if (accessible && provider && provider.id !== accessible.id) {
-          provider = accessible;
-          preferenceNotice = {code:'WHEELCHAIR_SUPPORT_FIRST',message:'휠체어 탑승 지원 확인이 우선이어서 일반 호출택시 선호 대신 교통약자 이동지원센터를 문의 경로로 정리했습니다. 이용자격·차량·예약은 확인 전입니다.'};
-        }
+        const provider = input.providerId ? candidates.find(record => record.id === input.providerId) : preferred ?? current ?? candidates[0];
         if (!provider) {
-          events.push(event(name,'문의 경로 추가 확인 필요','현재 행정지역에서 확인한 공개 문의처가 없습니다.',{status:'needs_input'}));
-          pendingActions.push(pending('support-region','지원 지역 확인','담당 지역·문의 경로를 추가 확인해야 합니다.'));
+          const requested = registry.providers.find(record => record.id === input.providerId && record.kind === input.kind);
+          const reason = requested && supportInquiryIssue(requested,{area:next.patient.area,wheelchair:next.visitSupport.requirements.wheelchair})
+            || '현재 지역과 지원 유형에 맞는 공개 문의처를 다시 선택해 주세요.';
+          const suggestion = candidates[0];
+          data = {status:'recipient_needs_review',reason,...(suggestion ? {suggestedProvider:publicProvider(suggestion)} : {}),...realCallStatus};
+          events.push(event(name,'문의처 다시 선택',reason,{status:'needs_input',source:requested?.source.url}));
+          pendingActions.push(pending('support-recipient','문의처 다시 선택',suggestion ? `${reason} ${suggestion.name}에 문의할지 선택해 주세요.` : reason));
           break;
+        }
+        let preferenceNotice;
+        if (!input.providerId && preferredId !== 'auto' && !preferred) {
+          preferenceNotice = provider.serviceType === 'accessible_transport' && next.visitSupport.requirements.wheelchair
+            ? {code:'WHEELCHAIR_SUPPORT_FIRST',message:'휠체어 탑승을 문의할 수 있는 교통약자 이동지원센터로 초안을 준비했습니다. 저장된 일반택시 선호는 유지됩니다.'}
+            : {code:'PREFERENCE_AREA_MISMATCH',message:'선호 택시는 현재 출발 지역의 문의 후보가 아니어서 지역에 맞는 문의처를 사용했습니다.'};
         }
         next = applyAction(next,{type:'SUPPORT_SELECT_PROVIDER',kind:input.kind,provider});
         next = applyAction(next,{type:'SUPPORT_PREPARE_INQUIRY',kind:input.kind});
         data = {provider:publicProvider(provider),draft:buildSupportInquiry(next,input.kind),...realCallStatus,callPlan:buildCallPlan(next,input.kind),...(preferenceNotice ? {preferenceNotice} : {})};
         if (preferenceNotice) events.push(event(name,'선호 택시 적용 조건 확인',preferenceNotice.message,{status:'needs_input',source:provider.source.url}));
         events.push(event(name,`${input.kind === 'taxi' ? '택시' : '동행'} 문의 초안 준비`,`${provider.name}에 날짜·지역·지원 범위를 확인할 초안을 준비했습니다. 환자 실명·진단·의료기록은 포함하지 않았습니다.`,{source:provider.source.url}));
-        data.publicDataEvidence=preparationDataEvidence(next,input.kind);
+        data.publicDataEvidence = {...preparationDataEvidence(next,input.kind),recipient:{
+          id:provider.id, sourceId:provider.source.datasetId ? `hub:${provider.source.datasetId}` : `official:${provider.id}`,
+          sourceUrl:provider.source.url, asOf:provider.source.asOf || null, retrievedAt:provider.source.retrievedAt,
+          locationMatch:provider.matchLabel, scope:provider.description,
+        }};
         break;
       }
       case 'request_support_contact': {
@@ -519,9 +527,11 @@ export function createToolDispatcher({phoneAdapter = createPhoneSimulationAdapte
           break;
         }
         fail(next.permissions.inquiry === true, 'PERMISSION_REQUIRED', '합성 전화 문의 시연의 허용 범위를 먼저 확인해 주세요. 실제 환자 위임은 미검증입니다.');
-        if (!checkCallGate(input.kind)) break;
         const entry = next.visitSupport[input.kind];
         fail(entry.provider, 'INQUIRY_REQUIRED', '먼저 해당 지원의 문의 초안을 준비해 주세요.');
+        const issue = supportInquiryIssue(entry.provider,{area:next.patient.area,wheelchair:next.visitSupport.requirements.wheelchair});
+        fail(!issue,'SUPPORT_RECIPIENT_RECHECK_REQUIRED',issue);
+        if (!checkCallGate(input.kind)) break;
         if (entry.status !== 'prepared') next = applyAction(next,{type:'SUPPORT_PREPARE_INQUIRY',kind:input.kind});
         item = await phoneAdapter.support({kind:input.kind,providerId:entry.provider.id,plan:buildCallPlan(next,input.kind),signal});
         fail(item?.isSimulation === true && ['available','unavailable','unreachable'].includes(item.outcome) && (item.failureReason === undefined || item.outcome === 'unreachable' && CALL_FAILURE_REASONS.includes(item.failureReason)), 'INVALID_ADAPTER_RESPONSE', '시연 어댑터 응답을 확인해 주세요.', 502);

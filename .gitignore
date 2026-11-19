@@ -2,6 +2,7 @@ node_modules/
 dist/
 output/
 .env
+.runtime/
 .env.*
 !.env.example
 *.log
@@ -12,3 +13,6 @@ test-results/
 orchestration/runs/
 .impeccable/review/
 .omo/evidence/
+web/.next/
+web/out/
+web/public/

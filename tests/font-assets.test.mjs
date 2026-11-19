@@ -6,6 +6,7 @@ import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
+import { pythonCli } from '../scripts/python-cli.mjs';
 
 const app = new URL('../app/', import.meta.url);
 const directory = new URL('assets/pretendard/', app);
@@ -78,7 +79,7 @@ test('재현 도구는 다른 패키지를 자산 쓰기 전에 거부한다', a
   await writeFile(archive, 'synthetic invalid font package');
   await mkdir(output);
   await writeFile(join(output, cssName), '기존 자산');
-  const result = spawnSync('python3', [fileURLToPath(new URL('../scripts/prepare-fonts.py', import.meta.url)), archive, '--output', output], {encoding:'utf8'});
+  const result = spawnSync(pythonCli(), [fileURLToPath(new URL('../scripts/prepare-fonts.py', import.meta.url)), archive, '--output', output], {encoding:'utf8',env:{...process.env,PYTHONUTF8:'1'},windowsHide:true});
   assert.equal(result.status, 1, result.stderr);
   assert.match(result.stderr, /공식 pretendard 1\.3\.9 패키지 해시가 아닙니다/);
   assert.deepEqual(await readdir(output), [cssName]);

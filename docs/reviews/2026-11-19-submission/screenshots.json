@@ -1,0 +1,43 @@
+{
+  "verification_date": "2026-11-18",
+  "app_fingerprint": "a513a34a3835e7ffa8ac444b500a87773e0f2b058cf931c0664f196f414a416b",
+  "scope": "Ego Lite에서 합성 보호자 사례로 실행한 로컬 화면. 화면 안의 회신, 가능 시간과 예약 식별자는 시연 데이터다.",
+  "images": [
+    {
+      "file": "calendar.png",
+      "original": "output/vehicle-recovery-qa/05-laptop-calendar.png",
+      "crop_xyxy": [
+        279,
+        75,
+        1407,
+        758
+      ],
+      "source_sha256": "394d1716d9cf0b124036b848072b0a90d3493a65ab3ab61be0eb047c79d9214d",
+      "sha256": "be811b893ace430706aaf14af8319dfd6cecffd553ee24c8f6f0b1ea5eff0cfe"
+    },
+    {
+      "file": "vehicle-options.png",
+      "original": "output/vehicle-recovery-qa/01-vehicle-alternatives.png",
+      "crop_xyxy": [
+        308,
+        103,
+        1408,
+        566
+      ],
+      "source_sha256": "5bee864dbab82292dabe8712241ae4bd4c44b864530a85724bdaf0c20c62303e",
+      "sha256": "c6a98575aac9f5f45593bf191fbd7cd3bb049acd6def8b0e2dddb8fbb2742d35"
+    },
+    {
+      "file": "edit-mobile.png",
+      "original": "output/vehicle-recovery-qa/06-mobile-edit.png",
+      "crop_xyxy": [
+        0,
+        0,
+        487,
+        1055
+      ],
+      "source_sha256": "2c253a6d000eb08c072582e89981f7cace3a074d8d2851a2391f0ee3812989a2",
+      "sha256": "6f0e45c15d54d397b9520521827f10359acecbad988769ec04b1cadf865c0491"
+    }
+  ]
+}

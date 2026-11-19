@@ -1,0 +1,411 @@
+/* 혼디: 흰 작업면, 초록 선택 상태, 주황 주 행동. 공통 컴포넌트는 예약 영역에 한정한다. */
+.public-data-mode { display:flex; flex-wrap:wrap; gap:6px; margin:18px 0 24px; border-bottom:1px solid var(--line); padding-bottom:8px; }
+.hondi-react .public-data-mode button { padding:9px 12px; font-size:14px; font-weight:500; }
+.hondi-react .public-data-mode button[aria-pressed=true] { background:#eaf3ec; color:#255238; }
+.public-data-intro { margin:0 0 24px; font-size:16px; line-height:1.85; max-width:64ch; }
+.public-result-heading { margin:28px 0 8px; }
+.public-result-heading h3 { font-size:18px; font-weight:600; }
+.public-result-heading h3 span { color:var(--secondary); margin-left:8px; white-space:nowrap; }
+.public-result-heading p,.public-support-context { font-size:13px; color:var(--muted); line-height:1.8; margin:6px 0; }
+.public-hospital-row,.public-support-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:20px; align-items:start; padding:22px 0; border-bottom:1px solid var(--line); }
+.public-hospital-row h4,.public-support-row h4 { font-size:18px; line-height:1.6; font-weight:600; margin:0 0 6px; overflow-wrap:anywhere; }
+.public-hospital-row p,.public-support-row p { font-size:14px; line-height:1.85; color:var(--muted); margin:6px 0; }
+.public-hospital-row>button,.public-support-row>button { margin-top:4px; font-size:14px; padding:10px 12px; }
+.public-address { display:flex; align-items:flex-start; gap:6px; }
+.public-address svg { margin-top:4px; }
+.public-hospital-row details { margin-top:6px; }
+.public-hospital-row summary,.jeju-data-sources summary { min-height:44px; padding:10px 0; cursor:pointer; color:var(--secondary); font-size:14px; line-height:1.7; }
+.public-hospital-row details a,.jeju-data-sources a,.public-contact-links a { display:inline-flex; align-items:center; gap:6px; min-height:44px; color:var(--secondary); text-decoration:underline; text-underline-offset:4px; font-size:14px; line-height:1.6; }
+.public-hospital-row details a svg,.jeju-data-sources a svg,.public-contact-links a svg { width:14px; height:14px; }
+.hondi-react .public-more { width:100%; margin:12px 0; color:var(--secondary); }
+.jeju-data-sources { border-top:1px solid var(--line); margin-top:24px; padding-top:8px; }
+.jeju-data-sources>p { font-size:14px; line-height:1.8; margin:12px 0; }
+.jeju-data-sources dl>div { display:grid; grid-template-columns:150px minmax(0,1fr); gap:20px; padding:8px 0; border-bottom:1px solid var(--line); }
+.jeju-data-sources dd { font-size:13px; line-height:1.8; color:var(--muted); margin:8px 0; }
+.public-wish-layout { display:grid; grid-template-columns:minmax(308px,1fr) minmax(180px,.7fr); gap:28px; margin:22px 0; align-items:start; }
+.public-wish-summary { padding-top:10px; }
+.public-wish-summary h3 { font-size:16px; }
+.public-wish-date { font-size:20px; line-height:1.7; font-weight:600; margin:12px 0 28px; font-variant-numeric:tabular-nums; }
+.public-wish-summary legend { font-size:14px; margin:0 0 12px; }
+.public-time-options { display:flex; gap:8px; flex-wrap:wrap; }
+.hondi-react .public-time-options button { font-size:14px; padding:8px 12px; }
+.hondi-react .public-time-options button[aria-pressed=true] { background:#eaf3ec; border-color:#799c83; color:#255238; }
+.hondi-react .public-wish-day { height:48px; font-size:16px; font-weight:500; }
+.public-review-heading { display:flex; gap:16px; justify-content:space-between; align-items:baseline; margin:24px 0 16px; }
+.public-review-heading h3 { font-size:22px; line-height:1.5; }
+.public-review-heading>span { font-size:13px; white-space:nowrap; color:var(--muted); }
+.public-review-facts>div { display:grid; grid-template-columns:100px minmax(0,1fr); gap:20px; padding:14px 0; border-bottom:1px solid var(--line); font-size:15px; line-height:1.8; }
+.public-review-facts dt { color:var(--muted); }
+.public-review-facts dd { margin:0; }
+.jeju-support-contacts { padding-bottom:28px; margin-bottom:28px; border-bottom:1px solid var(--line); }
+.jeju-support-contacts>h3 { font-size:20px; }
+.jeju-support-filters { display:grid; grid-template-columns:minmax(180px,1fr) 1.2fr; gap:24px; align-items:end; margin:20px 0 10px; }
+.jeju-support-filters .trip-check { border:0; padding:10px 0; margin:0; }
+.public-count { font-size:12px; color:var(--muted); margin-left:4px; font-variant-numeric:tabular-nums; }
+.public-contact-links { display:flex; flex-wrap:wrap; column-gap:20px; }
+.public-support-row .public-support-source { font-size:12px; }
+@media(max-width:1100px) { .public-wish-layout { grid-template-columns:minmax(0,1fr); gap:16px; } }
+@media(max-width:600px) {
+  .public-hospital-row,.public-support-row { grid-template-columns:minmax(0,1fr); gap:8px; padding:20px 0; }
+  .public-hospital-row>button,.public-support-row>button { justify-self:start; }
+  .public-hospital-row h4,.public-support-row h4 { font-size:17px; }
+  .jeju-support-filters { grid-template-columns:minmax(0,1fr); gap:12px; }
+  .public-data-mode { gap:2px; }
+  .hondi-react .public-data-mode button { font-size:13px; padding:9px 8px; }
+  .jeju-data-sources dl>div { grid-template-columns:minmax(0,1fr); gap:0; }
+  .jeju-data-sources dd { margin-top:0; }
+  .public-review-facts>div { grid-template-columns:76px minmax(0,1fr); gap:12px; font-size:14px; }
+  .public-review-heading { display:block; }
+  .public-review-heading>span { display:block; margin-top:8px; }
+}
+.hondi-react { --cell-size:44px; color:var(--ink); }
+/* 첫 행동은 두 지역 선택. 기존 대화·입력 DOM은 숨겨 보존한다. */
+.is-region-home .conversation-layout { grid-template-columns:minmax(0,1fr); grid-template-rows:minmax(0,1fr); grid-template-areas:'chat'; }
+.is-region-home .chat-workspace { grid-area:chat; }
+.is-region-home .preparation-rail,.is-region-home .workspace-controls,.is-region-home .header-actions { display:none; }
+.is-region-home #conversation-scroll { padding:clamp(20px,4vw,56px); }
+.region-start { max-width:1000px; margin:0 auto; padding:clamp(12px,3vh,36px) 0; }
+.region-start-heading { margin-bottom:32px; }
+.region-start-heading h2 { margin:0; font-size:36px; line-height:1.35; letter-spacing:-.035em; font-weight:650; text-wrap:balance; }
+.region-start-heading p { margin-top:12px; color:var(--muted); font-size:17px; line-height:1.7; }
+.care-region-choices { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:24px; align-items:stretch; }
+.hondi-react .care-region-choice[data-slot=button] { display:flex; flex-direction:column; align-items:stretch; justify-content:space-between; min-width:0; min-height:350px; gap:24px; padding:32px; border:1px solid #b5cbbb; border-radius:14px; background:#f1f7f2; color:#224b35; text-align:left; white-space:normal; box-shadow:none; transition:background-color 160ms ease-out,border-color 160ms ease-out; }
+.hondi-react .care-region-choice.region-seoul { background:#fff7ef; border-color:#dec8b5; color:#70401f; }
+.hondi-react .care-region-choice:hover { background:#e6f0e8; border-color:#5e856a; }
+.hondi-react .care-region-choice.region-seoul:hover { background:#f9ebdc; border-color:#b17b52; }
+.care-region-choice:focus-visible { outline:3px solid var(--secondary); outline-offset:4px; }
+.region-choice-main { display:flex; flex-direction:column; align-items:flex-start; gap:12px; }
+.hondi-react .region-choice-main>svg { width:30px; height:30px; margin-bottom:8px; stroke-width:1.5; }
+.region-choice-main>strong { font-size:38px; font-weight:650; line-height:1.3; letter-spacing:-.03em; }
+.region-choice-description { font-size:17px; font-weight:450; line-height:1.6; }
+.region-choice-detail { font-size:14px; font-weight:400; line-height:1.7; }
+.region-choice-action { display:flex; align-items:center; justify-content:space-between; gap:12px; padding-top:22px; border-top:1px solid #bfd1c3; font-size:17px; font-weight:650; line-height:1.6; }
+.region-seoul .region-choice-action { border-top-color:#e0cdbb; }
+.region-saved-detail { font-size:14px; line-height:1.7; font-weight:450; }
+.region-start-footer { display:flex; flex-wrap:wrap; align-items:flex-start; justify-content:space-between; gap:16px; margin-top:24px; }
+.region-start-footer [data-slot=button] { padding:8px 0; color:var(--secondary); gap:8px; font-size:14px; }
+.region-start-footer p { font-size:13px; color:var(--muted); line-height:1.8; margin:6px 0; }
+#choose-care-region { min-height:44px; padding:8px 12px; color:var(--secondary); font-size:14px; flex-shrink:0; }
+.appointment-next-region { margin-top:32px; padding-top:24px; border-top:1px solid var(--line); }
+.appointment-next-region [data-slot=button] { margin-top:16px; }
+@media(max-width:1100px) {
+  .region-choice-main>strong { font-size:30px; }
+  .hondi-react .care-region-choice[data-slot=button] { padding:24px; }
+  #choose-care-region { padding:8px 4px; font-size:13px; }
+}
+@media(max-width:600px) {
+  .is-region-home #conversation-scroll { padding:24px 16px; }
+  .region-start { padding:4px 0; }
+  .region-start-heading { margin-bottom:24px; }
+  .region-start-heading h2 { font-size:28px; }
+  .region-start-heading p { font-size:15px; margin-top:10px; }
+  .care-region-choices { gap:12px; }
+  .hondi-react .care-region-choice[data-slot=button] { min-height:290px; padding:20px 16px; gap:20px; }
+  .region-choice-main { gap:10px; }
+  .region-choice-main>strong { font-size:24px; }
+  .region-choice-description { font-size:15px; }
+  .region-choice-detail,.region-saved-detail { font-size:13px; }
+  .region-choice-action { padding-top:16px; font-size:15px; gap:6px; }
+  .region-start-footer { margin-top:18px; gap:6px; }
+  .region-start-footer p { font-size:12px; }
+  #choose-care-region { max-width:64px; line-height:1.5; }
+}
+@media(prefers-reduced-motion:reduce) { .hondi-react .care-region-choice { transition:none; } }
+.hondi-react svg { width:18px; height:18px; flex-shrink:0; }
+.hondi-react button { font-family:inherit; cursor:pointer; border-style:solid; }
+.hondi-react button:disabled { cursor:default; }
+.hondi-react [data-slot=button] { height:auto; min-height:44px; white-space:normal; line-height:1.6; }
+.hondi-react [data-variant=outline] { border:1px solid #cbd7cf; background:white; }
+.hondi-react [data-slot=badge] { display:inline-flex; align-items:center; padding:4px 8px; border-radius:5px; font-size:12px; font-weight:500; line-height:1.5; background:#eef5ef; color:#29513c; border:1px solid transparent; }
+.hondi-react [data-slot=select-trigger] { min-height:46px; width:100%; padding:10px 12px; border:1px solid #c5d2c9; border-radius:6px; color:var(--ink); font-family:inherit; font-size:16px; background:white; text-align:left; }
+.hondi-react [data-slot=select-trigger]>span { white-space:normal; text-align:left; }
+[data-slot=select-content] { font-family:'Pretendard Variable',sans-serif; color:#21372a; background:white; border:1px solid #c5d2c9; z-index:100; box-shadow:0 8px 24px #203c2920; border-radius:8px; max-width:calc(100vw - 24px); }
+[data-slot=select-item] { min-height:44px; padding:10px 32px 10px 12px; font-size:15px; line-height:1.6; cursor:pointer; }
+[data-slot=select-item][data-highlighted] { background:#edf5ef; outline:2px solid #438763; outline-offset:-2px; }
+.hondi-react .appointment-topline { margin-bottom:20px; }
+.hondi-react .appointment-topline button { padding:8px; font-size:13px; }
+.hondi-react .appointment-route-caption { margin-top:0; }
+.hondi-react .appointment-progress { gap:22px; padding-bottom:20px; }
+.hondi-react .appointment-progress li { display:flex; align-items:center; gap:7px; }
+.hondi-react .appointment-progress li>span { display:grid; place-items:center; width:23px; height:23px; border:1px solid #ccd9d0; border-radius:50%; font-size:12px; }
+.hondi-react .appointment-progress li[aria-current]>span { color:white; background:#315c43; border-color:#315c43; }
+.hondi-react .appointment-option { justify-content:flex-start; gap:12px; font-weight:400; min-height:54px; border:0; border-bottom:1px solid var(--line); border-radius:0; box-shadow:none; padding:12px 8px; }
+.hondi-react .appointment-option[aria-pressed=true] { border:0; border-bottom:1px solid var(--line); box-shadow:none; background:#f1f6f2; }
+.hondi-react .appointment-option svg { color:#6b7c70; }
+.hondi-react .appointment-option[aria-pressed=true] svg { color:#285839; }
+.hondi-react .appointment-filters { display:grid; grid-template-columns:1fr 1fr; gap:20px; align-items:start; }
+.hondi-react .appointment-filters>label { padding-top:0; }
+.hondi-react .appointment-filters label>span { font-size:14px; color:var(--ink); }
+.hondi-react .appointment-intake-group>div { gap:0; }
+.appointment-referral-state { flex:1; font-size:14px; color:var(--muted); }
+.doctor-department-label,.trip-progress-text { font-size:13px; color:var(--muted); }
+.hondi-react .appointment-doctor h3 { margin-top:10px; }
+.hondi-react .appointment-referral>div { flex-wrap:wrap; }
+.hondi-react .appointment-selection svg { color:var(--secondary); }
+.hondi-react .appointment-action-line [data-slot=button] { padding:10px 14px; }
+.hondi-react .appointment-policy summary,.hondi-react .appointment-policy a { min-height:44px; display:flex; align-items:center; font-size:13px; cursor:pointer; }
+.hondi-react .appointment-policy summary { text-decoration:underline; text-underline-offset:4px; }
+.hondi-react .appointment-completion-links { display:flex; flex-wrap:wrap; gap:10px; margin:20px 0; }
+.hondi-react .appointment-completion-links button { padding:10px 12px; }
+.hondi-react .appointment-nav button { white-space:normal; justify-content:start; background:transparent; }
+.hondi-react .appointment-nav button>svg { color:#447456; }
+.hondi-react .appointment-nav button[aria-pressed=true] { background:#eaf3ec; box-shadow:none; }
+.hondi-react .appointment-result-state>svg { width:24px; height:24px; }
+.appointment-schedule-layout { display:grid; grid-template-columns:minmax(0,1fr); gap:24px; }
+.appointment-calendar { width:100%; padding:0; --cell-size:44px; }
+.appointment-calendar .rdp-months { width:100%; }
+.appointment-calendar .rdp-month { gap:12px; }
+.appointment-calendar .rdp-month_caption { min-height:44px; }
+.appointment-calendar .rdp-caption_label { font-size:19px; font-weight:650; }
+.appointment-calendar .rdp-nav button { width:44px; height:44px; padding:0; background:#f3f7f4; border:1px solid #dce5df; }
+.appointment-calendar .rdp-month_grid,.appointment-calendar thead,.appointment-calendar tbody { display:block; width:100%; }
+.appointment-calendar .rdp-weekdays { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); }
+.appointment-calendar .rdp-weekday { text-align:center; width:100%; padding:8px 0; font-size:13px; }
+.appointment-calendar .rdp-week { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); margin-top:4px; gap:4px; }
+.appointment-calendar .rdp-day { display:block; min-width:0; width:100%; aspect-ratio:auto; }
+.appointment-calendar .appointment-day { width:100%; height:58px; min-width:44px; display:flex; flex-direction:column; gap:2px; padding:5px 0; border:1px solid transparent; background:white; }
+.appointment-calendar .appointment-day>span { font-size:17px; font-weight:500; line-height:1.6; }
+.appointment-calendar .appointment-day>small { font-size:11px; height:13px; line-height:13px; color:#66766c; }
+.appointment-calendar .appointment-day.is-available { border-color:#c8ddcf; background:#f0f7f2; color:#275e3e; }
+.appointment-calendar .appointment-day.is-available small { color:#32704a; }
+.appointment-calendar .appointment-day[aria-pressed=true] { color:white; background:#315c43; border-color:#315c43; box-shadow:none; }
+.appointment-calendar .appointment-day[aria-pressed=true]>small { color:white; }
+.appointment-calendar .appointment-day:disabled { color:#9ba79e; background:transparent; }
+.appointment-calendar .rdp-disabled { opacity:1; }
+.appointment-calendar .rdp-today { background:transparent; }
+.hondi-react .appointment-times { margin-top:18px; grid-template-columns:1fr 1fr; }
+.hondi-react .appointment-times fieldset>div { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.hondi-react .appointment-times button { min-height:58px; }
+.trip-heading { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; }
+.trip-plan-overview { margin:24px 0; display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.trip-field { display:grid; gap:8px; min-width:0; font-size:14px; }
+.trip-field>span { font-weight:500; line-height:1.7; }
+.trip-legs [data-slot=accordion-item] { border-bottom:1px solid #d9e2db; }
+.trip-legs [data-slot=accordion-trigger] { width:100%; display:flex; align-items:center; text-align:left; gap:12px; padding:20px 0; text-decoration:none; background:transparent; }
+.trip-legs [data-slot=accordion-trigger]>svg:last-child { margin-left:0; width:16px; }
+.trip-leg-number { flex-shrink:0; width:24px; font-size:14px; color:#627c6a; text-align:center; }
+.trip-leg-label { display:grid; gap:5px; flex:1; }
+.trip-leg-label strong { font-size:16px; font-weight:600; }
+.trip-leg-label small,.trip-leg-count { font-size:12px; color:var(--muted); line-height:1.6; }
+.trip-legs [data-slot=accordion-content]>div { padding:0 0 24px 0; }
+.trip-legs [data-slot=accordion-content] { font-size:14px; }
+.trip-check { display:flex; align-items:center; gap:12px; min-height:48px; cursor:pointer; padding:4px 0; margin:6px 0; line-height:1.7; }
+.hondi-react .trip-check [data-slot=checkbox] { position:relative; display:grid; place-items:center; width:44px; height:44px; min-height:44px; padding:0; border:0; border-radius:6px; background:transparent; box-shadow:none; flex-shrink:0; appearance:none; }
+.hondi-react .trip-check [data-slot=checkbox]::before { content:''; position:absolute; width:20px; height:20px; border:1px solid #819b8c; border-radius:4px; background:white; }
+.hondi-react .trip-check [data-slot=checkbox][data-state=checked]::before { background:var(--secondary); border-color:var(--secondary); }
+.trip-check [data-slot=checkbox-indicator] { position:relative; display:grid; place-items:center; color:white; }
+.hondi-react .trip-check [data-slot=checkbox-indicator] svg { width:15px; height:15px; stroke-width:2.5px; }
+.trip-check:hover { background:#f6f8f6; }
+.trip-time-details { border-top:1px dashed #d9e2db; margin-top:16px; }
+.trip-time-details summary { display:flex; align-items:center; min-height:44px; color:#315c43; cursor:pointer; text-decoration:underline; text-underline-offset:4px; }
+.trip-time-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin:14px 0; }
+.trip-time-grid input { min-width:0; width:100%; min-height:44px; font-family:inherit; padding:8px; border:1px solid #c2d0c7; border-radius:6px; background:white; font-size:16px; }
+.trip-official-link { display:flex; align-items:center; gap:8px; min-height:44px; font-size:13px; color:#315c43; margin-top:10px; text-decoration:underline; text-underline-offset:4px; }
+.trip-official-link svg { width:14px; }
+.trip-assessment { margin:24px 0; font-size:14px; line-height:1.8; }
+.trip-assessment h4 { font-weight:600; font-size:15px; }
+.trip-assessment ul { padding-left:20px; margin-top:8px; }
+.trip-conflict { border:0; padding:0; margin-bottom:24px; color:#9e3828; }
+.trip-conflict h4 { display:flex; align-items:center; gap:8px; }
+.hondi-react #appointment-department { justify-content:space-between; width:100%; min-height:46px; padding:10px 12px; text-align:left; font-size:16px; font-weight:400; }
+.department-note { color:var(--muted); font-size:12px; line-height:1.6; }
+.department-popover { width:var(--radix-popover-trigger-width); min-width:min(300px,calc(100vw - 24px)); max-width:calc(100vw - 24px); max-height:var(--radix-popover-content-available-height); padding:0; background:white; color:#21372a; border:1px solid #c7d3cb; border-radius:7px; box-shadow:0 5px 20px #203c2920; font-family:'Pretendard Variable',sans-serif; z-index:100; }
+.department-popover [data-slot=command-input-wrapper] { min-height:48px; padding:0 12px; border-bottom:1px solid #dde5df; }
+.department-popover [data-slot=command-input] { min-height:48px; width:100%; padding:10px 0; border:0; outline:none; background:white; font-family:inherit; font-size:16px; }
+.department-popover [data-slot=command-list] { max-height:min(300px,calc(var(--radix-popover-content-available-height) - 88px)); overflow-y:auto; }
+.department-popover [data-slot=command-item] { min-height:44px; padding:10px 12px; display:flex; justify-content:space-between; border-radius:4px; font-size:15px; cursor:pointer; }
+.department-popover [data-slot=command-item][data-selected=true] { background:#eaf3ed; color:#234c39; }
+.department-popover [cmdk-group-heading] { padding:12px 12px 6px; color:#64766a; font-size:12px; }
+.department-popover [data-slot=command-empty] { padding:24px 14px; line-height:1.8; text-align:left; font-size:14px; }
+.department-popover svg { width:16px; height:16px; }
+.department-picker-note { padding:8px 12px; margin:0; border-top:1px solid #e1e7e3; color:#64766a; font-size:12px; }
+@media(min-width:1280px) { .appointment-schedule-layout { grid-template-columns:minmax(330px,1.25fr) minmax(230px,1fr); gap:28px; } .hondi-react .appointment-times { grid-template-columns:1fr; } }
+@media(max-width:600px) {
+  .hondi-react .appointment-progress { gap:10px; font-size:12px; }
+  .hondi-react .appointment-progress li { gap:5px; }
+  .hondi-react .appointment-progress li>span { width:20px; height:20px; }
+  .trip-plan-overview,.trip-time-grid { grid-template-columns:1fr; }
+  .trip-leg-number { display:none; }
+  .trip-leg-label strong { font-size:15px; }
+  .hondi-react .appointment-referral strong { font-size:14px; }
+  .hondi-react .appointment-filters { grid-template-columns:1fr; gap:16px; }
+}
+@media(max-width:359px) {
+  .appointment-calendar .rdp-week { gap:0; }
+  .appointment-calendar .appointment-day { height:54px; }
+  .hondi-react .appointment-progress { gap:7px; font-size:11px; }
+  .hondi-react .appointment-progress li>span { display:none; }
+}
+@media(prefers-reduced-motion:reduce) { .hondi-react *,[data-slot=select-content] { transition:none!important; animation:none!important; } }
+
+/* 날짜를 먼저 정하고, 같은 날짜의 여러 의료진을 비교한다. */
+.availability-context,.date-preference-toolbar,.availability-result-heading { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; }
+.availability-context { font-size:14px; margin-bottom:12px; }
+.availability-context button { font-size:13px; padding:8px 0; }
+.date-preference-toolbar { margin-bottom:20px; }
+.date-preference-toolbar p,.availability-result-heading p { font-size:13px; line-height:1.7; color:var(--muted); }
+.date-mode { display:inline-flex; padding:3px; gap:2px; background:#f0f3f0; border-radius:7px; }
+.hondi-react .date-mode button { padding:8px 18px; border:0; background:transparent; border-radius:5px; font-size:14px; font-weight:500; }
+.hondi-react .date-mode button[aria-pressed=true] { background:var(--secondary); color:white; }
+.preference-calendar .rdp-day.rdp-range_start,.preference-calendar .rdp-day.rdp-range_end { background:transparent; }
+.preference-calendar .appointment-day[data-range-middle=true] { background:#e6f0e9; color:var(--secondary); border-color:transparent; border-radius:0; }
+.preference-calendar .appointment-day[data-range-middle=true]>small { color:var(--secondary); }
+.availability-legend { margin-top:14px; font-size:12px; line-height:1.8; color:var(--muted); }
+.availability-results { margin-top:28px; border-top:1px solid var(--line); padding-top:22px; }
+.availability-result-heading { align-items:baseline; margin-bottom:12px; }
+.availability-result-heading h3 { font-size:18px; line-height:1.6; }
+.availability-date { margin-top:20px; }
+.availability-date h4 { font-size:14px; font-weight:600; color:var(--secondary); margin-bottom:4px; }
+.availability-doctor { display:grid; grid-template-columns:minmax(110px,1fr) minmax(0,2fr); align-items:center; gap:20px; padding:16px 0; border-bottom:1px solid var(--line); }
+.availability-doctor>div:first-child { display:grid; gap:6px; }
+.availability-doctor strong { font-size:16px; font-weight:600; }
+.availability-doctor span { font-size:13px; color:var(--muted); }
+.availability-slots { display:flex; justify-content:flex-end; flex-wrap:wrap; gap:8px; }
+.hondi-react .availability-slots button { min-width:84px; padding:8px 16px; box-shadow:none; font-size:16px; font-weight:500; font-variant-numeric:tabular-nums; }
+.hondi-react .availability-slots button[aria-pressed=true] { background:var(--secondary); color:white; border-color:var(--secondary); }
+.hondi-react .availability-slots button[aria-pressed=true]:hover:not(:disabled),
+.hondi-react .date-mode button[aria-pressed=true]:hover:not(:disabled),
+.hondi-react .appointment-calendar .appointment-day[aria-pressed=true]:hover:not(:disabled) { background:var(--secondary); color:white; }
+.availability-next { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:16px; padding-top:24px; }
+.availability-next p { display:grid; gap:5px; font-size:14px; color:var(--muted); line-height:1.7; }
+.availability-next strong { color:var(--ink); }
+.availability-next button { padding:10px 16px; }
+.appointment-availability { container:visit-dates / inline-size; }
+.availability-layout { display:grid; grid-template-columns:minmax(0,1fr); }
+.availability-controls .availability-context { justify-content:flex-start; gap:4px 14px; margin:0; }
+.availability-controls .date-preference-toolbar { margin:0; }
+.availability-controls { margin:0 0 14px; }
+.availability-controls .range-instruction { grid-column:1/-1; font-size:14px; color:var(--muted); margin:4px 0; }
+.preference-calendar .rdp-week { margin-top:2px; }
+.preference-calendar .rdp-month { gap:6px; }
+.hondi-react .preference-calendar .appointment-day { height:46px; min-height:44px; padding:1px 0; gap:0; }
+.availability-first-date { margin-top:14px; }
+.hondi-react .availability-first-date button { padding:8px 12px; border-color:#b3c8b8; color:var(--secondary); }
+@container visit-dates (min-width:640px) {
+  .availability-controls { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:2px 12px; }
+  .availability-layout { grid-template-columns:minmax(324px,1.1fr) minmax(230px,1fr); gap:clamp(20px,3cqi,40px); align-items:start; }
+  .availability-results { border-top:0; padding-top:0; margin-top:0; }
+  .availability-result-heading { align-items:baseline; justify-content:flex-start; gap:4px 12px; margin-bottom:8px; }
+  .availability-result-heading p { margin:0; }
+  .availability-result-heading h3 { font-size:16px; }
+  .availability-doctor { grid-template-columns:1fr; gap:8px; padding:8px 0 12px; }
+  .availability-doctor>div:first-child { display:flex; align-items:baseline; gap:10px; }
+  .availability-slots { justify-content:flex-start; }
+  .availability-date { margin-top:8px; }
+}
+@media(min-width:760px) and (max-height:650px) {
+  .is-appointment-mode:has(.appointment-availability) { padding-block:6px; }
+  .appointment-availability { margin:6px 0; }
+  .availability-controls { margin-bottom:6px; }
+  .is-booking-workspace:has(.appointment-availability) .booking-footer-step { margin-right:8px; }
+  .is-booking-workspace:has(.appointment-availability) .booking-footer-selection { display:inline; }
+}
+.flight-search { padding-bottom:28px; margin-bottom:28px; border-bottom:1px solid var(--line); }
+.flight-search-heading { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:12px; }
+.flight-search-heading h3 { font-size:20px; }
+.flight-search-heading>span { font-size:14px; color:var(--muted); }
+.flight-clinic-date { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin:14px 0; }
+.flight-clinic-date p { font-size:14px; color:var(--muted); }
+.flight-clinic-date strong { margin-left:8px; color:var(--ink); font-weight:500; }
+.flight-clinic-date>div { display:flex; flex-wrap:wrap; gap:14px; }
+.flight-clinic-date button { font-size:13px; padding:8px 0; }
+.flight-search-fields { display:grid; grid-template-columns:1fr 1fr 100px; gap:16px; margin:20px 0 12px; }
+.flight-search-fields input { box-sizing:border-box; width:100%; min-width:0; height:46px; padding:8px 12px; font-size:16px; border:1px solid #c5d2c9; border-radius:6px; background:white; color:var(--ink); }
+.flight-search-action { display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin-top:18px; }
+.flight-search-action>span { font-size:12px; line-height:1.7; color:var(--muted); }
+.booking-link { display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:44px; padding:10px 12px; border:1px solid #c5d2c9; border-radius:6px; text-decoration:none; font-size:14px; line-height:1.6; font-weight:500; color:var(--secondary); }
+.booking-link:hover { background:var(--soft); }
+.booking-link-primary { background:var(--primary); border-color:var(--primary); color:white; }
+.booking-link-primary:hover { background:var(--primary-hover); color:white; }
+.hondi-react .booking-link svg { width:15px; height:15px; }
+.booking-details { margin-top:10px; }
+.booking-details summary { display:flex; align-items:center; min-height:44px; cursor:pointer; font-size:13px; color:var(--muted); text-decoration:underline; text-underline-offset:4px; }
+.booking-error { margin:10px 0; font-size:14px; line-height:1.8; color:var(--danger); }
+.ground-booking { margin:18px 0; }
+.ground-booking h4 { margin:0 0 6px; font-size:15px; font-weight:600; }
+.ground-booking>p { font-size:14px; line-height:1.8; color:var(--muted); }
+.booking-actions { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0; }
+.ground-booking>.booking-link { padding-left:0; border:0; text-decoration:underline; text-underline-offset:4px; }
+@media(max-width:600px) {
+  .availability-doctor { grid-template-columns:1fr; gap:12px; }
+  .availability-doctor>div:first-child { display:flex; align-items:baseline; gap:10px; }
+  .availability-slots { justify-content:flex-start; }
+  .date-preference-toolbar { gap:10px; }
+  .availability-next button { width:100%; }
+  .flight-search-fields { grid-template-columns:1fr 1fr; gap:16px 12px; }
+  .flight-search-fields>label:last-child { max-width:110px; }
+  .booking-actions { flex-direction:column; align-items:stretch; }
+  .flight-search-action .booking-link { width:100%; }
+}
+/* 단계 이동: 스크롤 영역 밖의 공통 하단에서 선택과 다음 행동을 함께 읽는다. */
+.chat-composer.is-booking { padding:14px 24px 6px; }
+.chat-composer.is-booking .draft-feedback { display:none; }
+.booking-footer { display:flex; align-items:center; justify-content:space-between; gap:16px; }
+.booking-footer-context { min-width:0; flex:1; }
+.booking-footer-step { font-size:12px; font-weight:600; color:#315c43; }
+.booking-footer-selection { font-size:14px; font-weight:600; line-height:1.6; margin:4px 0; overflow-wrap:anywhere; }
+.booking-footer-hint { font-size:13px; color:#526759; line-height:1.6; margin:0; }
+.booking-footer-buttons { display:flex; align-items:center; gap:8px; flex-shrink:0; }
+.booking-footer-buttons [data-slot=button] { padding:11px 14px; }
+.booking-footer-buttons [data-book-primary] { min-width:180px; }
+.booking-footer .appointment-primary { background:var(--primary); color:white; border:1px solid var(--primary); border-radius:6px; font-weight:600; }
+.booking-footer .appointment-primary:hover:not(:disabled) { background:var(--primary-hover); border-color:var(--primary-hover); }
+.booking-footer .appointment-primary:disabled { opacity:1; background:#6b776e; border-color:#6b776e; color:white; }
+.booking-footer-buttons>button:not(.appointment-primary) { color:var(--secondary); }
+.hondi-react .appointment-topline { margin-bottom:12px; }
+.public-data-mode { margin:14px 0 16px; }
+.public-data-intro { margin-bottom:16px; }
+.hondi-react .appointment-progress { justify-content:space-between; gap:12px; font-size:13px; padding:0 0 18px; margin-bottom:24px; }
+.hondi-react .appointment-progress li { flex-shrink:0; }
+.hondi-react .appointment-progress li:not([aria-current]) { color:#617366; }
+.hondi-react .appointment-nav .booking-nav-number { display:grid; place-items:center; width:26px; height:26px; flex-shrink:0; border:1px solid #bdcfc2; border-radius:50%; font-style:normal; font-size:13px; color:#315c43; }
+.hondi-react .appointment-nav [aria-current] .booking-nav-number { background:#315c43; border-color:#315c43; color:white; }
+.booking-records-link { margin-top:20px; }
+.booking-stage-intro { font-size:18px; line-height:1.7; margin:24px 0; }
+.booking-intake-questions { margin:26px 0; }
+.search-picker { display:grid; gap:8px; min-width:0; }
+.search-picker>span { font-size:14px; color:var(--ink); }
+.hondi-react .search-picker [role=combobox] { width:100%; padding:10px 12px; gap:10px; justify-content:space-between; text-align:left; font-size:16px; }
+.search-picker [role=combobox]>span { flex:1; min-width:0; overflow-wrap:anywhere; }
+.search-picker [role=combobox]>svg { flex-shrink:0; width:16px; color:#617366; }
+.search-popover { width:max(280px,var(--radix-popover-trigger-width)); max-width:calc(100vw - 24px); }
+.search-popover [data-slot=command-input-wrapper] { height:48px; }
+.search-popover [data-slot=command-input] { font-size:16px; }
+.search-popover [data-slot=command-item] { min-height:44px; cursor:pointer; padding:10px 12px; justify-content:space-between; }
+.hospital-search { display:grid; gap:8px; margin-top:20px; }
+.hospital-search>label { font-size:14px; }
+.hospital-search>div { display:flex; align-items:center; gap:10px; border:1px solid #c5d2c9; border-radius:6px; padding-left:12px; }
+.hospital-search>div:focus-within { outline:2px solid #438763; outline-offset:2px; }
+.hospital-search svg { width:18px; color:#617366; flex-shrink:0; }
+.hospital-search input { width:100%; min-width:0; font:inherit; font-size:16px; min-height:46px; background:transparent; outline:none; padding:8px 8px 8px 0; border:0; }
+.hospital-search input::-webkit-search-cancel-button { display:none; }
+.hospital-search input::placeholder,.wish-input input::placeholder { color:#617366; }
+.public-chosen-hospital { margin-top:24px; padding:18px 0; border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
+.public-chosen-hospital>p:first-child { display:flex; gap:8px; align-items:center; font-size:15px; color:#315c43; margin:0 0 14px; }
+.public-chosen-hospital svg { width:18px; }
+.public-chosen-hospital .search-picker { max-width:380px; }
+.public-hospital-row[data-selected=true] h4 { color:#315c43; }
+.public-wish-summary fieldset+fieldset { margin-top:24px; }
+.wish-input { margin-top:12px; }
+.wish-input input { width:100%; min-height:46px; padding:10px 12px; font:inherit; font-size:16px; color:var(--ink); border:1px solid #c5d2c9; border-radius:6px; background:white; }
+#availability-result-title { scroll-margin-top:20px; }
+#public-preferences-title { scroll-margin-top:20px; }
+@media (max-width:1200px) {
+  .booking-footer { align-items:stretch; flex-direction:column; gap:10px; }
+  .booking-footer-buttons { justify-content:flex-end; }
+  .booking-footer-buttons [data-book-primary] { min-width:220px; }
+}
+@media (max-width:600px) {
+  .chat-composer.is-booking { padding:10px 12px 4px; }
+  .booking-footer-step { display:none; }
+  .booking-footer-selection { font-size:13px; margin-top:0; }
+  .booking-footer-hint { font-size:12px; }
+  .booking-footer-buttons { display:grid; grid-template-columns:auto minmax(0,1fr); gap:8px; }
+  .booking-footer-buttons [data-book-primary] { min-width:0; width:100%; }
+  .hondi-react .appointment-progress { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; font-size:11px; margin-bottom:20px; padding-bottom:14px; }
+  .hondi-react .appointment-progress li { min-width:0; flex-shrink:1; flex-direction:column; align-items:flex-start; gap:6px; word-break:keep-all; overflow-wrap:anywhere; }
+  .hondi-react .appointment-progress li>span { display:grid; width:18px; height:18px; font-size:10px; }
+  .booking-stage-intro { font-size:16px; }
+}
+.hondi-react .public-official-search { display:inline-flex; align-items:center; gap:8px; min-height:44px; color:var(--secondary,#285c43); text-underline-offset:4px; }
+.hondi-react .public-official-search svg { width:16px; height:16px; }

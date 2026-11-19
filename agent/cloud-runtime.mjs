@@ -11,11 +11,11 @@ const REGION = 'ap-northeast-2';
 const SDK_CONFIG = Object.freeze({maxAttempts:2,requestHandler:{connectionTimeout:1500,requestTimeout:3000}});
 // budget ADD의 응답이 유실되면 SDK 재시도도 재차감이므로 DDB는 한 번만 보낸다.
 export const DYNAMODB_SDK_CONFIG = Object.freeze({...SDK_CONFIG,maxAttempts:1});
-const STORE_METHODS = ['loadOrCreate','acquire','release','save','consumeTurn'];
+const STORE_METHODS = ['loadOrCreate','acquire','release','save','consumeTurn','consumeModelCall'];
 const text = value => typeof value === 'string' ? value.trim() : '';
 const unavailable = () => new AgentError('CLOUD_RUNTIME_UNAVAILABLE','서버의 모델 연결을 준비하지 못했습니다. 잠시 후 다시 시도해 주세요.',503);
 const hasSecretSetting = env => env.OPENAI_SECRET_ARN !== undefined && env.OPENAI_SECRET_ARN !== '';
-const CONFIG_FIELDS = ['OPENAI_MODEL','OPENAI_REASONING_EFFORT','OPENAI_MAX_OUTPUT_TOKENS','OPENAI_TIMEOUT_MS','DEMO_DAILY_TURN_LIMIT'];
+const CONFIG_FIELDS = ['OPENAI_MODEL','OPENAI_REASONING_EFFORT','OPENAI_MAX_OUTPUT_TOKENS','OPENAI_TIMEOUT_MS','DEMO_DAILY_TURN_LIMIT','OPENAI_DAILY_CALL_LIMIT','OPENAI_MAX_CALLS_PER_TURN'];
 
 function cloudSettings(env, expectedAccountId, accountId) {
   const region = text(env.AWS_REGION) || text(env.AWS_DEFAULT_REGION) || REGION;

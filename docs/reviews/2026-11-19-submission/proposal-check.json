@@ -1,0 +1,23 @@
+{
+  "checkedOn": "2026-11-19",
+  "result": "pass",
+  "file": "docs/submission-proposal.pdf",
+  "source": "docs/submission-proposal.html",
+  "pdfHash": "330c1863d6d3364d8ff3152e9c423c6a7b625b9088f2ceaa767e295fe3aa3d77",
+  "bytes": 3642683,
+  "pages": 9,
+  "format": "A4",
+  "appEvidenceFingerprint": "a513a34a3835e7ffa8ac444b500a87773e0f2b058cf931c0664f196f414a416b",
+  "screenshotManifest": "docs/reviews/2026-11-19-submission/screenshots.json",
+  "usedScreenshots": [
+    "calendar.png",
+    "vehicle-options.png"
+  ],
+  "checks": [
+    "기존 10쪽 중 9쪽의 자동검사 표·모바일 그림을 삭제하고 새 문서의 쪽번호 01/9~09/9와 A4 크기를 대조했다.",
+    "PDF의 한글 4,527자와 클릭 가능한 외부 링크 17개를 확인했다. 공단 통계 원표는 첫 쪽, 공개 AI 대화는 마지막 쪽에 연결된다.",
+    "기존 통계 검증본의 2025년 제주 거주 관외 진료 실인원 140,203명과 전 연령이라는 집계 범위를 보존했다.",
+    "전체 쪽을 Poppler로 렌더링했고 PDF 본문의 마지막 글자와 쪽번호 사이 간격은 최소 42.0pt다.",
+    "문서 자산만 복사한 별도 폴더에서 다시 인쇄해 PDFium으로 렌더링한 아홉 쪽의 픽셀이 모두 일치했다."
+  ]
+}

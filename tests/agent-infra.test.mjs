@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile, mkdtemp, mkdir, rm, symlink } from 'node:fs/promises';
+import { readFile, mkdtemp, mkdir, rm } from 'node:fs/promises';
+import { createFixtureLink } from './helpers/fixture-link.mjs';
+import { pythonCli } from '../scripts/python-cli.mjs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -15,7 +17,7 @@ const functionName='jeju-care-compass-agent-api';
 const functionArn=`arn:aws:lambda:ap-northeast-2:111122223333:function:${functionName}`;
 const origin='example.lambda-url.ap-northeast-2.on.aws';
 const revision='a'.repeat(40);
-const env={AWS_REGION:'ap-northeast-2',AWS_DISTRIBUTION_ID:distributionId,AWS_AGENT_FUNCTION_NAME:functionName,APP_REVISION:revision};
+const env={AWS_REGION:'ap-northeast-2',AWS_DISTRIBUTION_ID:distributionId,AWS_AGENT_FUNCTION_NAME:functionName,APP_REVISION:revision,...(process.env.PYTHON_CLI?{PYTHON_CLI:process.env.PYTHON_CLI}:{})};
 const siteStack={StackStatus:'UPDATE_COMPLETE',Tags:[owner],Parameters:[
   {ParameterKey:'ProjectName',ParameterValue:'jeju-care-compass'},
   {ParameterKey:'GitHubRepository',ParameterValue:'example/jeju-demo'},
@@ -31,7 +33,7 @@ async function artifact(t,entries) {
   const root=await mkdtemp(join(tmpdir(),'jeju-agent-zip-'));
   t.after(()=>rm(root,{recursive:true,force:true}));await mkdir(join(root,'output'));
   const files=entries||{'index.mjs':'export const handler=async()=>({statusCode:503});','deployment.json':JSON.stringify({revision,runtime:'lambda',mode:'synthetic'})};
-  const result=spawnSync('python3',['-c',`import json,sys,zipfile
+  const result=spawnSync(pythonCli(),['-c',`import json,sys,zipfile
 with zipfile.ZipFile(sys.argv[1], 'w', zipfile.ZIP_DEFLATED) as archive:
  for name, body in json.loads(sys.argv[2]).items(): archive.writestr(name, body)
 `,join(root,'output/agent-lambda.zip'),JSON.stringify(files)],{encoding:'utf8'});
@@ -186,15 +188,17 @@ test('rollback 복원 완료만 재연결하고 cleanup·복원 실패 중에는
 
 test('Lambda ZIP은 정적 dist 밖의 정해진 파일과 동일 커밋 메타데이터만 허용한다',async t=>{
   const root=await artifact(t);const plan=await createAgentPublishPlan({env,root});
-  assert.ok(plan.zip.endsWith('/output/agent-lambda.zip'));assert.equal(plan.revision,revision);
+  assert.ok(plan.zip.endsWith(join('output','agent-lambda.zip')));assert.equal(plan.revision,revision);
   const result=await runAgentPublish({env,root,args:[],run:()=>{throw new Error('기본은 AWS 호출 금지');}});
   assert.equal(result.applied,false);
   await assert.rejects(createAgentPublishPlan({env:{...env,APP_REVISION:'b'.repeat(40)},root}),/검사한 커밋/);
   const badRoot=await artifact(t,{'../index.mjs':'bad','deployment.json':'{}'});
   await assert.rejects(createAgentPublishPlan({env,root:badRoot}),/ZIP 형식/);
   await rm(join(root,'output/agent-lambda.zip'));
-  await symlink(join(badRoot,'output/agent-lambda.zip'),join(root,'output/agent-lambda.zip'));
-  await assert.rejects(createAgentPublishPlan({env,root}),/symlink/);
+  await t.test('파일 symlink는 게시 입력에서 거절한다',async sub=>{
+    if (!await createFixtureLink(sub,join(badRoot,'output/agent-lambda.zip'),join(root,'output/agent-lambda.zip'),'file')) return;
+    await assert.rejects(createAgentPublishPlan({env,root}),/symlink/);
+  });
 });
 
 test('Lambda 태그·handler와 낙관적 갱신 토큰 확인 후 ZIP을 직접 게시한다',async t=>{
@@ -328,17 +332,19 @@ test('실제 update 명령도 이전 활성 설정을 보존하며 실패한 의
   assert.ok(calls.every(args=>!['create-stack','update-stack','validate-template'].includes(args[1])));
 });
 
-test('모델 활성화 배포 검증은 llm true와 허용·선택 모델을 요구하며 실제 외부 연결 과장을 거부한다',async t=>{
+test('배포 검증은 모델을 서버 설정에서 확인하고 공개 모델 노출과 외부 연결 과장을 거부한다',async t=>{
   const root=await artifact(t),plan=await createAgentPublishPlan({env,root});
-  const run=args=>args[1]==='get-function-configuration'?lambdaConfig(plan):{Tags:{Application:'jeju-care-compass',DataMode:'synthetic'}};
+  let selected='gpt-6.1-sol';
+  const run=args=>args[1]==='get-function-configuration'?{...lambdaConfig(plan),Environment:{Variables:{OPENAI_MODEL:selected}}}:{Tags:{Application:'jeju-care-compass',DataMode:'synthetic'}};
   const verifyEnv={...env,AWS_SITE_URL:'https://example.cloudfront.net',AGENT_EXPECT_MODEL:'true'};
   const check=async(capabilities,extra={})=>runAgentPublish({env:{...verifyEnv,...extra},root,args:['--verify'],run,fetchImpl:async()=>({ok:true,json:async()=>({revision,phone:'simulation',healthRecords:'demo',...capabilities})})});
   for(const model of ['gpt-6.1-sol','gpt-6.1-terra']) {
-    const result=await check({llm:true,model});assert.equal(result.verified,true);assert.equal(result.modelConnected,true);assert.equal(result.model,model);
+    selected=model;const result=await check({llm:true},{OPENAI_MODEL:model});assert.equal(result.verified,true);assert.equal(result.modelConnected,true);assert.equal(Object.hasOwn(result,'model'),false);
   }
   await assert.rejects(check({llm:false,model:'gpt-6.1-sol'}),/llm은 true/);
-  await assert.rejects(check({llm:true,model:'unreviewed-model'}),/모델 명칭/);
-  await assert.rejects(check({llm:true,model:'gpt-6.1-terra'},{OPENAI_MODEL:'gpt-6.1-sol'}),/OPENAI_MODEL과 다릅니다/);
+  await assert.rejects(check({llm:true,model:'gpt-6.1-sol'}),/노출/);
+  await assert.rejects(check({llm:true},{OPENAI_MODEL:'gpt-6.1-sol'}),/OPENAI_MODEL과 다릅니다/);
+  selected='unreviewed-model';await assert.rejects(check({llm:true}),/모델 명칭/);
   await assert.rejects(check({llm:true,model:'gpt-6.1-sol',phone:'connected'}),/실제 전화/);
   await assert.rejects(check({llm:true,model:'gpt-6.1-sol',healthRecords:'connected'}),/실제 전화/);
   await assert.rejects(runAgentPublish({env:{...env,AGENT_EXPECT_MODEL:'true'},root,args:['--verify'],run:()=>{throw new Error('공개 주소 검사 전에 AWS를 호출하면 안 됨');}}),/AWS_SITE_URL/);

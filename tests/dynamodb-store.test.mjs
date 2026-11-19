@@ -81,6 +81,22 @@ function fixture() {
 }
 async function locked(f) { const store = f.store(), item = await store.loadOrCreate(); await store.acquire(item.sessionId); return { store, item }; }
 
+test('실제 모델 호출 예산은 턴 예산과 분리되고 여러 인스턴스에서 원자적으로 차감한다',async()=>{
+  const f=fixture(),a=f.store(),b=f.store();
+  const results=await Promise.allSettled(Array.from({length:20},(_,i)=>(i%2?a:b).consumeModelCall(6)));
+  assert.equal(results.filter(x=>x.status==='fulfilled').length,6);
+  assert.ok(results.filter(x=>x.status==='rejected').every(x=>x.reason.code==='MODEL_DAILY_LIMIT'));
+  const record=f.client.item('model-budget#2026-10-31');assert.equal(record.used,6);
+  assert.deepEqual(Object.keys(record).sort(),['expiresAt','pk','used']);
+  assert.equal(f.client.item('budget#2026-10-31'),undefined);
+  f.advance(86400);await a.consumeModelCall(6);assert.equal(f.client.item('model-budget#2026-11-01').used,1);
+});
+
+test('모델 한도 저장 응답 유실은 재시도하지 않고 외부 원문 없는 실패로 닫는다',async()=>{
+  let calls=0;const store=createDynamoSessionStore({tableName,client:{async send(){calls++;throw new Error('PRIVATE database detail');}}});
+  await assert.rejects(store.consumeModelCall(60),safeError('SESSION_STORE_UNAVAILABLE',503));assert.equal(calls,1);
+});
+
 test('진행 DTO는 별도 해시 키·120초 TTL로 저장되고 다른 인스턴스에서 Get만으로 읽는다',async()=>{
   const f=fixture(),a=f.store(),progressToken='p'.repeat(43),reporter=createProgressReporter({store:a,token:progressToken,now:f.now});
   reporter.started('request_records',{source:'demo',query:'PRIVATE_QUERY'});reporter.finished('request_records');reporter.completed();await reporter.flush();

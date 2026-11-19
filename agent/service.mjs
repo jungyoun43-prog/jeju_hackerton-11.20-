@@ -6,6 +6,7 @@ import { AgentError, fail, isObject, publicError } from './errors.mjs';
 import { readBody, validateMessageRequest, validatePreviewRequest, validateProgressRequest, validateResumeRequest } from './validation.mjs';
 import { buildFixedPreview } from './preview.mjs';
 import { applyAction } from '../app/domain.js';
+import { currentSupportRecipients } from '../app/visit-support.js';
 import { getPreparationWorkflow } from '../app/preparation-workflow.js';
 import { createProgressReporter, readProgress, supportsProgress } from './progress.mjs';
 import { visitSessionId, supportsVisitRecovery, requestFingerprint, assertMatchingReceipt, recoverySummary, MAX_REQUEST_RECEIPTS, containsCredential } from './visit-recovery.mjs';
@@ -49,7 +50,7 @@ export function createAgentService({provider = createDisconnectedProvider(),stor
     deadlineMs:positiveInteger(config.deadlineMs,45000,45000), dailyTurns:positiveInteger(config.dailyTurns ?? process.env.DEMO_DAILY_TURN_LIMIT,80,80),
   };
   const progressAvailable = () => (provider.connected === true || progressReadOnly === true) && supportsProgress(store);
-  const capabilities = progress => ({llm:provider.connected === true,model:typeof provider.model === 'string' ? provider.model : '',phone:'simulation',healthRecords:'demo',voiceInput:'browser',progress,visitRecovery:supportsVisitRecovery(store)?'token':'unavailable',revision});
+  const capabilities = progress => ({llm:provider.connected === true,phone:'simulation',healthRecords:'demo',voiceInput:'browser',progress,visitRecovery:supportsVisitRecovery(store)?'token':'unavailable',revision});
   const getCapabilities = () => capabilities(progressAvailable()?'poll':'unavailable');
 
   async function runTurn(request) {
@@ -74,12 +75,13 @@ export function createAgentService({provider = createDisconnectedProvider(),stor
         session=await bounded(Promise.resolve().then(()=>store.loadOrCreate(session.sessionId,options)),controller.signal);
         assertMatchingReceipt(session.requestReceipts?.find(item=>item.requestId === request.requestId),digest,now());
       }
+      const currentState = currentSupportRecipients(session.state);
       if (session.requestIds.includes(request.requestId)) {
-        const pendingActions=getPendingActions(session.state),needsInput=pendingActions.length > 0;
+        const pendingActions=getPendingActions(currentState),needsInput=pendingActions.length > 0;
         progress.completed();
         await progress.flush({signal:controller.signal});
         return {
-          sessionId:session.sessionId,requestId:request.requestId,reply:'이미 처리한 요청입니다. 저장된 준비 상태를 다시 표시합니다.',caseState:session.state,
+          sessionId:session.sessionId,requestId:request.requestId,reply:'이미 처리한 요청입니다. 저장된 준비 상태를 다시 표시합니다.',caseState:currentState,
           events:[],pendingActions,capabilities:getCapabilities(),needsInput,
         };
       }
@@ -89,7 +91,7 @@ export function createAgentService({provider = createDisconnectedProvider(),stor
       await bounded(Promise.resolve().then(()=>store.save(session,options)),controller.signal);
       receiptStarted=true;
       await bounded(Promise.resolve().then(()=>store.consumeTurn(limits.dailyTurns,options)),controller.signal);
-      let state = session.state;
+      let state = currentState;
       const events = [], pending = [], usedIds = new Set();
       let toolCount = 0;
       let providerContext;
@@ -228,7 +230,8 @@ export function createAgentService({provider = createDisconnectedProvider(),stor
         const request=validateResumeRequest(parsed);
         fail(supportsVisitRecovery(store),'VISIT_RECOVERY_UNAVAILABLE','준비 이어하기를 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.',503);
         const session=await store.loadOrCreate(visitSessionId(request.visitToken));
-        return response(200,{sessionId:session.sessionId,caseState:session.state,pendingActions:getPendingActions(session.state),recovery:recoverySummary(session,now())},revision);
+        const caseState=currentSupportRecipients(session.state);
+        return response(200,{sessionId:session.sessionId,caseState,pendingActions:getPendingActions(caseState),recovery:recoverySummary(session,now())},revision);
       }
       if(route === '/api/agent/progress') {
         const request = validateProgressRequest(parsed);

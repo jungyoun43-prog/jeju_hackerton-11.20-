@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { PUBLIC_DATA_TOOLS, PUBLIC_DATA_SOURCE_URLS, createPublicDataToolExecutor, executePublicDataTool } from '../agent/public-data-tools.mjs';
 import { createToolDispatcher } from '../agent/tools.mjs';
 import { createDemoCase } from '../app/domain.js';
-import { getSupportCandidates, validateSupportRegistry } from '../app/support-data.js';
+import { getSupportCandidates, getSupportInquiryCandidates, validateSupportRegistry } from '../app/support-data.js';
 import hospitals from '../app/data/hospital-candidates.json' with {type:'json'};
 import supportData from '../app/data/visit-support-providers.json' with {type:'json'};
 
@@ -196,7 +196,7 @@ test('지원 후보 분석은 기존 registry와 같은 지역·휠체어 ID를 
     const state=freeze(mutable),before=JSON.stringify(state);
     for (const supportKind of ['taxi','companion']) {
       const {data,state:after,events,pendingActions}=executePublicDataTool({name:'analyze_public_data',input:{analysis:'support_candidates',supportKind},state});
-      const expected=getSupportCandidates(registry,{kind:supportKind,area,wheelchair});
+      const expected=getSupportInquiryCandidates(registry,{kind:supportKind,area,wheelchair});
       assert.strictEqual(after,state);assert.equal(JSON.stringify(state),before);
       assert.ok(data.candidates.length > 0);
       assert.deepEqual(data.candidates.map(item => item.id),expected.slice(0,data.candidates.length).map(item => item.id));

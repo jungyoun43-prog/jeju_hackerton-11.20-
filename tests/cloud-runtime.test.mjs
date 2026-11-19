@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createCloudRuntimeGetter, createCloudAgentRequestHandler } from '../agent/cloud-runtime.mjs';
 import { createLambdaHandler } from '../agent/handler.mjs';
 import { createMemorySessionStore } from '../agent/store.mjs';
+import { createRuntimeAgent } from '../agent/config.mjs';
 import { AgentError } from '../agent/errors.mjs';
 import { createProgressReporter, progressKey } from '../agent/progress.mjs';
 import { visitSessionId } from '../agent/visit-recovery.mjs';
@@ -40,7 +41,7 @@ test('ARN이 없으면 기존 local factory를 사용하고 키 없는 API는503
 
 test('local key 구성은 여전히 sync factory 경로와 선택 모델을 유지한다',async()=>{
   let called=0;
-  const getRuntime=createCloudRuntimeGetter({env:{OPENAI_API_KEY:KEY,OPENAI_MODEL:'gpt-6.1-terra',AWS_PROFILE:'fixture-profile',AWS_REGION:'ap-northeast-2'},fetchImpl:async(_url,options)=>{called++;assert.equal(JSON.parse(options.body).model,'gpt-6.1-terra');return Response.json({status:'completed',output:[{type:'message',role:'assistant',content:[{type:'output_text',text:'local fixture'}]}]});}});
+  const getRuntime=createCloudRuntimeGetter({env:{OPENAI_API_KEY:KEY,OPENAI_MODEL:'gpt-6.1-terra',AWS_PROFILE:'fixture-profile',AWS_REGION:'ap-northeast-2'},runtimeFactory:options=>createRuntimeAgent({...options,usageStore:createMemorySessionStore()}),fetchImpl:async(_url,options)=>{called++;assert.equal(JSON.parse(options.body).model,'gpt-6.1-terra');return Response.json({status:'completed',output:[{type:'message',role:'assistant',content:[{type:'output_text',text:'local fixture'}]}]});}});
   const service=await getRuntime();assert.equal(service.getCapabilities().llm,true);assert.equal(called,0);
   assert.equal((await service.handleAgentRequest(post())).statusCode,200);assert.equal(called,1);
 });
@@ -48,7 +49,7 @@ test('local key 구성은 여전히 sync factory 경로와 선택 모델을 유�
 test('cloud는 store와 secret을 lazy 구성하고 정확한 ARN/AWSCURRENT 및 SDK abortSignal을 사용한다',async()=>{
   const f=fixture();assert.equal(f.secretsCalls.length,0);assert.equal(f.storeCalls.length,0);
   const runtime=await f.getRuntime();
-  assert.equal(runtime.getCapabilities().llm,true);assert.equal(runtime.getCapabilities().model,'gpt-6.1-sol');assert.equal(f.modelCalls.length,0);
+  assert.equal(runtime.getCapabilities().llm,true);assert.equal(Object.hasOwn(runtime.getCapabilities(),'model'),false);assert.equal(f.modelCalls.length,0);
   assert.deepEqual(f.secretsCalls[0].command.input,{SecretId:ARN,VersionStage:'AWSCURRENT'});
   assert.ok(f.secretsCalls[0].options.abortSignal instanceof AbortSignal);
   assert.deepEqual(f.storeCalls[0],{client:f.client,tableName:ENV.SESSION_TABLE_NAME,region:'ap-northeast-2'});
@@ -146,7 +147,7 @@ test('잘못된 HTTP 입력·method·preview는 secret 조회 없이 기존 DTO 
 
 test('Lambda HTTPv2/context·base64 wrapper로 cloud runtime과 실제 도구 loop를 연결한다',async()=>{
   const operations=[],memory=createMemorySessionStore();
-  const store={kind:'dynamodb',...Object.fromEntries(['loadOrCreate','acquire','release','save','consumeTurn'].map(name=>[name,async(...args)=>{operations.push(name);return memory[name](...args);}]))};
+  const store={kind:'dynamodb',...Object.fromEntries(['loadOrCreate','acquire','release','save','consumeTurn','consumeModelCall'].map(name=>[name,async(...args)=>{operations.push(name);return memory[name](...args);}]))};
   const sent=[];
   const f=fixture({storeFactory:()=>store,fetchImpl:async(_url,options)=>{
     sent.push(JSON.parse(options.body));assert.ok(operations.includes('consumeTurn'));
@@ -249,7 +250,7 @@ test('진행 전용 cloud runtime은 합성 준비 DTO만 읽고 원문·secret 
   const memory=createMemorySessionStore(),progressToken='u'.repeat(43),reporter=createProgressReporter({store:memory,token:progressToken});
   reporter.started('request_hospital_contact',{target:'mainland',query:'PRIVATE'});await reporter.flush();
   const operations=[];
-  const store={kind:'dynamodb',...Object.fromEntries(['loadOrCreate','acquire','release','save','consumeTurn'].map(name=>[name,()=>{throw new Error('core store 접근 금지');}])),
+  const store={kind:'dynamodb',...Object.fromEntries(['loadOrCreate','acquire','release','save','consumeTurn','consumeModelCall'].map(name=>[name,()=>{throw new Error('core store 접근 금지');}])),
     async readProgress(...args){operations.push('read');return memory.readProgress(...args);},writeProgress(){throw new Error('poll write 금지');}};
   const f=fixture({storeFactory:()=>store,secretsClient:{async send(){throw new Error('PRIVATE secret forbidden');}},runtimeFactory(){throw new Error('provider 구성 금지');}});
   const handle=createCloudAgentRequestHandler({getRuntime:f.getRuntime});

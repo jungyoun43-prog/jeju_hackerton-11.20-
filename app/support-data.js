@@ -2,8 +2,9 @@ const REGISTRY_URL = '/data/visit-support-providers.json';
 const HUB = 'https://jejudatahub.net/data/view/data/';
 const SOURCE_HOSTS = new Set(['jejudatahub.net', 'www.data.go.kr', 'www.jjcsc.co.kr', 'www.jejuhappycall.com']);
 const clean = value => String(value ?? '').trim();
-const NORTH = ['애월읍', '한림읍', '한경면', '조천읍', '구좌읍', '우도면'];
+const NORTH = ['애월읍', '한림읍', '한경면', '조천읍', '구좌읍', '우도면', '추자면'];
 const SOUTH = ['대정읍', '남원읍', '성산읍', '안덕면', '표선면', '중문'];
+const LOCAL_NAMES = [...NORTH, ...SOUTH].map(place => place.replace(/[읍면]$/, ''));
 
 function cityOf(value) {
   if (value.includes('서귀포시') || SOUTH.some(place => value.includes(place.replace(/[읍면]$/, '')))) return '서귀포시';
@@ -123,4 +124,24 @@ export function getSupportCandidates(registry, {kind, area = '', wheelchair = fa
       : kind === 'companion' && provider.serviceType === 'hospital_escort' ? -1 : {local: 0, city: 1, island: 2, unverified: 3}[matchLevel];
     return {...provider, matchLevel, matchLabel, priority};
   }).filter(Boolean).sort((a, b) => a.priority - b.priority || a.name.localeCompare(b.name, 'ko')).map(({priority, ...provider}) => provider);
+}
+
+/** 주소록에서 조회한 곳을 실제 문의 대상으로 쓸 수 있는지 현재 방문 조건으로 확인한다. */
+export function supportInquiryIssue(provider, {area = '', wheelchair = false} = {}) {
+  if (wheelchair && provider.kind === 'taxi' && provider.serviceType !== 'accessible_transport') {
+    return '일반 호출택시 등록 자료에는 휠체어 탑승 차량 정보가 없습니다. 교통약자 이동지원 창구와 이용 조건을 확인해 주세요.';
+  }
+  if (provider.serviceType === 'accessible_transport') return '';
+  const region = provider.region.replace(/제주특별자치도|제주도/g, '').trim();
+  const places = LOCAL_NAMES.filter(place => region.includes(place));
+  const outsideLocal = places.length > 0 && !places.some(place => area.includes(place));
+  const originCity = cityOf(area), registeredCity = cityOf(region);
+  if (outsideLocal || (originCity && registeredCity && registeredCity !== originCity)) {
+    return '출발 지역에 맞는 문의처를 선택해 주세요. 등록 지역 밖의 지원 여부는 확인되지 않았습니다.';
+  }
+  return '';
+}
+
+export function getSupportInquiryCandidates(registry, conditions) {
+  return getSupportCandidates(registry, conditions).filter(provider => !supportInquiryIssue(provider, conditions));
 }

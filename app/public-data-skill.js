@@ -2,7 +2,7 @@ import catalog from './data/public-data-catalog.json' with {type: 'json'};
 import hospitalSnapshot from './data/hospital-candidates.json' with {type: 'json'};
 import supportRegistry from './data/visit-support-providers.json' with {type: 'json'};
 import publicHealthSnapshot from './data/public-health-contacts.json' with {type: 'json'};
-import {getSupportCandidates} from './support-data.js';
+import {getSupportInquiryCandidates} from './support-data.js';
 import {PUBLIC_HEALTH_COLUMNS, getPublicHealthContacts, validatePublicHealthSnapshot} from './public-health-data.js';
 
 const PURPOSES = ['hospital', 'taxi', 'companion', 'travel'];
@@ -189,7 +189,7 @@ function questionsFor(kind, context) {
 }
 
 function supportCandidates(kind, context) {
-  return getSupportCandidates(supportRegistry, {kind, area: context.area, wheelchair: context.wheelchair}).map(provider => ({
+  return getSupportInquiryCandidates(supportRegistry, {kind, area: context.area, wheelchair: context.wheelchair}).map(provider => ({
     ...clone(provider), source: {...provider.source, url: canonicalUrl(provider.source.url)}, availabilityVerified: false,
     conditions: [context.area ? `출발 지역: ${context.area}` : '출발 지역 미확인', context.wheelchair ? '휠체어 지원 필요; 자격·탑승·승하차·차량은 미확인' : '휠체어 조건: 현재 입력에서는 필요 없음', '등록 위치·서비스 안내와 실제 지원 관할은 별도 확인'],
     questions: questionsFor(kind, context),
@@ -288,11 +288,12 @@ export function analyzePublicData(input, context = {}) {
     const kinds = supportKind === 'both' ? ['taxi', 'companion'] : [supportKind];
     const groups = kinds.map(kind => ({kind, candidates: supportCandidates(kind, operating)}));
     const candidates = supportKind === 'both' ? Array.from({length: Math.max(...groups.map(group => group.candidates.length))}, (_, index) => groups.map(group => group.candidates[index]).filter(Boolean)).flat() : groups[0].candidates;
-    const data = baseAnalysis(analysis, {area, supportKind, wheelchair: operating.wheelchair}, '이동·병원동행 문의 후보', '기존 registry의 지역·휠체어 조건에 따른 문의 우선순위; 현재 지원 확정 아님');
+    const data = baseAnalysis(analysis, {area, supportKind, wheelchair: operating.wheelchair}, '이동·병원동행 문의 후보', '출발 지역과 요청한 지원 유형을 공개자료에서 확인할 수 있는 문의처');
     data.candidates = candidates.slice(0, 5);
     data.metrics = groups.map(group => ({key: 'candidateCount', kind: group.kind, value: group.candidates.length, returned: data.candidates.filter(candidate => candidate.kind === group.kind).length, unit: '문의처', label: '기존 지역·지원 유형 필터의 문의 후보 수; 서비스 제공 수 아님'}));
     data.datasetRefs = [...new Set(kinds.flatMap(kind => kind === 'taxi' ? ['hub:327', 'official:jeju-accessible-transport'] : ['hub:254', 'official:areum-escort']))].map(datasetRef);
-    data.limitations.push('후보 순서는 기존 getSupportCandidates와 같고 거리·수용·환자 적합성 점수가 아닙니다.', '돌봄 등록 문의처는 병원동행 제공·현재 인력 확보를 뜻하지 않습니다. 이용자격·회원등록·담당지역·비용은 별도 문의합니다.');
+    data.limitations.push('등록 지역과 서비스 유형으로 문의 후보를 골랐습니다. 실제 운행·방문일의 인력·요금은 해당 창구에 확인해야 합니다.', '돌봄시설 등록 자료로는 병원동행 제공 여부를 알 수 없습니다. 등록 문의처에 동행 제공 또는 관할 창구 연결을 먼저 문의해 주세요.');
+    if (kinds.includes('taxi') && operating.wheelchair) data.limitations.push('허브 327의 일반 호출택시 자료에는 휠체어 탑승 차량 항목이 없어 해당 업체를 탑승 차량 문의 후보에서 제외했습니다.');
     if (!area) data.missingData.push('지역에 맞는 문의 준비를 위해 출발 읍면동을 확인해야 합니다.');
     if (!candidates.length) data.missingData.push('현재 정제 registry에 이 조건의 문의 후보가 없습니다. 실제 서비스 부재라는 뜻은 아닙니다.');
     const differentWheelchair = typeof context?.wheelchair === 'boolean' && input.wheelchair !== undefined && input.wheelchair !== ctx.wheelchair;

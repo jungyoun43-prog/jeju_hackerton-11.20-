@@ -2,15 +2,18 @@
   "name": "jeju-care-compass",
   "version": "0.1.0",
   "private": true,
+  "workspaces": [
+    "web"
+  ],
   "type": "module",
   "description": "혼디(hondi) — 보호자를 위한 진료 연결 워크스페이스",
   "engines": {
     "node": ">=22"
   },
   "scripts": {
-    "dev": "node --env-file-if-exists=.env scripts/server.mjs",
-    "start": "node --env-file-if-exists=.env scripts/server.mjs",
-    "build": "node scripts/build.mjs",
+    "dev": "node --env-file-if-exists=.env scripts/dev.mjs",
+    "start": "node --env-file-if-exists=.env scripts/server.mjs --dist",
+    "build": "node scripts/build-web.mjs",
     "preview": "node --env-file-if-exists=.env scripts/server.mjs --dist",
     "test": "node --test tests/*.test.mjs",
     "test:browser": "node scripts/browser-check.mjs",
@@ -21,20 +24,33 @@
     "build:agent": "node scripts/build-agent.mjs",
     "test:conversation": "node scripts/conversation-browser-check.mjs",
     "test:guided-demo": "node scripts/guided-demo-browser-check.mjs",
+    "test:appointment": "node scripts/appointment-browser-check.mjs",
     "test:journey": "node scripts/journey-browser-check.mjs",
     "data:catalog": "node scripts/public-data-catalog.mjs",
     "data:query": "node scripts/public-data-query.mjs",
     "test:board": "node scripts/preparation-board-browser-check.mjs",
     "eval:agent": "node --env-file-if-exists=.env scripts/evaluate-agent.mjs",
     "test:recovery": "node scripts/visit-recovery-browser-check.mjs",
-    "proposal:pdf": "node scripts/build-proposal.mjs"
+    "proposal:pdf": "node scripts/build-proposal.mjs",
+    "phone:preview": "node scripts/phone-operator.mjs --dry-run",
+    "phone:operator": "node scripts/phone-operator.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-bedrock-runtime": "3.1161.0",
     "@aws-sdk/client-dynamodb": "3.1161.0",
     "@aws-sdk/client-secrets-manager": "3.1161.0",
     "@aws-sdk/lib-dynamodb": "3.1161.0",
-    "leaflet": "1.9.4"
+    "@tailwindcss/postcss": "4.3.5",
+    "class-variance-authority": "0.7.1",
+    "clsx": "2.1.1",
+    "leaflet": "1.9.4",
+    "lucide-react": "1.73.0",
+    "next": "16.4.6",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "tailwind-merge": "3.7.0",
+    "tailwindcss": "4.3.5",
+    "ws": "8.23.0"
   },
   "devDependencies": {
     "esbuild": "0.28.2"

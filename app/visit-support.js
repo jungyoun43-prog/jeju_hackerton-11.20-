@@ -1,10 +1,12 @@
 import { getJourneyContactContext } from './care-journey.js';
 import { callRecipientId, getCallRecoveryHandoffs } from './call-recovery.js';
+import { supportInquiryIssue } from './support-data.js';
 
 /** 단일 방문의 이동·동행 문의 준비. 실제 발신·예약·배차·결제를 수행하지 않는다. */
 const KINDS = ['taxi', 'companion'];
 const STATUSES = ['not_selected', 'selected', 'prepared', 'available_demo', 'unavailable_demo', 'unreachable_demo', 'needs_recheck'];
 const OUTCOMES = ['available', 'unavailable', 'unreachable'];
+const RECORDED = ['available_demo', 'unavailable_demo', 'unreachable_demo', 'needs_recheck'];
 const REQUIREMENTS = ['transportNeeded', 'companionNeeded', 'wheelchair', 'appointmentTime'];
 const MAX_EVENTS = 200;
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -117,14 +119,24 @@ function contextOf(state) {
 }
 const contextKey = state => JSON.stringify(contextOf(state));
 
-const LOCAL_AREAS = ['애월', '한림', '한경', '구좌', '조천', '우도', '추자', '대정', '남원', '성산', '안덕', '표선'];
-function definitelyDifferentRegion(provider, area) {
-  const region = provider.region.replace(/제주특별자치도|제주도/g, '').trim();
-  if (provider.serviceType === 'accessible_transport' || /^(?:제주|전역|제주 전역)?$/.test(region)) return false;
-  const local = LOCAL_AREAS.filter(name => region.includes(name));
-  if (local.length) return !local.some(name => area.includes(name));
-  const city = region.includes('서귀포') ? '서귀포' : region.includes('제주시') ? '제주시' : '';
-  return Boolean(city && (city === '서귀포' ? area.includes('제주시') : area.includes('서귀포')));
+/** 이전에 저장한 초안도 현재 조건과 맞는 수신처에만 이어진다. 읽기만으로 저장하거나 다른 곳을 선택하지 않는다. */
+export function currentSupportRecipients(state) {
+  const support = state.visitSupport;
+  if (!support) return state;
+  const conditions = {area: state.patient.area, wheelchair: support.requirements.wheelchair};
+  let cleanSupport = support;
+  for (const kind of KINDS) {
+    const entry = support[kind];
+    if (!entry.provider || !supportInquiryIssue(entry.provider, conditions)) continue;
+    const fresh = createVisitSupport()[kind];
+    if (kind === 'taxi' && conditions.wheelchair && entry.provider.serviceType === 'call_taxi' && RECORDED.includes(entry.status)) {
+      if (entry.status === 'needs_recheck' && !entry.response && !entry.inquiry && !entry.contextKey && !entry.wheelchairConfirmed && !entry.eligibilityConfirmed) continue;
+      fresh.provider = entry.provider;
+      fresh.status = 'needs_recheck';
+    }
+    cleanSupport = {...cleanSupport, [kind]:fresh};
+  }
+  return cleanSupport === support ? state : {...state, visitSupport: cleanSupport};
 }
 
 function log(state, title, detail, source = '이동·동행 문의 시뮬레이터 · 실제 발신 없음') {
@@ -142,7 +154,7 @@ function resetResponse(entry) {
 
 export function reconcileVisitSupport(previous, nextState) {
   const previousSupport = supportOf(previous);
-  const next = structuredClone(nextState);
+  const next = structuredClone(currentSupportRecipients(nextState));
   next.visitSupport ??= createVisitSupport();
   const support = supportOf(next);
   const oldContext = contextOf(previous), newContext = contextOf(next);
@@ -150,11 +162,8 @@ export function reconcileVisitSupport(previous, nextState) {
   for (const kind of KINDS) {
     const entry = support[kind];
     if (!entry.provider) continue;
-    if (oldContext.area !== newContext.area && definitelyDifferentRegion(entry.provider, newContext.area)) {
-      support[kind] = structuredClone(createVisitSupport()[kind]);
-      continue;
-    }
-    const recorded = ['available_demo', 'unavailable_demo', 'unreachable_demo', 'needs_recheck'].includes(previousSupport[kind].status);
+    if (supportInquiryIssue(entry.provider, newContext)) continue;
+    const recorded = RECORDED.includes(previousSupport[kind].status);
     resetResponse(entry);
     if (recorded) entry.status = 'needs_recheck';
     if (entry.inquiry !== undefined || entry.status === 'prepared' || recorded) {
@@ -207,7 +216,8 @@ export function applyVisitSupportAction(state, action) {
   if (action.type === 'SUPPORT_SELECT_PROVIDER') {
     assert(KINDS.includes(action.kind), '지원 문의 종류를 확인해 주세요.');
     provider = providerRecord(action.provider, action.kind);
-    assert(!definitelyDifferentRegion(provider, state.patient.area), '출발 지역에 맞는 문의처를 선택해 주세요.');
+    const issue = supportInquiryIssue(provider, {area: state.patient.area, wheelchair: current.requirements.wheelchair});
+    assert(!issue, issue);
   }
   const next = structuredClone(state);
   next.visitSupport ??= createVisitSupport();
@@ -228,6 +238,8 @@ export function applyVisitSupportAction(state, action) {
   }
   assert(entry.provider, '먼저 지원 문의처를 선택해 주세요.');
   assert(support.requirements[neededKey(action.kind)], '필요하지 않은 지원의 문의 응답을 진행할 수 없습니다.');
+  const issue = supportInquiryIssue(entry.provider, {area: next.patient.area, wheelchair: support.requirements.wheelchair});
+  assert(!issue, issue);
   if (action.type === 'SUPPORT_PREPARE_INQUIRY') {
     entry.inquiry = buildSupportInquiry(next, action.kind);
     entry.contextKey = contextKey(next);
@@ -259,6 +271,7 @@ export function applyVisitSupportAction(state, action) {
 }
 
 export function getVisitSupportSummary(state) {
+  state = currentSupportRecipients(state);
   const support = supportOf(state), context = contextOf(state);
   const destinationKnown = Boolean(object(state.selectedHospital) && state.selectedHospital.companyName?.trim() && context.address);
   const unresolved = [], nextActions = [];
@@ -271,12 +284,14 @@ export function getVisitSupportSummary(state) {
     const recovery = state.callRecovery?.targets[kind];
     const handoff = needed && entry.status !== 'needs_recheck' && recovery?.reason && recovery.recipientId === callRecipientId(state, kind)
       ? (handoffs ??= getCallRecoveryHandoffs(state)).find(item => item.target === kind) : null;
-    const label = !needed ? '필요 없음' : handoff ? `${handoff.title} · 시연` : labels[entry.status];
-    result[kind] = { status: needed ? entry.status : 'not_needed', label, providerName: entry.provider?.name || '', source: entry.provider ? { ...entry.provider.source } : null, questions: needed ? questionsFor(state, kind) : [], ready: false, unresolved: [] };
+    const recipientIssue = entry.provider && supportInquiryIssue(entry.provider, context);
+    const label = !needed ? '필요 없음' : recipientIssue ? '문의처 다시 선택' : handoff ? `${handoff.title} · 시연` : labels[entry.status];
+    result[kind] = { status: needed ? entry.status : 'not_needed', label, providerName: entry.provider?.name || '', source: entry.provider ? { ...entry.provider.source } : null, recipientNeedsReview: Boolean(recipientIssue), questions: needed && !recipientIssue ? questionsFor(state, kind) : [], ready: false, unresolved: [] };
     if (!needed) continue;
     totalNeeded += 1;
     const gaps = [];
     if (!entry.provider) gaps.push(`${name} 문의처가 정해지지 않았습니다.`);
+    else if (recipientIssue) gaps.push(recipientIssue);
     else if (entry.status !== 'available_demo') gaps.push(`${name} ${label} 상태입니다.`);
     if (!context.area) gaps.push('출발 지역이 미확인입니다.');
     if (!validDate(context.date)) gaps.push('방문 날짜가 미확인입니다.');
@@ -291,7 +306,7 @@ export function getVisitSupportSummary(state) {
     if (result[kind].ready) preparedCount += 1;
     else {
       unresolved.push(...gaps);
-      const title = !entry.provider ? `${name} 문의처 선택` : ['unavailable_demo', 'unreachable_demo'].includes(entry.status) ? `${name} 재문의 또는 다른 문의처 확인` : entry.status === 'needs_recheck' ? `${name} 변경 조건으로 재문의` : entry.status === 'selected' ? `${name} 문의 초안 준비` : `${name} 빠진 조건 확인`;
+      const title = !entry.provider || recipientIssue ? `${name} 문의처 선택` : ['unavailable_demo', 'unreachable_demo'].includes(entry.status) ? `${name} 재문의 또는 다른 문의처 확인` : entry.status === 'needs_recheck' ? `${name} 변경 조건으로 재문의` : entry.status === 'selected' ? `${name} 문의 초안 준비` : `${name} 빠진 조건 확인`;
       nextActions.push({ kind, title, reason: gaps.join(' ') });
     }
   }
@@ -299,6 +314,7 @@ export function getVisitSupportSummary(state) {
 }
 
 export function buildVisitSupportReport(state) {
+  state = currentSupportRecipients(state);
   const support = supportOf(state), summary = getVisitSupportSummary(state), context = contextOf(state);
   const lines = ['## 이번 방문의 이동·동행 문의', '', '단일 방문의 준비 상태입니다. 합성 응답은 실제 예약·배차·동행인 배정이 아닙니다.', `방문일: ${md(context.date || '미확인')} / 예약 시각: ${md(context.appointmentTime || '미확인')}`, `조건을 확인한 합성 지원: ${summary.preparedCount}/${summary.totalNeeded}`, ''];
   for (const kind of KINDS) {

@@ -1,5 +1,9 @@
 # 제출 ZIP 구성
 
+**2026년 11월 19일 최종본**은 `npm run package -- --submission`으로 생성한다. 심사자는 ZIP을 풀고 첫 폴더의 README를 열면 된다. 최신 예약 화면의 실행용 빌드·소스, 데이터·라이선스, 동일 버전의 결과표·브라우저 검사, A4 10쪽 기획서를 포함한다. 실제 모델은 [참가자가 운영하는 공개 대화 앱](https://d1mfksxrj025bx.cloudfront.net/)에서 사용할 수 있다.
+
+## 이전 개발 스냅샷 이력
+
 `npm run package`는 `output/jeju-care-compass-mvp.zip`을 생성한다. Node.js22·npm·Python3이 필요하며, 모델 키나 AWS 인증은 패키징에 필요하지 않다.
 
 ## 포함하는 자료

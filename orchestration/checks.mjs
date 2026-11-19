@@ -6,6 +6,7 @@ export async function sourceFiles(root, prefix='') {
   const files=[];
   for(const item of await readdir(resolve(root,prefix),{withFileTypes:true})) {
     if(excluded.has(item.name) || (item.name.startsWith('.env') && item.name !== '.env.example')) continue;
+    if(prefix==='web' && ['.next','out','public'].includes(item.name))continue;
     const path=prefix ? `${prefix}/${item.name}` : item.name;
     if(item.isDirectory()) files.push(...await sourceFiles(root,path));
     else if(item.isFile()) files.push(path);
@@ -25,7 +26,7 @@ export async function scanProject(root) {
 }
 export async function runtimeFingerprint(root) {
   const hash=createHash('sha256');
-  const files=(await sourceFiles(root)).filter(p=>p.startsWith('app/') || p.startsWith('agent/') || p.startsWith('prompts/') || p==='scripts/server.mjs' || p==='package.json' || p==='package-lock.json').sort();
+  const files=(await sourceFiles(root)).filter(p=>p.startsWith('app/') || p.startsWith('web/') || p.startsWith('agent/') || p.startsWith('prompts/') || ['scripts/server.mjs','scripts/dev.mjs','scripts/build-web.mjs','scripts/prepare-web.mjs','package.json','package-lock.json'].includes(p)).sort();
   for(const path of files) {hash.update(path+'\0');hash.update(await readFile(resolve(root,path)));}
   return hash.digest('hex');
 }
