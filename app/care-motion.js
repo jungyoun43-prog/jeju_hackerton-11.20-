@@ -33,12 +33,14 @@ function makeBurst(x, y) {
   return burst;
 }
 
-function makeFlash({ bounds, radius }) {
+function makeFlash({ bounds, radius, x, y }) {
   const flash = decoration('care-button-flash');
   Object.assign(flash.style, {
     left: bounds.left + 'px', top: bounds.top + 'px',
     width: bounds.width + 'px', height: bounds.height + 'px', borderRadius: radius,
   });
+  flash.style.setProperty('--press-x', (x - bounds.left) + 'px');
+  flash.style.setProperty('--press-y', (y - bounds.top) + 'px');
   return flash;
 }
 
