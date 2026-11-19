@@ -1,0 +1,361 @@
+.public-hospital-finder {
+  container: hospital-directory / inline-size;
+}
+
+.public-hospital-finder .hospital-finder-layout {
+  display: grid;
+  grid-template-columns: clamp(208px, 25%, 282px) minmax(0, 1fr);
+  align-items: stretch;
+  gap: 0;
+  border-block: 1px solid var(--line);
+  background: #fffdfa;
+}
+
+.public-hospital-finder .hospital-find-controls {
+  padding: 15px clamp(12px, 2cqi, 22px);
+  background: #eff3ed;
+  border-inline-end: 1px solid var(--line);
+  min-width: 0;
+}
+
+.public-hospital-finder .hospital-search {
+  margin: 0;
+}
+
+.public-hospital-finder .hospital-search label {
+  display: block;
+  margin: 0 0 6px;
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--ink);
+}
+
+.public-hospital-finder .hospital-search > div {
+  min-width: 0;
+  background: #fff;
+}
+
+.public-hospital-finder .hospital-search input {
+  min-width: 0;
+  font-size: 16px;
+}
+
+.public-hospital-finder .hospital-directory-filters {
+  margin: 9px 0 0;
+  border: 0;
+}
+
+.public-hospital-finder .hospital-directory-filters > summary,
+.public-hospital-finder .hospital-directory-source .jeju-data-sources > summary,
+.public-hospital-finder details.public-candidates > summary {
+  min-height: 44px;
+  padding-block: 10px;
+  color: var(--secondary);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.public-hospital-finder .hospital-directory-filters .appointment-filters {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  margin: 0;
+}
+
+.public-hospital-finder .hospital-directory-filters .search-picker {
+  min-width: 0;
+  margin: 0;
+}
+
+.public-hospital-finder .hospital-directory-filters .search-picker > button {
+  background: #fff;
+}
+
+.public-hospital-finder .hospital-directory-source {
+  margin-top: 12px;
+  padding-top: 9px;
+  border-top: 1px solid var(--line);
+}
+
+.public-hospital-finder .hospital-directory-source .appointment-note {
+  margin: 0;
+  line-height: 1.55;
+}
+.public-hospital-finder .hospital-directory-source .jeju-data-sources {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.public-hospital-finder .hospital-directory-source .jeju-data-sources dl > div {
+  display: block;
+}
+
+.public-hospital-finder .hospital-find-results {
+  min-width: 0;
+  padding: 0 clamp(12px, 2cqi, 24px);
+}
+.public-hospital-finder .public-candidates {
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
+.public-hospital-finder .hospital-directory-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding-block: 12px 9px;
+  border-bottom: 1px solid var(--line);
+}
+.public-hospital-finder .hospital-directory-heading h3 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 18px;
+  line-height: 1.35;
+}
+.hospital-directory-heading h3 span {
+  margin-inline-start: 3px;
+  color: var(--secondary);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.hospital-directory-heading > span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.public-hospital-finder .public-hospital-list {
+  display: block;
+}
+.public-hospital-finder .public-hospital-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0;
+  padding: 0;
+  margin: 0;
+  align-items: stretch;
+  border-bottom: 1px solid var(--line);
+}
+.public-hospital-finder .public-hospital-row:last-child {
+  border-bottom: 0;
+}
+.public-hospital-finder .public-hospital-row > .hospital-directory-pick[data-slot=button] {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) minmax(0, 1.15fr);
+  align-items: center;
+  justify-content: start;
+  justify-self: stretch;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  height: auto;
+  padding: 4px 8px 4px 3px;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  text-align: start;
+  color: var(--ink);
+}
+.hospital-directory-pick .hospital-choice-mark {
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid #8b9a8e;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+}
+.hospital-directory-pick[aria-pressed=true] .hospital-choice-mark {
+  background: var(--secondary);
+  border-color: var(--secondary);
+  color: #fff;
+}
+.hospital-directory-pick .hospital-choice-mark svg {
+  width: 10px;
+  height: 10px;
+  stroke-width: 3;
+}
+.hospital-directory-name,
+.hospital-directory-address {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hospital-directory-name {
+  font-size: 15px;
+  font-weight: 650;
+}
+.hospital-directory-address {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--muted);
+}
+.public-hospital-finder .public-hospital-row > .hospital-directory-toggle {
+  display: inline-flex;
+  justify-self: stretch;
+  justify-content: center;
+  align-items: center;
+  gap: 3px;
+  min-width: 56px;
+  min-height: 44px;
+  margin: 0;
+  padding: 3px 4px;
+  border: 0;
+  background: transparent;
+  color: var(--secondary);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.hospital-directory-toggle svg {
+  width: 14px;
+  height: 14px;
+  stroke-width: 1.75px;
+}
+.hospital-directory-toggle[aria-expanded=true] svg {
+  transform: rotate(180deg);
+}
+@media (hover: hover) {
+  .public-hospital-finder .public-hospital-row > .hospital-directory-pick:hover,
+  .public-hospital-finder .public-hospital-row > .hospital-directory-toggle:hover {
+    background: #edf3ed;
+  }
+}
+.public-hospital-finder .public-hospital-row > button:focus-visible {
+  outline: 2px solid var(--secondary);
+  outline-offset: -2px;
+}
+.public-hospital-finder .public-hospital-row[data-selected=true] > .hospital-directory-pick {
+  background: #edf3ed;
+  color: var(--secondary);
+}
+
+.hospital-directory-detail {
+  grid-column: 1 / -1;
+  min-width: 0;
+  padding: 10px 12px 12px 26px;
+  background: #f3f5f0;
+  font-size: 14px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+.hospital-directory-detail[hidden] {
+  display: none;
+}
+.hospital-directory-detail dl {
+  margin: 4px 0 0;
+}
+.hospital-directory-detail dl > div {
+  display: grid;
+  grid-template-columns: 5.1em minmax(0, 1fr);
+  gap: 7px;
+  padding-block: 3px;
+}
+.hospital-directory-detail dt {
+  color: var(--muted);
+}
+.hospital-directory-detail dd {
+  margin: 0;
+}
+.hospital-directory-detail a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--secondary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.hospital-directory-detail a svg {
+  width: 13px;
+  height: 13px;
+}
+
+@media (min-width: 901px) and (min-height: 650px) {
+  #appointment-workspace:has(.public-hospital-finder) {
+    height: 100%;
+    min-height: 0;
+  }
+  #appointment-workspace > [data-appointment-screen=public_find] {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+  [data-appointment-screen=public_find] > .appointment-topline,
+  [data-appointment-screen=public_find] > .appointment-boundary {
+    flex: none;
+  }
+  .public-hospital-finder,
+  .public-hospital-finder .hospital-find-results,
+  .public-hospital-finder section.public-candidates {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+  }
+  .public-hospital-finder .hospital-finder-layout {
+    flex: 1;
+    min-height: 0;
+    grid-template-rows: minmax(0, 1fr);
+  }
+  .public-hospital-finder .hospital-find-controls {
+    overflow-y: auto;
+  }
+  .public-hospital-finder .hospital-directory-heading {
+    flex: none;
+  }
+  .public-hospital-finder .public-hospital-list {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    scrollbar-gutter: stable;
+  }
+  .public-hospital-finder details.public-candidates[open] {
+    min-height: 0;
+    overflow-y: auto;
+  }
+}
+
+@container hospital-directory (max-width: 635px) {
+  .public-hospital-finder .hospital-finder-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .public-hospital-finder .hospital-find-controls {
+    padding: 12px;
+    border-inline-end: 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .public-hospital-finder .hospital-directory-filters .appointment-filters {
+    grid-template-columns: repeat(auto-fit, minmax(min(160px, 100%), 1fr));
+  }
+  .public-hospital-finder .hospital-directory-source {
+    margin-top: 0;
+    padding-top: 4px;
+  }
+  .public-hospital-finder .hospital-find-results {
+    padding-inline: 8px;
+  }
+}
+@container hospital-directory (max-width: 450px) {
+  .public-hospital-finder .public-hospital-row > .hospital-directory-pick[data-slot=button] {
+    grid-template-columns: 14px minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    gap: 0 7px;
+    padding-block: 7px;
+  }
+  .hospital-directory-pick .hospital-choice-mark {
+    grid-row: span 2;
+  }
+  .hospital-directory-name,
+  .hospital-directory-address {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .hospital-directory-address {
+    grid-column: 2;
+    font-size: 13px;
+  }
+}

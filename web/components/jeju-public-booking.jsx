@@ -1,6 +1,6 @@
 'use client';
-import { useState, useEffect } from 'react';
-import { ArrowRight, Download, ExternalLink, MapPin, Check, Search, X } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { ArrowRight, ChevronDown, Download, ExternalLink, Check, Search, X } from 'lucide-react';
 import { ko } from 'date-fns/locale';
 import { Calendar, CalendarDayButton } from './ui/calendar';
 import { Button } from './ui/button';
@@ -20,22 +20,131 @@ export function PublicSelect({id,label,action,value,options,all}) {
 export function JejuSourceDetails() {
   return <details className="jeju-data-sources"><summary>어떤 제주 데이터를 쓰나요?</summary><p>지역과 등록 진료과로 병원을 좁히고, 소재지·관할과 이동 조건으로 문의처를 찾습니다. 선택한 근거는 준비표에도 남아요.</p><dl>{JEJU_DATA_SOURCES.map(s=><div key={s.id}><dt><a href={s.hubUrl} target="_blank" rel="noreferrer">{s.name}<ExternalLink aria-hidden="true"/></a></dt><dd>{s.count}곳 · {s.scope}<br/>{s.dateLabel} {s.asOf}{s.url!==s.hubUrl&&<> · <a href={s.url} target="_blank" rel="noreferrer">연결 원출처</a></>}</dd></div>)}</dl><Note>표시 수는 보유 표본의 범위입니다. 제주 전체 기관·현재 운영 여부를 뜻하지 않아요. 센터 이동시간 자료는 명세만 확인해 예상 소요시간을 계산하지 않습니다.</Note></details>;
 }
+function HospitalDirectoryRow({hospital, selected}) {
+  const [expanded, setExpanded] = useState(false);
+  const {id, companyName, address, departments, updatedAt, collectedAt, source} = hospital;
+  const detailId = `hospital-directory-detail-${id}`;
+  const streetAddress = address.replace(/^제주특별자치도\s+/, '').split(/[,（(]/)[0].trim() || address;
+
+  return (
+    <article className="public-hospital-row" data-selected={selected}>
+      <Action action="public_hospital" value={id} variant="ghost" selected={selected}
+        className="hospital-directory-pick" aria-label={`${companyName} 선택`}>
+        <span className="hospital-choice-mark" aria-hidden="true">{selected && <Check/>}</span>
+        <span className="hospital-directory-name" title={companyName}>{companyName}</span>
+        <span className="hospital-directory-address" title={address}>{streetAddress}</span>
+      </Action>
+      <button type="button" className="hospital-directory-toggle" aria-expanded={expanded}
+        aria-label={`${companyName} 자세히`} aria-controls={detailId} onClick={()=>setExpanded(!expanded)}>
+        자세히<ChevronDown aria-hidden="true"/>
+      </button>
+      <div id={detailId} className="hospital-directory-detail" hidden={!expanded}>
+        <strong>{companyName}</strong>
+        <dl>
+          <div><dt>전체 주소</dt><dd>{address}</dd></div>
+          <div><dt>등록 진료과</dt><dd>{departments.length ? departments.join(' · ') : '등록 자료에 진료과 미수록'}</dd></div>
+          <div><dt>자료 시점</dt><dd>갱신 {updatedAt} · 수집 {collectedAt?.slice(0,10)}</dd></div>
+          <div><dt>출처</dt><dd><a href={source.url} target="_blank" rel="noreferrer">제주데이터허브 병·의원 정보<ExternalLink aria-hidden="true"/></a></dd></div>
+        </dl>
+      </div>
+    </article>
+  );
+}
+
 export function PublicHospitalFinder() {
-  const {state}=useAppointment(),plan=state.jejuHospital,[page,setPage]=useState(0),[query,setQuery]=useState(''),[compact,setCompact]=useState(()=>typeof window!=='undefined'&&window.matchMedia('(max-height:850px)').matches),chosen=publicHospital(state);
-  useEffect(()=>{const m=window.matchMedia('(max-height:850px)'),update=()=>{setCompact(m.matches);setPage(0);};m.addEventListener('change',update);return()=>m.removeEventListener('change',update);},[]);
-  useEffect(()=>setPage(0),[plan.area,plan.department]);
-  const words=query.trim().toLocaleLowerCase('ko').split(/\s+/).filter(Boolean),rows=publicHospitalCandidates(plan).filter(h=>words.every(word=>`${h.companyName} ${h.address}`.toLocaleLowerCase('ko').includes(word))),pageSize=compact?2:3,pages=Math.max(1,Math.ceil(rows.length/pageSize)),current=Math.min(page,pages-1),visible=rows.slice(current*pageSize,(current+1)*pageSize),source=JEJU_DATA_SOURCES[0];
-  return <section className="public-hospital-finder" aria-label="제주 공개자료 병원 찾기"><div className="hospital-finder-layout"><div className="hospital-find-controls">
-    <p className="public-data-intro">병원을 찾고, 그 병원에서 진료받을 과를 고르세요.</p>
-    <div className="hospital-search"><label htmlFor="public-hospital-search">병원명·주소 검색</label><div><Search aria-hidden="true"/><input id="public-hospital-search" type="search" value={query} onChange={event=>{setQuery(event.target.value);setPage(0);}} placeholder="예: 제주우리병원, 한림, 서광로" autoComplete="off"/>{query&&<Button type="button" variant="ghost" aria-label="병원 검색어 지우기" onClick={()=>{setQuery('');setPage(0);document.getElementById('public-hospital-search').focus();}}><X aria-hidden="true"/></Button>}</div></div>
-    <details className="compact-disclosure"><summary>지역·등록 진료과로 좁히기</summary><div className="appointment-filters"><PublicSelect id="public-hospital-area" label="병원 지역" action="public_area" value={plan.area} options={JEJU_DATA_AREAS} all="제주 전체"/><PublicSelect id="public-hospital-department" label="등록 진료과" action="public_department" value={plan.department} options={JEJU_REGISTERED_DEPARTMENTS} all="등록 진료과 전체"/></div></details>
-    <Note>공개 표본 {source.count}곳 · 수집 {source.asOf}. 전체 기관이나 현재 빈자리 목록이 아닙니다.</Note><JejuSourceDetails/>
-  </div><div className="hospital-find-results">
-    {chosen&&<section className="public-chosen-hospital" aria-label="선택한 병원·진료과"><p><Check aria-hidden="true"/><strong>{chosen.companyName}</strong> 선택</p><p className="public-address">{chosen.address}</p><PublicSelect id="public-visit-department" label="이제 진료받을 과를 선택하세요" action="public_visit_department" value={plan.visitDepartment} options={chosen.departments}/><Note>등록된 진료과입니다. 과를 고른 뒤 아래 ‘다음: 의료진·시간’으로 이어가세요.</Note></section>}
-    <details className="compact-disclosure public-candidates" open={!chosen}><summary>{chosen?'다른 병원 찾아보기':`등록 병원 ${rows.length}곳`}</summary><div className="public-result-heading"><p role="status">이름·주소를 확인하고 병원을 선택하세요.</p></div><div className="public-hospital-list">{visible.map(h=><article key={h.id} className="public-hospital-row" data-selected={h.id===plan.hospitalId}><div><h4>{h.companyName}</h4><p className="public-address"><MapPin aria-hidden="true"/>{h.address}</p><p className="public-departments">{plan.department?`${plan.department} 등록 · `:''}{h.departments.slice(0,3).join(' · ')}{h.departments.length>3?` 외 ${h.departments.length-3}개`:''}</p><details><summary>등록 정보·출처</summary><p>등록 진료과: {h.departments.join(' · ')}<br/>해당 행 갱신 {h.updatedAt} · 현재 운영·접수는 기관 확인이 필요해요.</p><a href={h.source.url} target="_blank" rel="noreferrer">제주데이터허브 병·의원 정보<ExternalLink aria-hidden="true"/></a></details></div><Action action="public_hospital" value={h.id} variant="outline" selected={h.id===plan.hospitalId} aria-label={`${h.companyName} 선택`}>{h.id===plan.hospitalId?<><Check/>선택됨</>:'병원 선택'}</Action></article>)}</div>
-    {!rows.length&&<div className="appointment-empty"><strong>보유 표본에서 찾지 못했어요</strong><p>해당 지역에 병원이 없다는 뜻은 아니에요. 검색어나 지역·진료과 조건을 넓혀 보세요.</p>{query&&<Button type="button" variant="link" onClick={()=>setQuery('')}>검색어 지우기</Button>}<Action action="public_area" value="" variant="link">제주 전체로 보기</Action><Action action="public_department" value="" variant="link">모든 등록 진료과 보기</Action></div>}
-    {pages>1&&<nav className="hospital-pagination" aria-label="병원 목록 페이지"><Button type="button" variant="ghost" aria-label="이전 병원 목록" disabled={current===0} onClick={()=>setPage(current-1)}>이전 목록</Button><span>{current+1} / {pages}쪽</span><Button type="button" variant="outline" aria-label="다음 병원 목록" disabled={current>=pages-1} onClick={()=>setPage(current+1)}>다음 목록<ArrowRight/></Button></nav>}
-    </details></div></div></section>;
+  const {state} = useAppointment();
+  const plan = state.jejuHospital;
+  const chosen = publicHospital(state);
+  const source = JEJU_DATA_SOURCES[0];
+  const [query, setQuery] = useState('');
+  const filters = useRef(null);
+  const search = useRef(null);
+  const otherHospitals = useRef(null);
+  const words = query.trim().toLocaleLowerCase('ko').split(/\s+/).filter(Boolean);
+  const rows = publicHospitalCandidates(plan).filter(hospital => {
+    const text = `${hospital.companyName} ${hospital.address}`.toLocaleLowerCase('ko');
+    return words.every(word => text.includes(word));
+  });
+
+  useEffect(() => {
+    const desktop = window.matchMedia('(min-width:901px)');
+    const adaptFilters = () => { filters.current.open = desktop.matches; };
+    adaptFilters();
+    desktop.addEventListener('change', adaptFilters);
+    return () => desktop.removeEventListener('change', adaptFilters);
+  }, []);
+
+  function updateQuery(value) {
+    setQuery(value);
+    if (otherHospitals.current) otherHospitals.current.open = true;
+  }
+
+  function clearQuery() {
+    updateQuery('');
+    search.current?.focus();
+  }
+
+  const results = (
+    <>
+      <header className="hospital-directory-heading">
+        <h3>병원 목록 <span role="status" aria-label={`검색 결과 ${rows.length}곳`}>{rows.length}곳</span></h3>
+        <span>병원명을 눌러 선택하세요</span>
+      </header>
+      <div className="public-hospital-list">
+        {rows.map(h => <HospitalDirectoryRow key={h.id} hospital={h} selected={h.id === plan.hospitalId}/>)}
+      </div>
+      {!rows.length && <div className="appointment-empty">
+        <strong>조건에 맞는 등록 병원이 없어요</strong>
+        <p>해당 지역에 병원이 없다는 뜻은 아니에요. 검색어나 필터를 바꿔 보세요.</p>
+        {query && <Button type="button" variant="link" onClick={clearQuery}>검색어 지우기</Button>}
+        {plan.area && <Action action="public_area" value="" variant="link">제주 전체로 보기</Action>}
+        {plan.department && <Action action="public_department" value="" variant="link">모든 등록 진료과 보기</Action>}
+      </div>}
+    </>
+  );
+
+  return (
+    <section className="public-hospital-finder" aria-label="제주 공개자료 병원 찾기">
+      <div className="hospital-finder-layout">
+        <div className="hospital-find-controls">
+          <div className="hospital-search">
+            <label htmlFor="public-hospital-search">병원명·주소 검색</label>
+            <div><Search aria-hidden="true"/>
+              <input ref={search} id="public-hospital-search" type="search" value={query}
+                onChange={event => updateQuery(event.target.value)} placeholder="제주우리병원, 한림, 서광로" autoComplete="off"/>
+              {query && <Button type="button" variant="ghost" aria-label="병원 검색어 지우기" onClick={clearQuery}><X aria-hidden="true"/></Button>}
+            </div>
+          </div>
+          <details ref={filters} className="compact-disclosure hospital-directory-filters">
+            <summary>지역·등록 진료과로 좁히기</summary>
+            <div className="appointment-filters">
+              <PublicSelect id="public-hospital-area" label="병원 지역" action="public_area" value={plan.area} options={JEJU_DATA_AREAS} all="제주 전체"/>
+              <PublicSelect id="public-hospital-department" label="등록 진료과" action="public_department" value={plan.department} options={JEJU_REGISTERED_DEPARTMENTS} all="등록 진료과 전체"/>
+            </div>
+          </details>
+          <div className="hospital-directory-source"><Note>공개 표본 {source.count}곳 · 수집 {source.asOf}<br/>현재 운영 여부와 빈자리는 병원에 확인해 주세요.</Note><JejuSourceDetails/></div>
+        </div>
+        <div className="hospital-find-results">
+          {chosen ? <>
+            <section className="public-chosen-hospital" aria-label="선택한 병원·진료과">
+              <p><Check aria-hidden="true"/><strong>{chosen.companyName}</strong> 선택</p>
+              <p className="public-address">{chosen.address}</p>
+              {chosen.departments.length ? <>
+                <PublicSelect id="public-visit-department" label="이제 진료받을 과를 선택하세요" action="public_visit_department" value={plan.visitDepartment} options={chosen.departments}/>
+                <Note>진료과를 고른 뒤 아래 ‘다음: 의료진·시간’을 눌러 주세요.</Note>
+              </> : <>
+                <Note>이 병원의 진료과는 공개 자료에 실려 있지 않아요. 공식 창구에 문의하거나 아래에서 다른 병원을 찾으세요.</Note>
+                <a id="public-visit-department" className="public-official-search" href={`https://search.naver.com/search.naver?query=${encodeURIComponent(chosen.companyName+' 공식 홈페이지 진료과')}`} target="_blank" rel="noreferrer">병원 공식 창구 검색<ExternalLink aria-hidden="true"/></a>
+              </>}
+            </section>
+            <details key={chosen.id} ref={otherHospitals} className="public-candidates compact-disclosure">
+              <summary>다른 병원 찾아보기</summary>{results}
+            </details>
+          </> : <section className="public-candidates">{results}</section>}
+        </div>
+      </div>
+    </section>
+  );
 }
 
 function WishDay({day,modifiers,...props}) {
