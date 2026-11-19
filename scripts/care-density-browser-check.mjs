@@ -38,7 +38,10 @@ async function checkHospitalDirectory(page,width) {
   report.directory ??= [];
   report.directory.push({width,rows:ids.length,...geometry});
   check(width+' 병원 목록 가로 넘침 없음',geometry.overflow<=1);
-  if (width===390) check('390px에서 병원·상세 터치 영역은 모두 44px 이상',Number.isFinite(geometry.smallestTouchHeight) && geometry.smallestTouchHeight>=44);
+  if (width===390) {
+    check('390×844에서 첫 스크롤 전 병원 두 곳 이상 온전히 표시',geometry.fullyVisible>=2);
+    check('390px에서 병원·상세 터치 영역은 모두 44px 이상',Number.isFinite(geometry.smallestTouchHeight) && geometry.smallestTouchHeight>=44);
+  }
   if (width===1280) {
     check('1280×720에서 첫 스크롤 전 병원 다섯 곳 이상 온전히 표시',geometry.fullyVisible>=5);
     check('1280×720에서 접힌 13행의 이름·주소를 같은 줄에 표시',geometry.singleLine===13);
